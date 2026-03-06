@@ -1,0 +1,38 @@
+{
+  "cookies": [
+    {
+      "name": "ci_session",
+      "value": "2jum1sjlodip4sfcfmjt0rnml4rq14m2",
+      "domain": "effi.com.co",
+      "path": "/",
+      "expires": 1772800747.444552,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://effi.com.co",
+      "localStorage": [
+        {
+          "name": "NRBA_SESSION",
+          "value": "{\"value\":\"3e7c5d5e903f1dac\",\"inactiveAt\":1772766546237,\"expiresAt\":1772779146237,\"updatedAt\":1772764746905,\"sessionReplayMode\":0,\"sessionReplaySentFirstChunk\":false,\"sessionTraceMode\":0,\"traceHarvestStarted\":false,\"loggingMode\":0,\"logApiMode\":0,\"serverTimeDiff\":5,\"custom\":{},\"numOfResets\":0,\"consent\":false}"
+        },
+        {
+          "name": "pusherTransportTLS",
+          "value": "{\"timestamp\":1772764747379,\"transport\":\"ws\",\"latency\":301}"
+        }
+      ]
+    },
+    {
+      "origin": "https://www.google.com",
+      "localStorage": [
+        {
+          "name": "rc::a",
+          "value": "MWg4Y3RjOXIxeXp2Zg=="
+        }
+      ]
+    }
+  ]
+}
