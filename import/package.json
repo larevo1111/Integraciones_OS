@@ -1,0 +1,15 @@
+{
+  "name": "effi-import",
+  "version": "1.0.0",
+  "description": "Importa exports de Effi a MariaDB effi_data",
+  "main": "import_all.js",
+  "scripts": {
+    "import": "node import_all.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "iconv-lite": "^0.6.3",
+    "mysql2": "^3.9.0",
+    "xlsx": "^0.18.5"
+  }
+}
