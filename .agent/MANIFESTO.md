@@ -25,5 +25,6 @@
 ## 5. Estructura de Memoria
 - `.agent/MANIFESTO.md`: Visión y reglas.
 - `.agent/CONTEXTO_ACTIVO.md`: Estado actual.
+- `.agent/docs/`: Informes y documentación externa (.docx, etc).
 - `.agent/skills/`: Conocimiento especializado.
 - `.agent/workflows/`: Guías de ejecución paso a paso.
