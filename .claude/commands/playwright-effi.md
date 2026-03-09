@@ -70,7 +70,9 @@ const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/B
 | Parámetro | Efecto | Usar para |
 |---|---|---|
 | `?sucursal=1` | Todos los registros históricos de todas las sucursales | **Preferir siempre** |
-| `?vigente=1` | Solo registros actualmente activos/abiertos | Solo si el módulo lo requiere (ej. facturas_venta) |
+| `?vigente=1` | Solo registros actualmente activos/abiertos | Solo si el módulo lo requiere |
+
+**Excepciones confirmadas con `?vigente=1`:** `facturas_venta` (decisión explícita del usuario — solo facturas vigentes).
 
 **Si un export trae menos registros de lo esperado:** cambiar a `?sucursal=1` como primer diagnóstico.
 
@@ -269,6 +271,23 @@ const total = await page.evaluate(() => {
 // inventario        → #form_excel           / botón: #btnValidarExcel
 // remisiones_venta  → #form_excel_conceptos / botón: #btnValidarExcelConceptos
 ```
+
+---
+
+## Paths especiales de producción
+
+Los scripts de producción guardan en subdirectorios no estándar bajo `/exports/produccion/`:
+
+| Script | Path de salida | Nombre de archivo |
+|---|---|---|
+| `export_produccion_encabezados.js` | `/exports/produccion/encabezados_prod/` | `produccion_encabezados_FECHA.xlsx` |
+| `export_produccion_reportes.js` | `/exports/produccion/{carpeta}/` | `{carpeta}_FECHA.xlsx` |
+
+`import_all.js` escanea recursivamente, así que todos estos archivos se importan correctamente.
+El nombre de la tabla se deriva del nombre de archivo sin la fecha (`produccion_encabezados`, `materiales`, `articulos_producidos`, etc.).
+
+> **Nota:** el archivo debe llamarse `produccion_encabezados_*.xlsx` (no solo `encabezados_*.xlsx`)
+> para que la tabla en MariaDB tenga nombre descriptivo.
 
 ---
 
