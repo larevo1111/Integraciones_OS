@@ -1,4 +1,5 @@
-const { getPage } = require('./session');
+const { getPage }     = require('./session');
+const { contarFilas } = require('./utils');
 
 const reportes = [
   { texto: 'Reporte de materiales',               carpeta: 'materiales' },
@@ -24,7 +25,7 @@ const reportes = [
 
       const filePath = `/exports/produccion/${reporte.carpeta}/${reporte.carpeta}_${fecha}.xlsx`;
       await download.saveAs(filePath);
-      console.log(`✅ ${reporte.texto}: ${filePath}`);
+      console.log(`✅ ${reporte.texto}: ${filePath} (${contarFilas(filePath)} filas)`);
 
     } catch (err) {
       console.error(`❌ Error en ${reporte.texto}:`, err.message);

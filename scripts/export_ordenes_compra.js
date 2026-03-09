@@ -1,4 +1,5 @@
-const { getPage } = require('./session');
+const { getPage }     = require('./session');
+const { contarFilas } = require('./utils');
 const path = require('path');
 const fs = require('fs');
 
@@ -26,7 +27,7 @@ const fecha      = new Date().toISOString().slice(0, 10);
       page.click('text=Exportar a excel'),
     ]);
     await dl1.saveAs(fileEncabezados);
-    console.log(`✅ Exportado: ${fileEncabezados}`);
+    console.log(`✅ Exportado: ${fileEncabezados} (${contarFilas(fileEncabezados)} filas)`);
 
     // --- 2. Reporte de conceptos (detalle) ---
     await page.click('text=Reportes y análisis de datos');
@@ -39,7 +40,7 @@ const fecha      = new Date().toISOString().slice(0, 10);
       page.click('text=Reporte de conceptos'),
     ]);
     await dl2.saveAs(fileDetalle);
-    console.log(`✅ Exportado: ${fileDetalle}`);
+    console.log(`✅ Exportado: ${fileDetalle} (${contarFilas(fileDetalle)} filas)`);
 
   } catch (err) {
     console.error('❌ Error:', err.message);

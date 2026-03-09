@@ -5,9 +5,10 @@
  * Ruta de salida: /exports/inventario/inventario_YYYY-MM-DD.xlsx
  */
 
-const { chromium } = require('playwright');
+const { chromium }    = require('playwright');
+const { contarFilas } = require('./utils');
 const path = require('path');
-const fs = require('fs');
+const fs   = require('fs');
 
 const SESSION_FILE = '/scripts/session.json';
 const EXPORT_DIR   = '/exports/inventario';
@@ -124,7 +125,7 @@ const EFFI_URL     = 'https://effi.com.co/app/articulo';
     }).on('error', reject);
   });
 
-  console.log(`✅ Guardado: ${rutaDestino}`);
+  console.log(`✅ Exportado: ${rutaDestino} (${contarFilas(rutaDestino)} filas)`);
 
   await browser.close();
   process.exit(0);

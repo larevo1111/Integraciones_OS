@@ -1,4 +1,5 @@
-const { getPage } = require('./session');
+const { getPage }     = require('./session');
+const { contarFilas } = require('./utils');
 const path = require('path');
 const fs = require('fs');
 
@@ -25,7 +26,7 @@ const EFFI_URL   = 'https://effi.com.co/app/bodega';
     ]);
 
     await download.saveAs(filePath);
-    console.log(`✅ Exportado: ${filePath}`);
+    console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 
   } catch (err) {
     console.error('❌ Error:', err.message);

@@ -1,8 +1,9 @@
-const { getPage } = require('./session');
+const { getPage }     = require('./session');
+const { contarFilas } = require('./utils');
 const path = require('path');
-const fs = require('fs');
+const fs   = require('fs');
 const https = require('https');
-const http = require('http');
+const http  = require('http');
 
 const EXPORT_DIR = '/exports/guias_transporte';
 const EFFI_URL   = 'https://effi.com.co/app/guia_transporte';
@@ -19,6 +20,20 @@ const fecha      = new Date().toISOString().slice(0, 10);
     console.log('🔄 Navegando a Guías de transporte...');
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForSelector('text=Exportar a excel', { timeout: 15000 });
+
+    // Verificar si hay registros antes de intentar exportar
+    const sinRegistros = await page.evaluate(() => {
+      const texto = document.body.innerText;
+      return texto.includes('0 guías de transporte encontradas') ||
+             texto.includes('No hay registros para exportar');
+    });
+
+    if (sinRegistros) {
+      console.log('⚠️  Sin registros en Guías de transporte — omitido (0 filas)');
+      await browser.close();
+      process.exit(0);
+    }
+
     await page.click('text=Exportar a excel');
 
     console.log('⏳ Esperando modal...');
@@ -85,7 +100,7 @@ const fecha      = new Date().toISOString().slice(0, 10);
       }).on('error', reject);
     });
 
-    console.log(`✅ Exportado: ${filePath}`);
+    console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 
   } catch (err) {
     console.error('❌ Error:', err.message);

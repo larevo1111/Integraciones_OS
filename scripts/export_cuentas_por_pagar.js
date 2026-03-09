@@ -1,4 +1,5 @@
-const { getPage } = require('./session');
+const { getPage }     = require('./session');
+const { contarFilas } = require('./utils');
 const path = require('path');
 const fs = require('fs');
 
@@ -25,7 +26,7 @@ const fecha      = new Date().toISOString().slice(0, 10);
       page.click('text=Exportar a excel'),
     ]);
     await download.saveAs(filePath);
-    console.log(`✅ Exportado: ${filePath}`);
+    console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 
   } catch (err) {
     console.error('❌ Error:', err.message);

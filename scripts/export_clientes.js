@@ -1,4 +1,5 @@
-const { getPage } = require('./session');
+const { getPage }     = require('./session');
+const { contarFilas } = require('./utils');
 const path = require('path');
 
 (async () => {
@@ -15,7 +16,7 @@ const path = require('path');
 
     const filePath = `/exports/clientes/clientes_${new Date().toISOString().slice(0,10)}.xlsx`;
     await download.saveAs(filePath);
-    console.log(`✅ Exportado: ${filePath}`);
+    console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 
   } catch (err) {
     console.error('❌ Error:', err.message);
