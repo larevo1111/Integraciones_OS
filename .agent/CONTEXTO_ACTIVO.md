@@ -39,10 +39,15 @@ Pipeline Effi → MariaDB funcional. NocoDB conectado a effi_data y espocrm. Esp
 - MariaDB corre en el **host** (systemd), NO en Docker
 - Bot Telegram: contenedor `bot_telegram` (ya existía)
 
+## Orquestador Python (activo desde 2026-03-08)
+- `scripts/orquestador.py` — pipeline completo cada 2h vía systemd
+- Credenciales en `scripts/.env` (Gmail + Telegram bot `@os_integraciones_bot`)
+- Notificaciones: email siempre + Telegram en error
+- Test: `python3 scripts/orquestador.py --forzar`
+
 ## Próximos Pasos
-1. **Orquestador Python**: reemplazar n8n para el pipeline Effi con script Python + cron
-2. **Vistas SQL en MariaDB**: JOINs entre tablas effi_data para NocoDB y Grafana
-3. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
+1. **Vistas SQL en MariaDB**: JOINs entre tablas effi_data para NocoDB y Grafana
+2. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`

@@ -21,7 +21,24 @@
 - **Sincronización**: Documentar aprendizajes en memoria y contexto activo al final de cada sesión.
 - **Solo Español**: Comunicación 100% en Español con el equipo humano.
 
-## 4. Reglas Técnicas Aprendidas
+## 4. Orquestador Python (effi-pipeline)
+- **Script**: `scripts/orquestador.py` — corre export + import cada 2h (Lun–Sab, 06:00–20:00).
+- **Credenciales**: `scripts/.env` — **NUNCA subir a Git** (está en .gitignore).
+  ```
+  GMAIL_USER=larevo1111@gmail.com
+  GMAIL_APP_PASSWORD=<app password de 16 chars — generar en myaccount.google.com → Seguridad → Contraseñas de aplicaciones>
+  EMAIL_DESTINO=larevo1111@gmail.com
+  TELEGRAM_BOT_TOKEN=<token de @BotFather>
+  TELEGRAM_CHAT_ID=<ID numérico — obtener vía api.telegram.org/bot<TOKEN>/getUpdates>
+  ```
+- **Notificaciones**: email siempre + Telegram solo en error.
+- **Systemd**: `systemd/effi-pipeline.service` + `.timer` — instalados en `/etc/systemd/system/`.
+  - Activar: `sudo systemctl enable --now effi-pipeline.timer`
+  - Estado: `systemctl status effi-pipeline.timer`
+  - Log: `journalctl -u effi-pipeline -f` o `logs/pipeline.log`
+  - Test manual (forzar fuera de horario): `python3 scripts/orquestador.py --forzar`
+
+## 5. Reglas Técnicas Aprendidas
 - **NocoDB**: tablas externas son solo lectura — relaciones entre tablas externas NO funcionan. Usar vistas SQL en MariaDB para JOINs.
 - **NocoDB Button field**: existe en v0.301.3 pero NO aparece en búsqueda — scrollear manualmente en la lista de tipos de campo.
 - **NocoDB conexión a MariaDB**: usar IP `172.18.0.1` (gateway de la red Docker de NocoDB), NO `host.docker.internal` (no resuelve en ese contenedor).
@@ -29,14 +46,23 @@
 - **Cloudflare Tunnel**: configuración en `/etc/cloudflared/config.yml`. Agregar hostname + reiniciar servicio + agregar CNAME en Cloudflare DNS.
 - **Vistas SQL cross-BD**: MariaDB permite JOINs entre `effi_data.*` y `espocrm.*` en la misma instancia. Crear vistas en `effi_data` para que NocoDB las detecte automáticamente.
 
-## 5. Diccionario de Negocio
+## 6. Diccionario de Negocio
 - Nomenclatura en Español (coherente con ERP Effi).
 - Clientes Effi → `tipo_de_persona` distingue empresa/persona natural.
 - Campo de enlace clave: `clientes.numero_de_identificacion` ↔ `facturas_venta_encabezados.id_cliente`.
 
-## 6. Estructura de Memoria
+## 7. Estructura de Memoria
 - `.agent/MANIFESTO.md`: Visión, reglas y aprendizajes técnicos.
 - `.agent/CONTEXTO_ACTIVO.md`: Estado actual y próximos pasos.
+- `.agent/CATALOGO_SCRIPTS.md`: **Catálogo completo de todos los scripts** — propósito, ejecución manual, salidas, tablas MariaDB, notas. **Actualizar obligatoriamente al crear o modificar cualquier script.**
 - `.agent/docs/`: Informes y documentación externa (.docx, etc).
 - `.agent/skills/`: Conocimiento especializado.
 - `.agent/workflows/`: Guías de ejecución paso a paso.
+
+## 8. Protocolo de documentación de scripts
+Al crear un script nuevo, agregar entrada en `.agent/CATALOGO_SCRIPTS.md` con:
+- Propósito (1 línea)
+- Comando de ejecución manual exacto
+- Archivos que genera / tablas que modifica
+- Dependencias (otros scripts, credenciales, servicios)
+- Comportamientos especiales o errores conocidos
