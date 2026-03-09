@@ -1,0 +1,22 @@
+[Unit]
+Description=Pipeline Effi → MariaDB (export + import)
+After=network.target mariadb.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=osserver
+WorkingDirectory=/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts
+ExecStart=/usr/bin/python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/orquestador.py
+# Reintentar si falla (max 3 veces con 2 min de espera)
+Restart=on-failure
+RestartSec=120
+StartLimitIntervalSec=600
+StartLimitBurst=3
+# Log a journald (además del log propio)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=effi-pipeline
+
+[Install]
+WantedBy=multi-user.target
