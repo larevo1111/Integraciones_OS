@@ -106,8 +106,9 @@ function findLatestFiles(dir) {
       } else if (entry.name.endsWith('.xlsx')) {
         const tableName = entry.name.replace(/_\d{4}-\d{2}-\d{2}\.xlsx$/, '');
         if (SKIP_TABLES.includes(tableName)) continue;
-        if (!map[tableName] || entry.name > map[tableName].name) {
-          map[tableName] = { filePath: full, name: entry.name };
+        const mtime = fs.statSync(full).mtimeMs;
+        if (!map[tableName] || mtime > map[tableName].mtime) {
+          map[tableName] = { filePath: full, name: entry.name, mtime };
         }
       }
     }
