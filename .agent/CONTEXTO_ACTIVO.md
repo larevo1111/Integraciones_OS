@@ -6,16 +6,10 @@ Pipeline Effi → MariaDB funcional. NocoDB conectado a effi_data y espocrm. Esp
 ## Lo que está funcionando
 
 ### Pipeline de datos Effi
-- **24 scripts Playwright** (antes 21) exportan módulos de Effi a `/home/osserver/playwright/exports/`
-- **import_all.js** importa tablas a MariaDB `effi_data` (TRUNCATE + INSERT)
+- **26 scripts Playwright** exportan módulos de Effi a `/home/osserver/playwright/exports/`
+- **import_all.js** importa **39 tablas** a MariaDB `effi_data` (TRUNCATE + INSERT, host: `127.0.0.1`)
 - **n8n workflow activo**: corre cada 2 horas + trigger manual + webhook
   - Webhook URL: `https://n8n.oscomunidad.com/webhook/fa393bcf-8eb3-4b14-80bc-bfda8ca42765`
-- **Scripts nuevos agregados**:
-  - `export_proveedores.js` → `/exports/proveedores/`
-  - `export_categorias_articulos.js` → `/exports/categorias_articulos/`
-  - `export_costos_produccion.js` → `/exports/costos_produccion/`
-  - `export_tipos_egresos.js` → `/exports/tipos_egresos/`
-  - `export_tipos_marketing.js` → `/exports/tipos_marketing/`
 
 ### Playwright — migrado al host
 - **Ya NO corre en Docker** — corre directamente en el host
@@ -47,10 +41,8 @@ Pipeline Effi → MariaDB funcional. NocoDB conectado a effi_data y espocrm. Esp
 
 ## Próximos Pasos
 1. **Orquestador Python**: reemplazar n8n para el pipeline Effi con script Python + cron
-2. **import_all.js**: agregar las 5 tablas nuevas (proveedores, categorias, costos, tipos_egresos, tipos_marketing)
-3. **export_all.sh**: agregar los 5 scripts nuevos al listado
-4. **Vistas SQL en MariaDB**: JOINs entre tablas effi_data para NocoDB y Grafana
-5. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
+2. **Vistas SQL en MariaDB**: JOINs entre tablas effi_data para NocoDB y Grafana
+3. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`

@@ -6,11 +6,13 @@
 
 SCRIPTS=(
   export_clientes
+  export_proveedores
   export_bodegas
   export_inventario
   export_trazabilidad
   export_ajustes_inventario
   export_traslados_inventario
+  export_categorias_articulos
   export_ordenes_compra
   export_facturas_compra
   export_remisiones_compra
@@ -26,6 +28,9 @@ SCRIPTS=(
   export_guias_transporte
   export_produccion_encabezados
   export_produccion_reportes
+  export_costos_produccion
+  export_tipos_egresos
+  export_tipos_marketing
 )
 
 OK=0

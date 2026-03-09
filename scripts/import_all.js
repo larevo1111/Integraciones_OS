@@ -15,7 +15,7 @@ const path    = require('path');
 const EXPORTS_DIR = '/exports';
 
 const DB = {
-  host:     'host.docker.internal',
+  host:     '127.0.0.1',
   port:     3306,
   user:     'osadmin',
   password: 'Epist2487.',
