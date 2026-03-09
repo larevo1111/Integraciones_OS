@@ -4,27 +4,39 @@
 - **Ejecutores**: Claude Code / Codex (Construcción técnica).
 
 ## 2. Contexto del Proyecto: Integraciones_OS
-- **Propósito**: Centralizar y automatizar los datos de Effi, EspoCRM y otras fuentes en una base de datos maestra (MariaDB) para análisis avanzado.
+- **Propósito**: Centralizar y automatizar los datos de Effi, EspoCRM y otras fuentes en una base de datos maestra (MariaDB) para análisis avanzado y gestión operativa.
 - **Cerebro**: n8n (orquestación de flujos).
-- **Persistencia**: MariaDB (local en Docker) gestionado visualmente con NocoDB.
+- **Persistencia**: MariaDB local — BD `effi_data` (Effi), `espocrm` (CRM), `nocodb_meta` (NocoDB).
+- **Visualización operativa**: NocoDB (tablas externas + vistas SQL de MariaDB).
+- **Visualización analítica**: Grafana (dashboards con vistas SQL).
 - **Fuentes**: Effi (vía Playwright) y EspoCRM.
-- **Visualización**: Looker Studio y Metabase.
-- **Infraestructura**: Entorno Docker con Nextcloud, NocoDB, n8n, Playwright, Gitea y MariaDB.
+- **Infraestructura**: Docker — NocoDB, n8n, EspoCRM, Playwright, Nextcloud, Gitea, MinIO, Grafana, Portainer, phpMyAdmin.
+- **Acceso público**: Cloudflare Tunnel → dominios `*.oscomunidad.com`.
 
 ## 3. Protocolo de Gobernanza (5S)
 - **Salami Slicing**: Dividir tareas en pasos pequeños y manejables.
-- **Sin Suposiciones**: Preguntar ante la duda. NUNCA investigar archivos del sistema o BD sin permiso.
+- **Sin Suposiciones**: Preguntar ante la duda. NUNCA asumir columnas, relaciones o comportamientos sin verificar en la BD.
 - **Espera Activa**: Solo actuar tras instrucción directa de ejecución.
-- **Seguridad Primero**: No tocar producción. En local, permiso previo para inspecciones.
-- **Sincronización**: Documentar aprendizajes en Skills.
-- **Solo Español**: Comunicación 100% en Español para humanos.
+- **Seguridad Primero**: No tocar producción. Confirmar antes de modificar docker-compose, cloudflared o MariaDB.
+- **Sincronización**: Documentar aprendizajes en memoria y contexto activo al final de cada sesión.
+- **Solo Español**: Comunicación 100% en Español con el equipo humano.
 
-## 4. Diccionario de Negocio
-- Nomenclatura en Español (coherente con ERP).
+## 4. Reglas Técnicas Aprendidas
+- **NocoDB**: tablas externas son solo lectura — relaciones entre tablas externas NO funcionan. Usar vistas SQL en MariaDB para JOINs.
+- **NocoDB Button field**: existe en v0.301.3 pero NO aparece en búsqueda — scrollear manualmente en la lista de tipos de campo.
+- **NocoDB conexión a MariaDB**: usar IP `172.18.0.1` (gateway de la red Docker de NocoDB), NO `host.docker.internal` (no resuelve en ese contenedor).
+- **MariaDB permisos Docker**: `osadmin@%` no funciona desde contenedores Docker — crear grants explícitos para `osadmin@172.18.0.%`.
+- **Cloudflare Tunnel**: configuración en `/etc/cloudflared/config.yml`. Agregar hostname + reiniciar servicio + agregar CNAME en Cloudflare DNS.
+- **Vistas SQL cross-BD**: MariaDB permite JOINs entre `effi_data.*` y `espocrm.*` en la misma instancia. Crear vistas en `effi_data` para que NocoDB las detecte automáticamente.
 
-## 5. Estructura de Memoria
-- `.agent/MANIFESTO.md`: Visión y reglas.
-- `.agent/CONTEXTO_ACTIVO.md`: Estado actual.
+## 5. Diccionario de Negocio
+- Nomenclatura en Español (coherente con ERP Effi).
+- Clientes Effi → `tipo_de_persona` distingue empresa/persona natural.
+- Campo de enlace clave: `clientes.numero_de_identificacion` ↔ `facturas_venta_encabezados.id_cliente`.
+
+## 6. Estructura de Memoria
+- `.agent/MANIFESTO.md`: Visión, reglas y aprendizajes técnicos.
+- `.agent/CONTEXTO_ACTIVO.md`: Estado actual y próximos pasos.
 - `.agent/docs/`: Informes y documentación externa (.docx, etc).
 - `.agent/skills/`: Conocimiento especializado.
 - `.agent/workflows/`: Guías de ejecución paso a paso.

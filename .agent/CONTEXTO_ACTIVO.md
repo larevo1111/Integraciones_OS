@@ -1,32 +1,59 @@
 # Contexto Activo - Integraciones_OS
 
-## Estado Actual (2026-03-06)
-Pipeline Effi → MariaDB completamente funcional y automatizado.
+## Estado Actual (2026-03-09)
+Pipeline Effi → MariaDB funcional. NocoDB conectado a effi_data y espocrm. EspoCRM instalado. Playwright migrado al host.
 
 ## Lo que está funcionando
 
 ### Pipeline de datos Effi
-- **21 scripts Playwright** exportan todos los módulos de Effi a `/home/osserver/playwright/exports/`
-- **import_all.js** importa 34 tablas a MariaDB `effi_data` (TRUNCATE + INSERT)
-- **n8n workflow activo**: corre cada 2 horas automáticamente + trigger manual
-  - Nodo 1: `docker exec playwright bash /repo/scripts/export_all.sh`
-  - Nodo 2: `docker exec playwright node /repo/scripts/import_all.js`
+- **24 scripts Playwright** (antes 21) exportan módulos de Effi a `/home/osserver/playwright/exports/`
+- **import_all.js** importa tablas a MariaDB `effi_data` (TRUNCATE + INSERT)
+- **n8n workflow activo**: corre cada 2 horas + trigger manual + webhook
+  - Webhook URL: `https://n8n.oscomunidad.com/webhook/fa393bcf-8eb3-4b14-80bc-bfda8ca42765`
+- **Scripts nuevos agregados**:
+  - `export_proveedores.js` → `/exports/proveedores/`
+  - `export_categorias_articulos.js` → `/exports/categorias_articulos/`
+  - `export_costos_produccion.js` → `/exports/costos_produccion/`
+  - `export_tipos_egresos.js` → `/exports/tipos_egresos/`
+  - `export_tipos_marketing.js` → `/exports/tipos_marketing/`
 
-### Infraestructura
-- `playwright`: imagen v1.49.1-jammy (v1.49.1 requerida por kernel 6.17)
-- `n8n`: tiene docker CLI y acceso al socket para ejecutar comandos
-- SSH server instalado en host (puerto 22) para conexión desde n8n
-- MariaDB: BD `effi_data` con 34 tablas, BD `nocodb_meta` para NocoDB
+### Playwright — migrado al host
+- **Ya NO corre en Docker** — corre directamente en el host
+- Node.js v24.14.0 + Playwright v1.49.1 + Chromium instalados en host
+- Symlinks creados para compatibilidad con rutas Docker:
+  - `/exports` → `/home/osserver/playwright/exports`
+  - `/scripts` → `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts`
+  - `/repo/scripts` → `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts`
+- Contenedor `playwright` eliminado del docker-compose
+
+### NocoDB (nocodb.oscomunidad.com)
+- Proyecto: **Origen Silvestre Integrado**
+- Fuente externa `effi_data` conectada vía `172.18.0.1:3306`
+- Fuente externa `espocrm` conectada vía `172.18.0.1:3306`
+- Tabla nativa `Control` con botón "Actualizar Effi" → webhook n8n
+- Grant MariaDB: `osadmin@172.18.0.%` para acceso desde contenedores Docker
+
+### EspoCRM (crm.oscomunidad.com)
+- Contenedor: `espocrm` — puerto 8083
+- BD: `espocrm` en MariaDB local
+- Admin: `admin` / `Epist2487.`
+- DNS CNAME configurado en Cloudflare
+
+### Infraestructura Docker
+- `/home/osserver/docker/docker-compose.yml`
+- Cloudflare Tunnel: `/etc/cloudflared/config.yml`
+- MariaDB corre en el **host** (systemd), NO en Docker
+- Bot Telegram: contenedor `bot_telegram` (ya existía)
 
 ## Próximos Pasos
-1. **Webhook en n8n**: agregar tercer trigger Webhook para llamarlo desde NocoDB
-2. **NocoDB**: conectar BD `effi_data` como External Data Source
-3. **Botón NocoDB**: crear botón que llame el webhook de n8n para trigger manual
-4. Crear vistas/dashboards en NocoDB sobre los datos de Effi
+1. **Orquestador Python**: reemplazar n8n para el pipeline Effi con script Python + cron
+2. **import_all.js**: agregar las 5 tablas nuevas (proveedores, categorias, costos, tipos_egresos, tipos_marketing)
+3. **export_all.sh**: agregar los 5 scripts nuevos al listado
+4. **Vistas SQL en MariaDB**: JOINs entre tablas effi_data para NocoDB y Grafana
+5. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
 
 ## Archivos Clave
-- Scripts export: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
-- Script maestro export: `scripts/export_all.sh`
-- Script import: `scripts/import_all.js`
+- Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
+- Exports: `/home/osserver/playwright/exports/`
 - Docker compose: `/home/osserver/docker/docker-compose.yml`
-- Session Effi: `scripts/session.js` (credenciales Effi, session.json)
+- Cloudflare tunnel: `/etc/cloudflared/config.yml`
