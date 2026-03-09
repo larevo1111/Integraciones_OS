@@ -13,3 +13,42 @@
 2026-03-08 20:22:30  WARNING   📧 Email no configurado en .env — omitiendo.
 2026-03-08 20:22:30  WARNING   📱 Telegram no configurado en .env — omitiendo.
 2026-03-08 20:26:52  INFO      ⏸  Omitido: domingo
+2026-03-08 21:32:05  INFO      ⚡ Ejecución forzada (fuera de horario: domingo)
+2026-03-08 21:32:05  INFO      ============================================================
+2026-03-08 21:32:05  INFO      🚀 PIPELINE INICIO — 2026-03-08 21:32:05
+2026-03-08 21:32:05  INFO      ============================================================
+2026-03-08 21:32:05  INFO      ▶ export_all.sh ...
+2026-03-08 21:37:52  INFO         RESULTADO: ✅ 26 ok  ❌ 0 errores  [347s]
+2026-03-08 21:37:52  INFO      ▶ import_all.js ...
+2026-03-08 21:38:06  INFO         ✅ 39 tablas importadas  ❌ 0 errores  [13s]
+2026-03-08 21:38:06  INFO      🏁 FIN — ✅ EXITOSO  [total 360s]
+2026-03-08 21:38:06  INFO      ============================================================
+2026-03-08 21:38:09  INFO      📧 Email enviado → larevo1111@gmail.com
+2026-03-08 22:15:52  INFO      ⏸  Omitido: domingo
+2026-03-08 22:33:40  INFO      ⏸  Omitido: domingo
+2026-03-08 22:38:29  INFO      ⏸  Omitido: domingo
+2026-03-09 00:38:29  INFO      ⏸  Omitido: fuera de horario (00:38)
+2026-03-09 02:38:29  INFO      ⏸  Omitido: fuera de horario (02:38)
+2026-03-09 04:38:30  INFO      ⏸  Omitido: fuera de horario (04:38)
+2026-03-09 06:38:30  INFO      ============================================================
+2026-03-09 06:38:30  INFO      🚀 PIPELINE INICIO — 2026-03-09 06:38:30
+2026-03-09 06:38:30  INFO      ============================================================
+2026-03-09 06:38:30  INFO      ▶ export_all.sh ...
+2026-03-09 06:46:13  INFO         RESULTADO: ✅ 25 ok  ❌ 1 errores  [463s]
+2026-03-09 06:46:13  INFO      ▶ import_all.js ...
+2026-03-09 06:46:42  INFO         ✅ 39 tablas importadas  ❌ 0 errores  [28s]
+2026-03-09 06:46:42  INFO      🏁 FIN — ❌ CON ERRORES  [total 491s]
+2026-03-09 06:46:42  INFO      ============================================================
+2026-03-09 06:46:44  INFO      📧 Email enviado → larevo1111@gmail.com
+2026-03-09 06:46:45  INFO      📱 Telegram enviado.
+2026-03-09 08:38:30  INFO      ============================================================
+2026-03-09 08:38:30  INFO      🚀 PIPELINE INICIO — 2026-03-09 08:38:30
+2026-03-09 08:38:30  INFO      ============================================================
+2026-03-09 08:38:30  INFO      ▶ export_all.sh ...
+2026-03-09 08:47:19  INFO         RESULTADO: ✅ 24 ok  ❌ 2 errores  [528s]
+2026-03-09 08:47:19  INFO      ▶ import_all.js ...
+2026-03-09 08:47:48  INFO         ✅ 39 tablas importadas  ❌ 0 errores  [28s]
+2026-03-09 08:47:48  INFO      🏁 FIN — ❌ CON ERRORES  [total 556s]
+2026-03-09 08:47:48  INFO      ============================================================
+2026-03-09 08:47:49  INFO      📧 Email enviado → larevo1111@gmail.com
+2026-03-09 08:47:50  INFO      📱 Telegram enviado.

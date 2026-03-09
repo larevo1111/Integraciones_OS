@@ -1,10 +1,10 @@
 const { getPage }     = require('./session');
-const { contarFilas, aplicarFiltroVigente } = require('./utils');
+const { contarFilas } = require('./utils');
 const path = require('path');
 const fs = require('fs');
 
 const EXPORT_DIR = '/exports/ordenes_venta';
-const EFFI_URL   = 'https://effi.com.co/app/orden_v?vigente=1';
+const EFFI_URL   = 'https://effi.com.co/app/orden_v?sucursal=1';
 const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
 (async () => {
@@ -17,9 +17,6 @@ const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/B
   try {
     console.log('🔄 Navegando a Órdenes de venta...');
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });
-
-    // --- 0. Aplicar filtro Vigente via UI (para que Reporte de Conceptos lo herede) ---
-    await aplicarFiltroVigente(page);
 
     // --- 1. Exportar a excel (encabezados) ---
     await page.waitForSelector('text=Exportar a excel', { timeout: 15000 });
