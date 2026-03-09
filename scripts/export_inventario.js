@@ -35,7 +35,7 @@ const EFFI_URL     = 'https://effi.com.co/app/articulo';
   const context = await browser.newContext({ storageState: sessionData });
   const page = await context.newPage();
 
-  const fecha = new Date().toISOString().split('T')[0];
+  const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
   const rutaDestino = path.join(EXPORT_DIR, `inventario_${fecha}.xlsx`);
 
   console.log('� Navegando a Inventario...');

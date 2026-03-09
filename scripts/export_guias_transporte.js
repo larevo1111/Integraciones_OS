@@ -6,8 +6,8 @@ const https = require('https');
 const http  = require('http');
 
 const EXPORT_DIR = '/exports/guias_transporte';
-const EFFI_URL   = 'https://effi.com.co/app/guia_transporte';
-const fecha      = new Date().toISOString().slice(0, 10);
+const EFFI_URL   = 'https://effi.com.co/app/guia_transporte?sucursal=1';
+const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
 (async () => {
   if (!fs.existsSync(EXPORT_DIR)) {

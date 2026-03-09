@@ -1,13 +1,13 @@
 const { getPage }     = require('./session');
-const { contarFilas } = require('./utils');
+const { contarFilas, aplicarFiltroVigente } = require('./utils');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
 
 const EXPORT_DIR = '/exports/remisiones_venta';
-const EFFI_URL   = 'https://effi.com.co/app/remision_v';
-const fecha      = new Date().toISOString().slice(0, 10);
+const EFFI_URL   = 'https://effi.com.co/app/remision_v?vigente=1';
+const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
 (async () => {
   if (!fs.existsSync(EXPORT_DIR)) {
@@ -19,6 +19,9 @@ const fecha      = new Date().toISOString().slice(0, 10);
   try {
     console.log('🔄 Navegando a Remisiones de venta...');
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });
+
+    // --- 0. Aplicar filtro Vigente via UI (para que Reporte de Conceptos lo herede) ---
+    await aplicarFiltroVigente(page);
 
     // --- 1. Exportar a excel (encabezados) — descarga directa ---
     await page.waitForSelector('text=Exportar a excel', { timeout: 15000 });

@@ -9,7 +9,7 @@ const reportes = [
 ];
 
 (async () => {
-  const fecha = new Date().toISOString().slice(0,10);
+  const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
   for (const reporte of reportes) {
     const { browser, page } = await getPage();

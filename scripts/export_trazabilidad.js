@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const EXPORT_DIR = '/exports/trazabilidad';
-const EFFI_URL   = 'https://effi.com.co/app/trazabilidad_inventario';
+const EFFI_URL   = 'https://effi.com.co/app/trazabilidad_inventario?sucursal=1';
 
 (async () => {
   if (!fs.existsSync(EXPORT_DIR)) {
@@ -18,7 +18,7 @@ const EFFI_URL   = 'https://effi.com.co/app/trazabilidad_inventario';
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForSelector('text=Exportar a excel', { timeout: 15000 });
 
-    const filePath = path.join(EXPORT_DIR, `trazabilidad_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const filePath = path.join(EXPORT_DIR, `trazabilidad_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })}.xlsx`);
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),

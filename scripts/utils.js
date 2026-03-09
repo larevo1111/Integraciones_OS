@@ -24,4 +24,35 @@ function contarFilas(filePath) {
   }
 }
 
-module.exports = { contarFilas };
+/**
+ * Aplica el filtro "Vigente" explícitamente a través de la UI de filtros de Effi.
+ * Necesario para que "Reporte de conceptos" use el filtro correcto (el servidor
+ * usa el filtro activo de sesión, no el parámetro ?vigente=1 de la URL).
+ */
+async function aplicarFiltroVigente(page) {
+  // Abrir panel de filtros (tab "Filtros de búsqueda")
+  await page.click('a:has-text("Filtros de búsqueda"), button:has-text("Filtros de búsqueda")', { timeout: 5000 });
+  await page.waitForTimeout(600);
+
+  // Seleccionar "Vigente" en el dropdown Vigencia via jQuery/Select2 (Effi usa jQuery)
+  await page.evaluate(() => {
+    const selects = Array.from(document.querySelectorAll('select'));
+    for (const sel of selects) {
+      const vigenteOpt = Array.from(sel.options).find(o => o.text.trim() === 'Vigente');
+      if (vigenteOpt) {
+        sel.value = vigenteOpt.value;
+        // Notificar a Select2 (Effi usa jQuery + Select2)
+        if (typeof $ !== 'undefined') $(sel).trigger('change');
+        else sel.dispatchEvent(new Event('change', { bubbles: true }));
+        break;
+      }
+    }
+  });
+  await page.waitForTimeout(300);
+
+  // Aplicar filtros
+  await page.click('button:has-text("Aplicar filtros")', { timeout: 5000 });
+  await page.waitForLoadState('networkidle', { timeout: 20000 });
+}
+
+module.exports = { contarFilas, aplicarFiltroVigente };

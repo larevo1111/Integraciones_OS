@@ -18,7 +18,7 @@ const EFFI_URL   = 'https://effi.com.co/app/traslado_inventario';
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForSelector('text=Exportar a excel', { timeout: 15000 });
 
-    const filePath = path.join(EXPORT_DIR, `traslados_inventario_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const filePath = path.join(EXPORT_DIR, `traslados_inventario_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })}.xlsx`);
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),

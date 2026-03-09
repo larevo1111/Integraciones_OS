@@ -14,7 +14,7 @@ const path = require('path');
       page.click('text=Exportar a excel')
     ]);
 
-    const filePath = `/exports/clientes/clientes_${new Date().toISOString().slice(0,10)}.xlsx`;
+    const filePath = `/exports/clientes/clientes_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })}.xlsx`;
     await download.saveAs(filePath);
     console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 

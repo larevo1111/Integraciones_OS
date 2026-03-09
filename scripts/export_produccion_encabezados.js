@@ -13,7 +13,7 @@ const { contarFilas } = require('./utils');
       page.click('text=Exportar a excel')
     ]);
 
-    const filePath = `/exports/produccion/encabezados_prod/encabezados_${new Date().toISOString().slice(0,10)}.xlsx`;
+    const filePath = `/exports/produccion/encabezados_prod/encabezados_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })}.xlsx`;
     await download.saveAs(filePath);
     console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 

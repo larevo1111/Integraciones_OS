@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs');
 
 const EXPORT_DIR = '/exports/notas_credito_venta';
-const EFFI_URL   = 'https://effi.com.co/app/nota_credito_v';
-const fecha      = new Date().toISOString().slice(0, 10);
+const EFFI_URL   = 'https://effi.com.co/app/nota_credito_v?vigente=1';
+const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
 (async () => {
   if (!fs.existsSync(EXPORT_DIR)) {
