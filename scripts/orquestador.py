@@ -235,22 +235,23 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s)
 
     # ── 5. Telegram (solo en error) ──────────────────────────────
     if hay_error:
-        todos_errores: list[str] = list(errores_exp)
-        for linea in salida_imp.splitlines():
-            if '❌' in linea:
-                todos_errores.append(linea.strip())
+        partes = [f'<b>⚠️ Pipeline Effi — ERROR</b>', f'📅 {ahora}']
 
-        LIMITE  = 15
-        detalle = '\n'.join(itertools.islice(todos_errores, LIMITE))
-        if len(todos_errores) > LIMITE:
-            detalle += f'\n... y {len(todos_errores) - LIMITE} errores más'
+        # Scripts que fallaron definitivamente (líneas "Falló definitivamente: export_X")
+        fallidos = [l for l in errores_exp if 'Falló definitivamente' in l]
+        if fallidos:
+            partes.append('\n<b>Scripts fallidos:</b>')
+            for f in fallidos:
+                nombre = f.split(':', 1)[-1].strip()
+                partes.append(f'  • {nombre}')
 
-        msg = (
-            f'<b>⚠️ Error — Pipeline Effi</b>\n'
-            f'📅 {ahora}\n\n'
-            f'{detalle}'
-        )
-        enviar_telegram(env, msg)
+        # Import
+        if exit_imp != 0:
+            partes.append(f'\n❌ Import: {resumen_imp}')
+        else:
+            partes.append(f'\n✅ Import: {resumen_imp}')
+
+        enviar_telegram(env, '\n'.join(partes))
 
 
 if __name__ == '__main__':
