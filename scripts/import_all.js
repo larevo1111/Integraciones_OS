@@ -23,8 +23,8 @@ const DB = {
   charset:  'utf8mb4',
 };
 
-// Archivos a ignorar (nombres viejos duplicados)
-const SKIP_TABLES = ['compras_detalle', 'compras_encabezados'];
+// Archivos a ignorar
+const SKIP_TABLES = [];
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
 

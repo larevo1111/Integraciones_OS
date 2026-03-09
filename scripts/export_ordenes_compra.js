@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const EXPORT_DIR = '/exports/ordenes_compra';
-const EFFI_URL   = 'https://effi.com.co/app/orden_c?vigente=1';
+const EFFI_URL   = 'https://effi.com.co/app/orden_c?sucursal=1';
 const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
 (async () => {
