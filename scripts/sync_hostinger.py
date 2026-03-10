@@ -43,6 +43,17 @@ BATCH_SIZE = 500   # filas por INSERT
 # Tablas a excluir del sync (ninguna por ahora)
 TABLAS_EXCLUIDAS = set()
 
+# Tablas analíticas que viven SOLO en Hostinger.
+# El pipeline las calcula en local (staging temporal), el sync las copia a Hostinger,
+# y luego se eliminan de local. Fuente de verdad = Hostinger.
+TABLAS_SOLO_HOSTINGER = {
+    'resumen_ventas_facturas_mes',
+    'resumen_ventas_facturas_canal_mes',
+    'resumen_ventas_facturas_cliente_mes',
+    'resumen_ventas_facturas_producto_mes',
+    'resumen_ventas_remisiones_mes',
+}
+
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_tablas(cursor):
@@ -154,6 +165,16 @@ def main():
     cur_host.execute("SET FOREIGN_KEY_CHECKS=1")
     cur_host.execute("SET UNIQUE_CHECKS=1")
     conn_host.commit()
+
+    # ── Limpiar tablas analíticas de local (viven solo en Hostinger) ─────────
+    cur_cleanup = conn_local.cursor()
+    for t in TABLAS_SOLO_HOSTINGER:
+        try:
+            cur_cleanup.execute(f"DROP TABLE IF EXISTS `{t}`")
+        except Exception:
+            pass
+    conn_local.commit()
+    cur_cleanup.close()
 
     # ── Cerrar conexiones ─────────────────────────────────────────────────────
     cur_local.close()

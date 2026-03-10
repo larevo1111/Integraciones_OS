@@ -77,14 +77,20 @@ Al crear o modificar cualquier script de resumen, correr queries V1–V7 del ski
 - `.agent/skills/`: Conocimiento especializado.
 - `.agent/workflows/`: Guías de ejecución paso a paso.
 
-## 8. ⚠️ BASES DE DATOS HOSTINGER — PROHIBICIÓN EXPLÍCITA
+## 8. ⚠️ BASES DE DATOS HOSTINGER — REGLAS CRÍTICAS
 
-**`u768061575_os_comunidad`** es la base de datos del ERP en producción de Hostinger.
-**NUNCA tocar esta BD sin autorización explícita de Santi** — ni lectura masiva, ni escritura, ni DROP, ni ALTER.
+### BDs en Hostinger
+| BD | Propósito | Acceso permitido |
+|---|---|---|
+| `u768061575_os_comunidad` | ERP en producción | **NUNCA tocar sin autorización explícita de Santi** |
+| `u768061575_os_integracion` | Datos Effi + analíticas | Lectura/escritura por el pipeline |
 
-Para datos de effi: usar ÚNICAMENTE la BD separada asignada para ese propósito (a definir por Santi vía hPanel).
+**`u768061575_os_comunidad`** — PROHIBICIÓN ABSOLUTA: ni lectura masiva, ni escritura, ni DROP, ni ALTER sin autorización explícita. Ignorar esta regla es una falta crítica.
 
-Ignorar esta regla es una falta crítica.
+### Tablas analíticas — viven SOLO en Hostinger
+Las tablas `resumen_ventas_*` tienen como **única fuente de verdad `u768061575_os_integracion`**.
+El pipeline las calcula en local (staging temporal durante la corrida), el sync las copia a Hostinger, y luego las elimina de local.
+**NO existen en `effi_data` local entre corridas. No leer ni escribir la versión local.**
 
 ## 9. Protocolo de documentación de scripts
 Al crear un script nuevo, agregar entrada en `.agent/CATALOGO_SCRIPTS.md` con:
