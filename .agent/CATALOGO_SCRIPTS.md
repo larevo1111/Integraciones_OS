@@ -185,6 +185,35 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   - NO incluye consignaciones (OVs no tienen producto por factura de consignación global).
   - SUM(producto_mes) vs resumen_mes: diff ≤ 0.25 (solo redondeo DECIMAL).
 
+### calcular_resumen_ventas_remisiones_mes.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_remisiones_mes` — resumen mensual de ventas por remisión (paralelo a facturas_mes)
+- **Tipo**: import / analítica (paso 4a del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_remisiones_mes.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_remisiones_mes — N meses actualizados`
+- **Tabla(s) MariaDB**: `resumen_ventas_remisiones_mes` (PK: `mes`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_remisiones_venta_encabezados`, `zeffi_remisiones_venta_detalle`, `zeffi_devoluciones_venta_encabezados`; driver `mysql-connector-python`
+- **Columnas clave** (38 total, PK: mes):
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, ventas_netas, devoluciones, ingresos_netos
+  - `cto_*`: costo_total (de detalle), utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, **num_remisiones**, ticket_promedio
+  - `cli_*`: clientes_activos, clientes_nuevos (primera remisión histórica), vtas_por_cliente
+  - `car_*`: saldo (pdte_de_cobro)
+  - `cat_*`: num_referencias, vtas_por_referencia, num_canales
+  - `rem_*`: **rem_pendientes**, **rem_facturadas**, **rem_pct_facturadas** — conteos actuales de estado
+  - `top_*`: top_canal/ventas, top_cliente/ventas, top_producto_cod/nombre/ventas
+  - `pry_*`: proyección lineal — solo mes en curso
+  - `ant_*`: ventas_netas, var_pct
+- **Notas técnicas**:
+  - **Filtro de inclusión**: `estado_remision = 'Pendiente de facturar'` OR `observacion_de_anulacion LIKE 'Remisión convertida a factura de venta%'`. Excluye anulaciones reales (348 remisiones).
+  - Encabezados: formato coma decimal → `cn()` con REPLACE. Detalle: números planos → `cn_det()` con CAST directo.
+  - `fin_ventas_netas_sin_iva = subtotal` (del encabezado, sin IVA). `fin_ventas_netas = total_neto` (incluye IVA).
+  - `rem_pct_facturadas` es dinámico — puede aumentar con el tiempo conforme remisiones pendientes se convierten.
+  - Canal: `tipo_de_markting` (typo sin 'e') en encabezados; `tipo_de_marketing_cliente` en detalle.
+  - 29 meses (2023-11 a 2026-03). diff_total vs fuente = 0.00.
+
 ---
 
 ## 2. Infraestructura / Utilidades

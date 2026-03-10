@@ -1,18 +1,19 @@
 # Contexto Activo - Integraciones_OS
 
 ## Estado Actual (2026-03-10)
-Pipeline Effi → MariaDB funcional. Pasos 3a/3b/3c/3d analíticos activos. NocoDB conectado. Playwright corre en el host.
+Pipeline Effi → MariaDB funcional. Pasos 3a/3b/3c/3d (facturas) + 4a (remisiones) analíticos activos. NocoDB conectado. Playwright corre en el host.
 
 ## Lo que está funcionando
 
-### Pipeline de datos Effi (5 pasos)
+### Pipeline de datos Effi (6 pasos)
 - **Paso 1 — 26 scripts Playwright** exportan módulos de Effi a `/home/osserver/playwright/exports/`
 - **Paso 2 — import_all.js** importa **39 tablas** a MariaDB `effi_data` (TRUNCATE + INSERT)
 - **Paso 3a — calcular_resumen_ventas.py** → `resumen_ventas_facturas_mes` (38 campos, PK: mes)
 - **Paso 3b — calcular_resumen_ventas_canal.py** → `resumen_ventas_facturas_canal_mes` (32 campos, PK: mes+canal, 251 filas)
 - **Paso 3c — calcular_resumen_ventas_cliente.py** → `resumen_ventas_facturas_cliente_mes` (34 campos, PK: mes+id_cliente, 600 filas)
 - **Paso 3d — calcular_resumen_ventas_producto.py** → `resumen_ventas_facturas_producto_mes` (30 campos, PK: mes+cod_articulo, 697 filas)
-- **Orquestador**: `scripts/orquestador.py` — corre los 5 pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
+- **Paso 4a — calcular_resumen_ventas_remisiones_mes.py** → `resumen_ventas_remisiones_mes` (38 campos, PK: mes, 29 meses)
+- **Orquestador**: `scripts/orquestador.py` — corre los 6 pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
 - **n8n workflow activo**: trigger cada 2h + manual + webhook
   - Webhook URL: `https://n8n.oscomunidad.com/webhook/fa393bcf-8eb3-4b14-80bc-bfda8ca42765`
 
@@ -41,6 +42,14 @@ Pipeline Effi → MariaDB funcional. Pasos 3a/3b/3c/3d analíticos activos. Noco
 - `con_consignacion_pp` = OVs directamente por id_cliente (sin mapping)
 - SUM(cliente_mes) vs resumen_mes: diff ≤ 0.26 (solo redondeo DECIMAL)
 
+**resumen_ventas_remisiones_mes**
+- 38 campos, PK mes, 29 meses (2023-11 a 2026-03)
+- Incluye: "Pendiente de facturar" + "Convertida a factura". Excluye: anuladas reales (348).
+- `rem_pendientes / rem_facturadas / rem_pct_facturadas` = estado actual (dinámico)
+- Devoluciones de `zeffi_devoluciones_venta_encabezados` (27 registros)
+- Encabezados: formato coma decimal. Detalle: números planos (2 helpers distintos).
+- diff_total vs fuente = 0.00
+
 ### NocoDB (nocodb.oscomunidad.com)
 - Proyecto: **Origen Silvestre Integrado**
 - Fuente externa `effi_data` conectada vía `172.18.0.1:3306`
@@ -58,8 +67,9 @@ Pipeline Effi → MariaDB funcional. Pasos 3a/3b/3c/3d analíticos activos. Noco
 - Credenciales: `osadmin` / `Epist2487.`
 
 ## Próximos Pasos
-1. **App de datos**: decidir entre AppSheet (conocido, MySQL nativo) vs Appsmith (self-hosted Docker)
-2. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
+1. **Tablas remisiones desglosadas**: canal_mes, cliente_mes, producto_mes (paralelo a las de facturas)
+2. **App AppSheet**: nueva app separada conectada a effi_data para portal de datos (transitorio al ERP)
+3. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
