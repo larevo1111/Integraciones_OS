@@ -160,6 +160,31 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   - Consignaciones directas por id_cliente (sin necesidad de mapping de canal).
   - SUM(cliente_mes) vs resumen_mes: diff ≤ 0.26 (solo redondeo DECIMAL).
 
+### calcular_resumen_ventas_producto.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_facturas_producto_mes` — resumen mensual de ventas por referencia de producto
+- **Tipo**: import / analítica (paso 3d del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_producto.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_facturas_producto_mes — N filas actualizadas`
+- **Tabla(s) MariaDB**: `resumen_ventas_facturas_producto_mes` (PK: `mes, cod_articulo`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_facturas_venta_detalle`; driver `mysql-connector-python`
+- **Columnas clave** (30 total, PK compuesto: mes + cod_articulo):
+  - Dimensiones: `nombre` (descripcion_articulo), `categoria` (categoria_articulo), `marca` (marca_articulo)
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, **fin_pct_del_mes**
+  - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, num_facturas (facturas con este producto), precio_unitario_prom
+  - `cli_*`: clientes_activos (clientes distintos que compraron el producto)
+  - `top_*`: top_cliente/ventas, top_canal/ventas
+  - `pry_*`: proyección lineal — solo mes en curso
+  - `ant_*`: ventas_netas, var_pct, **ant_unidades**, **ant_var_unidades_pct** (variación unidades YoY)
+- **Notas**:
+  - `cod_articulo` en facturas = `id` en `zeffi_inventario` (tasa de match 97%).
+  - Dimensiones vienen directo del detalle (no requiere JOIN con inventario).
+  - NO incluye consignaciones (OVs no tienen producto por factura de consignación global).
+  - SUM(producto_mes) vs resumen_mes: diff ≤ 0.25 (solo redondeo DECIMAL).
+
 ---
 
 ## 2. Infraestructura / Utilidades

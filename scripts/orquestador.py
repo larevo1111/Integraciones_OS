@@ -31,6 +31,7 @@ IMPORT_SCRIPT   = SCRIPTS_DIR / 'import_all.js'
 RESUMEN_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas.py'
 RESUMEN_CANAL_SCRIPT    = SCRIPTS_DIR / 'calcular_resumen_ventas_canal.py'
 RESUMEN_CLIENTE_SCRIPT  = SCRIPTS_DIR / 'calcular_resumen_ventas_cliente.py'
+RESUMEN_PRODUCTO_SCRIPT = SCRIPTS_DIR / 'calcular_resumen_ventas_producto.py'
 
 EXPORT_TIMEOUT  = 30 * 60   # 30 minutos (margen sobre los ~20 min reales)
 IMPORT_TIMEOUT  =  5 * 60   # 5 minutos
@@ -138,6 +139,13 @@ def parsear_resumen_cliente(salida):
     """Extrae la línea de resumen de calcular_resumen_ventas_cliente."""
     for linea in reversed(salida.splitlines()):
         if 'filas actualizadas' in linea or 'cliente_mes' in linea:
+            return linea.strip()
+    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
+
+def parsear_resumen_producto(salida):
+    """Extrae la línea de resumen de calcular_resumen_ventas_producto."""
+    for linea in reversed(salida.splitlines()):
+        if 'filas actualizadas' in linea or 'producto_mes' in linea:
             return linea.strip()
     return salida.splitlines()[-1].strip() if salida else '(sin salida)'
 
@@ -251,10 +259,19 @@ def main():
     resumen_rsm_cliente = parsear_resumen_cliente(salida_rsm_cliente)
     log.info(f'   {resumen_rsm_cliente}  [{dur_rsm_cliente}s]')
 
+    # ── 3d. RESUMEN PRODUCTO ─────────────────────────────────────
+    log.info('▶ calcular_resumen_ventas_producto.py ...')
+    t5 = datetime.datetime.now()
+    exit_rsm_producto, salida_rsm_producto = ejecutar(['python3', str(RESUMEN_PRODUCTO_SCRIPT)], RESUMEN_TIMEOUT)
+    dur_rsm_producto = int((datetime.datetime.now() - t5).total_seconds())
+    resumen_rsm_producto = parsear_resumen_producto(salida_rsm_producto)
+    log.info(f'   {resumen_rsm_producto}  [{dur_rsm_producto}s]')
+
     # ── 4. Estado global ─────────────────────────────────────────
-    hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0 or exit_rsm_cliente != 0 or len(errores_exp) > 0)
+    hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
+                 or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
@@ -266,7 +283,7 @@ def main():
 {'=' * 50}
 Fecha:    {ahora}
 Estado:   {estado}
-Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s + canal {dur_rsm_canal}s + cliente {dur_rsm_cliente}s)
+Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s + canal {dur_rsm_canal}s + cliente {dur_rsm_cliente}s + producto {dur_rsm_producto}s)
 
 ── EXPORT ──────────────────────────────────────────
 {resumen_exp}
@@ -288,6 +305,9 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 
 ── RESUMEN VENTAS CLIENTE ──────────────────────────
 {resumen_rsm_cliente}
+
+── RESUMEN VENTAS PRODUCTO ─────────────────────────
+{resumen_rsm_producto}
 """
     enviar_email(env, asunto, cuerpo)
 
