@@ -104,7 +104,7 @@ def main():
             COALESCE(NULLIF(TRIM(marketing_cliente), ''), 'Sin canal')  AS canal,
             SUM({cn('precio_bruto_total')})                             AS fin_ventas_brutas,
             SUM({cn('descuento_total')})                                AS fin_descuentos,
-            SUM({cn('precio_neto_total')})                              AS fin_ventas_netas_sin_iva,
+            SUM({cn('precio_bruto_total')}) - SUM({cn('descuento_total')}) AS fin_ventas_netas_sin_iva,
             SUM({cn('impuesto_total')})                                 AS fin_impuestos,
             SUM({cn('costo_manual_total')})                             AS cto_costo_total,
             SUM({cn('cantidad')})                                       AS vol_unidades,

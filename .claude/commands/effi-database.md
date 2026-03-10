@@ -115,7 +115,8 @@ Tablas de datos Effi: prefijo `zeffi_` (39 tablas BASE TABLE). Más 1 tabla anal
 
 | Tabla | Descripción |
 |---|---|
-| `resumen_ventas_facturas_mes` | Resumen mensual de ventas (38 campos: fin_, cto_, vol_, cli_, car_, cat_, con_, top_, pry_, ant_). PK = `mes` VARCHAR(7) 'YYYY-MM'. Se actualiza como paso 3 del pipeline via `calcular_resumen_ventas.py`. |
+| `resumen_ventas_facturas_mes` | Resumen mensual de ventas (38 campos: fin_, cto_, vol_, cli_, car_, cat_, con_, top_, pry_, ant_). PK = `mes` VARCHAR(7) 'YYYY-MM'. Paso 3a del pipeline. |
+| `resumen_ventas_facturas_canal_mes` | Resumen mensual de ventas por canal de marketing (29 campos). PK = `(mes, canal)`. Canal = `marketing_cliente` del detalle, NULLs normalizados a `'Sin canal'`. Paso 3b del pipeline. `fin_ventas_netas_sin_iva` = `precio_bruto_total - descuento_total` (correcto, sin IVA). Los `top_ventas` y `fin_impuestos` incluyen IVA. SUM por mes de `fin_pct_del_mes` = 1.0 ± 0.0002 (redondeo DECIMAL). |
 
 ### Vistas SQL (sin prefijo)
 
@@ -147,8 +148,9 @@ Todas las tablas `zeffi_*` tienen:
 - **`referencia` = NULL** en la mayoría de registros — usar `cod_articulo` para identificar productos
 - `descripcion_articulo` = nombre legible del producto
 - `fecha_creacion_factura` y `vigencia_factura` duplican el encabezado → no se requiere JOIN para queries mensuales
-- `precio_neto_total` = valor de la línea (cantidad × precio_neto unitario)
-- `marketing_cliente` = canal de venta (e.g. `'1.3. Mercado Saludable'`)
+- `precio_neto_total` = **INCLUYE IVA** (precio_bruto - descuento + impuesto). Para obtener valor SIN IVA usar `precio_bruto_total - descuento_total`. NUNCA usar `precio_neto_total` como "sin IVA" — es un nombre engañoso.
+- `id_numeracion` = número/código de la factura en esta tabla (NO existe columna `numero_factura`)
+- `marketing_cliente` = canal de venta (e.g. `'1.3. Mercado Saludable'`). NULL o vacío → normalizar como `'Sin canal'`
 
 #### `zeffi_ordenes_venta_encabezados`
 - `vigencia` puede ser `'Vigente'` (en consignación activa) o `'Anulada'` (liquidada o error)
@@ -231,4 +233,86 @@ node /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/import_all.js
 journalctl -u effi-pipeline -f
 # o
 tail -f /home/osserver/Proyectos_Antigravity/Integraciones_OS/logs/pipeline.log
+```
+
+---
+
+## Verificaciones obligatorias de tablas analíticas
+
+> Ejecutar siempre que se cree o modifique un script de resumen. Comparar con fuente directa.
+
+### V1 — Financiero vs fuente (canal_mes vs detalle)
+```sql
+SELECT r.mes, LEFT(r.canal,30) AS canal,
+       r.fin_ventas_netas_sin_iva AS r_netas,
+       ROUND(SUM(CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2))
+             - CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))),2) AS v_netas,
+       ROUND(r.fin_ventas_netas_sin_iva -
+             SUM(CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2))
+             - CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))),2) AS diff
+FROM resumen_ventas_facturas_canal_mes r
+JOIN zeffi_facturas_venta_detalle d
+    ON DATE_FORMAT(d.fecha_creacion_factura,'%Y-%m') = r.mes
+    AND COALESCE(NULLIF(TRIM(d.marketing_cliente),''),'Sin canal') = r.canal
+    AND d.vigencia_factura = 'Vigente'
+WHERE r.mes IN ('2026-02','2026-01','2025-12','2025-09','2025-06')
+GROUP BY r.mes, r.canal, r.fin_ventas_netas_sin_iva
+ORDER BY r.mes DESC, r.fin_ventas_netas_sin_iva DESC LIMIT 20;
+-- Esperado: diff = 0.00 en todos
+```
+
+### V2 — Consistencia cruzada: SUM(canal_mes) debe igualar resumen_mes
+```sql
+SELECT m.mes,
+       m.fin_ventas_netas_sin_iva        AS m_netas,
+       ROUND(SUM(c.fin_ventas_netas_sin_iva),2) AS c_netas,
+       m.fin_ventas_brutas               AS m_brutas,
+       ROUND(SUM(c.fin_ventas_brutas),2) AS c_brutas,
+       m.cto_costo_total                 AS m_costo,
+       ROUND(SUM(c.cto_costo_total),2)   AS c_costo,
+       m.vol_unidades_vendidas           AS m_unid,
+       ROUND(SUM(c.vol_unidades_vendidas),2) AS c_unid,
+       ROUND(m.fin_ventas_netas_sin_iva - SUM(c.fin_ventas_netas_sin_iva),2) AS diff_netas,
+       ROUND(m.cto_costo_total          - SUM(c.cto_costo_total),2)          AS diff_costo
+FROM resumen_ventas_facturas_mes m
+JOIN resumen_ventas_facturas_canal_mes c ON c.mes = m.mes
+WHERE m.mes IN ('2026-02','2026-01','2025-12','2025-09','2025-06','2025-03','2025-01')
+GROUP BY m.mes, m.fin_ventas_netas_sin_iva, m.fin_ventas_brutas, m.cto_costo_total, m.vol_unidades_vendidas
+ORDER BY m.mes DESC;
+-- Esperado: diff_netas y diff_costo ≤ 0.30 (solo redondeo DECIMAL)
+-- ALERTA si diff > 1.00: revisar bug en join o cálculo de netas
+```
+
+### V3 — Porcentajes suman 1.0 por mes
+```sql
+SELECT mes, ROUND(SUM(fin_pct_del_mes),4) AS suma_pct, COUNT(*) AS canales
+FROM resumen_ventas_facturas_canal_mes
+GROUP BY mes ORDER BY mes;
+-- Esperado: suma_pct entre 0.9998 y 1.0002
+```
+
+### V4 — pry_ solo populado en mes corriente
+```sql
+SELECT mes, COUNT(*) AS filas,
+       SUM(CASE WHEN pry_dia_del_mes IS NULL THEN 1 ELSE 0 END) AS pry_null,
+       SUM(CASE WHEN pry_dia_del_mes IS NOT NULL THEN 1 ELSE 0 END) AS pry_ok
+FROM resumen_ventas_facturas_canal_mes
+GROUP BY mes ORDER BY mes;
+-- Esperado: pry_null = filas en todos los meses cerrados; pry_ok > 0 solo en mes corriente
+```
+
+### V5 — resumen_mes: financiero vs fuente directa (encabezados)
+```sql
+SELECT m.mes,
+       m.fin_ventas_brutas AS r_brutas,
+       ROUND(SUM(CAST(REPLACE(COALESCE(e.total_bruto,'0'),',','.') AS DECIMAL(15,2))),2) AS v_brutas,
+       ROUND(m.fin_ventas_brutas -
+             SUM(CAST(REPLACE(COALESCE(e.total_bruto,'0'),',','.') AS DECIMAL(15,2))),2) AS diff
+FROM resumen_ventas_facturas_mes m
+JOIN zeffi_facturas_venta_encabezados e
+    ON DATE_FORMAT(e.fecha_de_creacion,'%Y-%m') = m.mes
+WHERE m.mes IN ('2026-02','2026-01','2025-12','2025-09','2025-06')
+GROUP BY m.mes, m.fin_ventas_brutas
+ORDER BY m.mes DESC;
+-- Esperado: diff = 0.00
 ```
