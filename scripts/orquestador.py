@@ -33,10 +33,12 @@ RESUMEN_CANAL_SCRIPT    = SCRIPTS_DIR / 'calcular_resumen_ventas_canal.py'
 RESUMEN_CLIENTE_SCRIPT  = SCRIPTS_DIR / 'calcular_resumen_ventas_cliente.py'
 RESUMEN_PRODUCTO_SCRIPT    = SCRIPTS_DIR / 'calcular_resumen_ventas_producto.py'
 RESUMEN_REMISIONES_SCRIPT  = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_mes.py'
+SYNC_HOSTINGER_SCRIPT      = SCRIPTS_DIR / 'sync_hostinger.py'
 
-EXPORT_TIMEOUT  = 30 * 60   # 30 minutos (margen sobre los ~20 min reales)
-IMPORT_TIMEOUT  =  5 * 60   # 5 minutos
-RESUMEN_TIMEOUT =  2 * 60   # 2 minutos
+EXPORT_TIMEOUT   = 30 * 60   # 30 minutos
+IMPORT_TIMEOUT   =  5 * 60   # 5 minutos
+RESUMEN_TIMEOUT  =  2 * 60   # 2 minutos
+SYNC_TIMEOUT     =  5 * 60   # 5 minutos (sync Hostinger ~100s)
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 
@@ -154,6 +156,13 @@ def parsear_resumen_remisiones(salida):
     """Extrae la línea de resumen de calcular_resumen_ventas_remisiones_mes."""
     for linea in reversed(salida.splitlines()):
         if 'meses actualizados' in linea or 'remisiones_mes' in linea:
+            return linea.strip()
+    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
+
+def parsear_sync_hostinger(salida):
+    """Extrae la línea de resumen de sync_hostinger."""
+    for linea in reversed(salida.splitlines()):
+        if 'tablas OK' in linea or 'sync_hostinger' in linea:
             return linea.strip()
     return salida.splitlines()[-1].strip() if salida else '(sin salida)'
 
@@ -283,12 +292,20 @@ def main():
     resumen_rsm_rem = parsear_resumen_remisiones(salida_rsm_rem)
     log.info(f'   {resumen_rsm_rem}  [{dur_rsm_rem}s]')
 
-    # ── 5. Estado global ─────────────────────────────────────────
+    # ── 5. SYNC HOSTINGER ────────────────────────────────────────
+    log.info('▶ sync_hostinger.py ...')
+    t7 = datetime.datetime.now()
+    exit_sync, salida_sync = ejecutar(['python3', str(SYNC_HOSTINGER_SCRIPT)], SYNC_TIMEOUT)
+    dur_sync = int((datetime.datetime.now() - t7).total_seconds())
+    resumen_sync = parsear_sync_hostinger(salida_sync)
+    log.info(f'   {resumen_sync}  [{dur_sync}s]')
+
+    # ── 6. Estado global ─────────────────────────────────────────
     hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
                  or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or exit_rsm_rem != 0
-                 or len(errores_exp) > 0)
+                 or exit_sync != 0 or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_sync
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
@@ -300,7 +317,7 @@ def main():
 {'=' * 50}
 Fecha:    {ahora}
 Estado:   {estado}
-Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s + canal {dur_rsm_canal}s + cliente {dur_rsm_cliente}s + producto {dur_rsm_producto}s + remisiones {dur_rsm_rem}s)
+Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s + canal {dur_rsm_canal}s + cliente {dur_rsm_cliente}s + producto {dur_rsm_producto}s + remisiones {dur_rsm_rem}s + sync {dur_sync}s)
 
 ── EXPORT ──────────────────────────────────────────
 {resumen_exp}
@@ -328,6 +345,9 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 
 ── RESUMEN REMISIONES MES ──────────────────────────
 {resumen_rsm_rem}
+
+── SYNC HOSTINGER ──────────────────────────────────
+{resumen_sync}
 """
     enviar_email(env, asunto, cuerpo)
 
