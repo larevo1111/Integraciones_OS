@@ -2,10 +2,10 @@
   "cookies": [
     {
       "name": "ci_session",
-      "value": "3t858b7h2rl33n1nnb20gge8mjiguru4",
+      "value": "fajmki3gqi099es5mcibi7ooaug042dp",
       "domain": "effi.com.co",
       "path": "/",
-      "expires": 1773050098.889309,
+      "expires": 1773177314.878868,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
@@ -17,11 +17,11 @@
       "localStorage": [
         {
           "name": "NRBA_SESSION",
-          "value": "{\"value\":\"ef4a6a8e21958355\",\"inactiveAt\":1773015897678,\"expiresAt\":1773028497678,\"updatedAt\":1773014098354,\"sessionReplayMode\":0,\"sessionReplaySentFirstChunk\":false,\"sessionTraceMode\":0,\"traceHarvestStarted\":false,\"loggingMode\":0,\"logApiMode\":0,\"serverTimeDiff\":-118,\"custom\":{},\"numOfResets\":0,\"consent\":false}"
+          "value": "{\"value\":\"b60dc66f985f8467\",\"inactiveAt\":1773143113614,\"expiresAt\":1773155713614,\"updatedAt\":1773141314270,\"sessionReplayMode\":0,\"sessionReplaySentFirstChunk\":false,\"sessionTraceMode\":0,\"traceHarvestStarted\":false,\"loggingMode\":0,\"logApiMode\":0,\"serverTimeDiff\":null,\"custom\":{},\"numOfResets\":0,\"consent\":false}"
         },
         {
           "name": "pusherTransportTLS",
-          "value": "{\"timestamp\":1773014098978,\"transport\":\"ws\",\"latency\":305}"
+          "value": "{\"timestamp\":1773098078294,\"transport\":\"ws\",\"latency\":296}"
         }
       ]
     },

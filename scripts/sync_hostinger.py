@@ -52,6 +52,9 @@ TABLAS_SOLO_HOSTINGER = {
     'resumen_ventas_facturas_cliente_mes',
     'resumen_ventas_facturas_producto_mes',
     'resumen_ventas_remisiones_mes',
+    'resumen_ventas_remisiones_canal_mes',
+    'resumen_ventas_remisiones_cliente_mes',
+    'resumen_ventas_remisiones_producto_mes',
 }
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 orquestador.py
-Pipeline Effi → MariaDB — Orquestador Python
+Sincronización Effi → MariaDB — Orquestador Python
 
 Horario operativo: cada 2h | 06:00–20:00 | Lunes–Sábado
 Auto-restart: vía systemd (Restart=on-failure)
@@ -26,22 +26,11 @@ from pathlib import Path
 SCRIPTS_DIR   = Path('/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts')
 ENV_FILE      = SCRIPTS_DIR / '.env'
 LOG_FILE      = Path('/home/osserver/Proyectos_Antigravity/Integraciones_OS/logs/pipeline.log')
-EXPORT_SCRIPT   = SCRIPTS_DIR / 'export_all.sh'
-IMPORT_SCRIPT   = SCRIPTS_DIR / 'import_all.js'
-RESUMEN_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas.py'
-RESUMEN_CANAL_SCRIPT    = SCRIPTS_DIR / 'calcular_resumen_ventas_canal.py'
-RESUMEN_CLIENTE_SCRIPT  = SCRIPTS_DIR / 'calcular_resumen_ventas_cliente.py'
-RESUMEN_PRODUCTO_SCRIPT    = SCRIPTS_DIR / 'calcular_resumen_ventas_producto.py'
-RESUMEN_REMISIONES_SCRIPT         = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_mes.py'
-RESUMEN_REM_CANAL_SCRIPT          = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_canal_mes.py'
-RESUMEN_REM_CLIENTE_SCRIPT        = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_cliente_mes.py'
-RESUMEN_REM_PRODUCTO_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_producto_mes.py'
-SYNC_HOSTINGER_SCRIPT             = SCRIPTS_DIR / 'sync_hostinger.py'
+EXPORT_SCRIPT = SCRIPTS_DIR / 'export_all.sh'
+IMPORT_SCRIPT = SCRIPTS_DIR / 'import_all.js'
 
-EXPORT_TIMEOUT   = 30 * 60   # 30 minutos
-IMPORT_TIMEOUT   =  5 * 60   # 5 minutos
-RESUMEN_TIMEOUT  =  2 * 60   # 2 minutos
-SYNC_TIMEOUT     =  5 * 60   # 5 minutos (sync Hostinger ~100s)
+EXPORT_TIMEOUT = 30 * 60   # 30 minutos (margen sobre los ~20 min reales)
+IMPORT_TIMEOUT =  5 * 60   # 5 minutos
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 
@@ -124,48 +113,6 @@ def parsear_import(salida):
     """Extrae la línea de resumen del import."""
     for linea in reversed(salida.splitlines()):
         if 'tablas importadas' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
-
-def parsear_resumen(salida):
-    """Extrae la línea de resumen de calcular_resumen_ventas."""
-    for linea in reversed(salida.splitlines()):
-        if 'meses actualizados' in linea or 'resumen_ventas' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
-
-def parsear_resumen_canal(salida):
-    """Extrae la línea de resumen de calcular_resumen_ventas_canal."""
-    for linea in reversed(salida.splitlines()):
-        if 'filas actualizadas' in linea or 'canal_mes' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
-
-def parsear_resumen_cliente(salida):
-    """Extrae la línea de resumen de calcular_resumen_ventas_cliente."""
-    for linea in reversed(salida.splitlines()):
-        if 'filas actualizadas' in linea or 'cliente_mes' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
-
-def parsear_resumen_producto(salida):
-    """Extrae la línea de resumen de calcular_resumen_ventas_producto."""
-    for linea in reversed(salida.splitlines()):
-        if 'filas actualizadas' in linea or 'producto_mes' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
-
-def parsear_resumen_remisiones(salida):
-    """Extrae la línea de resumen de calcular_resumen_ventas_remisiones_mes."""
-    for linea in reversed(salida.splitlines()):
-        if 'meses actualizados' in linea or 'remisiones_mes' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
-
-def parsear_sync_hostinger(salida):
-    """Extrae la línea de resumen de sync_hostinger."""
-    for linea in reversed(salida.splitlines()):
-        if 'tablas OK' in linea or 'sync_hostinger' in linea:
             return linea.strip()
     return salida.splitlines()[-1].strip() if salida else '(sin salida)'
 
@@ -255,86 +202,14 @@ def main():
     resumen_imp = parsear_import(salida_imp)
     log.info(f'   {resumen_imp}  [{dur_imp}s]')
 
-    # ── 3. RESUMEN MES ──────────────────────────────────────────
-    log.info('▶ calcular_resumen_ventas.py ...')
-    t2 = datetime.datetime.now()
-    exit_rsm, salida_rsm = ejecutar(['python3', str(RESUMEN_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rsm = int((datetime.datetime.now() - t2).total_seconds())
-    resumen_rsm = parsear_resumen(salida_rsm)
-    log.info(f'   {resumen_rsm}  [{dur_rsm}s]')
-
-    # ── 3b. RESUMEN CANAL ────────────────────────────────────────
-    log.info('▶ calcular_resumen_ventas_canal.py ...')
-    t3 = datetime.datetime.now()
-    exit_rsm_canal, salida_rsm_canal = ejecutar(['python3', str(RESUMEN_CANAL_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rsm_canal = int((datetime.datetime.now() - t3).total_seconds())
-    resumen_rsm_canal = parsear_resumen_canal(salida_rsm_canal)
-    log.info(f'   {resumen_rsm_canal}  [{dur_rsm_canal}s]')
-
-    # ── 3c. RESUMEN CLIENTE ──────────────────────────────────────
-    log.info('▶ calcular_resumen_ventas_cliente.py ...')
-    t4 = datetime.datetime.now()
-    exit_rsm_cliente, salida_rsm_cliente = ejecutar(['python3', str(RESUMEN_CLIENTE_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rsm_cliente = int((datetime.datetime.now() - t4).total_seconds())
-    resumen_rsm_cliente = parsear_resumen_cliente(salida_rsm_cliente)
-    log.info(f'   {resumen_rsm_cliente}  [{dur_rsm_cliente}s]')
-
-    # ── 3d. RESUMEN PRODUCTO ─────────────────────────────────────
-    log.info('▶ calcular_resumen_ventas_producto.py ...')
-    t5 = datetime.datetime.now()
-    exit_rsm_producto, salida_rsm_producto = ejecutar(['python3', str(RESUMEN_PRODUCTO_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rsm_producto = int((datetime.datetime.now() - t5).total_seconds())
-    resumen_rsm_producto = parsear_resumen_producto(salida_rsm_producto)
-    log.info(f'   {resumen_rsm_producto}  [{dur_rsm_producto}s]')
-
-    # ── 4a. RESUMEN REMISIONES MES ───────────────────────────────
-    log.info('▶ calcular_resumen_ventas_remisiones_mes.py ...')
-    t6 = datetime.datetime.now()
-    exit_rsm_rem, salida_rsm_rem = ejecutar(['python3', str(RESUMEN_REMISIONES_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rsm_rem = int((datetime.datetime.now() - t6).total_seconds())
-    resumen_rsm_rem = parsear_resumen_remisiones(salida_rsm_rem)
-    log.info(f'   {resumen_rsm_rem}  [{dur_rsm_rem}s]')
-
-    # ── 4b. RESUMEN REMISIONES CANAL ─────────────────────────────
-    log.info('▶ calcular_resumen_ventas_remisiones_canal_mes.py ...')
-    t_rem_canal = datetime.datetime.now()
-    exit_rem_canal, salida_rem_canal = ejecutar(['python3', str(RESUMEN_REM_CANAL_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rem_canal = int((datetime.datetime.now() - t_rem_canal).total_seconds())
-    log.info(f'   {salida_rem_canal.strip().splitlines()[-1] if salida_rem_canal.strip() else "sin salida"}  [{dur_rem_canal}s]')
-
-    # ── 4c. RESUMEN REMISIONES CLIENTE ───────────────────────────
-    log.info('▶ calcular_resumen_ventas_remisiones_cliente_mes.py ...')
-    t_rem_cli = datetime.datetime.now()
-    exit_rem_cli, salida_rem_cli = ejecutar(['python3', str(RESUMEN_REM_CLIENTE_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rem_cli = int((datetime.datetime.now() - t_rem_cli).total_seconds())
-    log.info(f'   {salida_rem_cli.strip().splitlines()[-1] if salida_rem_cli.strip() else "sin salida"}  [{dur_rem_cli}s]')
-
-    # ── 4d. RESUMEN REMISIONES PRODUCTO ──────────────────────────
-    log.info('▶ calcular_resumen_ventas_remisiones_producto_mes.py ...')
-    t_rem_prod = datetime.datetime.now()
-    exit_rem_prod, salida_rem_prod = ejecutar(['python3', str(RESUMEN_REM_PRODUCTO_SCRIPT)], RESUMEN_TIMEOUT)
-    dur_rem_prod = int((datetime.datetime.now() - t_rem_prod).total_seconds())
-    log.info(f'   {salida_rem_prod.strip().splitlines()[-1] if salida_rem_prod.strip() else "sin salida"}  [{dur_rem_prod}s]')
-
-    # ── 5. SYNC HOSTINGER ────────────────────────────────────────
-    log.info('▶ sync_hostinger.py ...')
-    t7 = datetime.datetime.now()
-    exit_sync, salida_sync = ejecutar(['python3', str(SYNC_HOSTINGER_SCRIPT)], SYNC_TIMEOUT)
-    dur_sync = int((datetime.datetime.now() - t7).total_seconds())
-    resumen_sync = parsear_sync_hostinger(salida_sync)
-    log.info(f'   {resumen_sync}  [{dur_sync}s]')
-
-    # ── 6. Estado global ─────────────────────────────────────────
-    hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
-                 or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or exit_rsm_rem != 0
-                 or exit_rem_canal != 0 or exit_rem_cli != 0 or exit_rem_prod != 0
-                 or exit_sync != 0 or len(errores_exp) > 0)
+    # ── 3. Estado global ─────────────────────────────────────────
+    hay_error = (exit_exp != 0 or exit_imp != 0 or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_sync
+    dur_total = dur_exp + dur_imp
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
-    # ── 5. Email (siempre) ───────────────────────────────────────
+    # ── 4. Email (siempre) ───────────────────────────────────────
     icono  = '❌' if hay_error else '✅'
     asunto = f'{icono} [Effi Pipeline] {estado} — {ahora}'
 
@@ -342,7 +217,7 @@ def main():
 {'=' * 50}
 Fecha:    {ahora}
 Estado:   {estado}
-Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s + canal {dur_rsm_canal}s + cliente {dur_rsm_cliente}s + producto {dur_rsm_producto}s + remisiones {dur_rsm_rem}s + sync {dur_sync}s)
+Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s)
 
 ── EXPORT ──────────────────────────────────────────
 {resumen_exp}
@@ -355,28 +230,10 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 {resumen_imp}
 
 {salida_imp}
-
-── RESUMEN VENTAS MES ──────────────────────────────
-{resumen_rsm}
-
-── RESUMEN VENTAS CANAL ────────────────────────────
-{resumen_rsm_canal}
-
-── RESUMEN VENTAS CLIENTE ──────────────────────────
-{resumen_rsm_cliente}
-
-── RESUMEN VENTAS PRODUCTO ─────────────────────────
-{resumen_rsm_producto}
-
-── RESUMEN REMISIONES MES ──────────────────────────
-{resumen_rsm_rem}
-
-── SYNC HOSTINGER ──────────────────────────────────
-{resumen_sync}
 """
     enviar_email(env, asunto, cuerpo)
 
-    # ── 6. Telegram (solo en error) ──────────────────────────────
+    # ── 5. Telegram (solo en error) ──────────────────────────────
     if hay_error:
         partes = [f'<b>⚠️ Pipeline Effi — ERROR</b>', f'📅 {ahora}']
 
@@ -393,10 +250,6 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
             partes.append(f'\n❌ Import: {resumen_imp}')
         else:
             partes.append(f'\n✅ Import: {resumen_imp}')
-
-        # Resumen
-        if exit_rsm != 0:
-            partes.append(f'\n❌ Resumen: {resumen_rsm}')
 
         enviar_telegram(env, '\n'.join(partes))
 
