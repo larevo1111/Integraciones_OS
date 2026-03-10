@@ -34,7 +34,7 @@ SSH_KEY      = os.path.expanduser('~/.ssh/sos_erp')
 DB_HOSTINGER = dict(
     user='u768061575_ssierra047',
     password='Epist2487.',
-    database='u768061575_os_comunidad',
+    database='u768061575_integraciones_os',
     charset='utf8mb4',
 )
 
