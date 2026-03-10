@@ -39,6 +39,21 @@
   - Test manual (forzar fuera de horario): `python3 scripts/orquestador.py --forzar`
 
 ## 5. Reglas Técnicas Aprendidas
+
+### Gotchas críticos — zeffi_facturas_venta_detalle
+- **`precio_neto_total` INCLUYE IVA**: es `precio_bruto - descuento + impuesto`. Para "ventas sin IVA" usar `precio_bruto_total - descuento_total`. Nombre engañoso — nunca asumir que es "neto sin IVA".
+- **Número de factura**: en detalle se llama `id_numeracion` (no existe `numero_factura`).
+- **Canal**: `marketing_cliente` — NULL o vacío se normaliza como `'Sin canal'`.
+- **`vigencia_factura = 'Vigente'`**: filtro obligatorio en detalle para excluir anuladas.
+
+### Verificación obligatoria de scripts analíticos
+Al crear o modificar cualquier script de resumen, correr queries V1–V5 del skill `effi-database`:
+1. Comparar campo a campo contra la tabla fuente (diff = 0)
+2. SUM(tabla_desglosada) vs tabla_total (diff ≤ 0.30 = solo redondeo DECIMAL)
+3. Porcentajes suman 1.0 por período
+4. `pry_*` NULL en períodos cerrados
+
+
 - **NocoDB**: tablas externas son solo lectura — relaciones entre tablas externas NO funcionan. Usar vistas SQL en MariaDB para JOINs.
 - **NocoDB Button field**: existe en v0.301.3 pero NO aparece en búsqueda — scrollear manualmente en la lista de tipos de campo.
 - **NocoDB conexión a MariaDB**: usar IP `172.18.0.1` (gateway de la red Docker de NocoDB), NO `host.docker.internal` (no resuelve en ese contenedor).

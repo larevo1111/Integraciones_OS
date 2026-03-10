@@ -8,7 +8,8 @@ Pipeline Effi → MariaDB funcional. Paso 3 analítico activo. NocoDB conectado.
 ### Pipeline de datos Effi (3 pasos)
 - **Paso 1 — 26 scripts Playwright** exportan módulos de Effi a `/home/osserver/playwright/exports/`
 - **Paso 2 — import_all.js** importa **39 tablas** a MariaDB `effi_data` (TRUNCATE + INSERT)
-- **Paso 3 — calcular_resumen_ventas.py** calcula tabla analítica `resumen_ventas_facturas_mes` (38 campos: fin_, cto_, vol_, cli_, car_, cat_, con_, top_, pry_, ant_)
+- **Paso 3a — calcular_resumen_ventas.py** → `resumen_ventas_facturas_mes` (38 campos, PK: mes)
+- **Paso 3b — calcular_resumen_ventas_canal.py** → `resumen_ventas_facturas_canal_mes` (29 campos, PK: mes+canal, 193 filas)
 - **Orquestador**: `scripts/orquestador.py` — corre los 3 pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
 - **n8n workflow activo**: trigger cada 2h + manual + webhook
   - Webhook URL: `https://n8n.oscomunidad.com/webhook/fa393bcf-8eb3-4b14-80bc-bfda8ca42765`
@@ -18,12 +19,17 @@ Pipeline Effi → MariaDB funcional. Paso 3 analítico activo. NocoDB conectado.
 - Symlinks: `/exports` → `/home/osserver/playwright/exports`, `/repo/scripts` → scripts del proyecto
 - Contenedor `playwright` eliminado del docker-compose
 
-### resumen_ventas_facturas_mes (estado 2026-03-10)
-- 38 campos, 15 meses de datos (2025-01 a 2026-03)
-- Campos `_pct` en decimal 0–1 (no multiplicados por 100)
-- `pry_*` solo populados para el mes en curso (NULL para meses cerrados)
-- `top_*` usa nombres (no IDs/cédulas)
-- Devoluciones = NCs de `zeffi_notas_credito_venta_encabezados` (no `devoluciones_venta`)
+### Tablas analíticas (estado 2026-03-10)
+**resumen_ventas_facturas_mes**
+- 38 campos, 15 meses (2025-01 a 2026-03)
+- Campos `_pct` en decimal 0–1; `pry_*` solo mes corriente; `top_*` usa nombres
+- Devoluciones = NCs de `zeffi_notas_credito_venta_encabezados`
+
+**resumen_ventas_facturas_canal_mes**
+- 29 campos, PK (mes, canal), 193 filas
+- `fin_ventas_netas_sin_iva = precio_bruto_total - descuento_total` (precio_neto_total incluye IVA — gotcha crítico)
+- `fin_pct_del_mes` = % participación canal en total mes (suma 1.0 por mes)
+- NO incluye car_, con_, devoluciones (sin campo canal en esas fuentes)
 
 ### NocoDB (nocodb.oscomunidad.com)
 - Proyecto: **Origen Silvestre Integrado**
@@ -42,9 +48,9 @@ Pipeline Effi → MariaDB funcional. Paso 3 analítico activo. NocoDB conectado.
 - Credenciales: `osadmin` / `Epist2487.`
 
 ## Próximos Pasos
-1. **Vistas SQL en MariaDB**: JOINs entre tablas effi_data para NocoDB y Grafana
-2. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
-3. **Conectar NocoDB a resumen_ventas_facturas_mes** como tabla de análisis
+1. **Siguientes vistas analíticas**: resumen por cliente (`_cliente_mes`) y por producto (`_producto_mes`)
+2. **App de datos**: decidir entre AppSheet (conocido, MySQL nativo) vs Appsmith (self-hosted Docker)
+3. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
