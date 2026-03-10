@@ -261,7 +261,21 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 
 ---
 
-## 4. Comandos de diagnóstico rápido
+## 4. Skills / Comandos Claude (`.claude/commands/`)
+
+Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en la conversación.
+
+| Skill | Archivo | Contenido |
+|---|---|---|
+| `/playwright-effi` | `.claude/commands/playwright-effi.md` | Patrones, mecanismos de descarga y errores conocidos para scripts de exportación Effi con Playwright |
+| `/effi-database` | `.claude/commands/effi-database.md` | Credenciales, tablas `zeffi_*`, conexión desde host/Docker, por qué los comandos se cuelgan, patrones Python/Node |
+| `/telegram-pipeline` | `.claude/commands/telegram-pipeline.md` | Configuración del bot Telegram para notificaciones del pipeline |
+
+> **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla.
+
+---
+
+## 5. Comandos de diagnóstico rápido
 
 ```bash
 # Estado del pipeline automático
@@ -286,6 +300,6 @@ node scripts/import_all.js
 # Solo un script de export específico
 node scripts/export_clientes.js
 
-# Ver cuántos registros hay en una tabla
-mysql -u osadmin -p effi_data -e "SELECT COUNT(*) FROM clientes;"
+# Ver cuántos registros hay en una tabla (tablas tienen prefijo zeffi_)
+mysql -u osadmin -pEpist2487. effi_data -e "SELECT COUNT(*) FROM zeffi_clientes;" 2>/dev/null
 ```

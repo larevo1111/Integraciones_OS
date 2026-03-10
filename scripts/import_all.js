@@ -121,7 +121,7 @@ function findLatestFiles(dir) {
 // ─── Importación a MariaDB ────────────────────────────────────────────────────
 
 async function importTable(conn, tableName, headers, rows) {
-  const sqlTable = toSqlName(tableName);
+  const sqlTable = 'zeffi_' + toSqlName(tableName);
   const colDefs  = headers.map(h => `\`${toSqlName(h)}\` TEXT`).join(',\n  ');
   const colNames = headers.map(h => `\`${toSqlName(h)}\``).join(', ');
 
