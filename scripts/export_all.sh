@@ -31,6 +31,8 @@ SCRIPTS=(
   export_costos_produccion
   export_tipos_egresos
   export_tipos_marketing
+  export_empleados
+  export_tarifas_precios
 )
 
 OK=0

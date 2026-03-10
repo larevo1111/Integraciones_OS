@@ -1,34 +1,34 @@
 #!/usr/bin/env python3
 """
 sync_espocrm_marketing.py — Paso 6b del pipeline
-Sincroniza los tipos de marketing de Effi (zeffi_tipos_marketing) al campo
-'tipoDeMarketing' (Enum) en la entidad Contact de EspoCRM.
+Gestiona los campos custom de la entidad Contact en EspoCRM.
 
-Flujo:
-  1. Lee tipos vigentes de effi_data local
-  2. Compara con los que ya están en EspoCRM (custom metadata)
-  3. Si hay diferencias → regenera los JSON + rebuild EspoCRM
-  4. Si no hay diferencias → sale sin tocar nada
+Enums dinámicos (sincronizados desde Effi):
+  - tipoDeMarketing  ← zeffi_tipos_marketing
+  - tipoCliente      ← zeffi_tipo_de_cliente  (si se exporta) o valores fijos
+  - tarifaPrecios    ← zeffi_tarifas_precios
+
+Campos fijos (no dependen de Effi):
+  - numeroIdentificacion, tipoIdentificacion, tipoPersona,
+    formaPago, vendedorEffi
+
+Solo hace rebuild si detecta cambios en alguno de los enums dinámicos.
 
 Ejecutar manualmente:
   python3 scripts/sync_espocrm_marketing.py
 """
 
 import json
-import os
 import subprocess
 import sys
-from pathlib import Path
 
 import mysql.connector
 
 # ─── Configuración ─────────────────────────────────────────────────────────────
 
 DB_LOCAL = dict(
-    host='127.0.0.1',
-    port=3306,
-    user='osadmin',
-    password='Epist2487.',
+    host='127.0.0.1', port=3306,
+    user='osadmin', password='Epist2487.',
     database='effi_data',
 )
 
@@ -40,18 +40,28 @@ LAYOUT_PATH        = '/var/www/html/custom/Espo/Custom/Resources/layouts/Contact
 REBUILD_SCRIPT     = '/var/www/html/rebuild.php'
 CLEAR_CACHE_SCRIPT = '/var/www/html/clear_cache.php'
 
-TMP_ENTITY  = '/tmp/espo_contact_entitydefs.json'
-TMP_I18N    = '/tmp/espo_contact_i18n.json'
-TMP_LAYOUT  = '/tmp/espo_contact_layout.json'
+TMP_ENTITY = '/tmp/espo_contact_entitydefs.json'
+TMP_I18N   = '/tmp/espo_contact_i18n.json'
+TMP_LAYOUT = '/tmp/espo_contact_layout.json'
+
+# Enums fijos
+TIPOS_IDENTIFICACION = [
+    '', 'Cédula de ciudadanía', 'Cédula de extranjería',
+    'Número de Identificación Tributaria CO', 'Pasaporte'
+]
+TIPOS_PERSONA = ['', 'Física (natural)', 'Jurídica (moral)']
 
 LAYOUT_JSON = [
     {
         "label": "",
         "rows": [
-            [{"name": "name"}, {"name": "accounts"}],
-            [{"name": "emailAddress"}, {"name": "phoneNumber"}],
-            [{"name": "tipoDeMarketing"}, False],
-            [{"name": "address"}, False],
+            [{"name": "name"},                  {"name": "accounts"}],
+            [{"name": "emailAddress"},           {"name": "phoneNumber"}],
+            [{"name": "tipoDeMarketing"},        {"name": "tipoCliente"}],
+            [{"name": "numeroIdentificacion"},   {"name": "tipoIdentificacion"}],
+            [{"name": "tipoPersona"},            {"name": "vendedorEffi"}],
+            [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
+            [{"name": "address"},                False],
             [{"name": "description", "fullWidth": True}]
         ]
     }
@@ -66,44 +76,88 @@ def run(cmd, check=True):
     return result.stdout.strip()
 
 
-def get_tipos_effi():
+def query_opciones(tabla, columna):
+    """Lee opciones únicas vigentes de una tabla de effi_data."""
     conn = mysql.connector.connect(**DB_LOCAL)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT tipo_de_marketing FROM zeffi_tipos_marketing "
-        "WHERE vigencia = 'Vigente' ORDER BY tipo_de_marketing"
-    )
-    tipos = [row[0] for row in cur.fetchall()]
+    # Intentar filtrar por vigencia si la columna existe
+    try:
+        cur.execute(
+            f"SELECT DISTINCT `{columna}` FROM `{tabla}` "
+            f"WHERE vigencia = 'Vigente' AND `{columna}` IS NOT NULL AND `{columna}` != '' "
+            f"ORDER BY `{columna}`"
+        )
+    except Exception:
+        cur.execute(
+            f"SELECT DISTINCT `{columna}` FROM `{tabla}` "
+            f"WHERE `{columna}` IS NOT NULL AND `{columna}` != '' ORDER BY `{columna}`"
+        )
+    opciones = [row[0] for row in cur.fetchall()]
     cur.close()
     conn.close()
-    return tipos
+    return opciones
 
 
-def get_tipos_espocrm():
-    """Lee las opciones actuales del campo en EspoCRM."""
+def get_opciones_actuales_espocrm(campo):
+    """Lee las opciones actuales de un campo enum en EspoCRM."""
     try:
         raw = run(['docker', 'exec', ESPOCRM_CONTAINER, 'cat', ENTITY_DEFS_PATH], check=False)
         if not raw:
             return []
         defs = json.loads(raw)
-        opts = defs.get('fields', {}).get('tipoDeMarketing', {}).get('options', [])
-        return [o for o in opts if o]  # excluir el '' inicial
+        opts = defs.get('fields', {}).get(campo, {}).get('options', [])
+        return [o for o in opts if o]
     except Exception:
         return []
 
 
-def generar_json(tipos):
+def generar_json(tipos_marketing, tipos_cliente, tarifas_precios):
     entity_defs = {
         'fields': {
             'tipoDeMarketing': {
                 'type': 'enum',
-                'options': [''] + tipos
+                'options': [''] + tipos_marketing
+            },
+            'tipoCliente': {
+                'type': 'enum',
+                'options': [''] + tipos_cliente
+            },
+            'tarifaPrecios': {
+                'type': 'enum',
+                'options': [''] + tarifas_precios
+            },
+            'numeroIdentificacion': {
+                'type': 'varchar',
+                'maxLength': 100
+            },
+            'tipoIdentificacion': {
+                'type': 'enum',
+                'options': TIPOS_IDENTIFICACION
+            },
+            'tipoPersona': {
+                'type': 'enum',
+                'options': TIPOS_PERSONA
+            },
+            'formaPago': {
+                'type': 'varchar',
+                'maxLength': 100
+            },
+            'vendedorEffi': {
+                'type': 'varchar',
+                'maxLength': 200
             }
         }
     }
     i18n = {
         'fields': {
-            'tipoDeMarketing': 'Tipo de Marketing'
+            'tipoDeMarketing':      'Tipo de Marketing',
+            'tipoCliente':          'Tipo de Cliente',
+            'tarifaPrecios':        'Tarifa de Precios',
+            'numeroIdentificacion': 'N° Identificación',
+            'tipoIdentificacion':   'Tipo Identificación',
+            'tipoPersona':          'Tipo de Persona',
+            'formaPago':            'Forma de Pago',
+            'vendedorEffi':         'Vendedor (Effi)',
         }
     }
     with open(TMP_ENTITY, 'w', encoding='utf-8') as f:
@@ -115,7 +169,6 @@ def generar_json(tipos):
 
 
 def aplicar_a_espocrm():
-    # Asegurar que existan los directorios
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
          '/var/www/html/custom/Espo/Custom/Resources/metadata/entityDefs'])
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
@@ -123,12 +176,10 @@ def aplicar_a_espocrm():
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
          '/var/www/html/custom/Espo/Custom/Resources/layouts/Contact'])
 
-    # Copiar archivos al contenedor
-    run(['docker', 'cp', TMP_ENTITY,  f'{ESPOCRM_CONTAINER}:{ENTITY_DEFS_PATH}'])
-    run(['docker', 'cp', TMP_I18N,    f'{ESPOCRM_CONTAINER}:{I18N_PATH}'])
-    run(['docker', 'cp', TMP_LAYOUT,  f'{ESPOCRM_CONTAINER}:{LAYOUT_PATH}'])
+    run(['docker', 'cp', TMP_ENTITY, f'{ESPOCRM_CONTAINER}:{ENTITY_DEFS_PATH}'])
+    run(['docker', 'cp', TMP_I18N,   f'{ESPOCRM_CONTAINER}:{I18N_PATH}'])
+    run(['docker', 'cp', TMP_LAYOUT, f'{ESPOCRM_CONTAINER}:{LAYOUT_PATH}'])
 
-    # Rebuild + clear cache
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'php', REBUILD_SCRIPT])
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'php', CLEAR_CACHE_SCRIPT])
 
@@ -136,21 +187,35 @@ def aplicar_a_espocrm():
 # ─── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    tipos_effi    = get_tipos_effi()
-    tipos_espocrm = get_tipos_espocrm()
+    # Leer opciones vigentes de Effi
+    tipos_marketing = query_opciones('zeffi_tipos_marketing', 'tipo_de_marketing')
+    tarifas_precios = query_opciones('zeffi_tarifas_precios', 'nombre')
+    # tipo_de_cliente viene de zeffi_clientes (no tiene tabla propia exportada)
+    tipos_cliente   = query_opciones('zeffi_clientes', 'tipo_de_cliente')
 
-    if set(tipos_effi) == set(tipos_espocrm) and len(tipos_effi) == len(tipos_espocrm):
-        print(f'✅ sync_espocrm_marketing — sin cambios ({len(tipos_effi)} tipos)')
+    # Comparar con lo que ya hay en EspoCRM
+    mk_espo  = get_opciones_actuales_espocrm('tipoDeMarketing')
+    tar_espo = get_opciones_actuales_espocrm('tarifaPrecios')
+    cli_espo = get_opciones_actuales_espocrm('tipoCliente')
+
+    sin_cambios = (
+        set(tipos_marketing) == set(mk_espo)  and len(tipos_marketing) == len(mk_espo) and
+        set(tarifas_precios) == set(tar_espo) and len(tarifas_precios) == len(tar_espo) and
+        set(tipos_cliente)   == set(cli_espo) and len(tipos_cliente)   == len(cli_espo)
+    )
+
+    if sin_cambios:
+        print(f'✅ sync_espocrm_marketing — sin cambios '
+              f'({len(tipos_marketing)} marketing, {len(tarifas_precios)} tarifas, '
+              f'{len(tipos_cliente)} tipos cliente)')
         return
 
-    generar_json(tipos_effi)
+    generar_json(tipos_marketing, tipos_cliente, tarifas_precios)
     aplicar_a_espocrm()
 
-    agregados  = set(tipos_effi) - set(tipos_espocrm)
-    eliminados = set(tipos_espocrm) - set(tipos_effi)
     print(f'✅ sync_espocrm_marketing — actualizado: '
-          f'{len(tipos_effi)} tipos '
-          f'(+{len(agregados)} -{len(eliminados)})')
+          f'{len(tipos_marketing)} marketing | {len(tarifas_precios)} tarifas | '
+          f'{len(tipos_cliente)} tipos cliente')
 
 
 if __name__ == '__main__':

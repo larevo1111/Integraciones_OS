@@ -122,8 +122,18 @@ function findLatestFiles(dir) {
 
 async function importTable(conn, tableName, headers, rows) {
   const sqlTable = 'zeffi_' + toSqlName(tableName);
-  const colDefs  = headers.map(h => `\`${toSqlName(h)}\` TEXT`).join(',\n  ');
-  const colNames = headers.map(h => `\`${toSqlName(h)}\``).join(', ');
+
+  // Deduplicar nombres de columna (ej. "Departamento" aparece 2 veces en empleados)
+  const seen = {};
+  const dedupedHeaders = headers.map(h => {
+    const base = toSqlName(h);
+    if (!seen[base]) { seen[base] = 0; }
+    seen[base]++;
+    return seen[base] === 1 ? base : `${base}_${seen[base]}`;
+  });
+
+  const colDefs  = dedupedHeaders.map(c => `\`${c}\` TEXT`).join(',\n  ');
+  const colNames = dedupedHeaders.map(c => `\`${c}\``).join(', ');
 
   await conn.query(`
     CREATE TABLE IF NOT EXISTS \`${sqlTable}\` (
