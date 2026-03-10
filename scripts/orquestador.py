@@ -28,7 +28,8 @@ ENV_FILE      = SCRIPTS_DIR / '.env'
 LOG_FILE      = Path('/home/osserver/Proyectos_Antigravity/Integraciones_OS/logs/pipeline.log')
 EXPORT_SCRIPT   = SCRIPTS_DIR / 'export_all.sh'
 IMPORT_SCRIPT   = SCRIPTS_DIR / 'import_all.js'
-RESUMEN_SCRIPT  = SCRIPTS_DIR / 'calcular_resumen_ventas.py'
+RESUMEN_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas.py'
+RESUMEN_CANAL_SCRIPT = SCRIPTS_DIR / 'calcular_resumen_ventas_canal.py'
 
 EXPORT_TIMEOUT  = 30 * 60   # 30 minutos (margen sobre los ~20 min reales)
 IMPORT_TIMEOUT  =  5 * 60   # 5 minutos
@@ -125,6 +126,13 @@ def parsear_resumen(salida):
             return linea.strip()
     return salida.splitlines()[-1].strip() if salida else '(sin salida)'
 
+def parsear_resumen_canal(salida):
+    """Extrae la línea de resumen de calcular_resumen_ventas_canal."""
+    for linea in reversed(salida.splitlines()):
+        if 'filas actualizadas' in linea or 'canal_mes' in linea:
+            return linea.strip()
+    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
+
 # ─── Notificaciones ────────────────────────────────────────────────────────────
 
 def enviar_email(env, asunto, cuerpo):
@@ -211,7 +219,7 @@ def main():
     resumen_imp = parsear_import(salida_imp)
     log.info(f'   {resumen_imp}  [{dur_imp}s]')
 
-    # ── 3. RESUMEN ──────────────────────────────────────────────
+    # ── 3. RESUMEN MES ──────────────────────────────────────────
     log.info('▶ calcular_resumen_ventas.py ...')
     t2 = datetime.datetime.now()
     exit_rsm, salida_rsm = ejecutar(['python3', str(RESUMEN_SCRIPT)], RESUMEN_TIMEOUT)
@@ -219,10 +227,18 @@ def main():
     resumen_rsm = parsear_resumen(salida_rsm)
     log.info(f'   {resumen_rsm}  [{dur_rsm}s]')
 
+    # ── 3b. RESUMEN CANAL ────────────────────────────────────────
+    log.info('▶ calcular_resumen_ventas_canal.py ...')
+    t3 = datetime.datetime.now()
+    exit_rsm_canal, salida_rsm_canal = ejecutar(['python3', str(RESUMEN_CANAL_SCRIPT)], RESUMEN_TIMEOUT)
+    dur_rsm_canal = int((datetime.datetime.now() - t3).total_seconds())
+    resumen_rsm_canal = parsear_resumen_canal(salida_rsm_canal)
+    log.info(f'   {resumen_rsm_canal}  [{dur_rsm_canal}s]')
+
     # ── 4. Estado global ─────────────────────────────────────────
-    hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or len(errores_exp) > 0)
+    hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0 or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
@@ -234,7 +250,7 @@ def main():
 {'=' * 50}
 Fecha:    {ahora}
 Estado:   {estado}
-Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s)
+Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s + canal {dur_rsm_canal}s)
 
 ── EXPORT ──────────────────────────────────────────
 {resumen_exp}
@@ -248,8 +264,11 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 
 {salida_imp}
 
-── RESUMEN VENTAS ──────────────────────────────────
+── RESUMEN VENTAS MES ──────────────────────────────
 {resumen_rsm}
+
+── RESUMEN VENTAS CANAL ────────────────────────────
+{resumen_rsm_canal}
 """
     enviar_email(env, asunto, cuerpo)
 

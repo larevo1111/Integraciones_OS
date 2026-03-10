@@ -44,8 +44,8 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   python3 scripts/orquestador.py --forzar   # ignora horario operativo
   ```
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
-- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js y calcular_resumen_ventas.py)
-- **Dependencias**: `export_all.sh`, `import_all.js`, `calcular_resumen_ventas.py`, `scripts/.env`
+- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js, calcular_resumen_ventas.py y calcular_resumen_ventas_canal.py)
+- **Dependencias**: `export_all.sh`, `import_all.js`, `calcular_resumen_ventas.py`, `calcular_resumen_ventas_canal.py`, `scripts/.env`
 - **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
 - **Systemd**:
   ```bash
@@ -106,6 +106,28 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   - `pry_*`: proyección lineal al cierre del mes — **solo mes en curso, NULL para meses cerrados**
   - `ant_*`: comparativo año anterior (ventas_netas, var_pct, consignacion, var_pct)
 - **Notas**: todos los campos numéricos de Effi usan coma decimal; el script castea con `REPLACE(field, ',', '.')`. `vigencia` no existe en encabezados (export solo vigentes). Consignación excluye OVs anuladas en ≤1 día sin keywords de liquidación. Campos `_pct` almacenados como decimal 0–1 (no multiplicados por 100).
+
+### calcular_resumen_ventas_canal.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_facturas_canal_mes` — resumen mensual de ventas agrupado por canal de marketing
+- **Tipo**: import / analítica (paso 3b del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_canal.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_facturas_canal_mes — N filas actualizadas`
+- **Tabla(s) MariaDB**: `resumen_ventas_facturas_canal_mes` (PK: `mes, canal`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_facturas_venta_detalle`; driver `mysql-connector-python`
+- **Columnas clave** (29 total, PK compuesto: mes + canal):
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, **fin_pct_del_mes** (% participación canal en total mes)
+  - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, num_facturas (COUNT DISTINCT id_numeracion), ticket_promedio
+  - `cli_*`: clientes_activos, clientes_nuevos, vtas_por_cliente
+  - `cat_*`: num_referencias
+  - `top_*`: top_cliente, top_cliente_ventas, top_producto_cod/nombre/ventas
+  - `pry_*`: proyección lineal — solo mes en curso, NULL para meses cerrados
+  - `ant_*`: ventas_netas del mismo canal año anterior + var_pct
+- **Diferencias vs `resumen_ventas_facturas_mes`**: NO incluye cartera (`car_`), consignación (`con_`), devoluciones (`fin_devoluciones`/`fin_ingresos_netos`) — ninguna de estas fuentes tiene campo `marketing_cliente`. AGREGA `fin_pct_del_mes`.
+- **Notas**: Campo número de factura en detalle es `id_numeracion` (no `numero_factura`). Canales vacíos/NULL se normalizan a `'Sin canal'`. `ant_var_ventas_pct` compara contra el mismo canal del año anterior.
 
 ---
 
