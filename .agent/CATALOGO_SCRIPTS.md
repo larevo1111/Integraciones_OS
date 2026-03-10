@@ -44,8 +44,8 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   python3 scripts/orquestador.py --forzar   # ignora horario operativo
   ```
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
-- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js, calcular_resumen_ventas.py y calcular_resumen_ventas_canal.py)
-- **Dependencias**: `export_all.sh`, `import_all.js`, `calcular_resumen_ventas.py`, `calcular_resumen_ventas_canal.py`, `scripts/.env`
+- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js, calcular_resumen_ventas.py, calcular_resumen_ventas_canal.py y calcular_resumen_ventas_cliente.py)
+- **Dependencias**: `export_all.sh`, `import_all.js`, `calcular_resumen_ventas.py`, `calcular_resumen_ventas_canal.py`, `calcular_resumen_ventas_cliente.py`, `scripts/.env`
 - **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
 - **Systemd**:
   ```bash
@@ -116,18 +116,49 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   ```
 - **Salida**: stdout con `✅ resumen_ventas_facturas_canal_mes — N filas actualizadas`
 - **Tabla(s) MariaDB**: `resumen_ventas_facturas_canal_mes` (PK: `mes, canal`; crea si no existe, UPSERT)
-- **Dependencias**: `zeffi_facturas_venta_detalle`; driver `mysql-connector-python`
-- **Columnas clave** (29 total, PK compuesto: mes + canal):
+- **Dependencias**: `zeffi_facturas_venta_detalle`, `zeffi_ordenes_venta_encabezados`; driver `mysql-connector-python`
+- **Columnas clave** (32 total, PK compuesto: mes + canal):
   - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, **fin_pct_del_mes** (% participación canal en total mes)
   - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
   - `vol_*`: unidades_vendidas, num_facturas (COUNT DISTINCT id_numeracion), ticket_promedio
   - `cli_*`: clientes_activos, clientes_nuevos, vtas_por_cliente
   - `cat_*`: num_referencias
   - `top_*`: top_cliente, top_cliente_ventas, top_producto_cod/nombre/ventas
+  - `con_*`: **con_consignacion_pp** (OVs atribuidas al canal via id_cliente → canal histórico)
   - `pry_*`: proyección lineal — solo mes en curso, NULL para meses cerrados
-  - `ant_*`: ventas_netas del mismo canal año anterior + var_pct
-- **Diferencias vs `resumen_ventas_facturas_mes`**: NO incluye cartera (`car_`), consignación (`con_`), devoluciones (`fin_devoluciones`/`fin_ingresos_netos`) — ninguna de estas fuentes tiene campo `marketing_cliente`. AGREGA `fin_pct_del_mes`.
-- **Notas**: Campo número de factura en detalle es `id_numeracion` (no `numero_factura`). Canales vacíos/NULL se normalizan a `'Sin canal'`. `ant_var_ventas_pct` compara contra el mismo canal del año anterior.
+  - `ant_*`: ventas_netas, var_pct, **ant_consignacion_pp**, **ant_var_consignacion_pct**
+- **Diferencias vs `resumen_ventas_facturas_mes`**: NO incluye cartera (`car_`), devoluciones. AGREGA `fin_pct_del_mes` y `con_consignacion_pp`.
+- **Notas**:
+  - Campo número de factura en detalle: `id_numeracion` (no `numero_factura`).
+  - Canales vacíos/NULL se normalizan a `'Sin canal'`.
+  - Consignaciones atribuidas por canal via mapping id_cliente → canal más frecuente en historial de facturas (Opción A). Filas con solo consignaciones (sin facturas ese mes) se crean con valores de facturas en 0.
+  - SUM(canal_mes) vs resumen_mes: diff = 0.00 exacto (verificado 2026-03).
+
+### calcular_resumen_ventas_cliente.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_facturas_cliente_mes` — resumen mensual de ventas por cliente
+- **Tipo**: import / analítica (paso 3c del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_cliente.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_facturas_cliente_mes — N filas actualizadas`
+- **Tabla(s) MariaDB**: `resumen_ventas_facturas_cliente_mes` (PK: `mes, id_cliente`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_facturas_venta_detalle`, `zeffi_clientes`, `zeffi_ordenes_venta_encabezados`; driver `mysql-connector-python`
+- **Columnas clave** (34 total, PK compuesto: mes + id_cliente):
+  - Dimensiones: `cliente`, `ciudad`, `departamento`, `canal` (tipo_de_marketing del maestro), `vendedor`
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos
+  - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, num_facturas, ticket_promedio
+  - `cat_*`: num_referencias
+  - `top_*`: top_producto_cod/nombre/ventas
+  - `con_*`: con_consignacion_pp (OVs directamente por id_cliente)
+  - `cli_*`: cli_es_nuevo (1 si primera factura histórica del cliente)
+  - `pry_*`: proyección lineal — solo mes en curso
+  - `ant_*`: ventas_netas, var_pct, ant_consignacion_pp, ant_var_consignacion_pct
+- **Notas**:
+  - `canal` viene del maestro `zeffi_clientes.tipo_de_marketing` (JOIN por numero_de_identificacion ↔ id_cliente). Si no hay coincidencia: `'Sin canal'`.
+  - Consignaciones directas por id_cliente (sin necesidad de mapping de canal).
+  - SUM(cliente_mes) vs resumen_mes: diff ≤ 0.26 (solo redondeo DECIMAL).
 
 ---
 

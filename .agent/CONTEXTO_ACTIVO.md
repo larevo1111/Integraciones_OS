@@ -1,16 +1,17 @@
 # Contexto Activo - Integraciones_OS
 
 ## Estado Actual (2026-03-10)
-Pipeline Effi → MariaDB funcional. Paso 3 analítico activo. NocoDB conectado. Playwright corre en el host.
+Pipeline Effi → MariaDB funcional. Pasos 3a/3b/3c analíticos activos. NocoDB conectado. Playwright corre en el host.
 
 ## Lo que está funcionando
 
-### Pipeline de datos Effi (3 pasos)
+### Pipeline de datos Effi (4 pasos)
 - **Paso 1 — 26 scripts Playwright** exportan módulos de Effi a `/home/osserver/playwright/exports/`
 - **Paso 2 — import_all.js** importa **39 tablas** a MariaDB `effi_data` (TRUNCATE + INSERT)
 - **Paso 3a — calcular_resumen_ventas.py** → `resumen_ventas_facturas_mes` (38 campos, PK: mes)
-- **Paso 3b — calcular_resumen_ventas_canal.py** → `resumen_ventas_facturas_canal_mes` (29 campos, PK: mes+canal, 193 filas)
-- **Orquestador**: `scripts/orquestador.py` — corre los 3 pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
+- **Paso 3b — calcular_resumen_ventas_canal.py** → `resumen_ventas_facturas_canal_mes` (32 campos, PK: mes+canal, 251 filas)
+- **Paso 3c — calcular_resumen_ventas_cliente.py** → `resumen_ventas_facturas_cliente_mes` (34 campos, PK: mes+id_cliente, 600 filas)
+- **Orquestador**: `scripts/orquestador.py` — corre los 4 pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
 - **n8n workflow activo**: trigger cada 2h + manual + webhook
   - Webhook URL: `https://n8n.oscomunidad.com/webhook/fa393bcf-8eb3-4b14-80bc-bfda8ca42765`
 
@@ -26,10 +27,18 @@ Pipeline Effi → MariaDB funcional. Paso 3 analítico activo. NocoDB conectado.
 - Devoluciones = NCs de `zeffi_notas_credito_venta_encabezados`
 
 **resumen_ventas_facturas_canal_mes**
-- 29 campos, PK (mes, canal), 193 filas
+- 32 campos, PK (mes, canal), 251 filas
 - `fin_ventas_netas_sin_iva = precio_bruto_total - descuento_total` (precio_neto_total incluye IVA — gotcha crítico)
 - `fin_pct_del_mes` = % participación canal en total mes (suma 1.0 por mes)
-- NO incluye car_, con_, devoluciones (sin campo canal en esas fuentes)
+- `con_consignacion_pp` = OVs atribuidas al canal via id_cliente → canal histórico (mapping más-frecuente)
+- 58 filas son canales con solo consignaciones (sin facturas ese mes)
+
+**resumen_ventas_facturas_cliente_mes**
+- 34 campos, PK (mes, id_cliente), 600 filas
+- `canal` viene del maestro `zeffi_clientes.tipo_de_marketing` (estado actual del cliente)
+- `cli_es_nuevo = 1` si es la primera factura histórica del cliente
+- `con_consignacion_pp` = OVs directamente por id_cliente (sin mapping)
+- SUM(cliente_mes) vs resumen_mes: diff ≤ 0.26 (solo redondeo DECIMAL)
 
 ### NocoDB (nocodb.oscomunidad.com)
 - Proyecto: **Origen Silvestre Integrado**
@@ -48,7 +57,7 @@ Pipeline Effi → MariaDB funcional. Paso 3 analítico activo. NocoDB conectado.
 - Credenciales: `osadmin` / `Epist2487.`
 
 ## Próximos Pasos
-1. **Siguientes vistas analíticas**: resumen por cliente (`_cliente_mes`) y por producto (`_producto_mes`)
+1. **Vista analítica por producto**: `resumen_ventas_facturas_producto_mes` — resumen mensual por producto/referencia
 2. **App de datos**: decidir entre AppSheet (conocido, MySQL nativo) vs Appsmith (self-hosted Docker)
 3. **Sync Effi → EspoCRM**: pipeline n8n que upserte clientes vía REST API
 
