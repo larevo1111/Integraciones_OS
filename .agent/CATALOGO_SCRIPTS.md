@@ -45,7 +45,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   ```
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
 - **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js y los 8 scripts calcular_resumen_*)
-- **Dependencias**: `export_all.sh`, `import_all.js`, todos los `calcular_resumen_ventas_*.py` (pasos 3a/3b/3c/3d/4a/4b/4c/4d), `sync_hostinger.py`, `scripts/.env`
+- **Dependencias**: `export_all.sh`, `import_all.js`, todos los `calcular_resumen_ventas_*.py` (pasos 3a/3b/3c/3d/4a/4b/4c/4d), `sync_hostinger.py`, `sync_espocrm_marketing.py`, `sync_espocrm_contactos.py`, `sync_espocrm_to_hostinger.py`, `scripts/.env`
 - **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
 - **Systemd**:
   ```bash
@@ -288,6 +288,64 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   - `rem_pct_facturadas` es dinámico — puede aumentar con el tiempo conforme remisiones pendientes se convierten.
   - Canal: `tipo_de_markting` (typo sin 'e') en encabezados; `tipo_de_marketing_cliente` en detalle.
   - 29 meses (2023-11 a 2026-03). diff_total vs fuente = 0.00.
+
+---
+
+## 1b. Scripts EspoCRM (integración bidireccional)
+
+### sync_espocrm_marketing.py — Paso 6b
+- **Propósito**: Sincroniza enums dinámicos (tipoDeMarketing, tarifaPrecios, vendedorEffi) y campos custom de Contact en EspoCRM desde Effi
+- **Tipo**: utilidad
+- **Ejecución manual**: `python3 scripts/sync_espocrm_marketing.py`
+- **Salida**: `✅ sync_espocrm_marketing — actualizado: N marketing | N tarifas | N vendedores`
+- **Tabla(s)**: entityDefs + i18n + layout en contenedor `espocrm` vía docker cp
+- **Notas**: Solo hace rebuild si detecta cambios. Enums fijos hardcodeados: tipoCliente (6 valores), tipoIdentificacion, tipoPersona. Campos bool: enviadoAEffi.
+
+---
+
+### sync_espocrm_contactos.py — Paso 6c
+- **Propósito**: Sincroniza clientes vigentes de Effi (zeffi_clientes) → Contact en EspoCRM. Upsert por numero_identificacion.
+- **Tipo**: utilidad
+- **Ejecución manual**: `python3 scripts/sync_espocrm_contactos.py`
+- **Salida**: `✅ sync_espocrm_contactos — N contactos (X nuevos, Y actualizados, Z omitidos)`
+- **Tabla(s)**: `contact`, `email_address`, `entity_email_address`, `phone_number`, `entity_phone_number` en espocrm
+- **Notas**: Setea fuente='Effi' en todos los contactos importados. Resuelve ciudad → ciudad_id via tabla `ciudad`. Resuelve vendedor → assigned_user_id via nombre completo.
+
+---
+
+### sync_espocrm_to_hostinger.py — Paso 6d
+- **Propósito**: Exporta tabla `contact` de EspoCRM local → `crm_contactos` en Hostinger (u768061575_os_integracion). Para visibilidad en AppSheet/NocoDB.
+- **Tipo**: utilidad
+- **Ejecución manual**: `python3 scripts/sync_espocrm_to_hostinger.py`
+- **Salida**: `✅ sync_espocrm_to_hostinger — N contactos → crm_contactos en Hostinger`
+- **Tabla(s) Hostinger**: `crm_contactos` (TRUNCATE + INSERT en lotes de 500)
+- **Conexión**: SSH tunnel a Hostinger (mismo mecanismo que sync_hostinger.py)
+- **Campos**: id, nombre_completo, first/last_name, numero_identificacion, tipo_identificacion, tipo_persona, email, telefono, address_*, ciudad, departamento, pais, tipo_de_marketing, tipo_cliente, tarifa_precios, forma_pago, vendedor_effi, fuente, enviado_a_effi, descripcion
+
+---
+
+### bootstrap_ciudades_espocrm.py — Ejecución única
+- **Propósito**: Crea la entidad Ciudad en EspoCRM y la puebla con 12,237 ciudades de Colombia, Ecuador, Rep. Dominicana y Guatemala (desde plantilla_importacion_cliente.xlsx)
+- **Tipo**: bootstrap (solo correr una vez)
+- **Ejecución manual**: `python3 scripts/bootstrap_ciudades_espocrm.py`
+- **Salida**: `✅ bootstrap_ciudades_espocrm — completo`
+- **Tabla(s)**: `ciudad` en espocrm (creada via rebuild.php). Agrega `ciudad_id` a `contact`.
+- **Notas**: Idempotente (INSERT IGNORE por id_effi UNIQUE). Ya se ejecutó — NO volver a correr salvo que se limpie la BD.
+
+---
+
+### generar_plantilla_import_effi.py — Paso 7
+- **Propósito**: Lee contactos EspoCRM con fuente='CRM' y enviado_a_effi=0 → genera XLSX con formato de plantilla de importación de Effi
+- **Tipo**: utilidad
+- **Ejecución manual**:
+  ```bash
+  python3 scripts/generar_plantilla_import_effi.py            # solo pendientes
+  python3 scripts/generar_plantilla_import_effi.py --todos     # re-exportar todos
+  python3 scripts/generar_plantilla_import_effi.py --no-marcar # sin marcar enviado
+  ```
+- **Salida**: `/tmp/import_clientes_effi_<fecha>.xlsx` con 36 columnas
+- **Mapeos**: tipo_identificacion→id_effi (hardcoded), ciudad_id→id_effi, tarifa→id (zeffi_tarifas_precios), marketing→id (zeffi_tipos_marketing), tipo_persona→1/2, regimen→4/5, email_responsable fijo, sucursal=1, moneda=COP
+- **Notas**: Tras generar, marca contactos como enviado_a_effi=1 (a menos que --no-marcar). El XLSX se sube manualmente a Effi o via Playwright (pendiente).
 
 ---
 

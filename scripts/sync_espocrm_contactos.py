@@ -90,6 +90,34 @@ def resolver_vendedor(nombre_vendedor, usuarios_map):
     return usuarios_map.get(nombre_vendedor.lower().strip())
 
 
+def cargar_ciudades_espo(cur_espo):
+    """Devuelve dict para lookup: (nombre_lower, depto_lower, pais_lower) → ciudad_id."""
+    cur_espo.execute(
+        "SELECT id, LOWER(name), LOWER(COALESCE(departamento,'')), LOWER(COALESCE(pais,'')) "
+        "FROM ciudad WHERE deleted=0"
+    )
+    mapa = {}
+    for city_id, nombre, depto, pais in cur_espo.fetchall():
+        mapa[(nombre, depto, pais)] = city_id
+        # Índice de respaldo: solo nombre + pais
+        if (nombre, pais) not in mapa:
+            mapa[(nombre, pais)] = city_id
+    return mapa
+
+
+def resolver_ciudad(nombre_ciudad, departamento, pais, ciudades_map):
+    """Resuelve nombre ciudad → ciudad_id. Retorna None si no hay match."""
+    if not nombre_ciudad:
+        return None
+    n = nombre_ciudad.lower().strip()
+    d = (departamento or '').lower().strip()
+    p = (pais or 'colombia').lower().strip()
+    result = ciudades_map.get((n, d, p))
+    if result:
+        return result
+    return ciudades_map.get((n, p))
+
+
 # ─── Email y teléfono ──────────────────────────────────────────────────────────
 
 def upsert_email(cur, contact_id, email_raw, now):
@@ -173,8 +201,9 @@ def main():
     cur_espo  = conn_espo.cursor(buffered=True)
 
     try:
-        # Cargar mapeo vendedor → user_id
+        # Cargar mapeos de lookup
         usuarios_map = cargar_usuarios_espo(cur_espo)
+        ciudades_map = cargar_ciudades_espo(cur_espo)
 
         # Leer todos los clientes vigentes de Effi
         cur_effi.execute("""
@@ -203,6 +232,7 @@ def main():
 
             first, last = split_nombre(v(c['nombre']) or '')
             vendedor_id = resolver_vendedor(v(c['vendedor']), usuarios_map)
+            ciudad_id   = resolver_ciudad(v(c['ciudad']), v(c['departamento']), v(c['pais']), ciudades_map)
 
             # ¿Existe ya en EspoCRM?
             cur_espo.execute(
@@ -228,7 +258,9 @@ def main():
                 'tarifa_precios':       v(c['tarifa_de_precios']),
                 'forma_pago':           v(c['forma_de_pago']),
                 'vendedor_effi':        v(c['vendedor']),
+                'ciudad_id':            ciudad_id,
                 'assigned_user_id':     vendedor_id,
+                'fuente':               'Effi',
                 'modified_at':          now,
                 'modified_by_id':       CREATED_BY_ID,
             }

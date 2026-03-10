@@ -5,12 +5,15 @@ Gestiona los campos custom de la entidad Contact en EspoCRM.
 
 Enums dinámicos (sincronizados desde Effi):
   - tipoDeMarketing  ← zeffi_tipos_marketing
-  - tipoCliente      ← zeffi_tipo_de_cliente  (si se exporta) o valores fijos
   - tarifaPrecios    ← zeffi_tarifas_precios
+  - vendedorEffi     ← DISTINCT zeffi_clientes.vendedor UNION zeffi_remisiones_venta_encabezados.vendedor
 
-Campos fijos (no dependen de Effi):
-  - numeroIdentificacion, tipoIdentificacion, tipoPersona,
-    formaPago, vendedorEffi
+Enums fijos:
+  - tipoCliente      ← 6 valores hardcodeados (estables en Effi)
+  - tipoIdentificacion, tipoPersona
+
+Campos varchar fijos:
+  - numeroIdentificacion, formaPago
 
 Solo hace rebuild si detecta cambios en alguno de los enums dinámicos.
 
@@ -49,7 +52,8 @@ TIPOS_IDENTIFICACION = [
     '', 'Cédula de ciudadanía', 'Cédula de extranjería',
     'Número de Identificación Tributaria CO', 'Pasaporte'
 ]
-TIPOS_PERSONA = ['', 'Física (natural)', 'Jurídica (moral)']
+TIPOS_PERSONA  = ['', 'Física (natural)', 'Jurídica (moral)']
+TIPOS_CLIENTE  = ['', 'Común', 'Fiel', 'Desertor', 'Mayorista', 'Importador', 'Industrial']
 
 LAYOUT_JSON = [
     {
@@ -61,6 +65,7 @@ LAYOUT_JSON = [
             [{"name": "numeroIdentificacion"},   {"name": "tipoIdentificacion"}],
             [{"name": "tipoPersona"},            {"name": "vendedorEffi"}],
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
+            [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
             [{"name": "address"},                False],
             [{"name": "description", "fullWidth": True}]
         ]
@@ -98,6 +103,26 @@ def query_opciones(tabla, columna):
     return opciones
 
 
+def query_vendedores():
+    """DISTINCT vendedores de zeffi_clientes + zeffi_remisiones_venta_encabezados."""
+    conn = mysql.connector.connect(**DB_LOCAL)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT vendedor FROM (
+            SELECT vendedor FROM zeffi_clientes
+              WHERE vendedor IS NOT NULL AND vendedor != ''
+            UNION
+            SELECT vendedor FROM zeffi_remisiones_venta_encabezados
+              WHERE vendedor IS NOT NULL AND vendedor != ''
+        ) t
+        ORDER BY vendedor
+    """)
+    opciones = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return opciones
+
+
 def get_opciones_actuales_espocrm(campo):
     """Lee las opciones actuales de un campo enum en EspoCRM."""
     try:
@@ -111,7 +136,7 @@ def get_opciones_actuales_espocrm(campo):
         return []
 
 
-def generar_json(tipos_marketing, tipos_cliente, tarifas_precios):
+def generar_json(tipos_marketing, tarifas_precios, vendedores):
     entity_defs = {
         'fields': {
             'tipoDeMarketing': {
@@ -120,7 +145,7 @@ def generar_json(tipos_marketing, tipos_cliente, tarifas_precios):
             },
             'tipoCliente': {
                 'type': 'enum',
-                'options': [''] + tipos_cliente
+                'options': TIPOS_CLIENTE
             },
             'tarifaPrecios': {
                 'type': 'enum',
@@ -143,8 +168,17 @@ def generar_json(tipos_marketing, tipos_cliente, tarifas_precios):
                 'maxLength': 100
             },
             'vendedorEffi': {
-                'type': 'varchar',
-                'maxLength': 200
+                'type': 'enum',
+                'options': [''] + vendedores
+            },
+            'fuente': {
+                'type': 'enum',
+                'options': ['CRM', 'Effi'],
+                'default': 'CRM'
+            },
+            'enviadoAEffi': {
+                'type': 'bool',
+                'default': False
             }
         }
     }
@@ -158,6 +192,8 @@ def generar_json(tipos_marketing, tipos_cliente, tarifas_precios):
             'tipoPersona':          'Tipo de Persona',
             'formaPago':            'Forma de Pago',
             'vendedorEffi':         'Vendedor (Effi)',
+            'fuente':               'Fuente',
+            'enviadoAEffi':         'Enviado a Effi',
         }
     }
     with open(TMP_ENTITY, 'w', encoding='utf-8') as f:
@@ -187,35 +223,35 @@ def aplicar_a_espocrm():
 # ─── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    # Leer opciones vigentes de Effi
+    # Leer opciones dinámicas de Effi
     tipos_marketing = query_opciones('zeffi_tipos_marketing', 'tipo_de_marketing')
     tarifas_precios = query_opciones('zeffi_tarifas_precios', 'nombre')
-    # tipo_de_cliente viene de zeffi_clientes (no tiene tabla propia exportada)
-    tipos_cliente   = query_opciones('zeffi_clientes', 'tipo_de_cliente')
+    vendedores      = query_vendedores()
+    # tipo_de_cliente: 6 valores fijos (TIPOS_CLIENTE), no se consulta la BD
 
     # Comparar con lo que ya hay en EspoCRM
-    mk_espo  = get_opciones_actuales_espocrm('tipoDeMarketing')
-    tar_espo = get_opciones_actuales_espocrm('tarifaPrecios')
-    cli_espo = get_opciones_actuales_espocrm('tipoCliente')
+    mk_espo   = get_opciones_actuales_espocrm('tipoDeMarketing')
+    tar_espo  = get_opciones_actuales_espocrm('tarifaPrecios')
+    vend_espo = get_opciones_actuales_espocrm('vendedorEffi')
 
     sin_cambios = (
-        set(tipos_marketing) == set(mk_espo)  and len(tipos_marketing) == len(mk_espo) and
-        set(tarifas_precios) == set(tar_espo) and len(tarifas_precios) == len(tar_espo) and
-        set(tipos_cliente)   == set(cli_espo) and len(tipos_cliente)   == len(cli_espo)
+        set(tipos_marketing) == set(mk_espo)   and len(tipos_marketing) == len(mk_espo) and
+        set(tarifas_precios) == set(tar_espo)  and len(tarifas_precios) == len(tar_espo) and
+        set(vendedores)      == set(vend_espo) and len(vendedores)      == len(vend_espo)
     )
 
     if sin_cambios:
         print(f'✅ sync_espocrm_marketing — sin cambios '
               f'({len(tipos_marketing)} marketing, {len(tarifas_precios)} tarifas, '
-              f'{len(tipos_cliente)} tipos cliente)')
+              f'{len(vendedores)} vendedores)')
         return
 
-    generar_json(tipos_marketing, tipos_cliente, tarifas_precios)
+    generar_json(tipos_marketing, tarifas_precios, vendedores)
     aplicar_a_espocrm()
 
     print(f'✅ sync_espocrm_marketing — actualizado: '
           f'{len(tipos_marketing)} marketing | {len(tarifas_precios)} tarifas | '
-          f'{len(tipos_cliente)} tipos cliente')
+          f'{len(vendedores)} vendedores')
 
 
 if __name__ == '__main__':
