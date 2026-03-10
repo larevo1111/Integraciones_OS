@@ -247,15 +247,17 @@ PK: `mes` VARCHAR(7) `'YYYY-MM'`. Datos desde 2025-01.
 
 | Prefijo | Campos | Fuente |
 |---|---|---|
-| `fin_` | ventas_brutas, descuentos, pct_descuento, impuestos, devoluciones, ventas_netas | encabezados |
+| `fin_` | ventas_brutas, descuentos, pct_descuento, **ventas_netas_sin_iva**, impuestos, ventas_netas, devoluciones, **ingresos_netos** | encabezados + NCs |
 | `cto_` | costo_total, utilidad_bruta, margen_utilidad_pct | encabezados (`costo_manual`) |
 | `vol_` | unidades_vendidas, num_facturas, ticket_promedio | detalle+encabezados |
 | `cli_` | clientes_activos, clientes_nuevos, vtas_por_cliente | encabezados |
 | `car_` | saldo (pendiente de cobro acumulado de facturas del mes) | encabezados (`pdte_de_cobro`) |
 | `cat_` | num_referencias, vtas_por_referencia, num_canales | detalle (`cod_articulo`, `marketing_cliente`) |
 | `con_` | consignacion_pp (OVs creadas, excl. errores operativos) | OVs |
-| `top_` | canal, canal_ventas, cliente, cliente_ventas, producto_cod, producto_nombre, producto_ventas | detalle+encabezados |
-| `pry_` | dia_del_mes, proyeccion_mes (lineal), ritmo_pct (vs año ant.) | calculado |
+| `top_` | canal (nombre), canal_ventas, cliente (nombre), cliente_ventas, producto_cod, producto_nombre, producto_ventas | detalle+encabezados |
+| `pry_` | dia_del_mes, proyeccion_mes (lineal), ritmo_pct — **solo mes en curso**, NULL para meses cerrados | calculado |
 | `ant_` | ventas_netas, var_ventas_pct, consignacion_pp, var_consignacion_pct | self-join -12 meses |
+
+> **Campos porcentaje** (`fin_pct_descuento`, `cto_margen_utilidad_pct`, `ant_var_ventas_pct`, `ant_var_consignacion_pct`, `pry_ritmo_pct`): almacenados como **decimales (0–1)**, NO como porcentaje. Ej: 0.5079 = 50.79%. Multiplicar × 100 en la capa de presentación si se quiere mostrar como %.
 
 **Script**: `scripts/calcular_resumen_ventas.py` — idempotente, UPSERT por mes.

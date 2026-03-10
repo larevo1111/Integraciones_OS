@@ -95,7 +95,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Tabla(s) MariaDB**: `resumen_ventas_facturas_mes` (crea si no existe, UPSERT por mes)
 - **Dependencias**: tablas `zeffi_facturas_venta_encabezados`, `zeffi_facturas_venta_detalle`, `zeffi_ordenes_venta_encabezados`; driver `mysql-connector-python`
 - **Columnas clave** (38 total):
-  - `fin_*`: financiero (ventas brutas, descuentos, impuestos, devoluciones, netas)
+  - `fin_*`: financiero (ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, ventas_netas, devoluciones, ingresos_netos)
   - `cto_*`: costo y utilidad (costo_manual, utilidad_bruta, margen_pct)
   - `vol_*`: volumen (unidades, num_facturas, ticket_promedio)
   - `cli_*`: clientes (activos, nuevos, ventas_por_cliente)
@@ -103,9 +103,9 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   - `cat_*`: catálogo (num_referencias, ventas_por_referencia, num_canales)
   - `con_*`: consignación (total OVs creadas ese mes, excluye errores operativos ≤1 día)
   - `top_*`: tops del mes (canal, cliente, producto)
-  - `pry_*`: proyección lineal al cierre del mes
+  - `pry_*`: proyección lineal al cierre del mes — **solo mes en curso, NULL para meses cerrados**
   - `ant_*`: comparativo año anterior (ventas_netas, var_pct, consignacion, var_pct)
-- **Notas**: todos los campos numéricos de Effi usan coma decimal; el script castea con `REPLACE(field, ',', '.')`. `vigencia` no existe en encabezados (export solo vigentes). Consignación excluye OVs anuladas en ≤1 día sin keywords de liquidación.
+- **Notas**: todos los campos numéricos de Effi usan coma decimal; el script castea con `REPLACE(field, ',', '.')`. `vigencia` no existe en encabezados (export solo vigentes). Consignación excluye OVs anuladas en ≤1 día sin keywords de liquidación. Campos `_pct` almacenados como decimal 0–1 (no multiplicados por 100).
 
 ---
 

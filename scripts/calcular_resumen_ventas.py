@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_mes (
     -- Financiero
     fin_ventas_brutas        DECIMAL(15,2) COMMENT 'SUM total_bruto (precio público antes de descuentos)',
     fin_descuentos           DECIMAL(15,2) COMMENT 'SUM descuentos',
-    fin_pct_descuento        DECIMAL(8,4)  COMMENT 'descuentos / ventas_brutas * 100',
+    fin_pct_descuento        DECIMAL(8,4)  COMMENT 'descuentos / ventas_brutas (decimal 0-1)',
     fin_ventas_netas_sin_iva DECIMAL(15,2) COMMENT 'SUM subtotal = total_bruto - descuentos, SIN IVA',
     fin_impuestos            DECIMAL(15,2) COMMENT 'SUM impuestos (IVA — va a la DIAN, no se queda en la empresa)',
     fin_ventas_netas         DECIMAL(15,2) COMMENT 'SUM total_neto = subtotal + IVA - retenciones (incluye IVA)',
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_mes (
     -- Costo y utilidad
     cto_costo_total          DECIMAL(15,2) COMMENT 'SUM costo_manual',
     cto_utilidad_bruta       DECIMAL(15,2) COMMENT 'ventas_netas - costo_total',
-    cto_margen_utilidad_pct  DECIMAL(8,4)  COMMENT 'utilidad_bruta / ventas_netas * 100',
+    cto_margen_utilidad_pct  DECIMAL(8,4)  COMMENT 'utilidad_bruta / ventas_netas (decimal 0-1)',
 
     -- Volumen
     vol_unidades_vendidas    DECIMAL(15,2) COMMENT 'SUM cantidad en detalle',
@@ -85,9 +85,9 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_mes (
     top_producto_ventas      DECIMAL(15,2),
 
     -- Proyección
-    pry_dia_del_mes          INT           COMMENT 'Día actual (mes corriente) o último día (meses pasados)',
-    pry_proyeccion_mes       DECIMAL(15,2) COMMENT 'Proyección lineal al cierre del mes',
-    pry_ritmo_pct            DECIMAL(8,4)  COMMENT 'proyeccion_mes / ant_ventas_netas * 100',
+    pry_dia_del_mes          INT           COMMENT 'Día actual del mes (solo mes corriente, NULL si mes cerrado)',
+    pry_proyeccion_mes       DECIMAL(15,2) COMMENT 'Proyección lineal al cierre del mes (solo mes corriente)',
+    pry_ritmo_pct            DECIMAL(8,4)  COMMENT 'proyeccion_mes / ant_ventas_netas (decimal 0-1, solo mes corriente)',
 
     -- Año anterior
     ant_ventas_netas         DECIMAL(15,2) COMMENT 'ventas_netas del mismo mes año anterior',
@@ -242,10 +242,10 @@ def main():
     cursor.execute(f"""
         SELECT
             DATE_FORMAT(fecha_de_creacion, '%Y-%m') AS mes,
-            id_cliente,
+            cliente,
             SUM({cn('total_neto')})                 AS ventas
         FROM zeffi_facturas_venta_encabezados
-        GROUP BY mes, id_cliente
+        GROUP BY mes, cliente
         ORDER BY mes ASC, ventas DESC
     """)
 
@@ -254,7 +254,7 @@ def main():
         mes = row['mes']
         if mes in resumen and mes not in seen_cli:
             seen_cli.add(mes)
-            resumen[mes]['top_cliente']        = row['id_cliente']
+            resumen[mes]['top_cliente']        = row['cliente']
             resumen[mes]['top_cliente_ventas'] = fval(row['ventas'])
 
     # ── 7. Top producto por mes ───────────────────────────────────────────────
@@ -322,7 +322,7 @@ def main():
         if prev and prev['fin_ventas_netas']:
             d['ant_var_ventas_pct'] = (
                 (d['fin_ventas_netas'] - prev['fin_ventas_netas'])
-                / prev['fin_ventas_netas'] * 100
+                / prev['fin_ventas_netas']
             )
         else:
             d['ant_var_ventas_pct'] = None
@@ -331,7 +331,7 @@ def main():
         cur_con  = d.get('con_consignacion_pp')
         if prev_con:
             d['ant_var_consignacion_pct'] = (
-                ((cur_con or 0) - prev_con) / prev_con * 100
+                ((cur_con or 0) - prev_con) / prev_con
             )
         else:
             d['ant_var_consignacion_pct'] = None
@@ -348,7 +348,7 @@ def main():
 
         # fin_pct_descuento
         d['fin_pct_descuento'] = (
-            d.get('fin_descuentos', 0) / bruto * 100 if bruto else None
+            d.get('fin_descuentos', 0) / bruto if bruto else None
         )
 
         # fin_ventas_netas_sin_iva = subtotal de facturas
@@ -359,7 +359,7 @@ def main():
 
         # cto_
         d['cto_utilidad_bruta']      = netas - costo
-        d['cto_margen_utilidad_pct'] = (netas - costo) / netas * 100 if netas else None
+        d['cto_margen_utilidad_pct'] = (netas - costo) / netas if netas else None
 
         # vol_ticket_promedio
         facturas = d.get('vol_num_facturas', 0)
@@ -373,22 +373,20 @@ def main():
         refs = d.get('cat_num_referencias', 0)
         d['cat_vtas_por_referencia'] = netas / refs if refs else None
 
-        # pry_
+        # pry_ — solo se calcula para el mes en curso; meses cerrados quedan NULL
         if mes == current_month:
-            day_today              = today.day
-            d['pry_dia_del_mes']   = day_today
+            day_today               = today.day
+            d['pry_dia_del_mes']    = day_today
             d['pry_proyeccion_mes'] = (
                 netas / day_today * days_in_month if day_today else None
             )
+            proy = d.get('pry_proyeccion_mes')
+            ant  = d.get('ant_ventas_netas')
+            d['pry_ritmo_pct'] = proy / ant if (proy is not None and ant) else None
         else:
-            d['pry_dia_del_mes']    = days_in_month
-            d['pry_proyeccion_mes'] = netas
-
-        proy = d.get('pry_proyeccion_mes')
-        ant  = d.get('ant_ventas_netas')
-        d['pry_ritmo_pct'] = (
-            proy / ant * 100 if (proy is not None and ant) else None
-        )
+            d['pry_dia_del_mes']    = None
+            d['pry_proyeccion_mes'] = None
+            d['pry_ritmo_pct']      = None
 
     # ── 10. UPSERT ────────────────────────────────────────────────────────────
 
