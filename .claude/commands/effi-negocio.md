@@ -1,0 +1,214 @@
+# Skill: Modelo de Negocio Effi — Origen Silvestre
+
+Guía del modelo de datos de Effi en el contexto del negocio de Origen Silvestre.
+Documenta cómo se relacionan los módulos, qué significa cada estado, y la lógica de negocio detrás de los datos.
+
+---
+
+## 1. Qué es "vigente" en Effi
+
+> **CRÍTICO para no cometer errores de análisis.**
+
+**`vigencia = 'Vigente'` NO significa "abierto" o "pendiente de pago".**
+Significa **"no anulado"** (no cancelado/eliminado).
+
+Una factura cobrada al 100% sigue siendo `vigencia = 'Vigente'` porque no fue anulada.
+Una factura anulada es `vigencia = 'Anulada'`.
+
+**Consecuencia:** `?vigente=1` en los exports de Effi trae todos los documentos no anulados,
+incluyendo los ya pagados/cerrados. No es un filtro de "activos" en sentido financiero.
+
+**¿Cómo saber si una factura está pagada?**
+→ `pdte_de_cobro = '0'` o `'0.00'` (es campo TEXT, castear a DECIMAL para comparar)
+→ `estado_cxc = 'Cobrada'` o similar
+
+---
+
+## 2. Campos financieros en documentos de venta
+
+Presente en `facturas_venta_encabezados`, `remisiones_venta_encabezados`, `ordenes_venta_encabezados`:
+
+| Campo | Significado |
+|---|---|
+| `total_bruto` | Suma de precios antes de descuentos |
+| `descuentos` | Total de descuentos aplicados |
+| `subtotal` | total_bruto - descuentos |
+| `impuestos` | IVA y otros impuestos |
+| `retenciones` | Retenciones en la fuente |
+| `total_neto` | Lo que realmente se cobra: subtotal + impuestos - retenciones |
+| `pdte_de_cobro` | Saldo pendiente de cobro (0 = cobrado completamente) |
+| `devoluciones_vigentes` | Valor de devoluciones activas asociadas a este documento |
+| `costo_manual` | Costo de los productos vendidos (costo del inventario) |
+| `utilidad_costo_manual` | total_neto - costo_manual |
+| `margen_de_utilidad_costo_manual` | utilidad / total_neto × 100 |
+
+> **Nota:** todos estos campos vienen como TEXT en MariaDB. Siempre castear:
+> `CAST(REPLACE(total_neto, ',', '.') AS DECIMAL(15,2))`
+
+---
+
+## 3. Sistema de consignación
+
+Origen Silvestre usa **órdenes de venta (OV)** para gestionar mercancía en consignación.
+Es el mecanismo más importante y enredado del sistema.
+
+### Flujo completo
+
+```
+1. Se entrega mercancía al cliente consignatario
+   → Se crea una OV por las unidades entregadas
+   → Effi descarga el inventario con la OV
+
+2. El cliente vende parte de la mercancía
+   → Esas unidades se convierten en remisión de venta
+   → Luego en factura de venta (cuando se cobra)
+
+3. Se liquida la consignación (periódicamente)
+   → Se anulan las OVs de unidades NO vendidas
+     (observacion_de_anulacion: "LIQUIDACION" o "convertida a remisión")
+   → Se crea nueva OV con lo que queda en consignación (si aplica)
+```
+
+### Tablas involucradas
+
+| Tabla | Rol en consignación |
+|---|---|
+| `zeffi_ordenes_venta_encabezados` | Registro de mercancía entregada en consignación |
+| `zeffi_ordenes_venta_detalle` | Detalle de artículos consignados |
+| `zeffi_remisiones_venta_encabezados` | Liquidación parcial — lo que se vendió |
+| `zeffi_facturas_venta_encabezados` | Cobro de lo que se vendió |
+
+### Estados de OV
+
+| `vigencia` | `ultimo_estado` | Significado |
+|---|---|---|
+| `Vigente` | `Generada` | Mercancía actualmente en consignación |
+| `Anulada` | `Generada` | OV liquidada o anulada por error |
+
+### Cómo distinguir anulación por liquidación vs error operativo
+
+**Heurística (no 100% exacta):**
+
+```python
+def clasificar_ov_anulada(obs, fecha_creacion, fecha_anulacion):
+    # Keywords que confirman liquidación (override de heurística de días)
+    keywords_liquidacion = [
+        'liquidacion', 'liquidación', 'remision', 'remisión',
+        'convertida', 'retiro', 'devolucion', 'devolución',
+        'no vendio', 'no vendió', 'no se entrego', 'no se entregó'
+    ]
+    obs_lower = (obs or '').lower()
+    dias = (fecha_anulacion - fecha_creacion).days
+
+    if any(k in obs_lower for k in keywords_liquidacion):
+        return 'liquidacion'
+    elif dias <= 1:
+        return 'error_probable'
+    else:
+        return 'liquidacion'
+```
+
+**Distribución histórica en los datos:**
+- 151 error_probable (≤1 día sin keywords) → ~$81M
+- 533 liquidación_probable (>1 día o con keywords) → ~$143.5M
+
+### Campos para el resumen mensual
+
+| Campo | Cálculo |
+|---|---|
+| `consignacion_pp` | SUM `total_neto` de OVs creadas ese mes, excluyendo `error_probable` |
+| `consignacion_30pct` | `consignacion_pp × 0.70` (precio con 30% de descuento) |
+| `consignacion_efectiva` | SUM de remisiones/facturas generadas a clientes consignatarios ese mes |
+
+---
+
+## 4. Canales de venta (marketing_cliente)
+
+Campo `marketing_cliente` en `zeffi_facturas_venta_detalle` y `zeffi_remisiones_venta_detalle`.
+
+| Código | Canal |
+|---|---|
+| `1.x` | Tiendas (artesanales, medicinales, fitness, restaurantes, etc.) |
+| `2.x` | Distribuidores (nacional, internacional) |
+| `3.x` | Marketplaces (Mercado Libre, otros) |
+| `4.x` | Redes sociales (WhatsApp, Facebook) |
+| `6.x` | Redes de amigos |
+| `7.x` | Familiares y amigos |
+| `10.x` | Referidos / Voz a voz |
+| `11.x` | Miembros OS |
+| `12.x` | Sin clasificar |
+
+---
+
+## 5. Flujo completo de una venta normal
+
+```
+Cotización (opcional)
+    ↓
+Orden de Venta (reserva inventario)
+    ↓
+Remisión de Venta (entrega física, descarga inventario)
+    ↓
+Factura de Venta (documento fiscal, genera CxC)
+    ↓
+Comprobante de Ingreso (pago recibido, cierra CxC)
+```
+
+**Notas:**
+- No toda venta pasa por todos los pasos. Puede ir directo de OV a factura.
+- `estado_facturacion` en OV: `Pendiente` = no facturada aún, `Remisionada` = ya tiene remisión
+
+---
+
+## 6. Fechas — cuál usar para cada análisis
+
+| Análisis | Fecha a usar | Tabla | Campo |
+|---|---|---|---|
+| Ventas del mes | Fecha de creación de la factura | `facturas_venta_encabezados` | `fecha_de_creacion` |
+| Entregas del mes | Fecha de creación de remisión | `remisiones_venta_encabezados` | `fecha_de_creacion` |
+| Consignación creada | Fecha de creación OV | `ordenes_venta_encabezados` | `fecha_de_creacion` |
+| Liquidación de consignación | Fecha de anulación OV | `ordenes_venta_encabezados` | `fecha_de_anulacion` |
+
+> Para agrupar por mes: `DATE_FORMAT(fecha_de_creacion, '%Y-%m')`
+
+---
+
+## 7. Tarifas de precio
+
+Origen Silvestre maneja múltiples listas de precio. En detalle de facturas/cotizaciones aparecen como columnas separadas:
+
+| Tarifa | Campo (prefijo `precio_`) |
+|---|---|
+| Precio público sugerido (PP) | `precio_precio_publico_sugerido` |
+| Familiares y red de amigos | `precio_precio_familiares_y_red_de_amigos` |
+| Miembros (compras +200k) | `precio_de_200_000_en_compras_y_miembros` |
+| Miembros (compras +400k) | `precio_de_400_000_en_compras` |
+| Miembros (compras +800k) | `precio_de_800_000_en_compras` |
+| Miembros (compras +1.6M) | `precio_de_1_600_000_en_compras` |
+
+Estas columnas de tarifas existen en `facturas_venta_detalle`, `cotizaciones_ventas_detalle` y similares.
+**No están en `ordenes_venta_detalle`** — ahí solo hay `precio_unitario`.
+
+---
+
+## 8. Dropshipping
+
+Origen Silvestre también opera con distribuidores en modelo dropshipping.
+Identificable en facturas por campos: `distribuidor_dropshipping`, `convenio_dropshipping`, `estado_transaccion_de_dropshipping`.
+Estos registros representan ventas donde un distribuidor intermedia pero OS factura directamente.
+
+---
+
+## 9. Producción interna
+
+OS produce sus propios productos. Flujo:
+
+```
+Orden de Producción (produccion_encabezados)
+    ↓ consume materiales (materiales)
+    ↓ genera artículos (articulos_producidos)
+    ↓ incurre en costos (otros_costos)
+    ↓ pasa por estados (cambios_estado)
+```
+
+El costo de producción (`costo_manual` en ventas) refleja el costo de fabricación propio.
