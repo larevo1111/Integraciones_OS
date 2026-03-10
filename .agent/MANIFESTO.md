@@ -77,7 +77,16 @@ Al crear o modificar cualquier script de resumen, correr queries V1–V7 del ski
 - `.agent/skills/`: Conocimiento especializado.
 - `.agent/workflows/`: Guías de ejecución paso a paso.
 
-## 8. Protocolo de documentación de scripts
+## 8. ⚠️ BASES DE DATOS HOSTINGER — PROHIBICIÓN EXPLÍCITA
+
+**`u768061575_os_comunidad`** es la base de datos del ERP en producción de Hostinger.
+**NUNCA tocar esta BD sin autorización explícita de Santi** — ni lectura masiva, ni escritura, ni DROP, ni ALTER.
+
+Para datos de effi: usar ÚNICAMENTE la BD separada asignada para ese propósito (a definir por Santi vía hPanel).
+
+Ignorar esta regla es una falta crítica.
+
+## 9. Protocolo de documentación de scripts
 Al crear un script nuevo, agregar entrada en `.agent/CATALOGO_SCRIPTS.md` con:
 - Propósito (1 línea)
 - Comando de ejecución manual exacto
