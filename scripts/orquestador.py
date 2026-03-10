@@ -37,11 +37,13 @@ RESUMEN_REM_CANAL_SCRIPT          = SCRIPTS_DIR / 'calcular_resumen_ventas_remis
 RESUMEN_REM_CLIENTE_SCRIPT        = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_cliente_mes.py'
 RESUMEN_REM_PRODUCTO_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_producto_mes.py'
 SYNC_HOSTINGER_SCRIPT             = SCRIPTS_DIR / 'sync_hostinger.py'
+SYNC_ESPOCRM_MARKETING_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_marketing.py'
 
 EXPORT_TIMEOUT   = 30 * 60   # 30 minutos
 IMPORT_TIMEOUT   =  5 * 60   # 5 minutos
 RESUMEN_TIMEOUT  =  2 * 60   # 2 minutos
 SYNC_TIMEOUT     =  5 * 60   # 5 minutos (sync Hostinger ~100s)
+SYNC_ESPO_TIMEOUT =  2 * 60  # 2 minutos (sync EspoCRM marketing)
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 
@@ -324,13 +326,21 @@ def main():
     resumen_sync = parsear_sync_hostinger(salida_sync)
     log.info(f'   {resumen_sync}  [{dur_sync}s]')
 
+    # ── 6b. SYNC ESPOCRM MARKETING ───────────────────────────────
+    log.info('▶ sync_espocrm_marketing.py ...')
+    t_espo = datetime.datetime.now()
+    exit_espo, salida_espo = ejecutar(['python3', str(SYNC_ESPOCRM_MARKETING_SCRIPT)], SYNC_ESPO_TIMEOUT)
+    dur_espo = int((datetime.datetime.now() - t_espo).total_seconds())
+    resumen_espo = salida_espo.strip().splitlines()[-1] if salida_espo.strip() else 'sin salida'
+    log.info(f'   {resumen_espo}  [{dur_espo}s]')
+
     # ── 6. Estado global ─────────────────────────────────────────
     hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
                  or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or exit_rsm_rem != 0
                  or exit_rem_canal != 0 or exit_rem_cli != 0 or exit_rem_prod != 0
-                 or exit_sync != 0 or len(errores_exp) > 0)
+                 or exit_sync != 0 or exit_espo != 0 or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_sync
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_sync + dur_espo
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
@@ -373,6 +383,9 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 
 ── SYNC HOSTINGER ──────────────────────────────────
 {resumen_sync}
+
+── SYNC ESPOCRM MARKETING ─────────────────────────
+{resumen_espo}
 """
     enviar_email(env, asunto, cuerpo)
 
