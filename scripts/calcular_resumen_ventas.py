@@ -150,7 +150,7 @@ def main():
         SELECT
             DATE_FORMAT(fecha_creacion_factura, '%Y-%m') AS mes,
             SUM({cn('cantidad')})                        AS vol_unidades,
-            COUNT(DISTINCT referencia)                   AS cat_num_referencias,
+            COUNT(DISTINCT cod_articulo)                 AS cat_num_referencias,
             COUNT(DISTINCT marketing_cliente)            AS cat_num_canales
         FROM zeffi_facturas_venta_detalle
         WHERE vigencia_factura = 'Vigente'

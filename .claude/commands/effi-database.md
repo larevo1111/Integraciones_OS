@@ -65,7 +65,7 @@ mysql -u osadmin -pEpist2487. effi_data -e "SELECT 1;" 2>/dev/null
 
 ## Tablas disponibles en effi_data
 
-Todas las tablas tienen prefijo `zeffi_` (39 tablas BASE TABLE + 2 vistas sin prefijo).
+Tablas de datos Effi: prefijo `zeffi_` (39 tablas BASE TABLE). Más 1 tabla analítica propia y 2 vistas sin prefijo.
 
 ### Tablas BASE TABLE (datos Effi)
 
@@ -111,6 +111,12 @@ Todas las tablas tienen prefijo `zeffi_` (39 tablas BASE TABLE + 2 vistas sin pr
 | `zeffi_traslados_inventario` | Traslados entre bodegas |
 | `zeffi_trazabilidad` | Trazabilidad de lotes/series |
 
+### Tabla analítica propia (calculada por el pipeline)
+
+| Tabla | Descripción |
+|---|---|
+| `resumen_ventas_facturas_mes` | Resumen mensual de ventas (38 campos: fin_, cto_, vol_, cli_, car_, cat_, con_, top_, pry_, ant_). PK = `mes` VARCHAR(7) 'YYYY-MM'. Se actualiza como paso 3 del pipeline via `calcular_resumen_ventas.py`. |
+
 ### Vistas SQL (sin prefijo)
 
 | Vista | Descripción |
@@ -122,10 +128,32 @@ Todas las tablas tienen prefijo `zeffi_` (39 tablas BASE TABLE + 2 vistas sin pr
 
 ## Estructura de tablas
 
-Todas las tablas tienen:
+Todas las tablas `zeffi_*` tienen:
 - `_pk` BIGINT AUTO_INCREMENT PRIMARY KEY (columna interna)
 - Todas las demás columnas son TEXT
 - Charset: utf8mb4 / utf8mb4_unicode_ci
+
+### Gotchas de esquema — campos críticos en tablas de ventas
+
+> **CRÍTICO para no cometer errores al consultar.**
+
+#### `zeffi_facturas_venta_encabezados`
+- **NO tiene columna `vigencia`** — el export de Effi ya filtra solo vigentes (`?vigente=1`). No intentar `WHERE vigencia = 'Vigente'`.
+- Campo fecha: `fecha_de_creacion` (DATETIME como TEXT, e.g. `'2025-01-25 10:02:19'`)
+- Identificador cliente: `id_cliente` con prefijo `'CC '` o `'NIT '` (e.g. `'NIT 900982270'`)
+- Campos numéricos con coma decimal: `total_neto`, `descuentos`, `costo_manual`, `pdte_de_cobro`, etc. → castear con `CAST(REPLACE(COALESCE(campo, '0'), ',', '.') AS DECIMAL(15,2))`
+
+#### `zeffi_facturas_venta_detalle`
+- **`referencia` = NULL** en la mayoría de registros — usar `cod_articulo` para identificar productos
+- `descripcion_articulo` = nombre legible del producto
+- `fecha_creacion_factura` y `vigencia_factura` duplican el encabezado → no se requiere JOIN para queries mensuales
+- `precio_neto_total` = valor de la línea (cantidad × precio_neto unitario)
+- `marketing_cliente` = canal de venta (e.g. `'1.3. Mercado Saludable'`)
+
+#### `zeffi_ordenes_venta_encabezados`
+- `vigencia` puede ser `'Vigente'` (en consignación activa) o `'Anulada'` (liquidada o error)
+- Para consignación, excluir errores operativos: OVs anuladas en ≤1 día sin keywords de liquidación
+  (ver skill `/effi-negocio` sección 3 para la heurística completa)
 
 ```bash
 # Ver columnas de una tabla

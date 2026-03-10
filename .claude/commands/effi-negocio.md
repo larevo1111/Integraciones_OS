@@ -112,6 +112,8 @@ def clasificar_ov_anulada(obs, fecha_creacion, fecha_anulacion):
 - 151 error_probable (≤1 día sin keywords) → ~$81M
 - 533 liquidación_probable (>1 día o con keywords) → ~$143.5M
 
+**Heurística verificada manualmente** (2026-01): OV pk672 con `observacion_de_anulacion='mal'`, anulada el mismo día de creación → excluida correctamente como error operativo (~$210k fuera del cálculo). ✅
+
 ### Campos para el resumen mensual
 
 | Campo | Cálculo |
@@ -212,3 +214,26 @@ Orden de Producción (produccion_encabezados)
 ```
 
 El costo de producción (`costo_manual` en ventas) refleja el costo de fabricación propio.
+
+---
+
+## 10. Tabla analítica — resumen_ventas_facturas_mes
+
+Tabla calculada por el pipeline (paso 3) a partir de `zeffi_facturas_venta_encabezados`, `zeffi_facturas_venta_detalle` y `zeffi_ordenes_venta_encabezados`.
+
+PK: `mes` VARCHAR(7) `'YYYY-MM'`. Datos desde 2025-01.
+
+| Prefijo | Campos | Fuente |
+|---|---|---|
+| `fin_` | ventas_brutas, descuentos, pct_descuento, impuestos, devoluciones, ventas_netas | encabezados |
+| `cto_` | costo_total, utilidad_bruta, margen_utilidad_pct | encabezados (`costo_manual`) |
+| `vol_` | unidades_vendidas, num_facturas, ticket_promedio | detalle+encabezados |
+| `cli_` | clientes_activos, clientes_nuevos, vtas_por_cliente | encabezados |
+| `car_` | saldo (pendiente de cobro acumulado de facturas del mes) | encabezados (`pdte_de_cobro`) |
+| `cat_` | num_referencias, vtas_por_referencia, num_canales | detalle (`cod_articulo`, `marketing_cliente`) |
+| `con_` | consignacion_pp (OVs creadas, excl. errores operativos) | OVs |
+| `top_` | canal, canal_ventas, cliente, cliente_ventas, producto_cod, producto_nombre, producto_ventas | detalle+encabezados |
+| `pry_` | dia_del_mes, proyeccion_mes (lineal), ritmo_pct (vs año ant.) | calculado |
+| `ant_` | ventas_netas, var_ventas_pct, consignacion_pp, var_consignacion_pct | self-join -12 meses |
+
+**Script**: `scripts/calcular_resumen_ventas.py` — idempotente, UPSERT por mes.
