@@ -316,3 +316,53 @@ GROUP BY m.mes, m.fin_ventas_brutas
 ORDER BY m.mes DESC;
 -- Esperado: diff = 0.00
 ```
+
+### V6 — con_consignacion_pp cliente_mes vs OVs fuente directa
+```sql
+SELECT
+  r.mes, r.id_cliente, r.cliente,
+  r.con_consignacion_pp AS r_con,
+  ROUND(SUM(CAST(REPLACE(COALESCE(o.total_neto,'0'),',','.') AS DECIMAL(15,2))),2) AS src_con,
+  ROUND(r.con_consignacion_pp -
+        SUM(CAST(REPLACE(COALESCE(o.total_neto,'0'),',','.') AS DECIMAL(15,2))),2) AS diff
+FROM resumen_ventas_facturas_cliente_mes r
+JOIN zeffi_ordenes_venta_encabezados o
+  ON o.id_cliente = r.id_cliente
+  AND DATE_FORMAT(o.fecha_de_creacion,'%Y-%m') = r.mes
+WHERE r.con_consignacion_pp IS NOT NULL
+AND NOT (
+    o.vigencia = 'Anulada'
+    AND DATEDIFF(COALESCE(o.fecha_de_anulacion, o.fecha_de_creacion), o.fecha_de_creacion) <= 1
+    AND LOWER(COALESCE(o.observacion_de_anulacion,''))
+        NOT REGEXP 'liquidac|remis|convertid|retiro|devolu|no vendi|no se entreg'
+)
+GROUP BY r.mes, r.id_cliente, r.cliente, r.con_consignacion_pp
+HAVING diff != 0
+ORDER BY r.mes DESC, r.con_consignacion_pp DESC
+LIMIT 20;
+-- Esperado: 0 filas (ninguna diferencia)
+```
+
+### V7 — cli_clientes_nuevos canal_mes vs fuente directa
+```sql
+SELECT c.mes, c.canal, c.cli_clientes_nuevos AS r_nuevos, COUNT(*) AS src_nuevos,
+       c.cli_clientes_nuevos - COUNT(*) AS diff
+FROM resumen_ventas_facturas_canal_mes c
+JOIN (
+  SELECT d.id_cliente,
+         COALESCE(NULLIF(TRIM(d.marketing_cliente),''),'Sin canal') AS canal,
+         DATE_FORMAT(d.fecha_creacion_factura,'%Y-%m') AS mes
+  FROM zeffi_facturas_venta_detalle d
+  INNER JOIN (
+    SELECT id_cliente, MIN(fecha_creacion_factura) AS primera_fecha
+    FROM zeffi_facturas_venta_detalle WHERE vigencia_factura='Vigente'
+    GROUP BY id_cliente
+  ) p ON d.id_cliente = p.id_cliente AND d.fecha_creacion_factura = p.primera_fecha
+  WHERE d.vigencia_factura='Vigente'
+  GROUP BY d.id_cliente, canal, mes
+) src ON src.mes = c.mes AND src.canal = c.canal
+GROUP BY c.mes, c.canal, c.cli_clientes_nuevos
+HAVING diff != 0
+ORDER BY c.mes DESC;
+-- Esperado: 0 filas (ninguna diferencia)
+```

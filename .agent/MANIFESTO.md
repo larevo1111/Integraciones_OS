@@ -47,11 +47,14 @@
 - **`vigencia_factura = 'Vigente'`**: filtro obligatorio en detalle para excluir anuladas.
 
 ### Verificación obligatoria de scripts analíticos
-Al crear o modificar cualquier script de resumen, correr queries V1–V5 del skill `effi-database`:
-1. Comparar campo a campo contra la tabla fuente (diff = 0)
-2. SUM(tabla_desglosada) vs tabla_total (diff ≤ 0.30 = solo redondeo DECIMAL)
-3. Porcentajes suman 1.0 por período
-4. `pry_*` NULL en períodos cerrados
+Al crear o modificar cualquier script de resumen, correr queries V1–V7 del skill `effi-database`:
+1. **V1** Comparar campo a campo contra la tabla fuente (diff = 0)
+2. **V2** SUM(tabla_desglosada) vs tabla_total (diff ≤ 0.30 = solo redondeo DECIMAL)
+3. **V3** Porcentajes suman 1.0 por período
+4. **V4** `pry_*` NULL en períodos cerrados
+5. **V5** resumen_mes financiero vs fuente encabezados (diff = 0)
+6. **V6** `con_consignacion_pp` cliente_mes vs OVs fuente directa (0 filas con diff)
+7. **V7** `cli_clientes_nuevos` canal_mes vs fuente directa (0 filas con diff)
 
 
 - **NocoDB**: tablas externas son solo lectura — relaciones entre tablas externas NO funcionan. Usar vistas SQL en MariaDB para JOINs.
