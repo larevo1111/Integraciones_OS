@@ -36,11 +36,26 @@ ESPOCRM_CONTAINER = 'espocrm'
 
 ENTITY_DEFS_PATH   = '/var/www/html/custom/Espo/Custom/Resources/metadata/entityDefs/Contact.json'
 I18N_PATH          = '/var/www/html/custom/Espo/Custom/Resources/i18n/es_MX/Contact.json'
+LAYOUT_PATH        = '/var/www/html/custom/Espo/Custom/Resources/layouts/Contact/detail.json'
 REBUILD_SCRIPT     = '/var/www/html/rebuild.php'
 CLEAR_CACHE_SCRIPT = '/var/www/html/clear_cache.php'
 
-TMP_ENTITY = '/tmp/espo_contact_entitydefs.json'
-TMP_I18N   = '/tmp/espo_contact_i18n.json'
+TMP_ENTITY  = '/tmp/espo_contact_entitydefs.json'
+TMP_I18N    = '/tmp/espo_contact_i18n.json'
+TMP_LAYOUT  = '/tmp/espo_contact_layout.json'
+
+LAYOUT_JSON = [
+    {
+        "label": "",
+        "rows": [
+            [{"name": "name"}, {"name": "accounts"}],
+            [{"name": "emailAddress"}, {"name": "phoneNumber"}],
+            [{"name": "tipoDeMarketing"}, False],
+            [{"name": "address"}, False],
+            [{"name": "description", "fullWidth": True}]
+        ]
+    }
+]
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +110,8 @@ def generar_json(tipos):
         json.dump(entity_defs, f, ensure_ascii=False, indent=2)
     with open(TMP_I18N, 'w', encoding='utf-8') as f:
         json.dump(i18n, f, ensure_ascii=False, indent=2)
+    with open(TMP_LAYOUT, 'w', encoding='utf-8') as f:
+        json.dump(LAYOUT_JSON, f, ensure_ascii=False, indent=2)
 
 
 def aplicar_a_espocrm():
@@ -103,10 +120,13 @@ def aplicar_a_espocrm():
          '/var/www/html/custom/Espo/Custom/Resources/metadata/entityDefs'])
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
          '/var/www/html/custom/Espo/Custom/Resources/i18n/es_MX'])
+    run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
+         '/var/www/html/custom/Espo/Custom/Resources/layouts/Contact'])
 
     # Copiar archivos al contenedor
-    run(['docker', 'cp', TMP_ENTITY, f'{ESPOCRM_CONTAINER}:{ENTITY_DEFS_PATH}'])
-    run(['docker', 'cp', TMP_I18N,   f'{ESPOCRM_CONTAINER}:{I18N_PATH}'])
+    run(['docker', 'cp', TMP_ENTITY,  f'{ESPOCRM_CONTAINER}:{ENTITY_DEFS_PATH}'])
+    run(['docker', 'cp', TMP_I18N,    f'{ESPOCRM_CONTAINER}:{I18N_PATH}'])
+    run(['docker', 'cp', TMP_LAYOUT,  f'{ESPOCRM_CONTAINER}:{LAYOUT_PATH}'])
 
     # Rebuild + clear cache
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'php', REBUILD_SCRIPT])
