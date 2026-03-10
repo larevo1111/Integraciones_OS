@@ -44,8 +44,8 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   python3 scripts/orquestador.py --forzar   # ignora horario operativo
   ```
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
-- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js, calcular_resumen_ventas.py, calcular_resumen_ventas_canal.py y calcular_resumen_ventas_cliente.py)
-- **Dependencias**: `export_all.sh`, `import_all.js`, `calcular_resumen_ventas.py`, `calcular_resumen_ventas_canal.py`, `calcular_resumen_ventas_cliente.py`, `scripts/.env`
+- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js y los 8 scripts calcular_resumen_*)
+- **Dependencias**: `export_all.sh`, `import_all.js`, todos los `calcular_resumen_ventas_*.py` (pasos 3a/3b/3c/3d/4a/4b/4c/4d), `sync_hostinger.py`, `scripts/.env`
 - **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
 - **Systemd**:
   ```bash
@@ -184,6 +184,81 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   - Dimensiones vienen directo del detalle (no requiere JOIN con inventario).
   - NO incluye consignaciones (OVs no tienen producto por factura de consignación global).
   - SUM(producto_mes) vs resumen_mes: diff ≤ 0.25 (solo redondeo DECIMAL).
+
+### calcular_resumen_ventas_remisiones_canal_mes.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_remisiones_canal_mes` — resumen mensual de remisiones agrupado por canal de marketing
+- **Tipo**: import / analítica (paso 4b del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_remisiones_canal_mes.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_remisiones_canal_mes — N filas actualizadas`
+- **Tabla(s) MariaDB**: `resumen_ventas_remisiones_canal_mes` (PK: `mes, canal`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_remisiones_venta_encabezados`, `zeffi_remisiones_venta_detalle`; driver `mysql-connector-python`
+- **Columnas clave** (32 total, PK compuesto: mes + canal):
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, ventas_netas, **fin_pct_del_mes**
+  - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, num_remisiones, ticket_promedio
+  - `cli_*`: clientes_activos, clientes_nuevos, vtas_por_cliente
+  - `cat_*`: num_referencias
+  - `top_*`: top_cliente/ventas, top_producto_cod/nombre/ventas
+  - `pry_*`: proyección lineal — solo mes en curso
+  - `ant_*`: ventas_netas, var_pct
+- **Notas**:
+  - Canal de `tipo_de_markting` (typo sin 'e') en encabezados; NULL/vacío → `'Sin canal'`.
+  - Financiero del encabezado (cn() con REPLACE coma). Volumen/costo del detalle.
+  - `pct()` clamp aplicado a todos los `_pct` (previene overflow en remisiones tipo consumo interno con subtotal=0).
+  - 351 filas (29 meses × ~12 canales). diff vs fuente = 0.00.
+
+### calcular_resumen_ventas_remisiones_cliente_mes.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_remisiones_cliente_mes` — resumen mensual de remisiones por cliente
+- **Tipo**: import / analítica (paso 4c del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_remisiones_cliente_mes.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_remisiones_cliente_mes — N filas actualizadas`
+- **Tabla(s) MariaDB**: `resumen_ventas_remisiones_cliente_mes` (PK: `mes, id_cliente`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_remisiones_venta_encabezados`, `zeffi_remisiones_venta_detalle`; driver `mysql-connector-python`
+- **Columnas clave** (34 total, PK compuesto: mes + id_cliente):
+  - Dimensiones: `cliente`, `ciudad`, `departamento`, `canal` (canal dominante por subtotal en ese mes), `vendedor`
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, ventas_netas
+  - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, num_remisiones, ticket_promedio
+  - `cat_*`: num_referencias
+  - `top_*`: top_producto_cod/nombre/ventas
+  - `rem_*`: rem_pendientes, rem_facturadas, rem_pct_facturadas (estado actual por cliente-mes)
+  - `cli_*`: cli_es_nuevo (1 si es la primera remisión histórica del cliente)
+  - `pry_*`: proyección lineal — solo mes en curso
+  - `ant_*`: ventas_netas, var_pct
+- **Notas**:
+  - `canal` = canal con mayor subtotal del cliente en ese mes (dinámico, no del maestro).
+  - `cli_es_nuevo` basado en primera remisión histórica (mínimo fecha por id_cliente en encabezados).
+  - 1141 filas. diff vs fuente = 0.00.
+
+### calcular_resumen_ventas_remisiones_producto_mes.py
+- **Propósito**: Calcula y actualiza `resumen_ventas_remisiones_producto_mes` — resumen mensual de remisiones por referencia de producto
+- **Tipo**: import / analítica (paso 4d del pipeline)
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas_remisiones_producto_mes.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_remisiones_producto_mes — N filas actualizadas`
+- **Tabla(s) MariaDB**: `resumen_ventas_remisiones_producto_mes` (PK: `mes, cod_articulo`; crea si no existe, UPSERT)
+- **Dependencias**: `zeffi_remisiones_venta_encabezados`, `zeffi_remisiones_venta_detalle`; driver `mysql-connector-python`
+- **Columnas clave** (30 total, PK compuesto: mes + cod_articulo):
+  - Dimensiones: `nombre`, `categoria`, `marca`
+  - `fin_*`: ventas_brutas, descuentos, pct_descuento, ventas_netas_sin_iva, impuestos, ventas_netas, **fin_pct_del_mes**
+  - `cto_*`: costo_total, utilidad_bruta, margen_utilidad_pct
+  - `vol_*`: unidades_vendidas, num_remisiones, precio_unitario_prom
+  - `cli_*`: clientes_activos (clientes distintos con este producto)
+  - `top_*`: top_cliente/ventas, top_canal/ventas
+  - `cat_canal_principal`: canal con más ventas de ese producto ese mes
+  - `pry_*`: proyección lineal — solo mes en curso
+  - `ant_*`: ventas_netas, var_pct, ant_unidades, ant_var_unidades_pct
+- **Notas**:
+  - Todo el financiero/costo desde detalle JOIN encabezados (encabezados aporta canal y fecha).
+  - 1228 filas. diff vs fuente = 0.00.
 
 ### calcular_resumen_ventas_remisiones_mes.py
 - **Propósito**: Calcula y actualiza `resumen_ventas_remisiones_mes` — resumen mensual de ventas por remisión (paralelo a facturas_mes)
