@@ -26,11 +26,13 @@ from pathlib import Path
 SCRIPTS_DIR   = Path('/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts')
 ENV_FILE      = SCRIPTS_DIR / '.env'
 LOG_FILE      = Path('/home/osserver/Proyectos_Antigravity/Integraciones_OS/logs/pipeline.log')
-EXPORT_SCRIPT = SCRIPTS_DIR / 'export_all.sh'
-IMPORT_SCRIPT = SCRIPTS_DIR / 'import_all.js'
+EXPORT_SCRIPT   = SCRIPTS_DIR / 'export_all.sh'
+IMPORT_SCRIPT   = SCRIPTS_DIR / 'import_all.js'
+RESUMEN_SCRIPT  = SCRIPTS_DIR / 'calcular_resumen_ventas.py'
 
-EXPORT_TIMEOUT = 30 * 60   # 30 minutos (margen sobre los ~20 min reales)
-IMPORT_TIMEOUT =  5 * 60   # 5 minutos
+EXPORT_TIMEOUT  = 30 * 60   # 30 minutos (margen sobre los ~20 min reales)
+IMPORT_TIMEOUT  =  5 * 60   # 5 minutos
+RESUMEN_TIMEOUT =  2 * 60   # 2 minutos
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 
@@ -113,6 +115,13 @@ def parsear_import(salida):
     """Extrae la línea de resumen del import."""
     for linea in reversed(salida.splitlines()):
         if 'tablas importadas' in linea:
+            return linea.strip()
+    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
+
+def parsear_resumen(salida):
+    """Extrae la línea de resumen de calcular_resumen_ventas."""
+    for linea in reversed(salida.splitlines()):
+        if 'meses actualizados' in linea or 'resumen_ventas' in linea:
             return linea.strip()
     return salida.splitlines()[-1].strip() if salida else '(sin salida)'
 
@@ -202,14 +211,22 @@ def main():
     resumen_imp = parsear_import(salida_imp)
     log.info(f'   {resumen_imp}  [{dur_imp}s]')
 
-    # ── 3. Estado global ─────────────────────────────────────────
-    hay_error = (exit_exp != 0 or exit_imp != 0 or len(errores_exp) > 0)
+    # ── 3. RESUMEN ──────────────────────────────────────────────
+    log.info('▶ calcular_resumen_ventas.py ...')
+    t2 = datetime.datetime.now()
+    exit_rsm, salida_rsm = ejecutar(['python3', str(RESUMEN_SCRIPT)], RESUMEN_TIMEOUT)
+    dur_rsm = int((datetime.datetime.now() - t2).total_seconds())
+    resumen_rsm = parsear_resumen(salida_rsm)
+    log.info(f'   {resumen_rsm}  [{dur_rsm}s]')
+
+    # ── 4. Estado global ─────────────────────────────────────────
+    hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp
+    dur_total = dur_exp + dur_imp + dur_rsm
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
-    # ── 4. Email (siempre) ───────────────────────────────────────
+    # ── 5. Email (siempre) ───────────────────────────────────────
     icono  = '❌' if hay_error else '✅'
     asunto = f'{icono} [Effi Pipeline] {estado} — {ahora}'
 
@@ -217,7 +234,7 @@ def main():
 {'=' * 50}
 Fecha:    {ahora}
 Estado:   {estado}
-Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s)
+Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_rsm}s)
 
 ── EXPORT ──────────────────────────────────────────
 {resumen_exp}
@@ -230,10 +247,13 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s)
 {resumen_imp}
 
 {salida_imp}
+
+── RESUMEN VENTAS ──────────────────────────────────
+{resumen_rsm}
 """
     enviar_email(env, asunto, cuerpo)
 
-    # ── 5. Telegram (solo en error) ──────────────────────────────
+    # ── 6. Telegram (solo en error) ──────────────────────────────
     if hay_error:
         partes = [f'<b>⚠️ Pipeline Effi — ERROR</b>', f'📅 {ahora}']
 
@@ -250,6 +270,10 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s)
             partes.append(f'\n❌ Import: {resumen_imp}')
         else:
             partes.append(f'\n✅ Import: {resumen_imp}')
+
+        # Resumen
+        if exit_rsm != 0:
+            partes.append(f'\n❌ Resumen: {resumen_rsm}')
 
         enviar_telegram(env, '\n'.join(partes))
 

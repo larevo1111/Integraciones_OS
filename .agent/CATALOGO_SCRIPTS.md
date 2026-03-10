@@ -44,8 +44,8 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   python3 scripts/orquestador.py --forzar   # ignora horario operativo
   ```
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
-- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js)
-- **Dependencias**: `export_all.sh`, `import_all.js`, `scripts/.env`
+- **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js y calcular_resumen_ventas.py)
+- **Dependencias**: `export_all.sh`, `import_all.js`, `calcular_resumen_ventas.py`, `scripts/.env`
 - **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
 - **Systemd**:
   ```bash
@@ -81,6 +81,31 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Tabla(s) MariaDB**: todas las de `effi_data` (39 tablas). Estrategia: TRUNCATE + INSERT
 - **Dependencias**: `exports/` con archivos `.xlsx` generados por los export scripts
 - **Notas**: detecta automáticamente HTML ISO-8859 disfrazado de `.xlsx` (mayoría de Effi) vs Excel real. Ignora tablas en `SKIP_TABLES`. Todas las columnas son TEXT + `_pk` AUTO_INCREMENT.
+
+---
+
+### calcular_resumen_ventas.py
+- **Propósito**: Calcula y actualiza la tabla resumen mensual de ventas `resumen_ventas_facturas_mes`
+- **Tipo**: import / analítica
+- **Ejecución manual**:
+  ```bash
+  python3 /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/calcular_resumen_ventas.py
+  ```
+- **Salida**: stdout con `✅ resumen_ventas_facturas_mes — N meses actualizados`
+- **Tabla(s) MariaDB**: `resumen_ventas_facturas_mes` (crea si no existe, UPSERT por mes)
+- **Dependencias**: tablas `zeffi_facturas_venta_encabezados`, `zeffi_facturas_venta_detalle`, `zeffi_ordenes_venta_encabezados`; driver `mysql-connector-python`
+- **Columnas clave** (38 total):
+  - `fin_*`: financiero (ventas brutas, descuentos, impuestos, devoluciones, netas)
+  - `cto_*`: costo y utilidad (costo_manual, utilidad_bruta, margen_pct)
+  - `vol_*`: volumen (unidades, num_facturas, ticket_promedio)
+  - `cli_*`: clientes (activos, nuevos, ventas_por_cliente)
+  - `car_*`: cartera (saldo pendiente de cobro)
+  - `cat_*`: catálogo (num_referencias, ventas_por_referencia, num_canales)
+  - `con_*`: consignación (total OVs creadas ese mes, excluye errores operativos ≤1 día)
+  - `top_*`: tops del mes (canal, cliente, producto)
+  - `pry_*`: proyección lineal al cierre del mes
+  - `ant_*`: comparativo año anterior (ventas_netas, var_pct, consignacion, var_pct)
+- **Notas**: todos los campos numéricos de Effi usan coma decimal; el script castea con `REPLACE(field, ',', '.')`. `vigencia` no existe en encabezados (export solo vigentes). Consignación excluye OVs anuladas en ≤1 día sin keywords de liquidación.
 
 ---
 
