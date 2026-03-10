@@ -15,13 +15,20 @@ Solo detente y pregunta si hay riesgo irreversible fuera del proyecto:
 - Force push con historial perdido
 - Modificar configuración de otros proyectos del servidor
 
+## Contexto del proyecto — leer siempre al inicio
+
+Antes de cualquier tarea, revisar estos archivos en orden:
+1. `.agent/CONTEXTO_ACTIVO.md` — estado actual del sistema, qué funciona, próximos pasos
+2. `.agent/MANIFESTO.md` — visión, arquitectura, reglas técnicas aprendidas
+3. `.agent/CATALOGO_SCRIPTS.md` — catálogo completo de scripts (propósito, ejecución, tablas)
+4. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`
+
 ## Convenciones del proyecto
 
-- Scripts en `scripts/` — corren con `node` o `python3` directamente en el host
+- Scripts en `scripts/` — corren con `node` o `python3` directamente en el host (NO docker exec)
 - MariaDB: `mysql -u osadmin -pEpist2487. effi_data -e "..." 2>/dev/null`
 - Git: commit + push sin preguntar, con mensaje descriptivo en español
-- Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`
-- Memoria del proyecto: `.claude/projects/.../memory/MEMORY.md`
+- Al terminar una tarea significativa: actualizar `.agent/CONTEXTO_ACTIVO.md` con el estado nuevo
 
 ## Estilo de respuesta
 
