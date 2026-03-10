@@ -32,18 +32,40 @@ Presente en `facturas_venta_encabezados`, `remisiones_venta_encabezados`, `orden
 |---|---|
 | `total_bruto` | Suma de precios antes de descuentos |
 | `descuentos` | Total de descuentos aplicados |
-| `subtotal` | total_bruto - descuentos |
-| `impuestos` | IVA y otros impuestos |
-| `retenciones` | Retenciones en la fuente |
-| `total_neto` | Lo que realmente se cobra: subtotal + impuestos - retenciones |
+| `subtotal` | total_bruto - descuentos (SIN IVA — valor comercial neto de la venta) |
+| `impuestos` | IVA — se recauda y pasa íntegro a la DIAN, nunca es plata de la empresa |
+| `retenciones` | Retenciones en la fuente — anticipo del impuesto de renta del vendedor, pagado por el comprador directamente a la DIAN. Es un **activo** para la empresa (reduce CxC, no reduce ingresos en el P&L). En OS son ocasionales (solo 2 meses en todo el histórico). |
+| `total_neto` | subtotal + impuestos - retenciones (**incluye IVA**) |
 | `pdte_de_cobro` | Saldo pendiente de cobro (0 = cobrado completamente) |
-| `devoluciones_vigentes` | Valor de devoluciones activas asociadas a este documento |
+| `devoluciones_vigentes` | Snapshot dinámico de NCs vigentes asociadas a ese documento — **NO usar para análisis mensuales de calendario** |
 | `costo_manual` | Costo de los productos vendidos (costo del inventario) |
 | `utilidad_costo_manual` | total_neto - costo_manual |
 | `margen_de_utilidad_costo_manual` | utilidad / total_neto × 100 |
 
 > **Nota:** todos estos campos vienen como TEXT en MariaDB. Siempre castear:
 > `CAST(REPLACE(total_neto, ',', '.') AS DECIMAL(15,2))`
+
+### Métrica clave — ingresos netos (lo que realmente se queda en la empresa)
+
+```
+subtotal (= total_bruto - descuentos, sin IVA)
+  - NCs del mes (subtotal de notas_credito_venta, sin IVA)
+= ingresos_netos
+```
+
+IVA → nunca se queda (pasa a DIAN). Retenciones → son activo fiscal, no se restan de ingresos.
+En `resumen_ventas_facturas_mes`: campo `fin_ingresos_netos`.
+
+### Notas crédito vs devoluciones de venta — distinción CRÍTICA
+
+| Documento | Tabla | Afecta |
+|---|---|---|
+| Nota crédito | `zeffi_notas_credito_venta_encabezados` | **Facturas** |
+| Devolución de venta | `zeffi_devoluciones_venta_encabezados` | **Remisiones** |
+
+**Para análisis de ventas facturadas → usar NCs, nunca `devoluciones_venta`.**
+En NCs: usar campo `subtotal` (sin IVA), agrupado por `fecha_de_creacion` de la NC.
+El campo `devoluciones_vigentes` en encabezados de facturas es un snapshot dinámico agrupado por fecha de factura (no por fecha de NC) — no sirve para resumen mensual calendario.
 
 ---
 

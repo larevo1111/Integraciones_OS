@@ -40,12 +40,14 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_mes (
     fecha_actualizacion      DATETIME,
 
     -- Financiero
-    fin_ventas_brutas        DECIMAL(15,2) COMMENT 'SUM total_bruto',
+    fin_ventas_brutas        DECIMAL(15,2) COMMENT 'SUM total_bruto (precio público antes de descuentos)',
     fin_descuentos           DECIMAL(15,2) COMMENT 'SUM descuentos',
     fin_pct_descuento        DECIMAL(8,4)  COMMENT 'descuentos / ventas_brutas * 100',
-    fin_impuestos            DECIMAL(15,2) COMMENT 'SUM impuestos',
-    fin_devoluciones         DECIMAL(15,2) COMMENT 'SUM devoluciones_vigentes',
-    fin_ventas_netas         DECIMAL(15,2) COMMENT 'SUM total_neto',
+    fin_ventas_netas_sin_iva DECIMAL(15,2) COMMENT 'SUM subtotal = total_bruto - descuentos, SIN IVA',
+    fin_impuestos            DECIMAL(15,2) COMMENT 'SUM impuestos (IVA — va a la DIAN, no se queda en la empresa)',
+    fin_ventas_netas         DECIMAL(15,2) COMMENT 'SUM total_neto = subtotal + IVA - retenciones (incluye IVA)',
+    fin_devoluciones         DECIMAL(15,2) COMMENT 'SUM subtotal NCs emitidas en el mes (zeffi_notas_credito_venta_encabezados, sin IVA)',
+    fin_ingresos_netos       DECIMAL(15,2) COMMENT 'fin_ventas_netas_sin_iva - fin_devoluciones = lo que realmente se queda en la empresa',
 
     -- Costo y utilidad
     cto_costo_total          DECIMAL(15,2) COMMENT 'SUM costo_manual',
@@ -66,12 +68,12 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_mes (
     car_saldo                DECIMAL(15,2) COMMENT 'SUM pdte_de_cobro (saldo pendiente)',
 
     -- Catálogo
-    cat_num_referencias      INT           COMMENT 'Referencias distintas vendidas',
+    cat_num_referencias      INT           COMMENT 'Referencias distintas vendidas (cod_articulo)',
     cat_vtas_por_referencia  DECIMAL(15,2) COMMENT 'ventas_netas / num_referencias',
     cat_num_canales          INT           COMMENT 'Canales de marketing distintos activos',
 
     -- Consignación
-    con_consignacion_pp      DECIMAL(15,2) COMMENT 'SUM total_neto OVs creadas (excl. errores)',
+    con_consignacion_pp      DECIMAL(15,2) COMMENT 'SUM total_neto OVs creadas (excl. errores operativos ≤1 día sin keywords)',
 
     -- Top
     top_canal                TEXT          COMMENT 'Canal con mayores ventas (detalle)',
@@ -105,19 +107,31 @@ def main():
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute(DDL)
+    # Agregar columnas nuevas si la tabla ya existía sin ellas
+    cursor.execute("""
+        ALTER TABLE resumen_ventas_facturas_mes
+          ADD COLUMN IF NOT EXISTS fin_ventas_netas_sin_iva DECIMAL(15,2)
+              COMMENT 'SUM subtotal = total_bruto - descuentos, SIN IVA'
+              AFTER fin_pct_descuento,
+          ADD COLUMN IF NOT EXISTS fin_ingresos_netos DECIMAL(15,2)
+              COMMENT 'fin_ventas_netas_sin_iva - fin_devoluciones = lo que se queda en la empresa'
+              AFTER fin_devoluciones
+    """)
     conn.commit()
 
     resumen = {}   # mes (str 'YYYY-MM') → dict de campos
 
     # ── 1. Encabezados: financiero, costo, volumen de facturas, cartera ──────
+    # subtotal = total_bruto - descuentos, sin IVA → base para fin_ventas_netas_sin_iva
+    # devoluciones_vigentes ya NO se usa aquí (ver query de NCs más abajo)
 
     cursor.execute(f"""
         SELECT
             DATE_FORMAT(fecha_de_creacion, '%Y-%m')    AS mes,
             SUM({cn('total_bruto')})                   AS fin_ventas_brutas,
             SUM({cn('descuentos')})                    AS fin_descuentos,
+            SUM({cn('subtotal')})                      AS fin_subtotal,
             SUM({cn('impuestos')})                     AS fin_impuestos,
-            SUM({cn('devoluciones_vigentes')})         AS fin_devoluciones,
             SUM({cn('total_neto')})                    AS fin_ventas_netas,
             SUM({cn('costo_manual')})                  AS cto_costo_total,
             SUM({cn('pdte_de_cobro')})                 AS car_saldo,
@@ -135,8 +149,8 @@ def main():
         resumen[mes] = {
             'fin_ventas_brutas':    fval(row['fin_ventas_brutas']),
             'fin_descuentos':       fval(row['fin_descuentos']),
+            'fin_subtotal':         fval(row['fin_subtotal']),   # → fin_ventas_netas_sin_iva
             'fin_impuestos':        fval(row['fin_impuestos']),
-            'fin_devoluciones':     fval(row['fin_devoluciones']),
             'fin_ventas_netas':     fval(row['fin_ventas_netas']),
             'cto_costo_total':      fval(row['cto_costo_total']),
             'car_saldo':            fval(row['car_saldo']),
@@ -183,8 +197,26 @@ def main():
         if mes in resumen:
             resumen[mes]['cli_clientes_nuevos'] = ival(row['nuevos'])
 
-    # ── 4. Top canal de marketing por mes ────────────────────────────────────
-    # Tomar el canal con mayor suma de precio_neto_total en detalle
+    # ── 4. Devoluciones — Notas Crédito emitidas en el mes (sin IVA) ─────────
+    # IMPORTANTE: se usa zeffi_notas_credito_venta_encabezados (afectan facturas).
+    # NO usar zeffi_devoluciones_venta_encabezados (afectan remisiones, no facturas).
+    # Se toma el campo `subtotal` (= total_bruto NC - descuentos NC), sin IVA.
+    # Agrupado por fecha_de_creacion de la NC (cuándo se emitió, no cuándo fue la factura).
+
+    cursor.execute(f"""
+        SELECT
+            DATE_FORMAT(fecha_de_creacion, '%Y-%m') AS mes,
+            SUM({cn('subtotal')})                   AS fin_devoluciones
+        FROM zeffi_notas_credito_venta_encabezados
+        GROUP BY mes
+    """)
+
+    for row in cursor.fetchall():
+        mes = row['mes']
+        if mes in resumen:
+            resumen[mes]['fin_devoluciones'] = fval(row['fin_devoluciones'])
+
+    # ── 5. Top canal de marketing por mes ────────────────────────────────────
 
     cursor.execute(f"""
         SELECT
@@ -205,8 +237,7 @@ def main():
             resumen[mes]['top_canal']        = row['canal']
             resumen[mes]['top_canal_ventas'] = fval(row['ventas'])
 
-    # ── 5. Top cliente por mes ────────────────────────────────────────────────
-    # Tomar el cliente con mayor suma de total_neto en encabezados
+    # ── 6. Top cliente por mes ────────────────────────────────────────────────
 
     cursor.execute(f"""
         SELECT
@@ -226,7 +257,7 @@ def main():
             resumen[mes]['top_cliente']        = row['id_cliente']
             resumen[mes]['top_cliente_ventas'] = fval(row['ventas'])
 
-    # ── 6. Top producto por mes ───────────────────────────────────────────────
+    # ── 7. Top producto por mes ───────────────────────────────────────────────
 
     cursor.execute(f"""
         SELECT
@@ -249,8 +280,7 @@ def main():
             resumen[mes]['top_producto_nombre'] = row['descripcion_articulo']
             resumen[mes]['top_producto_ventas'] = fval(row['ventas'])
 
-    # ── 7. Consignación PP (OVs creadas, excluir error operativo) ────────────
-    # Error operativo = Anulada en ≤1 día SIN keywords de liquidación
+    # ── 8. Consignación PP (OVs creadas, excluir error operativo) ────────────
 
     cursor.execute(f"""
         SELECT
@@ -274,7 +304,7 @@ def main():
         if mes in resumen:
             resumen[mes]['con_consignacion_pp'] = fval(row['con_consignacion_pp'])
 
-    # ── 8. Derivados calculados en Python ─────────────────────────────────────
+    # ── 9. Derivados calculados en Python ─────────────────────────────────────
 
     today         = datetime.date.today()
     current_month = today.strftime('%Y-%m')
@@ -306,18 +336,26 @@ def main():
         else:
             d['ant_var_consignacion_pct'] = None
 
-    # Resto de derivados (necesitan los ant_ ya calculados)
+    # Resto de derivados
     for mes, d in resumen.items():
         year, month   = map(int, mes.split('-'))
         days_in_month = monthrange(year, month)[1]
-        netas = d.get('fin_ventas_netas', 0)
-        bruto = d.get('fin_ventas_brutas', 0)
-        costo = d.get('cto_costo_total', 0)
+        netas  = d.get('fin_ventas_netas', 0)
+        bruto  = d.get('fin_ventas_brutas', 0)
+        costo  = d.get('cto_costo_total', 0)
+        subtot = d.get('fin_subtotal', 0)
+        devol  = d.get('fin_devoluciones', 0.0)
 
         # fin_pct_descuento
         d['fin_pct_descuento'] = (
             d.get('fin_descuentos', 0) / bruto * 100 if bruto else None
         )
+
+        # fin_ventas_netas_sin_iva = subtotal de facturas
+        d['fin_ventas_netas_sin_iva'] = subtot
+
+        # fin_ingresos_netos = subtotal - NCs del mes (sin IVA)
+        d['fin_ingresos_netos'] = subtot - devol
 
         # cto_
         d['cto_utilidad_bruta']      = netas - costo
@@ -344,7 +382,7 @@ def main():
             )
         else:
             d['pry_dia_del_mes']    = days_in_month
-            d['pry_proyeccion_mes'] = netas   # mes cerrado = real
+            d['pry_proyeccion_mes'] = netas
 
         proy = d.get('pry_proyeccion_mes')
         ant  = d.get('ant_ventas_netas')
@@ -352,13 +390,14 @@ def main():
             proy / ant * 100 if (proy is not None and ant) else None
         )
 
-    # ── 9. UPSERT ─────────────────────────────────────────────────────────────
+    # ── 10. UPSERT ────────────────────────────────────────────────────────────
 
     upsert_sql = """
         INSERT INTO resumen_ventas_facturas_mes (
             mes, fecha_actualizacion,
             fin_ventas_brutas, fin_descuentos, fin_pct_descuento,
-            fin_impuestos, fin_devoluciones, fin_ventas_netas,
+            fin_ventas_netas_sin_iva, fin_impuestos, fin_ventas_netas,
+            fin_devoluciones, fin_ingresos_netos,
             cto_costo_total, cto_utilidad_bruta, cto_margen_utilidad_pct,
             vol_unidades_vendidas, vol_num_facturas, vol_ticket_promedio,
             cli_clientes_activos, cli_clientes_nuevos, cli_vtas_por_cliente,
@@ -374,7 +413,8 @@ def main():
         ) VALUES (
             %(mes)s, %(fecha_actualizacion)s,
             %(fin_ventas_brutas)s, %(fin_descuentos)s, %(fin_pct_descuento)s,
-            %(fin_impuestos)s, %(fin_devoluciones)s, %(fin_ventas_netas)s,
+            %(fin_ventas_netas_sin_iva)s, %(fin_impuestos)s, %(fin_ventas_netas)s,
+            %(fin_devoluciones)s, %(fin_ingresos_netos)s,
             %(cto_costo_total)s, %(cto_utilidad_bruta)s, %(cto_margen_utilidad_pct)s,
             %(vol_unidades_vendidas)s, %(vol_num_facturas)s, %(vol_ticket_promedio)s,
             %(cli_clientes_activos)s, %(cli_clientes_nuevos)s, %(cli_vtas_por_cliente)s,
@@ -393,9 +433,11 @@ def main():
             fin_ventas_brutas        = VALUES(fin_ventas_brutas),
             fin_descuentos           = VALUES(fin_descuentos),
             fin_pct_descuento        = VALUES(fin_pct_descuento),
+            fin_ventas_netas_sin_iva = VALUES(fin_ventas_netas_sin_iva),
             fin_impuestos            = VALUES(fin_impuestos),
-            fin_devoluciones         = VALUES(fin_devoluciones),
             fin_ventas_netas         = VALUES(fin_ventas_netas),
+            fin_devoluciones         = VALUES(fin_devoluciones),
+            fin_ingresos_netos       = VALUES(fin_ingresos_netos),
             cto_costo_total          = VALUES(cto_costo_total),
             cto_utilidad_bruta       = VALUES(cto_utilidad_bruta),
             cto_margen_utilidad_pct  = VALUES(cto_margen_utilidad_pct),
@@ -431,41 +473,43 @@ def main():
     for mes in sorted(resumen.keys()):
         d = resumen[mes]
         row = {
-            'mes':                    mes,
-            'fecha_actualizacion':    now,
-            'fin_ventas_brutas':      d.get('fin_ventas_brutas'),
-            'fin_descuentos':         d.get('fin_descuentos'),
-            'fin_pct_descuento':      d.get('fin_pct_descuento'),
-            'fin_impuestos':          d.get('fin_impuestos'),
-            'fin_devoluciones':       d.get('fin_devoluciones'),
-            'fin_ventas_netas':       d.get('fin_ventas_netas'),
-            'cto_costo_total':        d.get('cto_costo_total'),
-            'cto_utilidad_bruta':     d.get('cto_utilidad_bruta'),
-            'cto_margen_utilidad_pct': d.get('cto_margen_utilidad_pct'),
-            'vol_unidades_vendidas':  d.get('vol_unidades_vendidas'),
-            'vol_num_facturas':       d.get('vol_num_facturas'),
-            'vol_ticket_promedio':    d.get('vol_ticket_promedio'),
-            'cli_clientes_activos':   d.get('cli_clientes_activos'),
-            'cli_clientes_nuevos':    d.get('cli_clientes_nuevos'),
-            'cli_vtas_por_cliente':   d.get('cli_vtas_por_cliente'),
-            'car_saldo':              d.get('car_saldo'),
-            'cat_num_referencias':    d.get('cat_num_referencias'),
-            'cat_vtas_por_referencia': d.get('cat_vtas_por_referencia'),
-            'cat_num_canales':        d.get('cat_num_canales'),
-            'con_consignacion_pp':    d.get('con_consignacion_pp'),
-            'top_canal':              d.get('top_canal'),
-            'top_canal_ventas':       d.get('top_canal_ventas'),
-            'top_cliente':            d.get('top_cliente'),
-            'top_cliente_ventas':     d.get('top_cliente_ventas'),
-            'top_producto_cod':       d.get('top_producto_cod'),
-            'top_producto_nombre':    d.get('top_producto_nombre'),
-            'top_producto_ventas':    d.get('top_producto_ventas'),
-            'pry_dia_del_mes':        d.get('pry_dia_del_mes'),
-            'pry_proyeccion_mes':     d.get('pry_proyeccion_mes'),
-            'pry_ritmo_pct':          d.get('pry_ritmo_pct'),
-            'ant_ventas_netas':       d.get('ant_ventas_netas'),
-            'ant_var_ventas_pct':     d.get('ant_var_ventas_pct'),
-            'ant_consignacion_pp':    d.get('ant_consignacion_pp'),
+            'mes':                      mes,
+            'fecha_actualizacion':      now,
+            'fin_ventas_brutas':        d.get('fin_ventas_brutas'),
+            'fin_descuentos':           d.get('fin_descuentos'),
+            'fin_pct_descuento':        d.get('fin_pct_descuento'),
+            'fin_ventas_netas_sin_iva': d.get('fin_ventas_netas_sin_iva'),
+            'fin_impuestos':            d.get('fin_impuestos'),
+            'fin_ventas_netas':         d.get('fin_ventas_netas'),
+            'fin_devoluciones':         d.get('fin_devoluciones'),
+            'fin_ingresos_netos':       d.get('fin_ingresos_netos'),
+            'cto_costo_total':          d.get('cto_costo_total'),
+            'cto_utilidad_bruta':       d.get('cto_utilidad_bruta'),
+            'cto_margen_utilidad_pct':  d.get('cto_margen_utilidad_pct'),
+            'vol_unidades_vendidas':    d.get('vol_unidades_vendidas'),
+            'vol_num_facturas':         d.get('vol_num_facturas'),
+            'vol_ticket_promedio':      d.get('vol_ticket_promedio'),
+            'cli_clientes_activos':     d.get('cli_clientes_activos'),
+            'cli_clientes_nuevos':      d.get('cli_clientes_nuevos'),
+            'cli_vtas_por_cliente':     d.get('cli_vtas_por_cliente'),
+            'car_saldo':                d.get('car_saldo'),
+            'cat_num_referencias':      d.get('cat_num_referencias'),
+            'cat_vtas_por_referencia':  d.get('cat_vtas_por_referencia'),
+            'cat_num_canales':          d.get('cat_num_canales'),
+            'con_consignacion_pp':      d.get('con_consignacion_pp'),
+            'top_canal':                d.get('top_canal'),
+            'top_canal_ventas':         d.get('top_canal_ventas'),
+            'top_cliente':              d.get('top_cliente'),
+            'top_cliente_ventas':       d.get('top_cliente_ventas'),
+            'top_producto_cod':         d.get('top_producto_cod'),
+            'top_producto_nombre':      d.get('top_producto_nombre'),
+            'top_producto_ventas':      d.get('top_producto_ventas'),
+            'pry_dia_del_mes':          d.get('pry_dia_del_mes'),
+            'pry_proyeccion_mes':       d.get('pry_proyeccion_mes'),
+            'pry_ritmo_pct':            d.get('pry_ritmo_pct'),
+            'ant_ventas_netas':         d.get('ant_ventas_netas'),
+            'ant_var_ventas_pct':       d.get('ant_var_ventas_pct'),
+            'ant_consignacion_pp':      d.get('ant_consignacion_pp'),
             'ant_var_consignacion_pct': d.get('ant_var_consignacion_pct'),
         }
         cursor.execute(upsert_sql, row)
