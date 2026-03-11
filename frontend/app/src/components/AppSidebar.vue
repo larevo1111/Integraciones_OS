@@ -147,7 +147,7 @@ function toggleModulo(uid) {
   cursor: pointer;
   transition: background 80ms;
 }
-.workspace-switcher:hover { background: rgba(255,255,255,0.05); }
+.workspace-switcher:hover { background: var(--bg-card-hover); }
 
 .ws-logo {
   width: 22px; height: 22px;
@@ -209,7 +209,7 @@ function toggleModulo(uid) {
   user-select: none;
 }
 .nav-item:hover, .nav-item.active {
-  background: rgba(255,255,255,0.06);
+  background: var(--bg-card-hover);
   color: var(--text-primary);
 }
 .nav-item.active { font-weight: 500; }
@@ -232,7 +232,7 @@ function toggleModulo(uid) {
   cursor: pointer;
   transition: background 70ms;
 }
-.nav-module-header:hover { background: rgba(255,255,255,0.04); }
+.nav-module-header:hover { background: var(--bg-card-hover); }
 
 .nav-module-left {
   display: flex;
@@ -289,11 +289,11 @@ function toggleModulo(uid) {
   transition: background 70ms, color 70ms;
 }
 .nav-sub-item:hover {
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-card-hover);
   color: var(--text-primary);
 }
 .nav-sub-item.active {
-  background: rgba(255,255,255,0.07);
+  background: var(--accent-muted);
   color: var(--text-primary);
   font-weight: 500;
 }
@@ -341,7 +341,7 @@ function toggleModulo(uid) {
   transition: background 70ms, color 70ms;
 }
 .btn-icon:hover {
-  background: rgba(255,255,255,0.06);
+  background: var(--bg-card-hover);
   color: var(--text-primary);
 }
 
