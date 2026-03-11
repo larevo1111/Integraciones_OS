@@ -265,7 +265,7 @@ function doExport(format) {
   const params = new URLSearchParams({ format, fields: JSON.stringify(visibleKeys) })
   if (props.mes) params.set('mes', props.mes)
   if (filters)   params.set('filters', filters)
-  window.open(`http://localhost:3002/api/export/${props.recurso}?${params}`, '_blank')
+  window.open(`/api/export/${props.recurso}?${params}`, '_blank')
 }
 
 // ── Formato de celda ─────────────────────────────────

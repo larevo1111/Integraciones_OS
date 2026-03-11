@@ -141,7 +141,7 @@ import axios from 'axios'
 import { ChevronRightIcon, CalendarIcon, XIcon } from 'lucide-vue-next'
 import OsDataTable from 'src/components/OsDataTable.vue'
 
-const API = 'http://localhost:3002/api'
+const API = '/api'
 
 // ── Estado ────────────────────────────────────────────
 const mesSel = ref(null)

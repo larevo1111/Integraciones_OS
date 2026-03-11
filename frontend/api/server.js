@@ -183,4 +183,14 @@ app.get('/api/export/:recurso', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
-app.listen(3002, () => console.log('OS ERP API corriendo en puerto 3002'))
+// Servir frontend estático (dist/spa) — debe ir DESPUÉS de todas las rutas /api
+const path = require('path')
+const DIST  = path.join(__dirname, '../app/dist/spa')
+app.use(express.static(DIST))
+// SPA fallback: todas las rutas que no son /api/ devuelven index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(DIST, 'index.html'))
+})
+
+const PORT = 9100
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ OS ERP corriendo en puerto ${PORT}`))
