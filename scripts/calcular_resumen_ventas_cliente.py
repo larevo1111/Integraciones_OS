@@ -127,7 +127,7 @@ def main():
             COUNT(DISTINCT d.id_numeracion)                 AS vol_num_facturas,
             COUNT(DISTINCT d.cod_articulo)                  AS cat_num_referencias
         FROM zeffi_facturas_venta_detalle d
-        LEFT JOIN zeffi_clientes c ON c.numero_de_identificacion = d.id_cliente
+        LEFT JOIN zeffi_clientes c ON c.numero_de_identificacion = SUBSTRING_INDEX(d.id_cliente, ' ', -1)
         WHERE d.vigencia_factura = 'Vigente'
         GROUP BY mes, d.id_cliente
         ORDER BY mes, d.id_cliente
