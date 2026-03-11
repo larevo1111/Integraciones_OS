@@ -1,0 +1,93 @@
+/* ─── VARIABLES CSS — Manual de Estilos ERP Origen Silvestre ──── */
+/* Referencia: frontend/design-system/MANUAL_ESTILOS.md           */
+
+:root {
+  /* Fondos */
+  --bg-app:          #0d0d0f;
+  --bg-sidebar:      #141418;
+  --bg-card:         #1c1c1e;
+  --bg-card-hover:   #242428;
+  --bg-row-hover:    #1a1a1e;
+  --bg-row-selected: rgba(94, 106, 210, 0.08);
+  --bg-input:        #161618;
+  --bg-modal:        #1c1c1e;
+  --bg-overlay:      rgba(0, 0, 0, 0.65);
+
+  /* Textos */
+  --text-primary:    #ffffff;
+  --text-secondary:  #8a8f98;
+  --text-tertiary:   #5a5f6a;
+  --text-disabled:   #3a3f4a;
+  --text-inverse:    #0d0d0f;
+  --text-mono:       #8a8f98;
+
+  /* Bordes */
+  --border-subtle:   rgba(255, 255, 255, 0.06);
+  --border-default:  rgba(255, 255, 255, 0.10);
+  --border-strong:   rgba(255, 255, 255, 0.18);
+  --border-focus:    #5e6ad2;
+
+  /* Acento */
+  --accent:          #5e6ad2;
+  --accent-hover:    #6e7ae2;
+  --accent-active:   #4e5ac2;
+  --accent-muted:    rgba(94, 106, 210, 0.12);
+  --accent-border:   rgba(94, 106, 210, 0.35);
+
+  /* Estados */
+  --color-success:   #4ade80;
+  --color-warning:   #f59e0b;
+  --color-error:     #f87171;
+  --color-info:      #60a5fa;
+
+  /* Sombras */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 20px 80px rgba(0, 0, 0, 0.8);
+
+  /* Tipografía */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Fragment Mono', 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Radios */
+  --radius-xs:   3px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   10px;
+  --radius-2xl:  12px;
+  --radius-full: 9999px;
+}
+
+/* ─── RESET Y BASE ──────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #q-app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: rgba(255,255,255,0.10); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.10) transparent; }
+
+/* ─── QUASAR OVERRIDES ───────────────────────────────── */
+.q-layout { background: var(--bg-app); }
+.q-drawer { background: var(--bg-sidebar) !important; border-right: 1px solid var(--border-subtle) !important; }
+.q-page-container { background: var(--bg-app); }
