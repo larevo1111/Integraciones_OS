@@ -75,7 +75,6 @@ LAYOUT_JSON = [
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
             [{"name": "departamento"},           {"name": "ciudadNombre"}],
             [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
-            [{"name": "address"},                False],
             [{"name": "description", "fullWidth": True}]
         ]
     }
@@ -224,12 +223,10 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
                 'type': 'enum',
                 'options': [''] + municipios
             },
-            'address': {
-                'view': 'custom:views/fields/address-simple'
-            },
             'salutationName': {
                 'type': 'enum',
-                'options': ['']
+                'options': [''],
+                'disabled': True
             }
         }
     }
