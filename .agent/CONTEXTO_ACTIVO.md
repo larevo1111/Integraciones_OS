@@ -35,8 +35,8 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - **Paso 4b/4c/4d** — remisiones canal/cliente/producto analíticos
 - **Paso 5 — sync_hostinger.py** → copia las 49 tablas (41 zeffi + 8 resumen) a Hostinger → DROP local de las 8 resumen. Para tablas `resumen_*`: usa DROP+CREATE en Hostinger (garantiza schema actualizado); para `zeffi_*`: CREATE IF NOT EXISTS.
 - **Paso 6b — sync_espocrm_marketing.py** → actualiza enums y campos custom en EspoCRM Contact
-- **Paso 6c — sync_espocrm_contactos.py** → upsert clientes Effi → EspoCRM Contact (fuente='Effi')
-- **Paso 6d — sync_espocrm_to_hostinger.py** → `crm_contactos` en Hostinger (TRUNCATE + INSERT)
+- **Paso 6c — sync_espocrm_contactos.py** → upsert clientes Effi → EspoCRM Contact (fuente='Effi'). Traduce ciudad Effi → formato "Ciudad - Departamento" (normalización + alias)
+- **Paso 6d — sync_espocrm_to_hostinger.py** → `crm_contactos` en Hostinger (DROP+CREATE+INSERT). Usa campos custom (direccion, ciudad_nombre), NO nativos address_*
 - **Paso 7a — generar_plantilla_import_effi.py** → XLSX contactos CRM pendientes (fuente='CRM', enviado_a_effi=0)
 - **Paso 7b — import_clientes_effi.js** → Playwright sube XLSX a Effi automáticamente (solo si 7a generó)
 - **Orquestador**: `scripts/orquestador.py` — corre todos los pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
@@ -98,8 +98,10 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Contenedor: `espocrm` — puerto 8083
 - BD: `espocrm` en MariaDB local
 - 480+ contactos (Effi) + contactos CRM manuales
-- Campos custom en Contact: tipoDeMarketing, tipoCliente, tarifaPrecios, numeroIdentificacion, tipoIdentificacion, tipoPersona, formaPago, vendedorEffi, fuente (enum: CRM/Effi), enviadoAEffi (bool), ciudad_id (link → Ciudad)
-- Entidad Ciudad: 12,237 ciudades (Colombia/Ecuador/Rep.Dom/Guatemala) con id_effi
+- Campos custom en Contact: tipoDeMarketing, tipoCliente, tarifaPrecios, numeroIdentificacion, tipoIdentificacion, tipoPersona, formaPago, vendedorEffi, fuente (CRM/Effi), enviadoAEffi (bool), **ciudadNombre** (enum: "Ciudad - Depto"), **direccion** + **direccionLinea2** (varchar custom)
+- **Municipio**: enum dinámico con formato "Ciudad - Departamento" desde `codigos_ciudades_dane` (effi_data). NO usa campo compuesto `address` ni link a tabla `ciudad` (deprecados)
+- **Dirección**: campos custom `direccion` + `direccionLinea2`. Los nativos `address_street/city/state/country` ya NO se usan
+- Skill completa: `/espocrm-integracion`
 
 ### Infraestructura Docker
 - `/home/osserver/docker/docker-compose.yml`

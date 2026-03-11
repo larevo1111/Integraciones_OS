@@ -309,18 +309,18 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Ejecución manual**: `python3 scripts/sync_espocrm_contactos.py`
 - **Salida**: `✅ sync_espocrm_contactos — N contactos (X nuevos, Y actualizados, Z omitidos)`
 - **Tabla(s)**: `contact`, `email_address`, `entity_email_address`, `phone_number`, `entity_phone_number` en espocrm
-- **Notas**: Setea fuente='Effi' en todos los contactos importados. Resuelve ciudad → ciudad_id via tabla `ciudad`. Resuelve vendedor → assigned_user_id via nombre completo.
+- **Notas**: Setea fuente='Effi' en todos los contactos importados. Traduce ciudad Effi → formato "Ciudad - Departamento" para campo `ciudad_nombre` (normalización sin tildes + alias: Cali→Santiago De Cali, Cartagena→Cartagena De Indias). Escribe dirección en campo custom `direccion` (NO en address_street nativo). Resuelve vendedor → assigned_user_id via nombre completo.
 
 ---
 
 ### sync_espocrm_to_hostinger.py — Paso 6d
-- **Propósito**: Exporta tabla `contact` de EspoCRM local → `crm_contactos` en Hostinger (u768061575_os_integracion). Para visibilidad en AppSheet/NocoDB.
+- **Propósito**: Exporta tabla `contact` de EspoCRM local → `crm_contactos` en Hostinger (u768061575_os_integracion). Para visibilidad en NocoDB.
 - **Tipo**: utilidad
 - **Ejecución manual**: `python3 scripts/sync_espocrm_to_hostinger.py`
 - **Salida**: `✅ sync_espocrm_to_hostinger — N contactos → crm_contactos en Hostinger`
-- **Tabla(s) Hostinger**: `crm_contactos` (TRUNCATE + INSERT en lotes de 500)
+- **Tabla(s) Hostinger**: `crm_contactos` (DROP+CREATE+INSERT en lotes de 500)
 - **Conexión**: SSH tunnel a Hostinger (mismo mecanismo que sync_hostinger.py)
-- **Campos**: id, nombre_completo, first/last_name, numero_identificacion, tipo_identificacion, tipo_persona, email, telefono, address_*, ciudad, departamento, pais, tipo_de_marketing, tipo_cliente, tarifa_precios, forma_pago, vendedor_effi, fuente, enviado_a_effi, descripcion
+- **Campos**: id, nombre_completo, first/last_name, numero_identificacion, tipo_identificacion, tipo_persona, email, telefono, direccion, direccion_linea2, ciudad_nombre, tipo_de_marketing, tipo_cliente, tarifa_precios, forma_pago, vendedor_effi, fuente, enviado_a_effi, descripcion
 
 ---
 
@@ -344,7 +344,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   python3 scripts/generar_plantilla_import_effi.py --no-marcar # sin marcar enviado
   ```
 - **Salida**: `/tmp/import_clientes_effi_<fecha>.xlsx` con 36 columnas
-- **Mapeos**: tipo_identificacion→id_effi (hardcoded), ciudad_id→id_effi, tarifa→id (zeffi_tarifas_precios), marketing→id (zeffi_tipos_marketing), tipo_persona→1/2, regimen→4/5, email_responsable fijo, sucursal=1, moneda=COP
+- **Mapeos**: tipo_identificacion→id_effi (hardcoded), ciudad_nombre→código DANE via codigos_ciudades_dane, tarifa→id (zeffi_tarifas_precios), marketing→id (zeffi_tipos_marketing), tipo_persona→1/2, regimen→4/5, email_responsable fijo, sucursal=1, moneda=COP. Dirección = concatenación de `direccion` + `direccion_linea2`.
 - **Notas**: Tras generar, marca contactos como enviado_a_effi=1 (a menos que --no-marcar). Si no hay pendientes, imprime "sin contactos CRM pendientes" y termina (exit 0, sin XLSX).
 
 ---
