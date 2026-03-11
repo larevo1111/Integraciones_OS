@@ -75,6 +75,7 @@ LAYOUT_JSON = [
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
             [{"name": "departamento"},           {"name": "ciudadNombre"}],
             [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
+            [{"name": "address"},                False],
             [{"name": "description", "fullWidth": True}]
         ]
     }
