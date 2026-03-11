@@ -107,9 +107,14 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - MariaDB corre en el **host** (systemd), NO en Docker — puerto 3306
 - Credenciales: `osadmin` / `Epist2487.`
 
+### Botón "Enviar a Effi" en EspoCRM (activo)
+- Botón verde en la ficha de Contacto (detail view) → dispara pasos 7a+7b a demanda
+- Flujo: botón JS → `POST /api/v1/ImportEffi/action/triggerImport` (PHP) → Flask 172.18.0.1:5050 → scripts 7a+7b
+- Flask server: `scripts/webhook_server.py`, systemd service `effi-webhook.service` (activo, auto-restart)
+- Archivos versionados en `espocrm-custom/` con instrucciones de deploy
+
 ## Próximos Pasos
-1. **Botón en EspoCRM**: botón en ficha de Contacto para disparar import a Effi manualmente (vía n8n webhook → pasos 7a+7b)
-2. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. También borrar en Effi manualmente (3 clientes: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya).
+1. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. También borrar en Effi manualmente (3 clientes: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya).
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
