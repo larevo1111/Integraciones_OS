@@ -28,6 +28,7 @@ Guía de acceso, consultas y patrones para trabajar con la base de datos `effi_d
 | Contraseña | `Epist2487.` |
 | Base de datos principal | `effi_data` |
 | Otras BDs | `espocrm`, `nocodb_meta` |
+| BD Hostinger | `u768061575_os_integracion` (SSH tunnel) |
 
 **MariaDB corre en el HOST** (systemd), NO en Docker. El puerto 3306 escucha en `0.0.0.0`.
 
@@ -341,6 +342,62 @@ HAVING diff != 0
 ORDER BY r.mes DESC, r.con_consignacion_pp DESC
 LIMIT 20;
 -- Esperado: 0 filas (ninguna diferencia)
+```
+
+---
+
+## BD espocrm — Tablas clave
+
+### Tabla `contact`
+Entidad principal del CRM. Columnas custom (además de las estándar EspoCRM):
+```
+numero_identificacion VARCHAR(100)
+tipo_identificacion   VARCHAR(255)  -- enum texto
+tipo_persona          VARCHAR(255)  -- "Física (natural)" / "Jurídica (moral)"
+tipo_cliente          VARCHAR(255)  -- enum: Común, Fiel, Desertor, Mayorista, Importador, Industrial
+tipo_de_marketing     VARCHAR(255)  -- enum dinámico (sync desde zeffi_tipos_marketing)
+tarifa_precios        VARCHAR(255)  -- enum dinámico (sync desde zeffi_tarifas_precios)
+forma_pago            VARCHAR(100)
+vendedor_effi         VARCHAR(255)  -- enum dinámico (DISTINCT de vendedores en Effi)
+ciudad_id             VARCHAR(17)   -- FK → ciudad.id
+fuente                VARCHAR(255)  -- "CRM" (manual) o "Effi" (importado)
+enviado_a_effi        TINYINT(1)    -- 0=pendiente, 1=ya importado a Effi
+```
+
+### Tabla `ciudad`
+Catálogo de 12,237 ciudades cargado desde plantilla Effi.
+```
+id            VARCHAR(17)  PK (formato EspoCRM)
+name          VARCHAR(200) nombre ciudad
+id_effi       INT          UNIQUE — ID numérico en Effi (para la plantilla de import)
+departamento  VARCHAR(150)
+pais          VARCHAR(100)
+deleted       TINYINT(1)
+```
+Consultar ciudad por nombre:
+```sql
+SELECT id, name, id_effi, departamento, pais
+FROM ciudad WHERE LOWER(name) LIKE '%medell%' AND deleted=0;
+```
+
+### Tabla `crm_contactos` (Hostinger)
+Mirror de EspoCRM contact en `u768061575_os_integracion`. Se actualiza en paso 6d.
+480 contactos. Columnas: id, nombre_completo, first/last_name, numero_identificacion,
+tipo_identificacion, tipo_persona, email, telefono, address_*, ciudad, departamento,
+pais, tipo_de_marketing, tipo_cliente, tarifa_precios, forma_pago, vendedor_effi,
+fuente, enviado_a_effi, descripcion.
+
+### Queries útiles de EspoCRM
+
+```bash
+# Contactos pendientes de enviar a Effi (fuente=CRM, no enviados)
+mysql -u osadmin -pEpist2487. espocrm -e "
+SELECT first_name, last_name, numero_identificacion, tipo_de_marketing, fuente, enviado_a_effi
+FROM contact WHERE fuente='CRM' AND (enviado_a_effi=0 OR enviado_a_effi IS NULL) AND deleted=0;" 2>/dev/null
+
+# Ver distribución fuente/enviado
+mysql -u osadmin -pEpist2487. espocrm -e "
+SELECT fuente, enviado_a_effi, COUNT(*) FROM contact WHERE deleted=0 GROUP BY 1,2;" 2>/dev/null
 ```
 
 ### V7 — cli_clientes_nuevos canal_mes vs fuente directa

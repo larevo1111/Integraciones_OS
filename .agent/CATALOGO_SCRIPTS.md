@@ -533,9 +533,10 @@ Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en l
 | Skill | Archivo | Contenido |
 |---|---|---|
 | `/playwright-effi` | `.claude/commands/playwright-effi.md` | Patrones, mecanismos de descarga y errores conocidos para scripts de exportación Effi con Playwright |
-| `/effi-database` | `.claude/commands/effi-database.md` | Credenciales, tablas `zeffi_*`, conexión desde host/Docker, por qué los comandos se cuelgan, patrones Python/Node |
+| `/effi-database` | `.claude/commands/effi-database.md` | Credenciales, tablas `zeffi_*`, conexión desde host/Docker, por qué los comandos se cuelgan, patrones Python/Node, tablas espocrm/ciudad/crm_contactos |
 | `/effi-negocio` | `.claude/commands/effi-negocio.md` | Modelo de negocio Effi: qué significa "vigente", consignación, canales, tarifas, flujo de ventas, fechas a usar |
 | `/telegram-pipeline` | `.claude/commands/telegram-pipeline.md` | Configuración del bot Telegram para notificaciones del pipeline |
+| `/espocrm-integracion` | `.claude/commands/espocrm-integracion.md` | EspoCRM: integración bidireccional con Effi, campos custom Contact, entidad Ciudad, scripts de sync, queries diagnóstico, flujo CRM→Effi |
 
 > **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla.
 
