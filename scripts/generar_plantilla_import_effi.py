@@ -141,6 +141,15 @@ def cargar_ciudades_id(conn_espo):
     return mapa
 
 
+def cargar_vendedores(conn_effi):
+    """Devuelve dict {nombre_completo_lower: codigo_effi}."""
+    cur = conn_effi.cursor()
+    cur.execute("SELECT codigo, nombre_completo FROM zeffi_empleados WHERE codigo IS NOT NULL AND nombre_completo IS NOT NULL")
+    mapa = {nombre.strip().lower(): str(codigo) for codigo, nombre in cur.fetchall()}
+    cur.close()
+    return mapa
+
+
 # ─── Leer contactos CRM ────────────────────────────────────────────────────────
 
 def leer_contactos_crm(conn_espo, todos=False):
@@ -166,6 +175,7 @@ def leer_contactos_crm(conn_espo, todos=False):
             c.tipo_de_marketing,
             c.tarifa_precios,
             c.forma_pago,
+            c.vendedor_effi,
             c.ciudad_id,
             -- email primario
             (SELECT ea.name FROM entity_email_address eea
@@ -196,7 +206,7 @@ def leer_contactos_crm(conn_espo, todos=False):
 
 # ─── Construir fila ────────────────────────────────────────────────────────────
 
-def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map):
+def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_map):
     """Convierte un contacto EspoCRM a una fila de la plantilla Effi."""
 
     nombre_completo = ' '.join(filter(None, [c.get('first_name'), c.get('last_name')])).strip()
@@ -221,6 +231,11 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map):
 
     # Tipo de cliente → ID numérico Effi
     tipo_cliente = TIPO_CLIENTE_MAP.get(c.get('tipo_cliente') or '', None)
+
+    # Vendedor → código numérico Effi (lookup por nombre completo)
+    vendedor_id = None
+    if c.get('vendedor_effi'):
+        vendedor_id = vendedores_map.get(c['vendedor_effi'].strip().lower())
 
     fila = [
         tipo_id_effi,                           # 0: ID EFFI: Tipo de documento *
@@ -255,7 +270,7 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map):
         1,                                       # 29: ID EFFI: Sucursal
         None,                                    # 30: ID EFFI: Ruta logística
         EMAIL_RESPONSABLE,                       # 31: Email usuario responsable
-        None,                                    # 32: ID EFFI: Vendedor
+        vendedor_id,                             # 32: ID EFFI: Vendedor
         None,                                    # 33: Restringir sucursal
         None,                                    # 34: Restringir ruta logística
         c.get('description'),                    # 35: Observación
@@ -265,7 +280,7 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map):
 
 # ─── Generar XLSX ──────────────────────────────────────────────────────────────
 
-def generar_xlsx(contactos, tarifas_map, marketing_map, ciudades_id_map, output_path):
+def generar_xlsx(contactos, tarifas_map, marketing_map, ciudades_id_map, vendedores_map, output_path):
     wb = Workbook()
     ws = wb.active
     ws.title = 'Clientes'
@@ -275,7 +290,7 @@ def generar_xlsx(contactos, tarifas_map, marketing_map, ciudades_id_map, output_
 
     # Datos
     for c in contactos:
-        fila = construir_fila(c, tarifas_map, marketing_map, ciudades_id_map)
+        fila = construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_map)
         ws.append(fila)
 
     wb.save(str(output_path))
@@ -317,6 +332,7 @@ def main():
         tarifas_map     = cargar_tarifas(conn_effi)
         marketing_map   = cargar_tipos_marketing(conn_effi)
         ciudades_id_map = cargar_ciudades_id(conn_espo)
+        vendedores_map  = cargar_vendedores(conn_effi)
 
         # Leer contactos
         contactos = leer_contactos_crm(conn_espo, todos=args.todos)
@@ -328,7 +344,7 @@ def main():
         # Generar XLSX
         hoy = date.today().strftime('%Y-%m-%d')
         output_path = OUTPUT_DIR / f'import_clientes_effi_{hoy}.xlsx'
-        total = generar_xlsx(contactos, tarifas_map, marketing_map, ciudades_id_map, output_path)
+        total = generar_xlsx(contactos, tarifas_map, marketing_map, ciudades_id_map, vendedores_map, output_path)
 
         print(f'✅ generar_plantilla_import_effi — {total} contactos → {output_path}')
 
