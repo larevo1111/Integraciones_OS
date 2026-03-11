@@ -253,9 +253,12 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
         }
     }
     # Archivo JS con mapa departamento → [municipios] para cascading en EspoCRM
-    js_lines = ["define('custom:data/ciudades-colombia', [], function () {", "    return "]
-    js_lines.append(json.dumps(mapa_deptos, ensure_ascii=False, indent=4) + ";")
-    js_lines.append("});")
+    mapa_json = json.dumps(mapa_deptos, ensure_ascii=False, indent=4)
+    js_lines = [
+        "define('custom:data/ciudades-colombia', [], function () {",
+        "    return " + mapa_json + ";",
+        "});"
+    ]
 
     with open(TMP_ENTITY, 'w', encoding='utf-8') as f:
         json.dump(entity_defs, f, ensure_ascii=False, indent=2)
