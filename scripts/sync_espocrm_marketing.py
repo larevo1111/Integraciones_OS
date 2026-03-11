@@ -199,8 +199,9 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
                 'options': TIPOS_PERSONA
             },
             'formaPago': {
-                'type': 'varchar',
-                'maxLength': 100
+                'type': 'enum',
+                'options': ['Plazo predeterminado', 'Contraentrega', 'Contado', '15 días', '30 días', '60 días'],
+                'default': 'Plazo predeterminado'
             },
             'vendedorEffi': {
                 'type': 'enum',
@@ -213,7 +214,8 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             },
             'enviadoAEffi': {
                 'type': 'bool',
-                'default': False
+                'default': False,
+                'readOnly': True
             },
             'departamento': {
                 'type': 'enum',
@@ -222,6 +224,9 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             'ciudadNombre': {
                 'type': 'enum',
                 'options': [''] + municipios
+            },
+            'address': {
+                'view': 'custom:views/fields/address-simple'
             }
         }
     }
