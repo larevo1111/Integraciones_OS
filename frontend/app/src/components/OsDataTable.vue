@@ -10,102 +10,87 @@
       <div class="toolbar-right">
         <!-- Filtrar -->
         <div class="toolbar-btn-wrap" ref="filterRef">
-          <button class="toolbar-btn" :class="{ active: activeFilters.length > 0 }" @click="showFilter = !showFilter">
+          <button class="toolbar-btn" :class="{ active: activeFilters.length > 0 }" @click.stop="showFilter = !showFilter">
             <FilterIcon :size="14" />
             <span>Filtrar</span>
             <span v-if="activeFilters.length > 0" class="btn-badge">{{ activeFilters.length }}</span>
           </button>
           <!-- Popup filtros -->
           <div v-if="showFilter" class="popup filter-popup" @click.stop>
-            <div class="popup-header">
-              <span>Filtros</span>
-              <button class="icon-btn" @click="showFilter = false"><XIcon :size="14" /></button>
-            </div>
+            <div class="pp-section-label">Filtros</div>
             <div class="filter-list">
               <div v-for="(f, i) in activeFilters" :key="i" class="filter-row">
-                <select v-model="f.field" class="filter-select">
+                <select v-model="f.field" class="pp-select">
                   <option v-for="col in filterableCols" :key="col.key" :value="col.key">{{ col.label }}</option>
                 </select>
-                <select v-model="f.op" class="filter-select filter-op">
+                <select v-model="f.op" class="pp-select pp-select-op">
                   <option value="contains">contiene</option>
                   <option value="eq">igual a</option>
-                  <option value="gte">mayor o igual</option>
-                  <option value="lte">menor o igual</option>
+                  <option value="gte">≥</option>
+                  <option value="lte">≤</option>
                 </select>
-                <input v-model="f.value" class="filter-input" placeholder="valor" />
-                <button class="icon-btn danger" @click="removeFilter(i)"><XIcon :size="12" /></button>
+                <input v-model="f.value" class="pp-input" placeholder="valor" @keyup.enter="showFilter = false" />
+                <button class="pp-icon-btn" @click="removeFilter(i)"><XIcon :size="12" /></button>
               </div>
-              <div v-if="activeFilters.length === 0" class="filter-empty">Sin filtros activos</div>
+              <div v-if="activeFilters.length === 0" class="pp-empty">Sin filtros activos</div>
             </div>
-            <div class="popup-footer">
-              <button class="btn-ghost-sm" @click="addFilter">
-                <PlusIcon :size="13" /> Añadir filtro
-              </button>
-              <button v-if="activeFilters.length > 0" class="btn-ghost-sm danger" @click="activeFilters = []">
-                Limpiar
-              </button>
+            <div class="pp-footer">
+              <button class="pp-action-btn" @click="addFilter"><PlusIcon :size="13" />Añadir filtro</button>
+              <button v-if="activeFilters.length > 0" class="pp-action-btn danger" @click="activeFilters = []">Limpiar todo</button>
             </div>
           </div>
         </div>
 
-        <!-- Campos -->
+        <!-- Campos (Display) -->
         <div class="toolbar-btn-wrap" ref="fieldsRef">
-          <button class="toolbar-btn" @click="showFields = !showFields">
+          <button class="toolbar-btn" @click.stop="showFields = !showFields">
             <SlidersHorizontalIcon :size="14" />
             <span>Campos</span>
           </button>
           <!-- Popup campos -->
           <div v-if="showFields" class="popup fields-popup" @click.stop>
-            <div class="popup-header">
-              <span>Campos visibles</span>
-              <button class="icon-btn" @click="showFields = false"><XIcon :size="14" /></button>
+            <div class="pp-section-label">Propiedades visibles</div>
+            <div class="fields-pills">
+              <button
+                v-for="col in localColumns"
+                :key="col.key"
+                class="field-pill"
+                :class="{ active: col.visible }"
+                @click="col.visible = !col.visible"
+              >{{ col.label }}</button>
             </div>
-            <div class="fields-list">
-              <label v-for="col in localColumns" :key="col.key" class="field-row">
-                <input type="checkbox" v-model="col.visible" class="field-check" />
-                <span>{{ col.label }}</span>
-              </label>
-            </div>
-            <div class="popup-footer">
-              <button class="btn-ghost-sm" @click="showAll">Mostrar todos</button>
-              <button class="btn-ghost-sm" @click="hideAll">Ocultar todos</button>
+            <div class="pp-divider" />
+            <div class="pp-footer">
+              <button class="pp-action-btn" @click="showAll">Mostrar todos</button>
+              <button class="pp-action-btn" @click="hideAll">Ocultar todos</button>
             </div>
           </div>
         </div>
 
         <!-- Exportar -->
         <div class="toolbar-btn-wrap" ref="exportRef">
-          <button class="toolbar-btn" @click="showExport = !showExport">
+          <button class="toolbar-btn" @click.stop="showExport = !showExport">
             <DownloadIcon :size="14" />
             <span>Exportar</span>
           </button>
           <!-- Popup export -->
           <div v-if="showExport" class="popup export-popup" @click.stop>
-            <div class="popup-header">
-              <span>Exportar como</span>
-              <button class="icon-btn" @click="showExport = false"><XIcon :size="14" /></button>
-            </div>
-            <div class="export-options">
-              <button class="export-option" @click="doExport('csv')">
-                <FileTextIcon :size="16" />
-                <div>
-                  <strong>CSV</strong>
-                  <span>Separado por comas</span>
-                </div>
+            <div class="pp-section-label">Exportar como</div>
+            <div class="export-list">
+              <button class="export-row" @click="doExport('csv')">
+                <FileTextIcon :size="15" class="export-icon" />
+                <span class="export-label">CSV</span>
+                <span class="export-desc">Separado por comas</span>
               </button>
-              <button class="export-option" @click="doExport('xlsx')">
-                <TableIcon :size="16" />
-                <div>
-                  <strong>Excel</strong>
-                  <span>Archivo .xlsx</span>
-                </div>
+              <button class="export-row" @click="doExport('xlsx')">
+                <TableIcon :size="15" class="export-icon" />
+                <span class="export-label">Excel</span>
+                <span class="export-desc">Archivo .xlsx</span>
               </button>
-              <button class="export-option" @click="doExport('pdf')">
-                <FileIcon :size="16" />
-                <div>
-                  <strong>PDF</strong>
-                  <span>Documento PDF</span>
-                </div>
+              <button class="export-row" @click="doExport('pdf')">
+                <FileIcon :size="15" class="export-icon" />
+                <span class="export-label">PDF</span>
+                <span class="export-desc">Documento PDF</span>
               </button>
             </div>
           </div>
@@ -352,7 +337,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   min-width: 16px; text-align: center;
 }
 
-/* ── POPUPS ── */
+/* ── POPUPS — base ── */
 .popup {
   position: absolute; top: calc(100% + 6px); right: 0;
   background: var(--bg-modal);
@@ -360,69 +345,118 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   z-index: 200;
-  min-width: 260px;
+  min-width: 240px;
   animation: popup-in 120ms ease-out;
+  overflow: hidden;
 }
 @keyframes popup-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
-.popup-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 12px; font-weight: 600; color: var(--text-primary);
-}
-.popup-footer {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 14px 10px;
-  border-top: 1px solid var(--border-subtle);
+
+/* Label de sección (encabezado sin botón X, como Linear) */
+.pp-section-label {
+  padding: 10px 14px 6px;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--text-tertiary);
 }
 
-/* ── FILTROS ── */
-.filter-popup { min-width: 420px; }
-.filter-list  { padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
-.filter-row   { display: flex; align-items: center; gap: 6px; }
-.filter-select, .filter-input {
-  height: 28px; border-radius: var(--radius-sm);
+/* Divider interno */
+.pp-divider { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+
+/* Footer */
+.pp-footer {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.pp-action-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 26px; padding: 0 8px; border-radius: var(--radius-sm);
+  border: none; background: transparent;
+  font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  transition: background 60ms; font-family: var(--font-sans);
+}
+.pp-action-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.pp-action-btn.danger:hover { color: var(--color-error); }
+
+/* Vacío */
+.pp-empty { padding: 10px 14px; font-size: 12px; color: var(--text-tertiary); }
+
+/* Ícono btn dentro de popup */
+.pp-icon-btn {
+  width: 22px; height: 22px; border-radius: var(--radius-sm); border: none;
+  background: transparent; color: var(--text-tertiary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 60ms;
+}
+.pp-icon-btn:hover { background: var(--bg-card-hover); color: var(--color-error); }
+
+/* ── FILTRAR ── */
+.filter-popup { min-width: 440px; }
+.filter-list  { padding: 2px 10px 6px; display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow-y: auto; }
+.filter-row   { display: flex; align-items: center; gap: 5px; }
+.pp-select {
+  height: 27px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-input);
+  font-size: 12px; color: var(--text-primary);
+  padding: 0 7px; outline: none;
+  font-family: var(--font-sans); cursor: pointer;
+}
+.pp-select:focus { border-color: var(--accent); }
+.pp-select        { min-width: 130px; }
+.pp-select-op     { min-width: 80px; }
+.pp-input {
+  flex: 1; height: 27px; border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
   background: var(--bg-input);
   font-size: 12px; color: var(--text-primary);
   padding: 0 8px; outline: none;
   font-family: var(--font-sans);
 }
-.filter-select:focus, .filter-input:focus { border-color: var(--accent); }
-.filter-select  { min-width: 120px; }
-.filter-op      { min-width: 110px; }
-.filter-input   { flex: 1; }
-.filter-empty   { font-size: 12px; color: var(--text-tertiary); padding: 8px 0; }
+.pp-input:focus { border-color: var(--accent); }
 
-/* ── CAMPOS ── */
-.fields-popup { min-width: 220px; }
-.fields-list  { padding: 6px 14px; max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-.field-row    {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 6px; border-radius: var(--radius-sm);
-  font-size: 13px; color: var(--text-secondary);
-  cursor: pointer; transition: background 60ms;
+/* ── CAMPOS — pills ── */
+.fields-popup { min-width: 280px; }
+.fields-pills {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 6px 12px 10px;
+  max-height: 220px; overflow-y: auto;
 }
-.field-row:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.field-check  { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
-
-/* ── EXPORT ── */
-.export-popup   { min-width: 200px; }
-.export-options { padding: 6px; display: flex; flex-direction: column; gap: 2px; }
-.export-option  {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border-radius: var(--radius-md);
-  border: none; background: transparent; width: 100%;
-  cursor: pointer; text-align: left; transition: background 80ms;
+.field-pill {
+  display: inline-flex; align-items: center;
+  height: 26px; padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: transparent;
+  font-size: 12px; color: var(--text-secondary);
+  cursor: pointer; transition: all 80ms;
   font-family: var(--font-sans);
 }
-.export-option:hover { background: var(--bg-card-hover); }
-.export-option svg   { color: var(--text-secondary); flex-shrink: 0; }
-.export-option strong { display: block; font-size: 13px; color: var(--text-primary); font-weight: 500; }
-.export-option span   { font-size: 11px; color: var(--text-tertiary); }
+.field-pill:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.field-pill.active {
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── EXPORTAR ── */
+.export-popup { min-width: 220px; }
+.export-list  { padding: 4px 6px 8px; display: flex; flex-direction: column; gap: 1px; }
+.export-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--radius-md);
+  border: none; background: transparent; width: 100%;
+  cursor: pointer; transition: background 80ms;
+  font-family: var(--font-sans);
+}
+.export-row:hover { background: var(--bg-card-hover); }
+.export-icon { color: var(--text-tertiary); flex-shrink: 0; }
+.export-label { font-size: 13px; color: var(--text-primary); font-weight: 500; flex: 1; text-align: left; }
+.export-desc  { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 
 /* ── TABLA ── */
 .table-scroll { overflow-x: auto; }

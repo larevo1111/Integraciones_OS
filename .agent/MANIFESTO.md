@@ -9,6 +9,12 @@
 
 Este manual es la fuente de verdad única del diseño. No se puede crear UI sin consultarlo.
 
+**⚠️ REGLA CRÍTICA — BUILD OBLIGATORIO:** Después de cualquier modificación al código Vue/Quasar del frontend, ejecutar:
+```bash
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/frontend/app && npx quasar build
+```
+El servidor sirve los archivos compilados en `dist/spa/`, NO los fuentes. Sin rebuild, los cambios no se ven en producción.
+
 ---
 
 ## 1. Identidad y Roles
