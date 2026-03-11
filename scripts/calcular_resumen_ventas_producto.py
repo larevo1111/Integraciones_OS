@@ -81,7 +81,10 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_producto_mes (
     ant_unidades             DECIMAL(15,2) COMMENT 'vol_unidades_vendidas del mismo producto-mes ano anterior',
     ant_var_unidades_pct     DECIMAL(8,4)  COMMENT '(unidades - ant) / ant (decimal 0-1)',
 
-    PRIMARY KEY (mes, cod_articulo)
+    _key                     VARCHAR(100) NOT NULL COMMENT 'PK único: CONCAT(mes, |, cod_articulo)',
+
+    PRIMARY KEY (_key),
+    UNIQUE KEY uq_mes_producto (mes, cod_articulo)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 """
 
@@ -94,6 +97,7 @@ def main():
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute(DDL)
+    cursor.execute("ALTER TABLE resumen_ventas_facturas_producto_mes ADD COLUMN IF NOT EXISTS _key VARCHAR(100) NOT NULL DEFAULT '' AFTER mes")
     conn.commit()
 
     resumen = {}   # key: (mes, cod_articulo) → dict de campos
@@ -247,7 +251,7 @@ def main():
     # ── 5. UPSERT ─────────────────────────────────────────────────────────────
     upsert_sql = """
         INSERT INTO resumen_ventas_facturas_producto_mes (
-            mes, cod_articulo, fecha_actualizacion,
+            _key, mes, cod_articulo, fecha_actualizacion,
             nombre, categoria, marca,
             fin_ventas_brutas, fin_descuentos, fin_pct_descuento,
             fin_ventas_netas_sin_iva, fin_impuestos, fin_pct_del_mes,
@@ -260,7 +264,7 @@ def main():
             ant_ventas_netas, ant_var_ventas_pct,
             ant_unidades, ant_var_unidades_pct
         ) VALUES (
-            %(mes)s, %(cod_articulo)s, %(fecha_actualizacion)s,
+            %(_key)s, %(mes)s, %(cod_articulo)s, %(fecha_actualizacion)s,
             %(nombre)s, %(categoria)s, %(marca)s,
             %(fin_ventas_brutas)s, %(fin_descuentos)s, %(fin_pct_descuento)s,
             %(fin_ventas_netas_sin_iva)s, %(fin_impuestos)s, %(fin_pct_del_mes)s,
@@ -309,6 +313,7 @@ def main():
     for (mes, cod) in sorted(resumen.keys()):
         d = resumen[(mes, cod)]
         row = {
+            '_key':                     f'{mes}|{cod}',
             'mes':                      mes,
             'cod_articulo':             cod,
             'fecha_actualizacion':      now,

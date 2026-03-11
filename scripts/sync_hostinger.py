@@ -82,10 +82,21 @@ def sync_tabla(conn_src, cursor_src, cursor_dst, conn_dst, tabla):
         f'CREATE TABLE IF NOT EXISTS `{tabla}`',
         1
     )
-    cursor_dst.execute(create_sql_dst)
+    # Para tablas resumen_: DROP + CREATE para asegurar que el schema siempre esté actualizado
+    if tabla.startswith('resumen_'):
+        cursor_dst.execute(f"DROP TABLE IF EXISTS `{tabla}`")
+        conn_dst.commit()
+        final_sql = create_sql_dst.replace(
+            f'CREATE TABLE IF NOT EXISTS `{tabla}`',
+            f'CREATE TABLE `{tabla}`',
+            1
+        )
+    else:
+        final_sql = create_sql_dst
+    cursor_dst.execute(final_sql)
     conn_dst.commit()
 
-    # 2. TRUNCATE
+    # 2. TRUNCATE (para tablas zeffi_; resumen_ ya están vacías tras DROP+CREATE)
     cursor_dst.execute(f"TRUNCATE TABLE `{tabla}`")
     conn_dst.commit()
 

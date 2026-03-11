@@ -110,7 +110,10 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_remisiones_cliente_mes (
     ant_ventas_netas         DECIMAL(15,2) COMMENT 'fin_ventas_netas_sin_iva mismo cliente-mes ano anterior',
     ant_var_ventas_pct       DECIMAL(8,4),
 
-    PRIMARY KEY (mes, id_cliente)
+    _key                     VARCHAR(100) NOT NULL COMMENT 'PK único: CONCAT(mes, |, id_cliente)',
+
+    PRIMARY KEY (_key),
+    UNIQUE KEY uq_mes_cliente (mes, id_cliente)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 """
 
@@ -122,6 +125,7 @@ def main():
     conn   = mysql.connector.connect(**DB)
     cursor = conn.cursor(dictionary=True)
     cursor.execute(DDL)
+    cursor.execute("ALTER TABLE resumen_ventas_remisiones_cliente_mes ADD COLUMN IF NOT EXISTS _key VARCHAR(100) NOT NULL DEFAULT '' AFTER mes")
     conn.commit()
 
     resumen = {}   # key: (mes, id_cliente)
@@ -295,7 +299,7 @@ def main():
     # ── 7. UPSERT ─────────────────────────────────────────────────────────────
     upsert_sql = """
         INSERT INTO resumen_ventas_remisiones_cliente_mes (
-            mes, id_cliente, fecha_actualizacion,
+            _key, mes, id_cliente, fecha_actualizacion,
             cliente, canal,
             fin_ventas_brutas, fin_descuentos, fin_pct_descuento,
             fin_ventas_netas_sin_iva, fin_impuestos,
@@ -307,7 +311,7 @@ def main():
             pry_dia_del_mes, pry_proyeccion_mes, pry_ritmo_pct,
             ant_ventas_netas, ant_var_ventas_pct
         ) VALUES (
-            %(mes)s, %(id_cliente)s, %(fecha_actualizacion)s,
+            %(_key)s, %(mes)s, %(id_cliente)s, %(fecha_actualizacion)s,
             %(cliente)s, %(canal)s,
             %(fin_ventas_brutas)s, %(fin_descuentos)s, %(fin_pct_descuento)s,
             %(fin_ventas_netas_sin_iva)s, %(fin_impuestos)s,
@@ -354,6 +358,7 @@ def main():
     for (mes, id_cli) in sorted(resumen.keys()):
         d = resumen[(mes, id_cli)]
         cursor.execute(upsert_sql, {
+            '_key':                     f'{mes}|{id_cli}',
             'mes':                      mes,
             'id_cliente':               id_cli,
             'fecha_actualizacion':      now,

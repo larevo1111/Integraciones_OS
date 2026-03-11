@@ -94,7 +94,10 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_remisiones_producto_mes (
     ant_ventas_netas         DECIMAL(15,2) COMMENT 'fin_ventas_netas_sin_iva mismo producto-mes ano anterior',
     ant_var_ventas_pct       DECIMAL(8,4),
 
-    PRIMARY KEY (mes, cod_articulo)
+    _key                     VARCHAR(100) NOT NULL COMMENT 'PK único: CONCAT(mes, |, cod_articulo)',
+
+    PRIMARY KEY (_key),
+    UNIQUE KEY uq_mes_producto (mes, cod_articulo)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 """
 
@@ -106,6 +109,7 @@ def main():
     conn   = mysql.connector.connect(**DB)
     cursor = conn.cursor(dictionary=True)
     cursor.execute(DDL)
+    cursor.execute("ALTER TABLE resumen_ventas_remisiones_producto_mes ADD COLUMN IF NOT EXISTS _key VARCHAR(100) NOT NULL DEFAULT '' AFTER mes")
     conn.commit()
 
     resumen = {}   # key: (mes, cod_articulo)
@@ -248,7 +252,7 @@ def main():
     # ── 5. UPSERT ─────────────────────────────────────────────────────────────
     upsert_sql = """
         INSERT INTO resumen_ventas_remisiones_producto_mes (
-            mes, cod_articulo, fecha_actualizacion,
+            _key, mes, cod_articulo, fecha_actualizacion,
             descripcion_articulo, categoria_articulo, marca_articulo,
             fin_ventas_brutas, fin_descuentos, fin_pct_descuento,
             fin_ventas_netas_sin_iva, fin_impuestos, fin_pct_del_mes,
@@ -259,7 +263,7 @@ def main():
             pry_dia_del_mes, pry_proyeccion_mes, pry_ritmo_pct,
             ant_ventas_netas, ant_var_ventas_pct
         ) VALUES (
-            %(mes)s, %(cod_articulo)s, %(fecha_actualizacion)s,
+            %(_key)s, %(mes)s, %(cod_articulo)s, %(fecha_actualizacion)s,
             %(descripcion_articulo)s, %(categoria_articulo)s, %(marca_articulo)s,
             %(fin_ventas_brutas)s, %(fin_descuentos)s, %(fin_pct_descuento)s,
             %(fin_ventas_netas_sin_iva)s, %(fin_impuestos)s, %(fin_pct_del_mes)s,
@@ -302,6 +306,7 @@ def main():
     for (mes, cod) in sorted(resumen.keys()):
         d = resumen[(mes, cod)]
         cursor.execute(upsert_sql, {
+            '_key':                     f'{mes}|{cod}',
             'mes':                      mes,
             'cod_articulo':             cod,
             'fecha_actualizacion':      now,
