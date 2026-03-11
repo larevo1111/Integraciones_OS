@@ -200,8 +200,7 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             },
             'formaPago': {
                 'type': 'enum',
-                'options': ['Plazo predeterminado', 'Contraentrega', 'Contado', '15 días', '30 días', '60 días'],
-                'default': 'Plazo predeterminado'
+                'options': ['', 'Contraentrega', 'Contado', '15 días', '30 días', '45 días', '60 días']
             },
             'vendedorEffi': {
                 'type': 'enum',
