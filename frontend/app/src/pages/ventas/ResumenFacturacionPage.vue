@@ -279,7 +279,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page-wrap { display: flex; flex-direction: column; height: 100%; background: var(--bg-app); }
+.page-wrap { display: flex; flex-direction: column; min-height: 100%; background: var(--bg-app); }
 
 /* ── PAGE HEADER ── */
 .page-header {
@@ -312,7 +312,7 @@ onMounted(async () => {
 .mes-clear:hover { opacity: 1; }
 
 /* ── CONTENT ── */
-.page-content { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.page-content { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
 
 /* ── ACORDEONES ── */
 .acordeones { display: flex; flex-direction: column; gap: 8px; }

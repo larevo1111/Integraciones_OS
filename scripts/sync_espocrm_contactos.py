@@ -18,6 +18,7 @@ Ejecutar manualmente:
 
 import secrets
 import sys
+import unicodedata
 from datetime import datetime, timezone
 
 import mysql.connector
@@ -90,32 +91,70 @@ def resolver_vendedor(nombre_vendedor, usuarios_map):
     return usuarios_map.get(nombre_vendedor.lower().strip())
 
 
-def cargar_ciudades_espo(cur_espo):
-    """Devuelve dict para lookup: (nombre_lower, depto_lower, pais_lower) → ciudad_id."""
-    cur_espo.execute(
-        "SELECT id, LOWER(name), LOWER(COALESCE(departamento,'')), LOWER(COALESCE(pais,'')) "
-        "FROM ciudad WHERE deleted=0"
+def normalizar_texto(texto):
+    """Quita tildes, pasa a minúsculas y elimina puntuación para matching robusto."""
+    if not texto:
+        return ''
+    # NFD descompone los caracteres acentuados, luego filtramos los combining marks
+    nfkd = unicodedata.normalize('NFKD', texto.lower().strip())
+    sin_tildes = ''.join(c for c in nfkd if not unicodedata.combining(c))
+    # Quitar puntos y comas para normalizar "D.C." vs "DC" vs "D.C"
+    return sin_tildes.replace('.', '').replace(',', '').strip()
+
+
+def cargar_mapa_ciudad_display(cur_effi):
+    """
+    Construye mapa para traducir (ciudad, departamento) de Effi al formato
+    'Municipio - Departamento' de codigos_ciudades_dane (nombre_display).
+    Usa normalización robusta (sin tildes, sin puntuación).
+    """
+    cur_effi.execute(
+        "SELECT nombre_municipio, nombre_departamento, nombre_display "
+        "FROM codigos_ciudades_dane"
     )
-    mapa = {}
-    for city_id, nombre, depto, pais in cur_espo.fetchall():
-        mapa[(nombre, depto, pais)] = city_id
-        # Índice de respaldo: solo nombre + pais
-        if (nombre, pais) not in mapa:
-            mapa[(nombre, pais)] = city_id
-    return mapa
+    # Mapa por (municipio_norm, depto_norm) → nombre_display
+    mapa_doble = {}
+    # Mapa solo por municipio_norm → nombre_display (respaldo si hay uno solo)
+    mapa_simple = {}
+    conteo_mun = {}
+
+    for mun, depto, display in cur_effi.fetchall():
+        mn = normalizar_texto(mun)
+        dn = normalizar_texto(depto)
+        mapa_doble[(mn, dn)] = display
+        conteo_mun[mn] = conteo_mun.get(mn, 0) + 1
+        mapa_simple[mn] = display  # último gana; solo usamos si hay exactamente 1
+
+    # Solo mantener en mapa_simple los municipios únicos (sin ambigüedad)
+    mapa_simple = {k: v for k, v in mapa_simple.items() if conteo_mun.get(k, 0) == 1}
+
+    return mapa_doble, mapa_simple
 
 
-def resolver_ciudad(nombre_ciudad, departamento, pais, ciudades_map):
-    """Resuelve nombre ciudad → ciudad_id. Retorna None si no hay match."""
-    if not nombre_ciudad:
+def resolver_ciudad_display(ciudad, departamento, mapa_doble, mapa_simple):
+    """Resuelve (ciudad, departamento) de Effi → nombre_display ('Ciudad - Depto')."""
+    if not ciudad:
         return None
-    n = nombre_ciudad.lower().strip()
-    d = (departamento or '').lower().strip()
-    p = (pais or 'colombia').lower().strip()
-    result = ciudades_map.get((n, d, p))
+    cn = normalizar_texto(ciudad)
+    dn = normalizar_texto(departamento)
+
+    # Intento 1: match exacto normalizado por (ciudad, depto)
+    result = mapa_doble.get((cn, dn))
     if result:
         return result
-    return ciudades_map.get((n, p))
+
+    # Intento 2: match solo por municipio (si no es ambiguo)
+    result = mapa_simple.get(cn)
+    if result:
+        return result
+
+    # Intento 3: Bogotá special case — "bogota dc" vs "bogota, dc" etc.
+    if 'bogota' in cn:
+        for key, val in mapa_doble.items():
+            if 'bogota' in key[0]:
+                return val
+
+    return None
 
 
 # ─── Email y teléfono ──────────────────────────────────────────────────────────
@@ -203,6 +242,7 @@ def main():
     try:
         # Cargar mapeos de lookup
         usuarios_map = cargar_usuarios_espo(cur_espo)
+        ciudad_doble, ciudad_simple = cargar_mapa_ciudad_display(cur_effi)
 
         # Leer todos los clientes vigentes de Effi
         cur_effi.execute("""
@@ -232,6 +272,12 @@ def main():
             first, last = split_nombre(v(c['nombre']) or '')
             vendedor_id = resolver_vendedor(v(c['vendedor']), usuarios_map)
 
+            # Resolver ciudad al formato "Ciudad - Departamento"
+            ciudad_display = resolver_ciudad_display(
+                v(c['ciudad']), v(c['departamento']),
+                ciudad_doble, ciudad_simple
+            ) or ''
+
             # ¿Existe ya en EspoCRM?
             cur_espo.execute(
                 "SELECT id FROM contact WHERE numero_identificacion=%s AND deleted=0",
@@ -242,10 +288,7 @@ def main():
             campos = {
                 'first_name':           first[:100] if first else '',
                 'last_name':            last[:100]  if last  else '',
-                'address_street':       (v(c['direccion']) or '')[:255],
-                'address_city':         (v(c['ciudad'])    or '')[:100],
-                'address_state':        (v(c['departamento']) or '')[:100],
-                'address_country':      (v(c['pais'])       or 'Colombia')[:100],
+                'direccion':            (v(c['direccion']) or '')[:255],
                 'description':          v(c['observacia_n']),
                 # campos custom
                 'numero_identificacion': num_id[:100],
@@ -256,7 +299,7 @@ def main():
                 'tarifa_precios':       v(c['tarifa_de_precios']),
                 'forma_pago':           v(c['forma_de_pago']),
                 'vendedor_effi':        v(c['vendedor']),
-                'ciudad_nombre':        (v(c['ciudad']) or '')[:200],
+                'ciudad_nombre':        ciudad_display[:200],
                 'assigned_user_id':     vendedor_id,
                 'fuente':               'Effi',
                 'modified_at':          now,

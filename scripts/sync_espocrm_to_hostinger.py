@@ -53,13 +53,9 @@ CREATE TABLE IF NOT EXISTS `{TABLA}` (
     `tipo_persona`         VARCHAR(100) DEFAULT NULL,
     `email`                VARCHAR(200) DEFAULT NULL,
     `telefono`             VARCHAR(50)  DEFAULT NULL,
-    `address_street`       VARCHAR(255) DEFAULT NULL,
-    `address_city`         VARCHAR(100) DEFAULT NULL,
-    `address_state`        VARCHAR(100) DEFAULT NULL,
-    `address_country`      VARCHAR(100) DEFAULT NULL,
-    `ciudad`               VARCHAR(200) DEFAULT NULL,
-    `departamento`         VARCHAR(150) DEFAULT NULL,
-    `pais`                 VARCHAR(100) DEFAULT NULL,
+    `direccion`            VARCHAR(255) DEFAULT NULL,
+    `direccion_linea2`     VARCHAR(255) DEFAULT NULL,
+    `ciudad_nombre`        VARCHAR(200) DEFAULT NULL,
     `tipo_de_marketing`    VARCHAR(255) DEFAULT NULL,
     `tipo_cliente`         VARCHAR(100) DEFAULT NULL,
     `tarifa_precios`       VARCHAR(255) DEFAULT NULL,
@@ -85,13 +81,9 @@ def leer_contactos(conn_espo):
             c.numero_identificacion,
             c.tipo_identificacion,
             c.tipo_persona,
-            c.address_street,
-            c.address_city,
-            c.address_state,
-            c.address_country,
-            cd.name        AS ciudad,
-            cd.departamento,
-            cd.pais,
+            c.direccion,
+            c.direccion_linea2,
+            c.ciudad_nombre,
             c.tipo_de_marketing,
             c.tipo_cliente,
             c.tarifa_precios,
@@ -111,7 +103,6 @@ def leer_contactos(conn_espo):
              WHERE epn.entity_id = c.id AND epn.entity_type = 'Contact'
                AND epn.deleted = 0 AND epn.`primary` = 1 LIMIT 1) AS telefono
         FROM contact c
-        LEFT JOIN ciudad cd ON cd.id = c.ciudad_id
         WHERE c.deleted = 0
         ORDER BY c.first_name, c.last_name
     """)
@@ -126,8 +117,7 @@ COLUMNAS = [
     'id', 'nombre_completo', 'first_name', 'last_name',
     'numero_identificacion', 'tipo_identificacion', 'tipo_persona',
     'email', 'telefono',
-    'address_street', 'address_city', 'address_state', 'address_country',
-    'ciudad', 'departamento', 'pais',
+    'direccion', 'direccion_linea2', 'ciudad_nombre',
     'tipo_de_marketing', 'tipo_cliente', 'tarifa_precios', 'forma_pago',
     'vendedor_effi', 'fuente', 'enviado_a_effi', 'descripcion',
 ]
