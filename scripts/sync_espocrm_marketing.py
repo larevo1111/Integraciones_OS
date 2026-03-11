@@ -46,12 +46,14 @@ ESPOCRM_CONTAINER = 'espocrm'
 ENTITY_DEFS_PATH   = '/var/www/html/custom/Espo/Custom/Resources/metadata/entityDefs/Contact.json'
 I18N_PATH          = '/var/www/html/custom/Espo/Custom/Resources/i18n/es_MX/Contact.json'
 LAYOUT_PATH        = '/var/www/html/custom/Espo/Custom/Resources/layouts/Contact/detail.json'
+JS_DATA_PATH       = '/var/www/html/client/custom/src/data/ciudades-colombia.js'
 REBUILD_SCRIPT     = '/var/www/html/rebuild.php'
 CLEAR_CACHE_SCRIPT = '/var/www/html/clear_cache.php'
 
-TMP_ENTITY = '/tmp/espo_contact_entitydefs.json'
-TMP_I18N   = '/tmp/espo_contact_i18n.json'
-TMP_LAYOUT = '/tmp/espo_contact_layout.json'
+TMP_ENTITY  = '/tmp/espo_contact_entitydefs.json'
+TMP_I18N    = '/tmp/espo_contact_i18n.json'
+TMP_LAYOUT  = '/tmp/espo_contact_layout.json'
+TMP_JS_DATA = '/tmp/espo_ciudades_colombia.js'
 
 # Enums fijos
 TIPOS_IDENTIFICACION = [
@@ -71,8 +73,8 @@ LAYOUT_JSON = [
             [{"name": "numeroIdentificacion"},   {"name": "tipoIdentificacion"}],
             [{"name": "tipoPersona"},            {"name": "vendedorEffi"}],
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
-            [{"name": "ciudadNombre"},            {"name": "fuente"}],
-            [{"name": "enviadoAEffi"},           False],
+            [{"name": "departamento"},           {"name": "ciudadNombre"}],
+            [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
             [{"name": "address"},                False],
             [{"name": "description", "fullWidth": True}]
         ]
@@ -110,17 +112,30 @@ def query_opciones(tabla, columna):
     return opciones
 
 
-def query_ciudades():
-    """Lee nombres de ciudades de la tabla ciudad en espocrm BD, ordenados alfabéticamente."""
-    conn = mysql.connector.connect(**DB_ESPO)
+def query_departamentos_y_municipios():
+    """
+    Lee departamentos y municipios de codigos_ciudades_dane (effi_data).
+    Retorna:
+      deptos     — lista de nombres de departamento ordenada
+      municipios — lista plana de nombres de municipio ordenada
+      mapa       — dict {depto: [municipios...]} para el JS de cascading
+    """
+    conn = mysql.connector.connect(**DB_LOCAL)
     cur = conn.cursor()
     cur.execute(
-        "SELECT name FROM ciudad WHERE deleted=0 AND name IS NOT NULL AND name != '' ORDER BY name"
+        "SELECT nombre_departamento, nombre_municipio "
+        "FROM codigos_ciudades_dane "
+        "ORDER BY nombre_departamento, nombre_municipio"
     )
-    nombres = [row[0] for row in cur.fetchall()]
+    mapa = {}
+    for depto, muni in cur.fetchall():
+        mapa.setdefault(depto, []).append(muni)
     cur.close()
     conn.close()
-    return nombres
+
+    deptos     = sorted(mapa.keys())
+    municipios = sorted({m for lista in mapa.values() for m in lista})
+    return deptos, municipios, mapa
 
 
 def query_vendedores():
@@ -156,7 +171,7 @@ def get_opciones_actuales_espocrm(campo):
         return []
 
 
-def generar_json(tipos_marketing, tarifas_precios, vendedores, ciudades):
+def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipios, mapa_deptos):
     entity_defs = {
         'fields': {
             'tipoDeMarketing': {
@@ -200,9 +215,13 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, ciudades):
                 'type': 'bool',
                 'default': False
             },
+            'departamento': {
+                'type': 'enum',
+                'options': [''] + deptos
+            },
             'ciudadNombre': {
                 'type': 'enum',
-                'options': [''] + ciudades
+                'options': [''] + municipios
             }
         }
     }
@@ -218,15 +237,23 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, ciudades):
             'vendedorEffi':         'Vendedor (Effi)',
             'fuente':               'Fuente',
             'enviadoAEffi':         'Enviado a Effi',
-            'ciudadNombre':         'Ciudad',
+            'departamento':         'Departamento',
+            'ciudadNombre':         'Municipio',
         }
     }
+    # Archivo JS con mapa departamento → [municipios] para cascading en EspoCRM
+    js_lines = ["define('custom:data/ciudades-colombia', [], function () {", "    return "]
+    js_lines.append(json.dumps(mapa_deptos, ensure_ascii=False, indent=4) + ";")
+    js_lines.append("});")
+
     with open(TMP_ENTITY, 'w', encoding='utf-8') as f:
         json.dump(entity_defs, f, ensure_ascii=False, indent=2)
     with open(TMP_I18N, 'w', encoding='utf-8') as f:
         json.dump(i18n, f, ensure_ascii=False, indent=2)
     with open(TMP_LAYOUT, 'w', encoding='utf-8') as f:
         json.dump(LAYOUT_JSON, f, ensure_ascii=False, indent=2)
+    with open(TMP_JS_DATA, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(js_lines) + '\n')
 
 
 def aplicar_a_espocrm():
@@ -236,10 +263,13 @@ def aplicar_a_espocrm():
          '/var/www/html/custom/Espo/Custom/Resources/i18n/es_MX'])
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
          '/var/www/html/custom/Espo/Custom/Resources/layouts/Contact'])
+    run(['docker', 'exec', ESPOCRM_CONTAINER, 'mkdir', '-p',
+         '/var/www/html/client/custom/src/data'])
 
-    run(['docker', 'cp', TMP_ENTITY, f'{ESPOCRM_CONTAINER}:{ENTITY_DEFS_PATH}'])
-    run(['docker', 'cp', TMP_I18N,   f'{ESPOCRM_CONTAINER}:{I18N_PATH}'])
-    run(['docker', 'cp', TMP_LAYOUT, f'{ESPOCRM_CONTAINER}:{LAYOUT_PATH}'])
+    run(['docker', 'cp', TMP_ENTITY,  f'{ESPOCRM_CONTAINER}:{ENTITY_DEFS_PATH}'])
+    run(['docker', 'cp', TMP_I18N,    f'{ESPOCRM_CONTAINER}:{I18N_PATH}'])
+    run(['docker', 'cp', TMP_LAYOUT,  f'{ESPOCRM_CONTAINER}:{LAYOUT_PATH}'])
+    run(['docker', 'cp', TMP_JS_DATA, f'{ESPOCRM_CONTAINER}:{JS_DATA_PATH}'])
 
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'php', REBUILD_SCRIPT])
     run(['docker', 'exec', ESPOCRM_CONTAINER, 'php', CLEAR_CACHE_SCRIPT])
@@ -249,37 +279,38 @@ def aplicar_a_espocrm():
 
 def main():
     # Leer opciones dinámicas
-    tipos_marketing = query_opciones('zeffi_tipos_marketing', 'tipo_de_marketing')
-    tarifas_precios = query_opciones('zeffi_tarifas_precios', 'nombre')
-    vendedores      = query_vendedores()
-    ciudades        = query_ciudades()
-    # tipo_de_cliente: 6 valores fijos (TIPOS_CLIENTE), no se consulta la BD
+    tipos_marketing             = query_opciones('zeffi_tipos_marketing', 'tipo_de_marketing')
+    tarifas_precios             = query_opciones('zeffi_tarifas_precios', 'nombre')
+    vendedores                  = query_vendedores()
+    deptos, municipios, mapa_deptos = query_departamentos_y_municipios()
 
     # Comparar con lo que ya hay en EspoCRM
     mk_espo   = get_opciones_actuales_espocrm('tipoDeMarketing')
     tar_espo  = get_opciones_actuales_espocrm('tarifaPrecios')
     vend_espo = get_opciones_actuales_espocrm('vendedorEffi')
-    ciu_espo  = get_opciones_actuales_espocrm('ciudadNombre')
+    dep_espo  = get_opciones_actuales_espocrm('departamento')
+    mun_espo  = get_opciones_actuales_espocrm('ciudadNombre')
 
     sin_cambios = (
         set(tipos_marketing) == set(mk_espo)   and len(tipos_marketing) == len(mk_espo) and
         set(tarifas_precios) == set(tar_espo)  and len(tarifas_precios) == len(tar_espo) and
         set(vendedores)      == set(vend_espo) and len(vendedores)      == len(vend_espo) and
-        set(ciudades)        == set(ciu_espo)  and len(ciudades)        == len(ciu_espo)
+        set(deptos)          == set(dep_espo)  and len(deptos)          == len(dep_espo)  and
+        set(municipios)      == set(mun_espo)  and len(municipios)      == len(mun_espo)
     )
 
     if sin_cambios:
         print(f'✅ sync_espocrm_marketing — sin cambios '
               f'({len(tipos_marketing)} marketing, {len(tarifas_precios)} tarifas, '
-              f'{len(vendedores)} vendedores, {len(ciudades)} ciudades)')
+              f'{len(vendedores)} vendedores, {len(deptos)} deptos, {len(municipios)} municipios)')
         return
 
-    generar_json(tipos_marketing, tarifas_precios, vendedores, ciudades)
+    generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipios, mapa_deptos)
     aplicar_a_espocrm()
 
     print(f'✅ sync_espocrm_marketing — actualizado: '
           f'{len(tipos_marketing)} marketing | {len(tarifas_precios)} tarifas | '
-          f'{len(vendedores)} vendedores | {len(ciudades)} ciudades')
+          f'{len(vendedores)} vendedores | {len(deptos)} deptos | {len(municipios)} municipios')
 
 
 if __name__ == '__main__':

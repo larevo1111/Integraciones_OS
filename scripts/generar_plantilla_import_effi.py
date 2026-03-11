@@ -132,11 +132,11 @@ def cargar_tipos_marketing(conn_effi):
     return mapa
 
 
-def cargar_ciudades_id(conn_espo):
-    """Devuelve dict {nombre_lower: id_effi} para buscar por nombre de ciudad."""
+def cargar_ciudades_dane(conn_espo):
+    """Devuelve dict {nombre_municipio_lower: codigo_dane} desde codigos_ciudades_dane."""
     cur = conn_espo.cursor()
-    cur.execute("SELECT name, id_effi FROM ciudad WHERE deleted=0 AND id_effi IS NOT NULL")
-    mapa = {(nombre or '').strip().lower(): id_effi for nombre, id_effi in cur.fetchall()}
+    cur.execute("SELECT nombre_municipio, codigo_municipio FROM codigos_ciudades_dane")
+    mapa = {(nombre or '').strip().lower(): codigo for nombre, codigo in cur.fetchall()}
     cur.close()
     return mapa
 
@@ -225,9 +225,9 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_ma
     if c.get('tipo_de_marketing'):
         marketing_id = marketing_map.get(c['tipo_de_marketing'].strip().lower())
 
-    ciudad_effi_id = None
+    codigo_dane_ciudad = None
     if c.get('ciudad_nombre'):
-        ciudad_effi_id = ciudades_id_map.get(c['ciudad_nombre'].strip().lower())
+        codigo_dane_ciudad = ciudades_id_map.get(c['ciudad_nombre'].strip().lower())
 
     # Tipo de cliente → ID numérico Effi
     tipo_cliente = TIPO_CLIENTE_MAP.get(c.get('tipo_cliente') or '', None)
@@ -243,8 +243,8 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_ma
         nombre_completo or None,                 # 2: Nombre | Razón social *
         c.get('email'),                          # 3: Email
         None,                                    # 4: Página web
-        ciudad_effi_id,                          # 5: ID EFFI: Ciudad
-        None,                                    # 6: Código DANE Ciudad
+        None,                                    # 5: ID EFFI: Ciudad (no se usa con DANE)
+        codigo_dane_ciudad,                      # 6: Código DANE Ciudad
         c.get('address_street'),                 # 7: Dirección
         c.get('telefono_principal'),             # 8: Teléfono 1
         None,                                    # 9: Referencia teléfono 1
@@ -331,7 +331,7 @@ def main():
         # Cargar lookups
         tarifas_map     = cargar_tarifas(conn_effi)
         marketing_map   = cargar_tipos_marketing(conn_effi)
-        ciudades_id_map = cargar_ciudades_id(conn_espo)
+        ciudades_id_map = cargar_ciudades_dane(conn_espo)
         vendedores_map  = cargar_vendedores(conn_effi)
 
         # Leer contactos
