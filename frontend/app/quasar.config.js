@@ -13,7 +13,8 @@ export default defineConfig((/* ctx */) => {
     devServer: {
       open: false,
       port: 9100,
-      host: '0.0.0.0'
+      host: '0.0.0.0',
+      allowedHosts: 'all'
     },
     framework: {
       config: {},
