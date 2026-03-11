@@ -226,6 +226,10 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             },
             'address': {
                 'view': 'custom:views/fields/address-simple'
+            },
+            'salutationName': {
+                'type': 'enum',
+                'options': ['']
             }
         }
     }

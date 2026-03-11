@@ -1,5 +1,8 @@
 define('custom:views/contact/list', ['views/list'], function (Dep) {
 
+    // views/list es ES module → unwrap el export default
+    Dep = Dep.default || Dep;
+
     return Dep.extend({
 
         setup: function () {
@@ -11,6 +14,9 @@ define('custom:views/contact/list', ['views/list'], function (Dep) {
 
             var self = this;
 
+            // Evitar duplicados si afterRender corre varias veces
+            if (this.$el.find('#btn-sinc-effi').length) return;
+
             var $btn = $(
                 '<button class="btn btn-default btn-sm" id="btn-sinc-effi" style="margin-left:8px;">' +
                 '<span class="fas fa-sync-alt"></span> Sincronizar con Effi' +
@@ -21,11 +27,12 @@ define('custom:views/contact/list', ['views/list'], function (Dep) {
                 self.actionSincronizarConEffi();
             });
 
-            // En EspoCRM la cabecera de lista tiene .page-header con el botón Create
             var $header = this.$el.find('.page-header');
             if ($header.length) {
-                $header.find('.btn-group').first().append($btn);
-                if (!$header.find('.btn-group').length) {
+                var $group = $header.find('.btn-group').first();
+                if ($group.length) {
+                    $group.append($btn);
+                } else {
                     $header.append($btn);
                 }
             }

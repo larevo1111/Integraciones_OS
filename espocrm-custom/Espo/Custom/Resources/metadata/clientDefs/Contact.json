@@ -2,7 +2,17 @@
     "recordViews": {
         "detail": "custom:views/contact/record/detail"
     },
-    "views": {
-        "list": "custom:views/contact/list"
+    "menu": {
+        "list": {
+            "buttons": [
+                {
+                    "label": "Sincronizar con Effi",
+                    "action": "sincronizarConEffi",
+                    "handler": "custom:handlers/sync-effi",
+                    "iconClass": "fas fa-sync-alt",
+                    "style": "default"
+                }
+            ]
+        }
     }
 }
