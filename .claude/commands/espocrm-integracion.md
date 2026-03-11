@@ -195,11 +195,19 @@ Los contactos sincronizados desde Effi (fuente='Effi') pueden tener valores de `
 ```
 Vendedor crea contacto en EspoCRM
   ↓ (fuente='CRM', enviado_a_effi=0 automáticos)
-python3 scripts/generar_plantilla_import_effi.py
+Pipeline paso 7a: generar_plantilla_import_effi.py
   ↓ genera /tmp/import_clientes_effi_<hoy>.xlsx
-Subir XLSX a Effi (manual: Configuración → Importar clientes)
-  ↓ verificar que los registros aparecen en Effi
-  ↓ contacto marcado enviado_a_effi=1
+  ↓ marca enviado_a_effi=1
+Pipeline paso 7b: import_clientes_effi.js (Playwright — automático)
+  ↓ navega a /app/tercero/cliente
+  ↓ click "Crear o modificar clientes masivamente"
+  ↓ sube XLSX via #modalImportarCrearMasivo input[type="file"]
+  ↓ contactos aparecen en Effi como Vigentes
 En próxima corrida del pipeline:
-  sync_espocrm_contactos.py → el contacto vuelve como fuente='Effi' (si Effi lo devuelve)
+  sync_espocrm_contactos.py → el contacto vuelve como fuente='Effi'
+```
+
+**Para borrar contactos de prueba (bandera TEST_PIPELINE_DELETE):**
+```sql
+UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';
 ```
