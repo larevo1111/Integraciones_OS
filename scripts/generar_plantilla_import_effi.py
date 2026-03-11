@@ -48,9 +48,12 @@ EMAIL_RESPONSABLE = 'equipo.origensilvestre@gmail.com'
 # Mapeos fijos
 TIPO_ID_MAP = {
     'Número de Identificación Tributaria CO': 1,
+    'NIT': 1,                      # alias corto por si viene migrado
     'Cédula de ciudadanía': 2,
+    'Cédula de Ciudadanía': 2,     # variante mayúscula
     'Pasaporte': 3,
     'Cédula de extranjería': 4,
+    'Cédula de Extranjería': 4,
 }
 TIPO_PERSONA_MAP = {
     'Física (natural)': 1,
