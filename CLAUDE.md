@@ -15,13 +15,23 @@ Solo detente y pregunta si hay riesgo irreversible fuera del proyecto:
 - Force push con historial perdido
 - Modificar configuración de otros proyectos del servidor
 
+## ⚠️ REGLA ABSOLUTA — FRONTEND
+
+**Antes de crear CUALQUIER componente, vista o elemento visual del ERP:**
+1. Leer `frontend/design-system/MANUAL_ESTILOS.md` — es la fuente de verdad única del diseño
+2. Ver capturas en `frontend/design-system/screenshots/` para referencia visual (88 imágenes de Linear.app)
+3. Seguir el manual al pie de la letra: colores, tipografía, espaciado, CSS
+4. **Si el elemento NO está en el manual → DETENERSE. Preguntar a Santi y definirlo juntos antes de implementar.**
+5. Una vez definido el elemento nuevo, actualizar el manual inmediatamente.
+
 ## Contexto del proyecto — leer siempre al inicio
 
 Antes de cualquier tarea, revisar estos archivos en orden:
 1. `.agent/CONTEXTO_ACTIVO.md` — estado actual del sistema, qué funciona, próximos pasos
 2. `.agent/MANIFESTO.md` — visión, arquitectura, reglas técnicas aprendidas
 3. `.agent/CATALOGO_SCRIPTS.md` — catálogo completo de scripts (propósito, ejecución, tablas)
-4. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`
+4. **Para tareas frontend**: `frontend/design-system/MANUAL_ESTILOS.md` — manual de estilos obligatorio
+5. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`
 
 ## Convenciones del proyecto
 

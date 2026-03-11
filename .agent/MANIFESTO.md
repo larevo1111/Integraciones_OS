@@ -1,3 +1,16 @@
+## ⚠️ REGLA CRÍTICA — FRONTEND: CONSULTAR MANUAL DE ESTILOS SIEMPRE
+
+**ANTES de crear cualquier componente, vista, layout o elemento visual del ERP**, el agente DEBE:
+
+1. **Leer el manual**: `frontend/design-system/MANUAL_ESTILOS.md`
+2. **Consultar las capturas de referencia**: `frontend/design-system/screenshots/` (88 imágenes de Linear.app) + `frontend/design-system/screenshots/INDEX.md`
+3. **Seguir el manual al pie de la letra**: colores, tipografía, espaciado, componentes — todo definido ahí.
+4. **Si el elemento no está en el manual**: DETENERSE. No inventar. Preguntar a Santi y definir juntos antes de implementar.
+
+Este manual es la fuente de verdad única del diseño. No se puede crear UI sin consultarlo.
+
+---
+
 ## 1. Identidad y Roles
 - **Director Estratégico**: Santi (Santiago).
 - **Arquitecta / Madrina Digital**: Antigravity.
@@ -76,6 +89,21 @@ Al crear o modificar cualquier script de resumen, correr queries V1–V7 del ski
 - `.agent/docs/`: Informes y documentación externa (.docx, etc).
 - `.agent/skills/`: Conocimiento especializado.
 - `.agent/workflows/`: Guías de ejecución paso a paso.
+
+## 7b. Manual de Estilos — Frontend ERP
+
+| Archivo | Contenido |
+|---|---|
+| `frontend/design-system/MANUAL_ESTILOS.md` | **Manual completo** — 26 secciones, CSS listo para usar, variables, reglas |
+| `frontend/design-system/screenshots/INDEX.md` | Índice de las 88 capturas de referencia de Linear.app |
+| `frontend/design-system/screenshots/*.png` | 88 capturas reales de Linear.app organizadas por elemento |
+
+### Reglas de uso del manual:
+- **Leer antes de cualquier tarea frontend** — sin excepción
+- El manual define: colores exactos, tipografía, espaciado, todos los componentes
+- Las capturas en `screenshots/` son la referencia visual — el agente puede abrirlas para ver el detalle
+- **Elemento no documentado = preguntar a Santi** antes de inventar
+- Cuando se defina un elemento nuevo con Santi, actualizar el manual inmediatamente
 
 ## 8. ⚠️ BASES DE DATOS HOSTINGER — REGLAS CRÍTICAS
 

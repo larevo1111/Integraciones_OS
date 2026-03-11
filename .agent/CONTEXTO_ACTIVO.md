@@ -113,6 +113,17 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Flask server: `scripts/webhook_server.py`, systemd service `effi-webhook.service` (activo, auto-restart)
 - Archivos versionados en `espocrm-custom/` con instrucciones de deploy
 
+## Frontend — Estado actual
+
+| Recurso | Ruta | Estado |
+|---|---|---|
+| Manual de Estilos v2.0 | `frontend/design-system/MANUAL_ESTILOS.md` | ✅ Listo |
+| Screenshots de referencia (88) | `frontend/design-system/screenshots/` | ✅ Listos |
+| Índice de screenshots | `frontend/design-system/screenshots/INDEX.md` | ✅ Listo |
+| Proyecto Vue + Quasar | `frontend/` | ⏳ Por iniciar |
+
+**⚠️ Antes de cualquier trabajo frontend: leer `frontend/design-system/MANUAL_ESTILOS.md`**
+
 ## Próximos Pasos
 1. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. También borrar en Effi manualmente (3 clientes: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya).
 
