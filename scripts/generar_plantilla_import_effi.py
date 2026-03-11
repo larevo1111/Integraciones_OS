@@ -59,6 +59,15 @@ TIPO_PERSONA_MAP = {
     'Física (natural)': 1,
     'Jurídica (moral)': 2,
 }
+# Tipo de cliente → ID numérico Effi (posición en lista de opciones)
+TIPO_CLIENTE_MAP = {
+    'Común':      1,
+    'Fiel':       2,
+    'Desertor':   3,
+    'Mayorista':  4,
+    'Importador': 5,
+    'Industrial': 6,
+}
 # Régimen tributario por defecto según tipo de persona
 REGIMEN_NATURAL  = 5   # No responsable del IVA
 REGIMEN_JURIDICA = 4   # Responsable del IVA
@@ -210,8 +219,8 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map):
     if c.get('ciudad_id'):
         ciudad_effi_id = ciudades_id_map.get(c['ciudad_id'])
 
-    # Tipo de cliente: enviamos el texto (Effi puede aceptarlo)
-    tipo_cliente = c.get('tipo_cliente') or None
+    # Tipo de cliente → ID numérico Effi
+    tipo_cliente = TIPO_CLIENTE_MAP.get(c.get('tipo_cliente') or '', None)
 
     fila = [
         tipo_id_effi,                           # 0: ID EFFI: Tipo de documento *
