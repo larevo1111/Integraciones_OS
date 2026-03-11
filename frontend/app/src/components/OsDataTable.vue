@@ -250,7 +250,12 @@ function selectRow(row) {
   emit('row-click', row)
 }
 function isSelected(row) {
-  return selectedRow.value && (row.mes === selectedRow.value?.mes || row._pk === selectedRow.value?._pk || row._key === selectedRow.value?._key)
+  if (!selectedRow.value) return false
+  const s = selectedRow.value
+  if (s._pk   != null) return row._pk   === s._pk
+  if (s._key  != null) return row._key  === s._key
+  if (s.mes   != null) return row.mes   === s.mes
+  return false
 }
 
 // ── Campos ───────────────────────────────────────────
