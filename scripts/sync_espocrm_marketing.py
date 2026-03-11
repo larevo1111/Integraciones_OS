@@ -65,7 +65,8 @@ LAYOUT_JSON = [
             [{"name": "numeroIdentificacion"},   {"name": "tipoIdentificacion"}],
             [{"name": "tipoPersona"},            {"name": "vendedorEffi"}],
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
-            [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
+            [{"name": "ciudad"},                 {"name": "fuente"}],
+            [{"name": "enviadoAEffi"},           False],
             [{"name": "address"},                False],
             [{"name": "description", "fullWidth": True}]
         ]
@@ -179,6 +180,16 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores):
             'enviadoAEffi': {
                 'type': 'bool',
                 'default': False
+            },
+            'ciudad': {
+                'type': 'link',
+                'entity': 'Ciudad'
+            }
+        },
+        'links': {
+            'ciudad': {
+                'type': 'belongsTo',
+                'entity': 'Ciudad'
             }
         }
     }
@@ -194,6 +205,7 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores):
             'vendedorEffi':         'Vendedor (Effi)',
             'fuente':               'Fuente',
             'enviadoAEffi':         'Enviado a Effi',
+            'ciudad':               'Ciudad',
         }
     }
     with open(TMP_ENTITY, 'w', encoding='utf-8') as f:
