@@ -67,7 +67,7 @@ LAYOUT_JSON = [
     {
         "label": "",
         "rows": [
-            [{"name": "name"},                  {"name": "accounts"}],
+            [{"name": "firstName"},              {"name": "lastName"}],
             [{"name": "emailAddress"},           {"name": "phoneNumber"}],
             [{"name": "tipoDeMarketing"},        {"name": "tipoCliente"}],
             [{"name": "numeroIdentificacion"},   {"name": "tipoIdentificacion"}],
@@ -75,7 +75,7 @@ LAYOUT_JSON = [
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
             [{"name": "departamento"},           {"name": "ciudadNombre"}],
             [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
-            [{"name": "address"},                False],
+            [{"name": "addressStreet"},          False],
             [{"name": "description", "fullWidth": True}]
         ]
     }
@@ -223,11 +223,6 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             'ciudadNombre': {
                 'type': 'enum',
                 'options': [''] + municipios
-            },
-            'salutationName': {
-                'type': 'enum',
-                'options': [''],
-                'disabled': True
             }
         }
     }
