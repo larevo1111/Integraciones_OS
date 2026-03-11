@@ -1,4 +1,4 @@
-define('custom:views/contact/record/detail',
+define('custom:views/contact/record/edit',
     ['crm:views/contact/record/detail', 'custom:data/ciudades-colombia'],
     function (Dep, CiudadesData) {
 

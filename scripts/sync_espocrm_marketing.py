@@ -74,8 +74,8 @@ LAYOUT_JSON = [
             [{"name": "tipoPersona"},            {"name": "vendedorEffi"}],
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
             [{"name": "departamento"},           {"name": "ciudadNombre"}],
+            [{"name": "direccion"},              {"name": "direccionLinea2"}],
             [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
-            [{"name": "addressStreet"},          False],
             [{"name": "description", "fullWidth": True}]
         ]
     }
@@ -223,6 +223,14 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             'ciudadNombre': {
                 'type': 'enum',
                 'options': [''] + municipios
+            },
+            'direccion': {
+                'type': 'varchar',
+                'maxLength': 255
+            },
+            'direccionLinea2': {
+                'type': 'varchar',
+                'maxLength': 255
             }
         }
     }
@@ -240,6 +248,8 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, deptos, municipio
             'enviadoAEffi':         'Enviado a Effi',
             'departamento':         'Departamento',
             'ciudadNombre':         'Municipio',
+            'direccion':            'Dirección',
+            'direccionLinea2':      'Referencia / Línea 2',
         }
     }
     # Archivo JS con mapa departamento → [municipios] para cascading en EspoCRM

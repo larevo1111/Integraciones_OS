@@ -163,7 +163,7 @@ def leer_contactos_crm(conn_espo, todos=False):
             c.id,
             c.first_name,
             c.last_name,
-            c.address_street,
+            c.direccion,
             c.address_city,
             c.address_state,
             c.address_country,
@@ -245,7 +245,7 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_ma
         None,                                    # 4: Página web
         None,                                    # 5: ID EFFI: Ciudad (no se usa con DANE)
         codigo_dane_ciudad,                      # 6: Código DANE Ciudad
-        c.get('address_street'),                 # 7: Dirección
+        c.get('direccion'),                      # 7: Dirección
         c.get('telefono_principal'),             # 8: Teléfono 1
         None,                                    # 9: Referencia teléfono 1
         c.get('telefono_secundario'),            # 10: Teléfono 2
