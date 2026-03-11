@@ -334,7 +334,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 
 ---
 
-### generar_plantilla_import_effi.py — Paso 7
+### generar_plantilla_import_effi.py — Paso 7a
 - **Propósito**: Lee contactos EspoCRM con fuente='CRM' y enviado_a_effi=0 → genera XLSX con formato de plantilla de importación de Effi
 - **Tipo**: utilidad
 - **Ejecución manual**:
@@ -345,7 +345,22 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   ```
 - **Salida**: `/tmp/import_clientes_effi_<fecha>.xlsx` con 36 columnas
 - **Mapeos**: tipo_identificacion→id_effi (hardcoded), ciudad_id→id_effi, tarifa→id (zeffi_tarifas_precios), marketing→id (zeffi_tipos_marketing), tipo_persona→1/2, regimen→4/5, email_responsable fijo, sucursal=1, moneda=COP
-- **Notas**: Tras generar, marca contactos como enviado_a_effi=1 (a menos que --no-marcar). El XLSX se sube manualmente a Effi o via Playwright (pendiente).
+- **Notas**: Tras generar, marca contactos como enviado_a_effi=1 (a menos que --no-marcar). Si no hay pendientes, imprime "sin contactos CRM pendientes" y termina (exit 0, sin XLSX).
+
+---
+
+### import_clientes_effi.js — Paso 7b
+- **Propósito**: Sube el XLSX generado por `generar_plantilla_import_effi.py` a Effi vía Playwright (importación masiva de contactos)
+- **Tipo**: utilidad
+- **Ejecución manual**:
+  ```bash
+  node scripts/import_clientes_effi.js                          # usa /tmp/import_clientes_effi_<hoy>.xlsx
+  node scripts/import_clientes_effi.js /ruta/al/archivo.xlsx    # ruta explícita
+  ```
+- **Salida**: screenshot en `/exports/import_effi_resultado_<fecha>.png`; `✅ import_clientes_effi — importación completada`
+- **Flujo Playwright**: Navega a `/app/tercero/contacto` → click "Crear o modificar contactos masivamente" → `input[name="userfile"]` first → `#btn_submit` → espera 5s → screenshot
+- **Dependencias**: `session.js`, archivo XLSX en `/tmp/`, Effi accesible
+- **Notas**: Se ejecuta automáticamente en el pipeline (paso 7b) solo si el paso 7a generó un XLSX con contactos pendientes. Si no hay pendientes, se omite sin error.
 
 ---
 

@@ -40,6 +40,8 @@ SYNC_HOSTINGER_SCRIPT             = SCRIPTS_DIR / 'sync_hostinger.py'
 SYNC_ESPOCRM_MARKETING_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_marketing.py'
 SYNC_ESPOCRM_CONTACTOS_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_contactos.py'
 SYNC_ESPOCRM_HOSTINGER_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_to_hostinger.py'
+GENERAR_PLANTILLA_SCRIPT          = SCRIPTS_DIR / 'generar_plantilla_import_effi.py'
+IMPORT_EFFI_SCRIPT                = SCRIPTS_DIR / 'import_clientes_effi.js'
 
 EXPORT_TIMEOUT        = 30 * 60   # 30 minutos
 IMPORT_TIMEOUT        =  5 * 60   # 5 minutos
@@ -48,6 +50,8 @@ SYNC_TIMEOUT          =  5 * 60   # 5 minutos (sync Hostinger ~100s)
 SYNC_ESPO_TIMEOUT     =  2 * 60   # 2 minutos (sync EspoCRM marketing)
 SYNC_ESPO_CON_TIMEOUT =  3 * 60   # 3 minutos (sync EspoCRM contactos)
 SYNC_ESPO_HOST_TIMEOUT = 2 * 60   # 2 minutos (sync EspoCRM → Hostinger)
+GENERAR_PLANTILLA_TIMEOUT = 1 * 60  # 1 minuto
+IMPORT_EFFI_TIMEOUT       = 3 * 60  # 3 minutos (Playwright upload)
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 
@@ -354,15 +358,48 @@ def main():
     resumen_espo_host = salida_espo_host.strip().splitlines()[-1] if salida_espo_host.strip() else 'sin salida'
     log.info(f'   {resumen_espo_host}  [{dur_espo_host}s]')
 
-    # ── 6. Estado global ─────────────────────────────────────────
+    # ── 7a. GENERAR PLANTILLA EFFI ────────────────────────────
+    log.info('▶ generar_plantilla_import_effi.py ...')
+    t_gen = datetime.datetime.now()
+    exit_gen, salida_gen = ejecutar(['python3', str(GENERAR_PLANTILLA_SCRIPT)], GENERAR_PLANTILLA_TIMEOUT)
+    dur_gen = int((datetime.datetime.now() - t_gen).total_seconds())
+    resumen_gen = salida_gen.strip().splitlines()[-1] if salida_gen.strip() else 'sin salida'
+    log.info(f'   {resumen_gen}  [{dur_gen}s]')
+
+    # ── 7b. IMPORT A EFFI (solo si hay pendientes) ────────────
+    hay_pendientes_effi = exit_gen == 0 and 'contactos →' in salida_gen
+    exit_imp_effi    = 0
+    salida_imp_effi  = '(omitido — sin contactos pendientes)'
+    dur_imp_effi     = 0
+    resumen_imp_effi = salida_imp_effi
+    if hay_pendientes_effi:
+        # Extraer ruta del XLSX de la salida del generador
+        xlsx_path = None
+        for linea in salida_gen.splitlines():
+            if '/tmp/import_clientes_effi_' in linea and '.xlsx' in linea:
+                partes = linea.split('→')
+                if len(partes) >= 2:
+                    xlsx_path = partes[-1].strip()
+                    break
+        log.info('▶ import_clientes_effi.js ...')
+        t_imp_effi = datetime.datetime.now()
+        cmd_imp_effi = ['node', str(IMPORT_EFFI_SCRIPT)]
+        if xlsx_path is not None:
+            cmd_imp_effi.append(xlsx_path)
+        exit_imp_effi, salida_imp_effi = ejecutar(cmd_imp_effi, IMPORT_EFFI_TIMEOUT)
+        dur_imp_effi = int((datetime.datetime.now() - t_imp_effi).total_seconds())
+        resumen_imp_effi = salida_imp_effi.strip().splitlines()[-1] if salida_imp_effi.strip() else 'sin salida'
+        log.info(f'   {resumen_imp_effi}  [{dur_imp_effi}s]')
+
+    # ── 8. Estado global ─────────────────────────────────────────
     hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
                  or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or exit_rsm_rem != 0
                  or exit_rem_canal != 0 or exit_rem_cli != 0 or exit_rem_prod != 0
                  or exit_sync != 0 or exit_espo != 0 or exit_espo_con != 0
-                 or exit_espo_host != 0
+                 or exit_espo_host != 0 or exit_gen != 0 or exit_imp_effi != 0
                  or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_sync + dur_espo + dur_espo_con + dur_espo_host
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_gen + dur_imp_effi
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
@@ -414,6 +451,12 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 
 ── SYNC ESPOCRM → HOSTINGER ──────────────────────
 {resumen_espo_host}
+
+── GENERAR PLANTILLA EFFI (paso 7a) ───────────────
+{resumen_gen}
+
+── IMPORT A EFFI (paso 7b) ────────────────────────
+{resumen_imp_effi}
 """
     enviar_email(env, asunto, cuerpo)
 
