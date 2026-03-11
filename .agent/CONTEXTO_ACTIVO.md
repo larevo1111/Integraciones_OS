@@ -1,43 +1,49 @@
 # Contexto Activo - Integraciones_OS
 
 ## Estado Actual (2026-03-10)
-Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional activa.
+Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **completamente automatizada**.
 - Pasos 3a/3b/3c/3d (facturas) + 4a/4b/4c/4d (remisiones) analíticos activos.
-- Sync Effi → EspoCRM (paso 6c): 480 contactos.
+- Sync Effi → EspoCRM (paso 6c): 480+ contactos.
 - Sync EspoCRM → Hostinger (paso 6d): tabla `crm_contactos` en Hostinger.
-- Generador plantilla Effi (paso 7): genera XLSX de contactos CRM para importar a Effi.
+- Generador plantilla + import automático a Effi (pasos 7a y 7b): activos en pipeline.
 
 ## Arquitectura de BDs — Dónde vive cada tabla
 
 | Tipo | BD | Tabla(s) |
 |---|---|---|
-| Raw Effi (39 tablas) | `effi_data` local + `u768061575_os_integracion` Hostinger | `zeffi_*` |
-| **Analíticas (5 tablas)** | **SOLO `u768061575_os_integracion` Hostinger** | `resumen_ventas_*` |
+| Raw Effi (41 tablas) | `effi_data` local + `u768061575_os_integracion` Hostinger | `zeffi_*` |
+| **Analíticas (8 tablas)** | **SOLO `u768061575_os_integracion` Hostinger** | `resumen_ventas_*` |
 | NocoDB meta | `nocodb_meta` local | internas |
-| EspoCRM | `espocrm` local | internas |
+| EspoCRM | `espocrm` local | `contact`, `ciudad`, `email_address`, etc. |
+| CRM en Hostinger | `u768061575_os_integracion` | `crm_contactos` (480+ contactos) |
 | ERP Hostinger | `u768061575_os_comunidad` — **⚠️ NO TOCAR** | propias del ERP |
 
 **Las tablas `resumen_ventas_*` NO existen en local entre corridas del pipeline.** El pipeline las calcula → guarda en local (staging) → sync copia a Hostinger → DROP de local. Fuente de verdad = Hostinger.
 
 ## Lo que está funcionando
 
-### Pipeline de datos Effi (6 pasos)
+### Pipeline completo (16 pasos via orquestador.py)
 - **Paso 1 — 26 scripts Playwright** exportan módulos de Effi a `/home/osserver/playwright/exports/`
-- **Paso 2 — import_all.js** importa **39 tablas** a MariaDB `effi_data` local (TRUNCATE + INSERT)
+- **Paso 2 — import_all.js** importa **41 tablas** a MariaDB `effi_data` local (TRUNCATE + INSERT)
 - **Paso 3a — calcular_resumen_ventas.py** → `resumen_ventas_facturas_mes` (38 campos, PK: mes)
 - **Paso 3b — calcular_resumen_ventas_canal.py** → `resumen_ventas_facturas_canal_mes` (32 campos, PK: mes+canal, 251 filas)
 - **Paso 3c — calcular_resumen_ventas_cliente.py** → `resumen_ventas_facturas_cliente_mes` (34 campos, PK: mes+id_cliente, 600 filas)
 - **Paso 3d — calcular_resumen_ventas_producto.py** → `resumen_ventas_facturas_producto_mes` (30 campos, PK: mes+cod_articulo, 697 filas)
 - **Paso 4a — calcular_resumen_ventas_remisiones_mes.py** → `resumen_ventas_remisiones_mes` (38 campos, PK: mes, 29 meses)
 - **Paso 4b/4c/4d** — remisiones canal/cliente/producto analíticos
-- **Paso 5 — sync_hostinger.py** → copia las 47 tablas (39 zeffi + 8 resumen) a Hostinger → DROP local de las 8 resumen
+- **Paso 5 — sync_hostinger.py** → copia las 49 tablas (41 zeffi + 8 resumen) a Hostinger → DROP local de las 8 resumen
 - **Paso 6b — sync_espocrm_marketing.py** → actualiza enums y campos custom en EspoCRM Contact
-- **Paso 6c — sync_espocrm_contactos.py** → upsert 480 clientes Effi → EspoCRM Contact (fuente='Effi')
-- **Paso 6d — sync_espocrm_to_hostinger.py** → `crm_contactos` en Hostinger (480 contactos)
-- **Paso 7 — generar_plantilla_import_effi.py** → XLSX para importar contactos CRM a Effi (manual)
+- **Paso 6c — sync_espocrm_contactos.py** → upsert clientes Effi → EspoCRM Contact (fuente='Effi')
+- **Paso 6d — sync_espocrm_to_hostinger.py** → `crm_contactos` en Hostinger (TRUNCATE + INSERT)
+- **Paso 7a — generar_plantilla_import_effi.py** → XLSX contactos CRM pendientes (fuente='CRM', enviado_a_effi=0)
+- **Paso 7b — import_clientes_effi.js** → Playwright sube XLSX a Effi automáticamente (solo si 7a generó)
 - **Orquestador**: `scripts/orquestador.py` — corre todos los pasos cada 2h (Lun–Sab 06:00–20:00) vía systemd
-- **n8n workflow activo**: trigger cada 2h + manual + webhook
-  - Webhook URL: `https://n8n.oscomunidad.com/webhook/fa393bcf-8eb3-4b14-80bc-bfda8ca42765`
+
+### Flujo CRM → Effi (automatizado)
+1. Vendedor crea contacto en EspoCRM (fuente='CRM', enviado_a_effi=0 automáticos)
+2. Pipeline paso 7a: genera `/tmp/import_clientes_effi_<hoy>.xlsx`
+3. Pipeline paso 7b: Playwright lo sube a Effi via "Crear o modificar contactos masivamente"
+4. Contacto queda con enviado_a_effi=1
 
 ### Sync a Hostinger (paso 5)
 - Script: `scripts/sync_hostinger.py`
@@ -45,7 +51,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional activa.
 - Usuario MySQL Hostinger: `u768061575_osserver` / `Epist2487.`
 - SSH tunnel: `109.106.250.195:65002` vía `~/.ssh/sos_erp`
 - Estrategia: TRUNCATE + INSERT lotes 500 + DROP local de tablas resumen al final
-- ~100s para 44 tablas (~63k filas en zeffi_trazabilidad = más pesada)
+- ~100s para 49 tablas
 
 ### Playwright — corre en el host (NO Docker)
 - Node.js v24.14.0 + Playwright v1.49.1 + Chromium instalados en host
@@ -89,10 +95,9 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional activa.
 ### EspoCRM (crm.oscomunidad.com)
 - Contenedor: `espocrm` — puerto 8083
 - BD: `espocrm` en MariaDB local
-- 480 contactos (Effi) + contactos CRM manuales
-- Campos custom en Contact: tipoDeMarketing, tipoCliente, tarifaPrecios, numeroIdentificacion, tipoIdentificacion, tipoPersona, formaPago, vendedorEffi, fuente (enum: CRM/Effi), enviadoAEffi (bool)
+- 480+ contactos (Effi) + contactos CRM manuales
+- Campos custom en Contact: tipoDeMarketing, tipoCliente, tarifaPrecios, numeroIdentificacion, tipoIdentificacion, tipoPersona, formaPago, vendedorEffi, fuente (enum: CRM/Effi), enviadoAEffi (bool), ciudad_id (link → Ciudad)
 - Entidad Ciudad: 12,237 ciudades (Colombia/Ecuador/Rep.Dom/Guatemala) con id_effi
-- Workflow EspoCRM → Effi: crear contacto con fuente=CRM → generar_plantilla_import_effi.py → subir XLSX a Effi (manual por ahora)
 
 ### Infraestructura Docker
 - `/home/osserver/docker/docker-compose.yml`
@@ -101,9 +106,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional activa.
 - Credenciales: `osadmin` / `Epist2487.`
 
 ## Próximos Pasos
-1. **import_clientes_effi.js**: script Playwright que suba el XLSX generado a Effi automáticamente (solo después de validar el XLSX manualmente en Effi)
-2. **Conectar AppSheet** a `crm_contactos` en Hostinger para portal de contactos
-3. **Paso 7 al pipeline**: agregar generador XLSX + Playwright import como paso automático
+1. **AppSheet**: conectar a `crm_contactos` en Hostinger para portal de contactos
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`

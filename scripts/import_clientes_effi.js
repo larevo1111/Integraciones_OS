@@ -2,7 +2,7 @@
  * import_clientes_effi.js — Paso 7b del pipeline
  *
  * Sube el XLSX generado por generar_plantilla_import_effi.py a Effi
- * via "Crear o modificar contactos masivamente".
+ * via "Crear o modificar clientes masivamente".
  *
  * Uso:
  *   node scripts/import_clientes_effi.js                  # usa /tmp/import_clientes_effi_<hoy>.xlsx
@@ -34,24 +34,24 @@ const xlsxPath = process.argv[2]
   const { browser, page } = await getPage();
 
   try {
-    // 1. Navegar a la sección de contactos
-    await page.goto('https://effi.com.co/app/tercero/contacto', { waitUntil: 'networkidle' });
-    await page.waitForSelector('text=Crear o modificar contactos masivamente', { timeout: 15000 });
+    // 1. Navegar a la sección de clientes
+    await page.goto('https://effi.com.co/app/tercero/cliente', { waitUntil: 'networkidle' });
+    await page.waitForSelector('text=Crear o modificar clientes masivamente', { timeout: 15000 });
 
     // 2. Abrir el modal de importación masiva
-    await page.click('text=Crear o modificar contactos masivamente');
-    // Esperar a que el modal esté visible (el input #id_ICM está en el DOM siempre, pero el modal se abre)
+    await page.click('text=Crear o modificar clientes masivamente');
+    // Esperar a que el modal esté visible
     await page.waitForTimeout(1000);
 
     // 3. Subir el archivo XLSX
-    // Hay varios input[name="userfile"] — el primero es el del ICM (importar contactos masivamente)
-    const fileInput = page.locator('input[name="userfile"]').first();
+    // El modal de importación es #modalImportarCrearMasivo — usar ese selector para precisión
+    const fileInput = page.locator('#modalImportarCrearMasivo input[type="file"]');
     await fileInput.setInputFiles(xlsxPath);
     console.log(`   ✅ Archivo seleccionado: ${path.basename(xlsxPath)}`);
     await page.waitForTimeout(1000);
 
-    // 4. Click en "Crear o modificar" — botón #btn_submit dentro del modal ICM
-    await page.click('#btn_submit');
+    // 4. Click en "Crear o modificar" — botón submit dentro del modal
+    await page.click('#modalImportarCrearMasivo #btn_submit');
 
     // 5. Esperar resultado — Effi procesa y muestra mensaje
     await page.waitForTimeout(5000);
