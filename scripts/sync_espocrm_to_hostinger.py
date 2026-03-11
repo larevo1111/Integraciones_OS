@@ -161,12 +161,12 @@ def main():
         cur_host = conn_host.cursor()
         cur_host.execute("SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'")
 
-        # Crear tabla si no existe
+        # Recrear tabla (DROP + CREATE para aplicar cambios de schema)
+        cur_host.execute(f"DROP TABLE IF EXISTS `{TABLA}`")
         cur_host.execute(DDL)
         conn_host.commit()
 
-        # TRUNCATE + INSERT
-        cur_host.execute(f"TRUNCATE TABLE `{TABLA}`")
+        # INSERT en lotes (tabla recién creada, no necesita TRUNCATE)
         conn_host.commit()
 
         total = insertar_lotes(cur_host, conn_host, contactos)

@@ -102,6 +102,14 @@ def normalizar_texto(texto):
     return sin_tildes.replace('.', '').replace(',', '').strip()
 
 
+# Alias comunes: nombre de Effi → nombre DANE oficial
+ALIAS_CIUDADES = {
+    'cali': 'santiago de cali',
+    'cartagena': 'cartagena de indias',
+    'cartagena de indias distrito turistico y cultural': 'cartagena de indias',
+}
+
+
 def cargar_mapa_ciudad_display(cur_effi):
     """
     Construye mapa para traducir (ciudad, departamento) de Effi al formato
@@ -138,13 +146,22 @@ def resolver_ciudad_display(ciudad, departamento, mapa_doble, mapa_simple):
     cn = normalizar_texto(ciudad)
     dn = normalizar_texto(departamento)
 
+    # Aplicar alias si existe
+    cn_alias = ALIAS_CIUDADES.get(cn, cn)
+
     # Intento 1: match exacto normalizado por (ciudad, depto)
-    result = mapa_doble.get((cn, dn))
+    result = mapa_doble.get((cn_alias, dn))
     if result:
         return result
 
+    # Intento 1b: con alias pero sin depto exacto, buscar alias + cualquier depto
+    if cn_alias != cn:
+        for (mn, _dn), display in mapa_doble.items():
+            if mn == cn_alias:
+                return display
+
     # Intento 2: match solo por municipio (si no es ambiguo)
-    result = mapa_simple.get(cn)
+    result = mapa_simple.get(cn_alias)
     if result:
         return result
 
