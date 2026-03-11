@@ -203,7 +203,6 @@ def main():
     try:
         # Cargar mapeos de lookup
         usuarios_map = cargar_usuarios_espo(cur_espo)
-        ciudades_map = cargar_ciudades_espo(cur_espo)
 
         # Leer todos los clientes vigentes de Effi
         cur_effi.execute("""
@@ -232,7 +231,6 @@ def main():
 
             first, last = split_nombre(v(c['nombre']) or '')
             vendedor_id = resolver_vendedor(v(c['vendedor']), usuarios_map)
-            ciudad_id   = resolver_ciudad(v(c['ciudad']), v(c['departamento']), v(c['pais']), ciudades_map)
 
             # ¿Existe ya en EspoCRM?
             cur_espo.execute(
@@ -258,7 +256,7 @@ def main():
                 'tarifa_precios':       v(c['tarifa_de_precios']),
                 'forma_pago':           v(c['forma_de_pago']),
                 'vendedor_effi':        v(c['vendedor']),
-                'ciudad_id':            ciudad_id,
+                'ciudad_nombre':        (v(c['ciudad']) or '')[:200],
                 'assigned_user_id':     vendedor_id,
                 'fuente':               'Effi',
                 'modified_at':          now,

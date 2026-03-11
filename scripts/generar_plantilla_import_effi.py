@@ -133,10 +133,10 @@ def cargar_tipos_marketing(conn_effi):
 
 
 def cargar_ciudades_id(conn_espo):
-    """Devuelve dict {ciudad_espo_id: id_effi}."""
+    """Devuelve dict {nombre_lower: id_effi} para buscar por nombre de ciudad."""
     cur = conn_espo.cursor()
-    cur.execute("SELECT id, id_effi FROM ciudad WHERE deleted=0 AND id_effi IS NOT NULL")
-    mapa = {espo_id: id_effi for espo_id, id_effi in cur.fetchall()}
+    cur.execute("SELECT name, id_effi FROM ciudad WHERE deleted=0 AND id_effi IS NOT NULL")
+    mapa = {(nombre or '').strip().lower(): id_effi for nombre, id_effi in cur.fetchall()}
     cur.close()
     return mapa
 
@@ -176,7 +176,7 @@ def leer_contactos_crm(conn_espo, todos=False):
             c.tarifa_precios,
             c.forma_pago,
             c.vendedor_effi,
-            c.ciudad_id,
+            c.ciudad_nombre,
             -- email primario
             (SELECT ea.name FROM entity_email_address eea
              JOIN email_address ea ON ea.id = eea.email_address_id
@@ -226,8 +226,8 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_ma
         marketing_id = marketing_map.get(c['tipo_de_marketing'].strip().lower())
 
     ciudad_effi_id = None
-    if c.get('ciudad_id'):
-        ciudad_effi_id = ciudades_id_map.get(c['ciudad_id'])
+    if c.get('ciudad_nombre'):
+        ciudad_effi_id = ciudades_id_map.get(c['ciudad_nombre'].strip().lower())
 
     # Tipo de cliente → ID numérico Effi
     tipo_cliente = TIPO_CLIENTE_MAP.get(c.get('tipo_cliente') or '', None)

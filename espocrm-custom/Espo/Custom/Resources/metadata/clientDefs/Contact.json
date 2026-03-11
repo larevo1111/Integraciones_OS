@@ -1,8 +1,5 @@
 {
     "recordViews": {
         "detail": "custom:views/contact/record/detail"
-    },
-    "views": {
-        "list": "custom:views/contact/list"
     }
 }
