@@ -1,6 +1,6 @@
 define('custom:views/contact/record/detail',
-    ['crm:views/contact/record/detail', 'custom:data/ciudades-colombia'],
-    function (Dep, CiudadesData) {
+    ['crm:views/contact/record/detail'],
+    function (Dep) {
 
     return Dep.extend({
 
@@ -14,28 +14,34 @@ define('custom:views/contact/record/detail',
 
         afterRender: function () {
             Dep.prototype.afterRender.call(this);
-            try {
-                this._filtrarMunicipios();
-            } catch (e) {
-                // No romper la vista si el cascading falla
-            }
+            this._filtrarMunicipios();
         },
 
         _filtrarMunicipios: function () {
+            var self = this;
             if (!this.getFieldView('ciudadNombre')) return;
 
-            var depto    = this.model.get('departamento');
-            var opciones = [''];
+            try {
+                Espo.loader.require('custom:data/ciudades-colombia', function (mod) {
+                    var data = mod && mod.default ? mod.default : mod;
+                    if (!data) return;
 
-            if (depto && CiudadesData[depto]) {
-                opciones = opciones.concat(CiudadesData[depto]);
-            } else {
-                Object.keys(CiudadesData).sort().forEach(function (d) {
-                    opciones = opciones.concat(CiudadesData[d]);
+                    var depto = self.model.get('departamento');
+                    var opciones = [''];
+
+                    if (depto && data[depto]) {
+                        opciones = opciones.concat(data[depto]);
+                    } else {
+                        Object.keys(data).sort().forEach(function (d) {
+                            opciones = opciones.concat(data[d]);
+                        });
+                    }
+
+                    self.setFieldOptionList('ciudadNombre', opciones);
                 });
+            } catch (e) {
+                // Cascading falla silenciosamente, vista sigue funcionando
             }
-
-            this.setFieldOptionList('ciudadNombre', opciones);
         },
 
     });

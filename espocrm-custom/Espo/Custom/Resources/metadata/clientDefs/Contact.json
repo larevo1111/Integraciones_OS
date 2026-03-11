@@ -1,8 +1,4 @@
 {
-    "recordViews": {
-        "detail": "custom:views/contact/record/detail",
-        "edit": "custom:views/contact/record/edit"
-    },
     "menu": {
         "list": {
             "buttons": [

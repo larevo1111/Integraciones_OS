@@ -133,9 +133,10 @@ def cargar_tipos_marketing(conn_effi):
 
 
 def cargar_ciudades_dane(conn_espo):
-    """Devuelve dict {nombre_municipio_lower: codigo_dane} desde codigos_ciudades_dane."""
+    """Devuelve dict {nombre_display_lower: codigo_dane} desde codigos_ciudades_dane.
+    nombre_display = 'Municipio - Departamento' (formato del enum en EspoCRM)."""
     cur = conn_espo.cursor()
-    cur.execute("SELECT nombre_municipio, codigo_municipio FROM codigos_ciudades_dane")
+    cur.execute("SELECT nombre_display, codigo_municipio FROM codigos_ciudades_dane")
     mapa = {(nombre or '').strip().lower(): codigo for nombre, codigo in cur.fetchall()}
     cur.close()
     return mapa
@@ -164,9 +165,7 @@ def leer_contactos_crm(conn_espo, todos=False):
             c.first_name,
             c.last_name,
             c.direccion,
-            c.address_city,
-            c.address_state,
-            c.address_country,
+            c.direccion_linea2,
             c.description,
             c.numero_identificacion,
             c.tipo_identificacion,
@@ -245,7 +244,7 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_ma
         None,                                    # 4: Página web
         None,                                    # 5: ID EFFI: Ciudad (no se usa con DANE)
         codigo_dane_ciudad,                      # 6: Código DANE Ciudad
-        c.get('direccion'),                      # 7: Dirección
+        ' '.join(filter(None, [c.get('direccion'), c.get('direccion_linea2')])).strip() or None,  # 7: Dirección
         c.get('telefono_principal'),             # 8: Teléfono 1
         None,                                    # 9: Referencia teléfono 1
         c.get('telefono_secundario'),            # 10: Teléfono 2
