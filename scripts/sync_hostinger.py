@@ -82,8 +82,8 @@ def sync_tabla(conn_src, cursor_src, cursor_dst, conn_dst, tabla):
         f'CREATE TABLE IF NOT EXISTS `{tabla}`',
         1
     )
-    # Para tablas resumen_: DROP + CREATE para asegurar que el schema siempre esté actualizado
-    if tabla.startswith('resumen_'):
+    # Para tablas resumen_ y codigos_ciudades_dane: DROP + CREATE para asegurar schema actualizado
+    if tabla.startswith('resumen_') or tabla == 'codigos_ciudades_dane':
         cursor_dst.execute(f"DROP TABLE IF EXISTS `{tabla}`")
         conn_dst.commit()
         final_sql = create_sql_dst.replace(

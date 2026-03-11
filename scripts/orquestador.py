@@ -173,11 +173,19 @@ def parsear_resumen_remisiones(salida):
     return salida.splitlines()[-1].strip() if salida else '(sin salida)'
 
 def parsear_sync_hostinger(salida):
-    """Extrae la línea de resumen de sync_hostinger."""
-    for linea in reversed(salida.splitlines()):
-        if 'tablas OK' in linea or 'sync_hostinger' in linea:
-            return linea.strip()
-    return salida.splitlines()[-1].strip() if salida else '(sin salida)'
+    """Extrae resumen + errores de sync_hostinger."""
+    lineas = salida.splitlines()
+    resumen = '(sin salida)'
+    errores_sync = []
+    for linea in lineas:
+        stripped = linea.strip()
+        if '❌' in stripped and ':' in stripped and 'tablas OK' not in stripped:
+            errores_sync.append(stripped)
+        if 'tablas OK' in stripped or 'sync_hostinger' in stripped:
+            resumen = stripped
+    if errores_sync:
+        return resumen + '\n' + '\n'.join(errores_sync)
+    return resumen
 
 # ─── Notificaciones ────────────────────────────────────────────────────────────
 
