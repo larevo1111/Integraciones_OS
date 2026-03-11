@@ -35,6 +35,12 @@ DB_LOCAL = dict(
     database='effi_data',
 )
 
+DB_ESPO = dict(
+    host='127.0.0.1', port=3306,
+    user='osadmin', password='Epist2487.',
+    database='espocrm',
+)
+
 ESPOCRM_CONTAINER = 'espocrm'
 
 ENTITY_DEFS_PATH   = '/var/www/html/custom/Espo/Custom/Resources/metadata/entityDefs/Contact.json'
@@ -104,6 +110,19 @@ def query_opciones(tabla, columna):
     return opciones
 
 
+def query_ciudades():
+    """Lee nombres de ciudades de la tabla ciudad en espocrm BD, ordenados alfabéticamente."""
+    conn = mysql.connector.connect(**DB_ESPO)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM ciudad WHERE deleted=0 AND name IS NOT NULL AND name != '' ORDER BY name"
+    )
+    nombres = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return nombres
+
+
 def query_vendedores():
     """DISTINCT vendedores de zeffi_clientes + zeffi_remisiones_venta_encabezados."""
     conn = mysql.connector.connect(**DB_LOCAL)
@@ -137,7 +156,7 @@ def get_opciones_actuales_espocrm(campo):
         return []
 
 
-def generar_json(tipos_marketing, tarifas_precios, vendedores):
+def generar_json(tipos_marketing, tarifas_precios, vendedores, ciudades):
     entity_defs = {
         'fields': {
             'tipoDeMarketing': {
@@ -182,8 +201,8 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores):
                 'default': False
             },
             'ciudadNombre': {
-                'type': 'varchar',
-                'maxLength': 200
+                'type': 'enum',
+                'options': [''] + ciudades
             }
         }
     }
@@ -229,35 +248,38 @@ def aplicar_a_espocrm():
 # ─── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    # Leer opciones dinámicas de Effi
+    # Leer opciones dinámicas
     tipos_marketing = query_opciones('zeffi_tipos_marketing', 'tipo_de_marketing')
     tarifas_precios = query_opciones('zeffi_tarifas_precios', 'nombre')
     vendedores      = query_vendedores()
+    ciudades        = query_ciudades()
     # tipo_de_cliente: 6 valores fijos (TIPOS_CLIENTE), no se consulta la BD
 
     # Comparar con lo que ya hay en EspoCRM
     mk_espo   = get_opciones_actuales_espocrm('tipoDeMarketing')
     tar_espo  = get_opciones_actuales_espocrm('tarifaPrecios')
     vend_espo = get_opciones_actuales_espocrm('vendedorEffi')
+    ciu_espo  = get_opciones_actuales_espocrm('ciudadNombre')
 
     sin_cambios = (
         set(tipos_marketing) == set(mk_espo)   and len(tipos_marketing) == len(mk_espo) and
         set(tarifas_precios) == set(tar_espo)  and len(tarifas_precios) == len(tar_espo) and
-        set(vendedores)      == set(vend_espo) and len(vendedores)      == len(vend_espo)
+        set(vendedores)      == set(vend_espo) and len(vendedores)      == len(vend_espo) and
+        set(ciudades)        == set(ciu_espo)  and len(ciudades)        == len(ciu_espo)
     )
 
     if sin_cambios:
         print(f'✅ sync_espocrm_marketing — sin cambios '
               f'({len(tipos_marketing)} marketing, {len(tarifas_precios)} tarifas, '
-              f'{len(vendedores)} vendedores)')
+              f'{len(vendedores)} vendedores, {len(ciudades)} ciudades)')
         return
 
-    generar_json(tipos_marketing, tarifas_precios, vendedores)
+    generar_json(tipos_marketing, tarifas_precios, vendedores, ciudades)
     aplicar_a_espocrm()
 
     print(f'✅ sync_espocrm_marketing — actualizado: '
           f'{len(tipos_marketing)} marketing | {len(tarifas_precios)} tarifas | '
-          f'{len(vendedores)} vendedores')
+          f'{len(vendedores)} vendedores | {len(ciudades)} ciudades')
 
 
 if __name__ == '__main__':
