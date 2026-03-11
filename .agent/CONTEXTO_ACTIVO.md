@@ -1,11 +1,13 @@
 # Contexto Activo - Integraciones_OS
 
-## Estado Actual (2026-03-10)
+## Estado Actual (2026-03-11)
 Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **completamente automatizada**.
 - Pasos 3a/3b/3c/3d (facturas) + 4a/4b/4c/4d (remisiones) analíticos activos.
 - Sync Effi → EspoCRM (paso 6c): 480+ contactos.
 - Sync EspoCRM → Hostinger (paso 6d): tabla `crm_contactos` en Hostinger.
 - Generador plantilla + import automático a Effi (pasos 7a y 7b): activos en pipeline.
+- 6 tablas resumen compuestas tienen columna `_key` (PK simple = mes|col2) para herramientas externas.
+- **AppSheet descartado** — Santi optó por no usarlo.
 
 ## Arquitectura de BDs — Dónde vive cada tabla
 
@@ -31,7 +33,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - **Paso 3d — calcular_resumen_ventas_producto.py** → `resumen_ventas_facturas_producto_mes` (30 campos, PK: mes+cod_articulo, 697 filas)
 - **Paso 4a — calcular_resumen_ventas_remisiones_mes.py** → `resumen_ventas_remisiones_mes` (38 campos, PK: mes, 29 meses)
 - **Paso 4b/4c/4d** — remisiones canal/cliente/producto analíticos
-- **Paso 5 — sync_hostinger.py** → copia las 49 tablas (41 zeffi + 8 resumen) a Hostinger → DROP local de las 8 resumen
+- **Paso 5 — sync_hostinger.py** → copia las 49 tablas (41 zeffi + 8 resumen) a Hostinger → DROP local de las 8 resumen. Para tablas `resumen_*`: usa DROP+CREATE en Hostinger (garantiza schema actualizado); para `zeffi_*`: CREATE IF NOT EXISTS.
 - **Paso 6b — sync_espocrm_marketing.py** → actualiza enums y campos custom en EspoCRM Contact
 - **Paso 6c — sync_espocrm_contactos.py** → upsert clientes Effi → EspoCRM Contact (fuente='Effi')
 - **Paso 6d — sync_espocrm_to_hostinger.py** → `crm_contactos` en Hostinger (TRUNCATE + INSERT)
@@ -42,7 +44,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 ### Flujo CRM → Effi (automatizado)
 1. Vendedor crea contacto en EspoCRM (fuente='CRM', enviado_a_effi=0 automáticos)
 2. Pipeline paso 7a: genera `/tmp/import_clientes_effi_<hoy>.xlsx`
-3. Pipeline paso 7b: Playwright lo sube a Effi via "Crear o modificar contactos masivamente"
+3. Pipeline paso 7b: Playwright lo sube a Effi via "Crear o modificar **clientes** masivamente"
 4. Contacto queda con enviado_a_effi=1
 
 ### Sync a Hostinger (paso 5)
@@ -65,14 +67,14 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Devoluciones = NCs de `zeffi_notas_credito_venta_encabezados`
 
 **resumen_ventas_facturas_canal_mes**
-- 32 campos, PK (mes, canal), 251 filas
+- 32 campos + `_key`, PK `_key` (`mes|canal`), UNIQUE (mes, canal), 251 filas
 - `fin_ventas_netas_sin_iva = precio_bruto_total - descuento_total` (precio_neto_total incluye IVA — gotcha crítico)
 - `fin_pct_del_mes` = % participación canal en total mes (suma 1.0 por mes)
 - `con_consignacion_pp` = OVs atribuidas al canal via id_cliente → canal histórico (mapping más-frecuente)
 - 58 filas son canales con solo consignaciones (sin facturas ese mes)
 
 **resumen_ventas_facturas_cliente_mes**
-- 34 campos, PK (mes, id_cliente), 600 filas
+- 34 campos + `_key`, PK `_key` (`mes|id_cliente`), UNIQUE (mes, id_cliente), 600 filas
 - `canal` viene del maestro `zeffi_clientes.tipo_de_marketing` (estado actual del cliente)
 - `cli_es_nuevo = 1` si es la primera factura histórica del cliente
 - `con_consignacion_pp` = OVs directamente por id_cliente (sin mapping)
@@ -106,7 +108,8 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Credenciales: `osadmin` / `Epist2487.`
 
 ## Próximos Pasos
-1. **AppSheet**: conectar a `crm_contactos` en Hostinger para portal de contactos
+1. **Botón en EspoCRM**: botón en ficha de Contacto para disparar import a Effi manualmente (vía n8n webhook → pasos 7a+7b)
+2. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. También borrar en Effi manualmente (3 clientes: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya).
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
