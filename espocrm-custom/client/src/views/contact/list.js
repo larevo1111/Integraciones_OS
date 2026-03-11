@@ -1,4 +1,4 @@
-define('custom:views/contact/list', ['crm:views/contact/list'], function (Dep) {
+define('custom:views/contact/list', ['views/list'], function (Dep) {
 
     return Dep.extend({
 
@@ -12,7 +12,7 @@ define('custom:views/contact/list', ['crm:views/contact/list'], function (Dep) {
             var self = this;
 
             var $btn = $(
-                '<button class="btn btn-default btn-sm action" style="margin-left:8px;" id="btn-sinc-effi">' +
+                '<button class="btn btn-default btn-sm" id="btn-sinc-effi" style="margin-left:8px;">' +
                 '<span class="fas fa-sync-alt"></span> Sincronizar con Effi' +
                 '</button>'
             );
@@ -21,10 +21,13 @@ define('custom:views/contact/list', ['crm:views/contact/list'], function (Dep) {
                 self.actionSincronizarConEffi();
             });
 
-            // Insertar junto al botón Create (en la cabecera de la lista)
-            this.$el.find('.page-header .btn-group').first().append($btn);
-            if (!this.$el.find('.page-header .btn-group').length) {
-                this.$el.find('.page-header').append($btn);
+            // En EspoCRM la cabecera de lista tiene .page-header con el botón Create
+            var $header = this.$el.find('.page-header');
+            if ($header.length) {
+                $header.find('.btn-group').first().append($btn);
+                if (!$header.find('.btn-group').length) {
+                    $header.append($btn);
+                }
             }
         },
 
