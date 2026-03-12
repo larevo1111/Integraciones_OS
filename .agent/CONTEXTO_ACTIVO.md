@@ -99,8 +99,11 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 ### EspoCRM (crm.oscomunidad.com)
 - Contenedor: `espocrm` — puerto 8083
 - BD: `espocrm` en MariaDB local
-- 480+ contactos (Effi) + contactos CRM manuales
-- Campos custom en Contact: tipoDeMarketing, tipoCliente, tarifaPrecios, numeroIdentificacion, tipoIdentificacion, tipoPersona, formaPago, vendedorEffi, fuente (CRM/Effi), enviadoAEffi (bool), **ciudadNombre** (enum: "Ciudad - Depto"), **direccion** + **direccionLinea2** (varchar custom)
+- 488 contactos: 362 Cliente directo, 106 Negocio amigo, 13 Interno, 7 Red de amigos
+- **tipoCliente**: enum propio de EspoCRM (Negocio amigo, Red de amigos, Cliente directo, Interno, Otro). NO se sincroniza desde Effi — se gestiona manualmente. A Effi siempre tipo_cliente=1.
+- **calificacionNegocioAmigo**: enum A/B/C, solo visible cuando tipoCliente='Negocio amigo' (dynamicLogic). Todos en B inicialmente.
+- **fuente**: readOnly (CRM/Effi). No editable por usuario.
+- Otros campos custom: tipoDeMarketing, tarifaPrecios, numeroIdentificacion, tipoIdentificacion, tipoPersona, formaPago, vendedorEffi, enviadoAEffi (bool), **ciudadNombre** (enum: "Ciudad - Depto"), **direccion** + **direccionLinea2** (varchar custom)
 - **Municipio**: enum dinámico con formato "Ciudad - Departamento" desde `codigos_ciudades_dane` (effi_data). NO usa campo compuesto `address` ni link a tabla `ciudad` (deprecados)
 - **Dirección**: campos custom `direccion` + `direccionLinea2`. Los nativos `address_street/city/state/country` ya NO se usan
 - Skill completa: `/espocrm-integracion`
@@ -163,10 +166,56 @@ ResumenFacturacionPage (todos los meses)
 - Emits: `row-click` (selección), `row-dblclick` (drill-down)
 - Features: filtros inline, selector de columnas, export CSV/XLSX/PDF, ordenamiento, skeleton
 
+## Servicio Central de IA — `ia_service_os` (en construcción 2026-03-12)
+
+**Plan completo:** `.agent/planes/plan_ia_service.md`
+
+### Arquitectura
+- **Código:** `scripts/ia_service/` — módulo Python con función `consultar()`
+- **BD:** `ia_service_os` en MariaDB local (4 tablas)
+- **API Flask:** puerto 5100, systemd `ia-service.service`
+- **Uso:** cualquier proyecto llama `POST http://localhost:5100/ia/consultar`
+
+### 4 tablas en `ia_service_os`
+| Tabla | Para qué |
+|---|---|
+| `ia_agentes` | Catálogo de modelos con API key, endpoint, capacidades, costos |
+| `ia_tipos_consulta` | Tipos con reglas, pasos, system_prompt y agente preferido |
+| `ia_conversaciones` | Contexto vivo: resumen (≤1000 palabras) + agente activo por usuario/canal |
+| `ia_logs` | Auditoría completa: SQL generado, tokens, costo, latencia, errores |
+
+### Agentes configurados
+| slug | modelo | tipo | Estado |
+|---|---|---|---|
+| `gemini-flash` | gemini-2.5-flash | free | ✅ Activo (key: `AIzaSyAz_...`) |
+| `gemini-flash-lite` | gemini-2.5-flash | free | ✅ Activo (misma key) |
+| `deepseek-chat` | deepseek-chat | free* | 🔲 Pendiente key: platform.deepseek.com |
+| `deepseek-reasoner` | deepseek-reasoner | premium | 🔲 Pendiente (misma key que deepseek-chat) |
+| `groq-llama` | llama-3.3-70b-versatile | free | 🔲 Pendiente key: console.groq.com |
+| `claude-sonnet` | claude-sonnet-4-6 | premium | 🔲 Pendiente key: console.anthropic.com |
+
+**Estado del servicio (2026-03-12):** ✅ Activo — `sudo systemctl status ia-service`
+**Pruebas pasadas:** enrutamiento automático, redacción, resumen — todas con Gemini Flash.
+**Para agregar keys:** ver instrucciones en `.agent/planes/plan_ia_service.md` (sección Pendiente)
+
+### Función principal
+```python
+resultado = consultar(
+    pregunta="¿Cuánto vendimos ayer?",
+    tipo=None,           # None = enrutar automático vía Groq
+    agente=None,         # None = usar preferido del tipo
+    usuario_id="santi",
+    canal="telegram",
+    conversacion_id=None # None = buscar por (usuario_id+canal)
+)
+# Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id
+```
+
 ## Próximos Pasos
-1. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. Borrar en Effi manualmente: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya.
-2. **Bot Telegram** — ampliar más allá de notificaciones de error: consultas de KPIs, estado pipeline, alertas proactivas.
-3. Continuar construyendo módulo Ventas: páginas de Remisiones, módulo Clientes, módulo Productos.
+1. **Servicio IA** — ver plan detallado en `.agent/planes/plan_ia_service.md`
+2. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. Borrar en Effi manualmente: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya.
+3. **Bot Telegram** — construir sobre el servicio de IA una vez esté listo. Spec: `.agent/planes/bot_telegram.md`
+4. Continuar construyendo módulo Ventas: páginas de Remisiones, módulo Clientes, módulo Productos.
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
