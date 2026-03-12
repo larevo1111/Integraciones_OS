@@ -1290,5 +1290,20 @@
             ],
             "default": ""
         }
+    },
+    "dynamicLogic": {
+        "fields": {
+            "calificacionNegocioAmigo": {
+                "readOnly": {
+                    "conditionGroup": [
+                        {
+                            "type": "notEquals",
+                            "attribute": "tipoCliente",
+                            "value": "Negocio amigo"
+                        }
+                    ]
+                }
+            }
+        }
     }
 }
