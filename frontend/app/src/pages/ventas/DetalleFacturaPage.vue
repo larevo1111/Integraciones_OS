@@ -150,10 +150,11 @@ const items      = ref([])
 const colsItems  = ref([])
 const loading    = ref(true)
 
-const VISIBLE_ITEMS = ['id_numeracion','cod_articulo','nombre_articulo','cantidad','precio_unitario','descuento_total','precio_bruto_total','bodega']
+const VISIBLE_ITEMS = ['id_numeracion','cod_articulo','descripcion_articulo','cantidad','precio_unitario','descuento_total','precio_bruto_total','bodega']
 
 function labelFromKey(key) {
   if (key === 'id_numeracion') return 'No Fac'
+  if (key === 'descripcion_articulo') return 'Producto'
   return key.replace(/^_pk$/, 'N°').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim()
 }
 
