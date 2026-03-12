@@ -144,7 +144,7 @@
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
             <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
-              @row-dblclick="row => router.push(`/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`)" />
+              @row-dblclick="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'canal', desde_id: canal, desde_label: canal } })" />
           </div>
         </div>
 
@@ -216,7 +216,7 @@ const colsRemisiones = ref([])
 const VISIBLE = {
   'canal_clientes':                    ['id_cliente','cliente','fin_ventas_netas_sin_iva','vol_num_facturas','vol_unidades_vendidas'],
   'canal_productos':                   ['cod_articulo','nombre','fin_ventas_netas_sin_iva','vol_unidades_vendidas','vol_num_facturas'],
-  'zeffi_facturas_venta_encabezados':  ['fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
+  'zeffi_facturas_venta_encabezados':  ['id_numeracion','fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
   'zeffi_remisiones_venta_encabezados': ['fecha_de_creacion','id_remision','cliente','ciudad','vendedor','total_neto','estado_remision','estado_cxc','dias_mora'],
 }
 
@@ -227,6 +227,7 @@ function colsFromData(data, tabla) {
 }
 
 function labelFromKey(key) {
+  if (key === 'id_numeracion') return 'No Fac'
   return key.replace(/^_pk$/, 'N°').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     .replace(/^Fin /, '').replace(/^Vol /, '').replace(/^Cli /, '').replace(/^Cto /, '').trim()
 }

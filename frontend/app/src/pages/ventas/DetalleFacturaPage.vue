@@ -6,8 +6,18 @@
       <div class="page-header-inner">
         <div class="breadcrumb">
           <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Ventas</span>
+          <template v-if="qMes">
+            <ChevronRightIcon :size="13" />
+            <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Resumen Facturación</span>
+            <ChevronRightIcon :size="13" />
+            <span class="bc-link" @click="router.push(`/ventas/detalle-mes/${qMes}`)">{{ nombreMes(qMes) }}</span>
+            <template v-if="qDesde !== 'mes' && DESDE_CONFIG[qDesde]?.path">
+              <ChevronRightIcon :size="13" />
+              <span class="bc-link" @click="router.push(DESDE_CONFIG[qDesde].path)">{{ DESDE_CONFIG[qDesde].label }}</span>
+            </template>
+          </template>
           <ChevronRightIcon :size="13" />
-          <span class="bc-current">Detalle Factura</span>
+          <span class="bc-current">Factura #{{ id_numeracion }}</span>
         </div>
         <div class="page-title-row">
           <h1 class="page-title">Factura #{{ id_numeracion }}</h1>
@@ -103,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { ChevronRightIcon } from 'lucide-vue-next'
@@ -115,14 +125,35 @@ const API          = '/api'
 const id_interno   = route.params.id_interno
 const id_numeracion = route.params.id_numeracion
 
+// Contexto de navegación (desde dónde llegamos)
+const qMes        = route.query.mes        || ''
+const qDesde      = route.query.desde      || ''
+const qDesdeId    = route.query.desde_id   || ''
+const qDesdeLabel = route.query.desde_label || ''
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+function nombreMes(m) {
+  if (!m) return m
+  const [y, mo] = m.split('-')
+  return `${MESES[parseInt(mo) - 1]} ${y}`
+}
+
+const DESDE_CONFIG = {
+  cliente:  { label: qDesdeLabel, path: qMes && qDesdeId ? `/ventas/detalle-cliente/${qMes}/${encodeURIComponent(qDesdeId)}` : null },
+  canal:    { label: qDesdeLabel, path: qMes && qDesdeId ? `/ventas/detalle-canal/${qMes}/${encodeURIComponent(qDesdeId)}` : null },
+  producto: { label: qDesdeLabel, path: qMes && qDesdeId ? `/ventas/detalle-producto/${qMes}/${encodeURIComponent(qDesdeId)}` : null },
+  mes:      { label: null, path: qMes ? `/ventas/detalle-mes/${qMes}` : null },
+}
+
 const encabezado = ref(null)
 const items      = ref([])
 const colsItems  = ref([])
 const loading    = ref(true)
 
-const VISIBLE_ITEMS = ['cod_articulo','nombre_articulo','cantidad','precio_unitario','descuento_total','precio_bruto_total','bodega']
+const VISIBLE_ITEMS = ['id_numeracion','cod_articulo','nombre_articulo','cantidad','precio_unitario','descuento_total','precio_bruto_total','bodega']
 
 function labelFromKey(key) {
+  if (key === 'id_numeracion') return 'No Fac'
   return key.replace(/^_pk$/, 'N°').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim()
 }
 

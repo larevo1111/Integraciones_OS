@@ -138,7 +138,7 @@
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
             <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
-              @row-dblclick="row => router.push(`/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`)" />
+              @row-dblclick="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'producto', desde_id: cod_articulo, desde_label: kpi?.nombre || cod_articulo } })" />
           </div>
         </div>
 
@@ -193,7 +193,7 @@ const colsFacturas = ref([])
 const VISIBLE = {
   'producto_canales':                  ['canal','fin_ventas_netas_sin_iva','vol_unidades_vendidas','cli_clientes_activos'],
   'producto_clientes':                 ['id_cliente','cliente','fin_ventas_netas_sin_iva','vol_unidades_vendidas'],
-  'zeffi_facturas_venta_encabezados':  ['fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
+  'zeffi_facturas_venta_encabezados':  ['id_numeracion','fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
 }
 
 function colsFromData(data, tabla) {
@@ -203,6 +203,7 @@ function colsFromData(data, tabla) {
 }
 
 function labelFromKey(key) {
+  if (key === 'id_numeracion') return 'No Fac'
   return key.replace(/^_pk$/, 'N°').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     .replace(/^Fin /, '').replace(/^Vol /, '').replace(/^Cli /, '').replace(/^Cto /, '').trim()
 }

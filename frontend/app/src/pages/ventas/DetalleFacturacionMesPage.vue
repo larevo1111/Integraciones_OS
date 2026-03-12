@@ -240,7 +240,7 @@
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
             <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
-              @row-dblclick="row => router.push(`/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`)" />
+              @row-dblclick="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'mes' } })" />
           </div>
         </div>
 
@@ -331,12 +331,13 @@ const DEFAULT_VISIBLE = {
   'resumen_ventas_facturas_canal_mes':   ['mes','canal','fin_ventas_netas_sin_iva','fin_pct_del_mes','vol_num_facturas','cli_clientes_activos','top_cliente','con_consignacion_pp'],
   'resumen_ventas_facturas_cliente_mes': ['mes','cliente','ciudad','canal','fin_ventas_netas_sin_iva','vol_num_facturas','cli_es_nuevo','top_producto_nombre'],
   'resumen_ventas_facturas_producto_mes':['mes','cod_articulo','nombre','categoria','fin_ventas_netas_sin_iva','fin_pct_del_mes','vol_unidades_vendidas','cli_clientes_activos'],
-  'zeffi_facturas_venta_encabezados':    ['fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
+  'zeffi_facturas_venta_encabezados':    ['id_numeracion','fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
   'zeffi_cotizaciones_ventas_encabezados': ['fecha_de_creacion','id_cotizacion','cliente','ciudad','vendedor','total_bruto','descuentos','total_neto','estado_cotizacion','estado'],
   'zeffi_remisiones_venta_encabezados':  ['fecha_de_creacion','id_remision','cliente','ciudad','vendedor','total_neto','estado_remision','estado_cxc','dias_mora'],
 }
 
 function labelFromKey(key) {
+  if (key === 'id_numeracion') return 'No Fac'
   return key
     .replace(/^_pk$/, 'N°')
     .replace(/_/g, ' ')
