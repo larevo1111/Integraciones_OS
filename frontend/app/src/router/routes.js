@@ -14,8 +14,12 @@ const routes = [
       { path: 'terceros/empleados',   component: () => import('pages/PlaceholderPage.vue') },
 
       // Ventas
-      { path: 'ventas/resumen-facturacion',  component: () => import('pages/ventas/ResumenFacturacionPage.vue') },
-      { path: 'ventas/detalle-mes/:mes',     component: () => import('pages/ventas/DetalleFacturacionMesPage.vue') },
+      { path: 'ventas/resumen-facturacion',                      component: () => import('pages/ventas/ResumenFacturacionPage.vue') },
+      { path: 'ventas/detalle-mes/:mes',                         component: () => import('pages/ventas/DetalleFacturacionMesPage.vue') },
+      { path: 'ventas/detalle-cliente/:mes/:id_cliente',         component: () => import('pages/ventas/DetalleClienteMesPage.vue') },
+      { path: 'ventas/detalle-canal/:mes/:canal',                component: () => import('pages/ventas/DetalleCanalMesPage.vue') },
+      { path: 'ventas/detalle-producto/:mes/:cod_articulo',      component: () => import('pages/ventas/DetalleProductoMesPage.vue') },
+      { path: 'ventas/detalle-factura/:id_interno/:id_numeracion', component: () => import('pages/ventas/DetalleFacturaPage.vue') },
       { path: 'ventas/resumen-remisiones',  component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/consignacion',        component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/pedidos-pendientes',  component: () => import('pages/PlaceholderPage.vue') },
