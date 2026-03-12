@@ -175,7 +175,7 @@ app.get('/api/ventas/cliente-productos', async (req, res) => {
              COUNT(DISTINCT d.id_interno) AS vol_num_facturas
       FROM zeffi_facturas_venta_detalle d
       WHERE d.id_cliente = ?`
-    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
     sql += ` GROUP BY d.cod_articulo, d.nombre_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
     const rows = await query(sql, params)
     res.json(rows)
@@ -195,7 +195,7 @@ app.get('/api/ventas/canal-clientes', async (req, res) => {
              SUM(d.cantidad) AS vol_unidades_vendidas
       FROM zeffi_facturas_venta_detalle d
       WHERE d.marketing_cliente = ?`
-    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
     sql += ` GROUP BY d.id_cliente, d.cliente ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
     const rows = await query(sql, params)
     res.json(rows)
@@ -215,7 +215,7 @@ app.get('/api/ventas/canal-productos', async (req, res) => {
              COUNT(DISTINCT d.id_interno) AS vol_num_facturas
       FROM zeffi_facturas_venta_detalle d
       WHERE d.marketing_cliente = ?`
-    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
     sql += ` GROUP BY d.cod_articulo, d.nombre_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
     const rows = await query(sql, params)
     res.json(rows)
@@ -271,7 +271,7 @@ app.get('/api/ventas/producto-canales', async (req, res) => {
              COUNT(DISTINCT d.id_cliente) AS cli_clientes_activos
       FROM zeffi_facturas_venta_detalle d
       WHERE d.cod_articulo = ?`
-    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
     sql += ` GROUP BY d.marketing_cliente ORDER BY fin_ventas_netas_sin_iva DESC`
     const rows = await query(sql, params)
     res.json(rows)
@@ -290,7 +290,7 @@ app.get('/api/ventas/producto-clientes', async (req, res) => {
              SUM(d.cantidad) AS vol_unidades_vendidas
       FROM zeffi_facturas_venta_detalle d
       WHERE d.cod_articulo = ?`
-    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
     sql += ` GROUP BY d.id_cliente, d.cliente ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 300`
     const rows = await query(sql, params)
     res.json(rows)
@@ -324,7 +324,7 @@ app.get('/api/ventas/factura/:id_interno/:id_numeracion', async (req, res) => {
       [id_interno, id_numeracion]
     )
     const items = await query(
-      `SELECT * FROM zeffi_facturas_venta_detalle WHERE id_interno = ? AND id_numeracion = ? ORDER BY id_item`,
+      `SELECT * FROM zeffi_facturas_venta_detalle WHERE id_interno = ? AND id_numeracion = ?`,
       [id_interno, id_numeracion]
     )
     res.json({ encabezado: encabezado || null, items })
