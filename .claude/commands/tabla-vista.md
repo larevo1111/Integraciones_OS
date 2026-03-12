@@ -6,6 +6,16 @@
 
 ---
 
+## ⚠️ BUILD OBLIGATORIO
+
+Después de cualquier cambio en `.vue`, `.js` del frontend, ejecutar:
+```bash
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/frontend/app && npx quasar build
+```
+El servidor sirve `dist/spa/`. Sin rebuild, los cambios NO aparecen.
+
+---
+
 ## 1. COMPONENTE REUTILIZABLE: `OsDataTable.vue`
 
 Ubicación: `frontend/app/src/components/OsDataTable.vue`
@@ -16,16 +26,17 @@ Ubicación: `frontend/app/src/components/OsDataTable.vue`
 |---|---|---|
 | `title` | String | Título que aparece en la toolbar izquierda |
 | `rows` | Array | Array de objetos con los datos |
-| `columns` | Array | Definición de columnas (ver formato abajo) |
+| `columns` | Array | Definición de columnas `{key, label, visible}` |
 | `loading` | Boolean | Muestra skeleton rows cuando es true |
 | `recurso` | String | Slug para el endpoint de export (ej: `'resumen-mes'`) |
-| `mes` | String | Mes seleccionado para drill-down (`'2026-02'`) |
+| `mes` | String | Mes seleccionado para export filtrado (`'2026-02'`) |
 
 ### Eventos
 
 | Evento | Payload | Cuándo |
 |---|---|---|
-| `row-click` | `row` (objeto) | Al hacer clic en una fila |
+| `row-click` | objeto fila | Clic simple en una fila |
+| `row-dblclick` | objeto fila | Doble clic en una fila |
 
 ### Formato de columnas
 
@@ -37,15 +48,37 @@ const columnas = ref([
 ])
 ```
 
-Las columnas se pueden cargar dinámicamente desde la API:
+Las columnas se cargan dinámicamente desde la API:
 ```javascript
-const { data: cols } = await axios.get(`${API}/columnas/nombre_tabla`)
+const { data: cols } = await axios.get(`/api/columnas/nombre_tabla`)
 columnas.value = cols.map(key => ({
   key,
-  label: labelFromKey(key),   // función helper que convierte snake_case a legible
+  label: labelFromKey(key),
   visible: DEFAULT_VISIBLE.includes(key)
 }))
 ```
+
+### Selección de filas — cómo funciona `isSelected`
+- Si la fila seleccionada tiene `_pk` → compara por `_pk`
+- Si tiene `_key` → compara por `_key` (tablas compuestas `mes|col`)
+- Si tiene `mes` → compara por `mes`
+
+**Importante**: si se quieren usar `_pk` o `_key` como identificadores sin mostrarlos, incluirlos en `columns` con `visible: false`.
+
+### Formateo automático de celdas
+| Patrón de key | Formato |
+|---|---|
+| `*_pct*` o `*_margen*` | `(n * 100).toFixed(1) + '%'` — valores en BD son 0–1 |
+| `fin_*`, `cto_*`, `car_*`, `*ventas*`, `*ticket*`, `*costo*`, `*utilidad*` | `$` + `toLocaleString('es-CO', {maximumFractionDigits: 0})` |
+| `null` o `undefined` | `'—'` |
+
+### Popups (Filtrar / Campos / Exportar)
+**Bug crítico evitado**: los botones del toolbar usan `@click.stop` para evitar que el click burbujee al `document` y el `handleOutsideClick` cierre el popup de inmediato.
+
+Los popups siguen el estilo Linear.app:
+- **Filtrar**: filas [campo ▾] [op ▾] [valor] [×] + footer "Añadir filtro / Limpiar todo"
+- **Campos**: pills clicables (violeta = visible, gris = oculto) + "Mostrar todos / Ocultar todos"
+- **Exportar**: 3 filas limpias con ícono + label + descripción corta
 
 ---
 
@@ -55,7 +88,7 @@ columnas.value = cols.map(key => ({
 
 ```vue
 <template>
-  <div class="page-wrap">          <!-- min-height:100%, NO height:100% -->
+  <div class="page-wrap">
 
     <!-- HEADER fijo: breadcrumb + título + badges de filtros activos -->
     <div class="page-header">
@@ -67,7 +100,6 @@ columnas.value = cols.map(key => ({
         </div>
         <div class="page-title-row">
           <h1 class="page-title">Nombre Vista</h1>
-          <!-- Badge de selección activa (ej: mes seleccionado) -->
           <div v-if="seleccion" class="sel-badge">
             <span>{{ seleccion }}</span>
             <button @click="seleccion = null"><XIcon :size="11" /></button>
@@ -78,13 +110,15 @@ columnas.value = cols.map(key => ({
 
     <!-- CONTENT: sin overflow-y propio, deja que main-area scrollee -->
     <div class="page-content">
-      <!-- Tabla principal -->
-      <OsDataTable ... @row-click="onRowClick" />
+      <OsDataTable
+        ...
+        @row-click="onRowClick"
+        @row-dblclick="onRowDblclick"
+      />
 
-      <!-- Acordeones de detalle -->
       <div class="acordeones">
         <div class="acordeon">
-          <button class="acordeon-header" @click="toggle('detalle')">
+          <button class="acordeon-header" @click="toggleAcordeon('detalle')">
             <div class="ac-left">
               <ChevronRightIcon :size="14" class="ac-chevron" :class="{open: abiertos.detalle}" />
               <span class="ac-title">Título acordeón</span>
@@ -103,186 +137,215 @@ columnas.value = cols.map(key => ({
 </template>
 ```
 
-### CSS obligatorio para toda vista con tablas
+### CSS obligatorio para toda vista
 
 ```css
-/* CRÍTICO: min-height no height — permite que el contenido crezca */
-.page-wrap { display: flex; flex-direction: column; min-height: 100%; background: var(--bg-app); }
-
-/* CRÍTICO: SIN overflow-y ni flex:1 — el scroll lo maneja main-area del layout */
+.page-wrap    { display: flex; flex-direction: column; min-height: 100%; background: var(--bg-app); }
+/* CRÍTICO: SIN overflow-y ni height — el scroll lo maneja main-area del layout */
 .page-content { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
 
-/* Page header */
-.page-header {
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-app);
-  padding: 0 24px;
-  flex-shrink: 0;
-}
+.page-header       { border-bottom: 1px solid var(--border-subtle); background: var(--bg-app); padding: 0 24px; flex-shrink: 0; }
 .page-header-inner { padding: 16px 0 12px; }
-.breadcrumb { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; }
-.bc-current { color: var(--text-secondary); }
-.page-title-row { display: flex; align-items: center; gap: 12px; }
-.page-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.breadcrumb        { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; }
+.bc-current        { color: var(--text-secondary); }
+.page-title-row    { display: flex; align-items: center; gap: 12px; }
+.page-title        { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
 
-/* Badge de selección (mes, canal, etc.) */
+/* Badge de selección activa */
 .sel-badge {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px 3px 7px;
-  border-radius: var(--radius-full);
+  padding: 3px 8px 3px 7px; border-radius: var(--radius-full);
   background: var(--accent-muted); border: 1px solid var(--accent-border);
   font-size: 12px; font-weight: 500; color: var(--accent);
 }
 
 /* Acordeones */
-.acordeones { display: flex; flex-direction: column; gap: 8px; }
-.acordeon { border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-card); }
-.acordeon-header {
+.acordeones       { display: flex; flex-direction: column; gap: 8px; }
+.acordeon         { border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-card); }
+.acordeon-header  {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; padding: 0 14px; height: 42px;
   border: none; background: transparent; cursor: pointer;
   transition: background 80ms; font-family: var(--font-sans);
 }
 .acordeon-header:hover { background: var(--bg-card-hover); }
-.ac-left { display: flex; align-items: center; gap: 8px; }
-.ac-chevron { color: var(--text-tertiary); transition: transform 150ms ease-out; }
+.ac-left     { display: flex; align-items: center; gap: 8px; }
+.ac-chevron  { color: var(--text-tertiary); transition: transform 150ms ease-out; }
 .ac-chevron.open { transform: rotate(90deg); }
-.ac-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.ac-mes-tag { font-size: 11px; font-weight: 500; color: var(--accent); background: var(--accent-muted); border: 1px solid var(--accent-border); padding: 1px 7px; border-radius: var(--radius-full); }
-.ac-count { font-size: 12px; color: var(--text-tertiary); }
+.ac-title    { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.ac-mes-tag  { font-size: 11px; font-weight: 500; color: var(--accent); background: var(--accent-muted); border: 1px solid var(--accent-border); padding: 1px 7px; border-radius: var(--radius-full); }
+.ac-count    { font-size: 12px; color: var(--text-tertiary); }
 .acordeon-body { border-top: 1px solid var(--border-subtle); }
 ```
 
 ---
 
-## 3. TOOLBAR DE TABLA (estilo Linear)
-
-La toolbar del `OsDataTable` replica exactamente el estilo de Linear.app:
-
-```
-[Título de la tabla]  [N]          [⚡ Filtrar] [≡ Campos] [↓ Exportar]
-```
-
-- **Izquierda**: título + badge con conteo de filas
-- **Derecha**: 3 botones con borde `1px solid var(--border-default)`
-- **Activo (Filtrar con filtros)**: badge púrpura con conteo + borde `var(--accent-border)`
-
-### Botones toolbar
-
-```css
-.toolbar-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 28px; padding: 0 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: transparent;
-  font-size: 12px; font-weight: 500; color: var(--text-secondary);
-  cursor: pointer; transition: background 80ms, color 80ms;
-}
-.toolbar-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-strong); }
-.toolbar-btn.active { color: var(--accent); border-color: var(--accent-border); background: var(--accent-muted); }
-```
-
----
-
-## 4. POPUP DE FILTROS
-
-Aparece debajo del botón Filtrar. Permite agregar condiciones:
-
-```
-[campo ▾] [operador ▾] [valor___________] [×]
-[+ Añadir filtro]                  [Limpiar]
-```
-
-**Operadores disponibles**: `contiene`, `igual a`, `mayor o igual`, `menor o igual`
-**Posición**: `position: absolute; top: calc(100% + 6px); right: 0; z-index: 200`
-**Ancho mínimo**: 420px
-
----
-
-## 5. POPUP DE CAMPOS
-
-Lista de checkboxes para mostrar/ocultar columnas:
-
-```
-[✓] Mes
-[✓] Ventas Netas Sin IVA
-[ ] Ventas Brutas
-[✓] Núm. Facturas
-...
-[Mostrar todos]  [Ocultar todos]
-```
-
-**Ancho mínimo**: 220px
-
----
-
-## 6. POPUP DE EXPORTAR
-
-```
-[📄] CSV — Separado por comas
-[📊] Excel — Archivo .xlsx
-[📋] PDF — Documento PDF
-```
-
-Llama a `GET /api/export/:recurso?format=csv|xlsx|pdf&mes=...&fields=[...]`
-
----
-
-## 7. FORMATO DE CELDAS (función `formatCell`)
-
-| Patrón de key | Formato |
-|---|---|
-| `*_pct*` o `*_margen*` | `(n * 100).toFixed(1) + '%'` — los valores en BD son 0–1 |
-| `fin_*`, `cto_*`, `car_*`, `*ventas*`, `*ticket*` | `$` + `toLocaleString('es-CO', {maximumFractionDigits: 0})` |
-| `null` o `undefined` | `'—'` |
-| Resto | valor tal cual |
-
----
-
-## 8. DRILL-DOWN POR SELECCIÓN DE FILA
-
-Patrón estándar:
+## 3. PATRÓN: DRILL-DOWN POR FILA (click) + NAVEGACIÓN (doble click)
 
 ```javascript
+import { useRouter } from 'vue-router'
+const router = useRouter()
+
 const seleccion = ref(null)
 
+// Click simple: selecciona/deselecciona → filtra acordeones
 function onRowClick(row) {
-  // Toggle: clic en la misma fila la deselecciona
   seleccion.value = row.campo_id === seleccion.value ? null : row.campo_id
 }
 
-// Watcher: cuando cambia la selección, recargar datos de los acordeones abiertos
+// Doble click: navega a vista de detalle
+function onRowDblclick(row) {
+  router.push(`/modulo/detalle/${row.campo_id}`)
+}
+
+// Watcher: recarga acordeones abiertos cuando cambia la selección
 watch(seleccion, () => {
-  loadDetalle1()
-  loadDetalle2()
+  if (abiertos.value.detalle) loadDetalle()
 })
 ```
 
-En los loaders, usar la selección como filtro:
+---
+
+## 4. PATRÓN: VISTA DE DETALLE CON KPI CARDS
+
+Para vistas de detalle de un ítem (ej: detalle de un mes), usar tarjetas KPI agrupadas por tema.
+
+### Estructura de grupos KPI
+
+```vue
+<div class="kpi-section">
+  <div class="kpi-section-label">Financiero</div>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <span class="kpi-label">Ventas Netas s/IVA</span>
+      <span class="kpi-value">{{ fmt$(kpi.fin_ventas_netas_sin_iva) }}</span>
+    </div>
+    <!-- más cards... -->
+  </div>
+</div>
+```
+
+### CSS para KPI Cards
+
+```css
+.kpi-section       { display: flex; flex-direction: column; gap: 8px; }
+.kpi-section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-tertiary); }
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.kpi-label  { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-value  { font-size: 20px; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
+.kpi-pos    { color: var(--color-success); }
+.kpi-neg    { color: var(--color-error); }
+.kpi-warn   { color: var(--color-warning); }
+```
+
+### Formatters estándar para KPIs
+
 ```javascript
-const params = seleccion.value ? { filtro: seleccion.value } : {}
-const { data } = await axios.get(`${API}/endpoint`, { params })
+function fmt$(v)   { const n = parseFloat(v); return isNaN(n) ? '—' : '$' + n.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }
+function fmtPct(v) { const n = parseFloat(v); return isNaN(n) ? '—' : (n * 100).toFixed(1) + '%' }
+function fmtNum(v) { const n = parseFloat(v); return isNaN(n) ? '—' : n.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }
 ```
 
 ---
 
-## 9. ERRORES FRECUENTES — NO REPETIR
+## 5. AGRUPACIÓN DE CAMPOS POR PREFIJO (tabla `resumen_ventas_facturas_mes`)
 
-| Error | Causa | Solución |
+| Prefijo | Grupo | Descripción |
 |---|---|---|
-| Tabla principal se oculta al abrir acordeón | `.page-content` tiene `height` fija + `overflow-y: auto` | Usar `min-height` y quitar `overflow-y` de `.page-content` |
-| Scroll no funciona | Scroll en `.page-content` en lugar de `.main-area` | El único scroll es en `MainLayout.vue > .main-area` |
-| Popups no cierran | Sin listener `click` en document | `onMounted(() => document.addEventListener('click', handleOutsideClick))` |
-| Exportar abre misma pestaña | `window.location = url` | Usar `window.open(url, '_blank')` |
+| `fin_*` | Financiero | Ventas brutas, netas, devoluciones, ingresos |
+| `vol_*` | Volumen | Num facturas, ticket, unidades |
+| `cli_*` | Clientes | Activos, nuevos, venta por cliente |
+| `cto_*` | Costo/Margen | Utilidad, margen, costo total |
+| `car_*` | Cartera | Saldo CxC |
+| `pry_*` | Proyección | Proyección mes, ritmo (solo mes corriente) |
+| `ant_*` | Año anterior | Ventas ant., variación, consignación ant. |
+| `top_*` | Top del mes | Canal, cliente, producto top |
+| `cat_*` | Catálogo | Num canales, referencias, venta/referencia |
+| `con_*` | Consignación | Consignación PP |
+
+Los valores `_pct` van de 0 a 1 → multiplicar por 100 para mostrar.
 
 ---
 
-## 10. EJEMPLO COMPLETO: vista Resumen Facturación
+## 6. CARGA LAZY DE ACORDEONES (patrón óptimo)
 
-Referencia: `frontend/app/src/pages/ventas/ResumenFacturacionPage.vue`
+```javascript
+const abiertos = ref({ canal: false, facturas: false })
 
-- Tabla principal: `resumen_ventas_facturas_mes` (15 meses)
-- 4 acordeones: canal, cliente, producto, facturas del mes
-- Drill-down: clic en fila de mes → filtra los 4 acordeones
-- Badge en título: muestra el mes seleccionado con botón para limpiar
+async function toggleAcordeon(key) {
+  abiertos.value[key] = !abiertos.value[key]
+  if (!abiertos.value[key]) return    // solo cargar al abrir, nunca al cerrar
+
+  const loaders = {
+    canal:    () => load(`/api/ventas/resumen-canal`,  resCanal,    loadingCanal),
+    facturas: () => load(`/api/ventas/facturas`,       resFacturas, loadingFacturas),
+  }
+  if (loaders[key]) loaders[key]()
+}
+
+async function load(url, dataRef, loadingRef) {
+  if (loadingRef.value) return        // evitar doble carga
+  loadingRef.value = true
+  try {
+    const { data } = await axios.get(url, { params: { mes: mesActivo } })
+    dataRef.value = data
+  } finally { loadingRef.value = false }
+}
+```
+
+---
+
+## 7. ENDPOINTS DE LA API
+
+Ver skill `/erp-frontend` para la lista completa de endpoints.
+Endpoints de tablas de encabezado con filtro `?mes=YYYY-MM`:
+
+| Endpoint | Tabla |
+|---|---|
+| `GET /api/ventas/resumen-mes` | `resumen_ventas_facturas_mes` |
+| `GET /api/ventas/resumen-canal` | `resumen_ventas_facturas_canal_mes` |
+| `GET /api/ventas/resumen-cliente` | `resumen_ventas_facturas_cliente_mes` |
+| `GET /api/ventas/resumen-producto` | `resumen_ventas_facturas_producto_mes` |
+| `GET /api/ventas/facturas` | `zeffi_facturas_venta_encabezados` |
+| `GET /api/ventas/cotizaciones` | `zeffi_cotizaciones_ventas_encabezados` |
+| `GET /api/ventas/remisiones` | `zeffi_remisiones_venta_encabezados` |
+
+Todas usan `LEFT(fecha_de_creacion, 7) = ?mes` para filtrar (campo es TEXT `'YYYY-MM-DD HH:MM:SS'`).
+
+---
+
+## 8. ERRORES FRECUENTES — NO REPETIR
+
+| Error | Causa | Solución |
+|---|---|---|
+| Popups no aparecen | Botones del toolbar sin `@click.stop` | Siempre usar `@click.stop` en los 3 botones de toolbar |
+| Tabla principal se oculta al abrir acordeón | `.page-content` con `height` fija + `overflow-y: auto` | Usar `min-height` y quitar `overflow-y` de `.page-content` |
+| Scroll no funciona | Scroll en `.page-content` | El único scroll es en `MainLayout.vue > .main-area` |
+| Toda la tabla se selecciona | `isSelected` compara `undefined === undefined` | Ver el patrón actual en OsDataTable — siempre comparar con PK del item seleccionado |
+| Exportar abre misma pestaña | `window.location = url` | Usar `window.open(url, '_blank')` |
+| Cambios no se ven | Falta rebuild Quasar | `cd frontend/app && npx quasar build` |
+
+---
+
+## 9. PÁGINAS EXISTENTES
+
+| Página | Ruta | Archivo |
+|---|---|---|
+| Resumen Facturación | `/ventas/resumen-facturacion` | `pages/ventas/ResumenFacturacionPage.vue` |
+| Detalle Mes Facturación | `/ventas/detalle-mes/:mes` | `pages/ventas/DetalleFacturacionMesPage.vue` |
+
+### Flujo de navegación
+- Clic en fila de mes → selecciona mes, filtra acordeones en la misma página
+- Doble clic en fila de mes → navega a `/ventas/detalle-mes/YYYY-MM`
+- Breadcrumb en detalle → navega de vuelta al resumen

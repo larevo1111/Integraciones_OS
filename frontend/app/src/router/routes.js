@@ -14,7 +14,8 @@ const routes = [
       { path: 'terceros/empleados',   component: () => import('pages/PlaceholderPage.vue') },
 
       // Ventas
-      { path: 'ventas/resumen-facturacion', component: () => import('pages/ventas/ResumenFacturacionPage.vue') },
+      { path: 'ventas/resumen-facturacion',  component: () => import('pages/ventas/ResumenFacturacionPage.vue') },
+      { path: 'ventas/detalle-mes/:mes',     component: () => import('pages/ventas/DetalleFacturacionMesPage.vue') },
       { path: 'ventas/resumen-remisiones',  component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/consignacion',        component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/pedidos-pendientes',  component: () => import('pages/PlaceholderPage.vue') },

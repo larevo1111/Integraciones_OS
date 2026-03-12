@@ -130,6 +130,7 @@
               class="data-row"
               :class="{ selected: isSelected(row) }"
               @click="selectRow(row)"
+              @dblclick="emit('row-dblclick', row)"
             >
               <td v-for="col in visibleColumns" :key="col.key" class="td">
                 <span class="cell-value">{{ formatCell(row[col.key], col.key) }}</span>
@@ -174,7 +175,7 @@ const props = defineProps({
   mes:     { type: String,  default: '' },
 })
 
-const emit = defineEmits(['row-click'])
+const emit = defineEmits(['row-click', 'row-dblclick'])
 
 // ── Columnas locales (copia para mutar visible) ──────
 const localColumns = ref([])

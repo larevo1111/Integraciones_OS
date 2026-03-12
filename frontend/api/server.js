@@ -140,6 +140,28 @@ app.get('/api/ventas/facturas', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Cotizaciones por mes
+app.get('/api/ventas/cotizaciones', async (req, res) => {
+  try {
+    const filters = req.query.filters ? JSON.parse(req.query.filters) : []
+    if (req.query.mes) filters.push({ field: 'fecha_de_creacion', op: 'mes', value: req.query.mes })
+    const { sql, params } = buildWhere(filters)
+    const rows = await query(`SELECT * FROM zeffi_cotizaciones_ventas_encabezados${sql} ORDER BY fecha_de_creacion DESC LIMIT 500`, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Remisiones por mes
+app.get('/api/ventas/remisiones', async (req, res) => {
+  try {
+    const filters = req.query.filters ? JSON.parse(req.query.filters) : []
+    if (req.query.mes) filters.push({ field: 'fecha_de_creacion', op: 'mes', value: req.query.mes })
+    const { sql, params } = buildWhere(filters)
+    const rows = await query(`SELECT * FROM zeffi_remisiones_venta_encabezados${sql} ORDER BY fecha_de_creacion DESC LIMIT 500`, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Columnas de una tabla
 app.get('/api/columnas/:tabla', async (req, res) => {
   try {
@@ -161,7 +183,9 @@ app.get('/api/export/:recurso', async (req, res) => {
       'resumen-canal':    { tabla: 'resumen_ventas_facturas_canal_mes',    order: 'mes DESC' },
       'resumen-cliente':  { tabla: 'resumen_ventas_facturas_cliente_mes',  order: 'mes DESC' },
       'resumen-producto': { tabla: 'resumen_ventas_facturas_producto_mes', order: 'mes DESC' },
-      'facturas':         { tabla: 'zeffi_facturas_venta_encabezados',     order: 'fecha_de_creacion DESC' },
+      'facturas':         { tabla: 'zeffi_facturas_venta_encabezados',          order: 'fecha_de_creacion DESC' },
+      'cotizaciones':     { tabla: 'zeffi_cotizaciones_ventas_encabezados',     order: 'fecha_de_creacion DESC' },
+      'remisiones':       { tabla: 'zeffi_remisiones_venta_encabezados',        order: 'fecha_de_creacion DESC' },
     }
     if (!MAP[recurso]) return res.status(404).json({ error: 'recurso no encontrado' })
 

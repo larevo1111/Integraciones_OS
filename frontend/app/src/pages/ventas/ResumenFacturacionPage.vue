@@ -36,6 +36,7 @@
         :loading="loadingMes"
         :mes="mesSel"
         @row-click="onMesClick"
+        @row-dblclick="onMesDblclick"
       />
 
       <!-- ── ACORDEONES ── -->
@@ -137,9 +138,12 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ChevronRightIcon, CalendarIcon, XIcon } from 'lucide-vue-next'
 import OsDataTable from 'src/components/OsDataTable.vue'
+
+const router = useRouter()
 
 const API = '/api'
 
@@ -250,9 +254,12 @@ async function loadFacturas() {
   } finally { loadingFacturas.value = false }
 }
 
-// ── Click en fila de resumen-mes ─────────────────────
+// ── Click / doble click en resumen-mes ───────────────
 function onMesClick(row) {
   mesSel.value = row.mes === mesSel.value ? null : row.mes
+}
+function onMesDblclick(row) {
+  router.push(`/ventas/detalle-mes/${row.mes}`)
 }
 
 // ── Watchers ──────────────────────────────────────────
