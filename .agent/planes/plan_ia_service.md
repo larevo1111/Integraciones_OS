@@ -29,7 +29,7 @@
 - **Gemini 2.5 Flash** es un modelo "thinking" — usa hasta 15 tokens internos antes de responder. Para el enrutador se usan 200 max_tokens mínimo para que siempre responda.
 - **Fallback de agente**: si el agente preferido del tipo no tiene API key, el servicio busca automáticamente el primero activo con key configurada.
 - **Fallback de enrutamiento**: si Groq no tiene key, usa Gemini. Si ninguno tiene key, retorna `analisis_datos`.
-- **API key activa**: `AIzaSyAz_p6dUizoQX6gzV6124CTVZVIm9mOyUw` (proyecto SOS_ERP). La primera key del bot_telegram tenía quota agotada.
+- **API key activa**: guardada SOLO en BD `ia_service_os.ia_agentes` y en `scripts/.env` (en .gitignore). NUNCA en archivos del repo.
 - **Puerto 5100**: systemd `ia-service.service` — activo y habilitado en boot.
 
 ## Pendiente (para completar con keys de Groq/DeepSeek/Claude)

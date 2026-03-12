@@ -187,7 +187,7 @@ ResumenFacturacionPage (todos los meses)
 ### Agentes configurados
 | slug | modelo | tipo | Estado |
 |---|---|---|---|
-| `gemini-flash` | gemini-2.5-flash | free | ✅ Activo (key: `AIzaSyAz_...`) |
+| `gemini-flash` | gemini-2.5-flash | free | ✅ Activo (key en BD + .env solamente) |
 | `gemini-flash-lite` | gemini-2.5-flash | free | ✅ Activo (misma key) |
 | `deepseek-chat` | deepseek-chat | free* | 🔲 Pendiente key: platform.deepseek.com |
 | `deepseek-reasoner` | deepseek-reasoner | premium | 🔲 Pendiente (misma key que deepseek-chat) |
