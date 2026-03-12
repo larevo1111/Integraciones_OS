@@ -278,7 +278,8 @@ def _enrutar(pregunta: str) -> str:
     Prefiere Groq (velocidad), fallback a Gemini, fallback a 'analisis_datos'.
     """
     agente_cfg = None
-    for slug in ('groq-llama', 'gemini-flash', 'gemini-flash-lite'):
+    # Orden: primero los de mayor RPD (groq 14400, gemma 14400), luego los más restrictivos
+    for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
         cand = _cargar_agente(slug)
         if cand and cand.get('api_key'):
             agente_cfg = cand
