@@ -162,6 +162,175 @@ app.get('/api/ventas/remisiones', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ── DETALLE CLIENTE: productos comprados en un mes ────
+app.get('/api/ventas/cliente-productos', async (req, res) => {
+  try {
+    const { mes, id_cliente } = req.query
+    if (!id_cliente) return res.status(400).json({ error: 'id_cliente requerido' })
+    const params = [id_cliente]
+    let sql = `
+      SELECT d.cod_articulo, d.nombre_articulo AS nombre,
+             SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
+             SUM(d.cantidad) AS vol_unidades_vendidas,
+             COUNT(DISTINCT d.id_interno) AS vol_num_facturas
+      FROM zeffi_facturas_venta_detalle d
+      WHERE d.id_cliente = ?`
+    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` GROUP BY d.cod_articulo, d.nombre_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE CANAL: clientes del canal en un mes ───────
+app.get('/api/ventas/canal-clientes', async (req, res) => {
+  try {
+    const { mes, canal } = req.query
+    if (!canal) return res.status(400).json({ error: 'canal requerido' })
+    const params = [canal]
+    let sql = `
+      SELECT d.id_cliente, d.cliente,
+             SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
+             COUNT(DISTINCT d.id_interno) AS vol_num_facturas,
+             SUM(d.cantidad) AS vol_unidades_vendidas
+      FROM zeffi_facturas_venta_detalle d
+      WHERE d.marketing_cliente = ?`
+    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` GROUP BY d.id_cliente, d.cliente ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE CANAL: productos del canal en un mes ──────
+app.get('/api/ventas/canal-productos', async (req, res) => {
+  try {
+    const { mes, canal } = req.query
+    if (!canal) return res.status(400).json({ error: 'canal requerido' })
+    const params = [canal]
+    let sql = `
+      SELECT d.cod_articulo, d.nombre_articulo AS nombre,
+             SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
+             SUM(d.cantidad) AS vol_unidades_vendidas,
+             COUNT(DISTINCT d.id_interno) AS vol_num_facturas
+      FROM zeffi_facturas_venta_detalle d
+      WHERE d.marketing_cliente = ?`
+    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` GROUP BY d.cod_articulo, d.nombre_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE CANAL: facturas del canal en un mes ───────
+app.get('/api/ventas/canal-facturas', async (req, res) => {
+  try {
+    const { mes, canal } = req.query
+    if (!canal) return res.status(400).json({ error: 'canal requerido' })
+    const params = [canal]
+    let sql = `
+      SELECT DISTINCT e.*
+      FROM zeffi_facturas_venta_encabezados e
+      JOIN zeffi_facturas_venta_detalle d ON d.id_interno = e.id_interno AND d.id_numeracion = e.id_numeracion
+      WHERE d.marketing_cliente = ?`
+    if (mes) { sql += ` AND LEFT(e.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` ORDER BY e.fecha_de_creacion DESC LIMIT 500`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE CANAL: remisiones del canal en un mes ─────
+app.get('/api/ventas/canal-remisiones', async (req, res) => {
+  try {
+    const { mes, canal } = req.query
+    if (!canal) return res.status(400).json({ error: 'canal requerido' })
+    const params = [canal]
+    let sql = `
+      SELECT DISTINCT e.*
+      FROM zeffi_remisiones_venta_encabezados e
+      JOIN zeffi_remisiones_venta_detalle d ON d.id_remision = e.id_remision
+      WHERE d.tipo_de_marketing_cliente = ?`
+    if (mes) { sql += ` AND LEFT(e.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` ORDER BY e.fecha_de_creacion DESC LIMIT 500`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE PRODUCTO: canales del producto en un mes ──
+app.get('/api/ventas/producto-canales', async (req, res) => {
+  try {
+    const { mes, cod_articulo } = req.query
+    if (!cod_articulo) return res.status(400).json({ error: 'cod_articulo requerido' })
+    const params = [cod_articulo]
+    let sql = `
+      SELECT d.marketing_cliente AS canal,
+             SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
+             SUM(d.cantidad) AS vol_unidades_vendidas,
+             COUNT(DISTINCT d.id_cliente) AS cli_clientes_activos
+      FROM zeffi_facturas_venta_detalle d
+      WHERE d.cod_articulo = ?`
+    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` GROUP BY d.marketing_cliente ORDER BY fin_ventas_netas_sin_iva DESC`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE PRODUCTO: clientes del producto en un mes ─
+app.get('/api/ventas/producto-clientes', async (req, res) => {
+  try {
+    const { mes, cod_articulo } = req.query
+    if (!cod_articulo) return res.status(400).json({ error: 'cod_articulo requerido' })
+    const params = [cod_articulo]
+    let sql = `
+      SELECT d.id_cliente, d.cliente,
+             SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
+             SUM(d.cantidad) AS vol_unidades_vendidas
+      FROM zeffi_facturas_venta_detalle d
+      WHERE d.cod_articulo = ?`
+    if (mes) { sql += ` AND LEFT(d.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` GROUP BY d.id_cliente, d.cliente ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 300`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE PRODUCTO: facturas del producto en un mes ─
+app.get('/api/ventas/producto-facturas', async (req, res) => {
+  try {
+    const { mes, cod_articulo } = req.query
+    if (!cod_articulo) return res.status(400).json({ error: 'cod_articulo requerido' })
+    const params = [cod_articulo]
+    let sql = `
+      SELECT DISTINCT e.*
+      FROM zeffi_facturas_venta_encabezados e
+      JOIN zeffi_facturas_venta_detalle d ON d.id_interno = e.id_interno AND d.id_numeracion = e.id_numeracion
+      WHERE d.cod_articulo = ?`
+    if (mes) { sql += ` AND LEFT(e.fecha_de_creacion, 7) = ?`; params.push(mes) }
+    sql += ` ORDER BY e.fecha_de_creacion DESC LIMIT 500`
+    const rows = await query(sql, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── DETALLE FACTURA: encabezado + ítems ───────────────
+app.get('/api/ventas/factura/:id_interno/:id_numeracion', async (req, res) => {
+  try {
+    const { id_interno, id_numeracion } = req.params
+    const [encabezado] = await query(
+      `SELECT * FROM zeffi_facturas_venta_encabezados WHERE id_interno = ? AND id_numeracion = ?`,
+      [id_interno, id_numeracion]
+    )
+    const items = await query(
+      `SELECT * FROM zeffi_facturas_venta_detalle WHERE id_interno = ? AND id_numeracion = ? ORDER BY id_item`,
+      [id_interno, id_numeracion]
+    )
+    res.json({ encabezado: encabezado || null, items })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Columnas de una tabla
 app.get('/api/columnas/:tabla', async (req, res) => {
   try {

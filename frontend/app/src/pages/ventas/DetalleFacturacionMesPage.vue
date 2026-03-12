@@ -9,10 +9,10 @@
           <ChevronRightIcon :size="13" />
           <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Resumen Facturación</span>
           <ChevronRightIcon :size="13" />
-          <span class="bc-current">{{ mes }}</span>
+          <span class="bc-current">{{ nombreMes(mes) }}</span>
         </div>
         <div class="page-title-row">
-          <h1 class="page-title">Detalle {{ mes }}</h1>
+          <h1 class="page-title">Indicadores: {{ nombreMes(mes) }}</h1>
         </div>
       </div>
     </div>
@@ -191,7 +191,8 @@
             <span class="ac-count">{{ resCanal.length }} registros</span>
           </button>
           <div v-if="abiertos.canal" class="acordeon-body">
-            <OsDataTable title="Por canal" recurso="resumen-canal" :rows="resCanal" :columns="colsCanal" :loading="loadingCanal" :mes="mes" />
+            <OsDataTable title="Por canal" recurso="resumen-canal" :rows="resCanal" :columns="colsCanal" :loading="loadingCanal" :mes="mes"
+              @row-dblclick="row => router.push(`/ventas/detalle-canal/${mes}/${encodeURIComponent(row.canal)}`)" />
           </div>
         </div>
 
@@ -206,7 +207,8 @@
             <span class="ac-count">{{ resCliente.length }} registros</span>
           </button>
           <div v-if="abiertos.cliente" class="acordeon-body">
-            <OsDataTable title="Por cliente" recurso="resumen-cliente" :rows="resCliente" :columns="colsCliente" :loading="loadingCliente" :mes="mes" />
+            <OsDataTable title="Por cliente" recurso="resumen-cliente" :rows="resCliente" :columns="colsCliente" :loading="loadingCliente" :mes="mes"
+              @row-dblclick="row => router.push(`/ventas/detalle-cliente/${mes}/${encodeURIComponent(row.id_cliente)}`)" />
           </div>
         </div>
 
@@ -221,7 +223,8 @@
             <span class="ac-count">{{ resProducto.length }} registros</span>
           </button>
           <div v-if="abiertos.producto" class="acordeon-body">
-            <OsDataTable title="Por producto" recurso="resumen-producto" :rows="resProducto" :columns="colsProducto" :loading="loadingProducto" :mes="mes" />
+            <OsDataTable title="Por producto" recurso="resumen-producto" :rows="resProducto" :columns="colsProducto" :loading="loadingProducto" :mes="mes"
+              @row-dblclick="row => router.push(`/ventas/detalle-producto/${mes}/${encodeURIComponent(row.cod_articulo)}`)" />
           </div>
         </div>
 
@@ -236,7 +239,8 @@
             <span class="ac-count">{{ resFacturas.length }} facturas</span>
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
-            <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes" />
+            <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
+              @row-dblclick="row => router.push(`/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`)" />
           </div>
         </div>
 
@@ -286,6 +290,13 @@ const route  = useRoute()
 const router = useRouter()
 const API    = '/api'
 const mes    = route.params.mes
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+function nombreMes(m) {
+  if (!m) return m
+  const [y, mo] = m.split('-')
+  return `${MESES[parseInt(mo) - 1]} ${y}`
+}
 
 // ── KPI ──────────────────────────────────────────────
 const kpi        = ref(null)
@@ -422,31 +433,31 @@ onMounted(async () => {
 /* KPI Grid */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
 }
-.kpi-grid-wide { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.kpi-grid-wide { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 
 /* KPI Card */
 .kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  padding: 14px 16px;
-  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 3px;
 }
-.kpi-label     { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
-.kpi-value     { font-size: 20px; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
-.kpi-value.kpi-text { font-size: 14px; font-weight: 500; }
-.kpi-sub       { font-size: 13px; font-weight: 400; color: var(--text-tertiary); margin-left: 4px; }
-.kpi-sub-value { font-size: 12px; color: var(--text-tertiary); }
+.kpi-label     { font-size: 10px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-value     { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
+.kpi-value.kpi-text { font-size: 12px; font-weight: 500; }
+.kpi-sub       { font-size: 11px; font-weight: 400; color: var(--text-tertiary); margin-left: 4px; }
+.kpi-sub-value { font-size: 11px; color: var(--text-tertiary); }
 .kpi-pos       { color: var(--color-success); }
 .kpi-neg       { color: var(--color-error); }
 .kpi-warn      { color: var(--color-warning); }
 
 /* Skeleton KPI */
 .skeleton-kpi {
-  height: 82px;
+  height: 60px;
   background: linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.09) 50%, rgba(0,0,0,0.05) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;

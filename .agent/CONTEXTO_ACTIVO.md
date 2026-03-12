@@ -2,9 +2,10 @@
 
 ## Estado Actual (2026-03-11)
 Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **completamente automatizada**.
+- Pipeline verificado 2026-03-11: **50/50 tablas** sincronizadas, 487 contactos, 0 errores.
 - Pasos 3a/3b/3c/3d (facturas) + 4a/4b/4c/4d (remisiones) analíticos activos.
-- Sync Effi → EspoCRM (paso 6c): 480+ contactos.
-- Sync EspoCRM → Hostinger (paso 6d): tabla `crm_contactos` en Hostinger.
+- Sync Effi → EspoCRM (paso 6c): 487 contactos con ciudad normalizada ("Ciudad - Departamento").
+- Sync EspoCRM → Hostinger (paso 6d): tabla `crm_contactos` en Hostinger (DROP+CREATE).
 - Generador plantilla + import automático a Effi (pasos 7a y 7b): activos en pipeline.
 - 6 tablas resumen compuestas tienen columna `_key` (PK simple = mes|col2) para herramientas externas.
 - **AppSheet descartado** — Santi optó por no usarlo.
@@ -33,7 +34,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - **Paso 3d — calcular_resumen_ventas_producto.py** → `resumen_ventas_facturas_producto_mes` (30 campos, PK: mes+cod_articulo, 697 filas)
 - **Paso 4a — calcular_resumen_ventas_remisiones_mes.py** → `resumen_ventas_remisiones_mes` (38 campos, PK: mes, 29 meses)
 - **Paso 4b/4c/4d** — remisiones canal/cliente/producto analíticos
-- **Paso 5 — sync_hostinger.py** → copia las 49 tablas (41 zeffi + 8 resumen) a Hostinger → DROP local de las 8 resumen. Para tablas `resumen_*`: usa DROP+CREATE en Hostinger (garantiza schema actualizado); para `zeffi_*`: CREATE IF NOT EXISTS.
+- **Paso 5 — sync_hostinger.py** → copia las 50 tablas (41 zeffi + 8 resumen + codigos_ciudades_dane) a Hostinger → DROP local de las 8 resumen. Para tablas `resumen_*` y `codigos_ciudades_dane`: usa DROP+CREATE (garantiza schema actualizado); para `zeffi_*`: CREATE IF NOT EXISTS.
 - **Paso 6b — sync_espocrm_marketing.py** → actualiza enums y campos custom en EspoCRM Contact
 - **Paso 6c — sync_espocrm_contactos.py** → upsert clientes Effi → EspoCRM Contact (fuente='Effi'). Traduce ciudad Effi → formato "Ciudad - Departamento" (normalización + alias)
 - **Paso 6d — sync_espocrm_to_hostinger.py** → `crm_contactos` en Hostinger (DROP+CREATE+INSERT). Usa campos custom (direccion, ciudad_nombre), NO nativos address_*
@@ -53,7 +54,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Usuario MySQL Hostinger: `u768061575_osserver` / `Epist2487.`
 - SSH tunnel: `109.106.250.195:65002` vía `~/.ssh/sos_erp`
 - Estrategia: TRUNCATE + INSERT lotes 500 + DROP local de tablas resumen al final
-- ~100s para 49 tablas
+- ~100s para 50 tablas
 
 ### Playwright — corre en el host (NO Docker)
 - Node.js v24.14.0 + Playwright v1.49.1 + Chromium instalados en host
@@ -74,8 +75,9 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - 58 filas son canales con solo consignaciones (sin facturas ese mes)
 
 **resumen_ventas_facturas_cliente_mes**
-- 34 campos + `_key`, PK `_key` (`mes|id_cliente`), UNIQUE (mes, id_cliente), 600 filas
+- 34 campos + `_key`, PK `_key` (`mes|id_cliente`), UNIQUE (mes, id_cliente), 603 filas
 - `canal` viene del maestro `zeffi_clientes.tipo_de_marketing` (estado actual del cliente)
+- **⚠️ Gotcha id_cliente**: `zeffi_facturas_venta_detalle.id_cliente` = "CC 74084937" (con prefijo tipo doc), mientras `zeffi_clientes.numero_de_identificacion` = "74084937". JOIN usa `SUBSTRING_INDEX(d.id_cliente, ' ', -1)`.
 - `cli_es_nuevo = 1` si es la primera factura histórica del cliente
 - `con_consignacion_pp` = OVs directamente por id_cliente (sin mapping)
 - SUM(cliente_mes) vs resumen_mes: diff ≤ 0.26 (solo redondeo DECIMAL)
