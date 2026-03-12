@@ -124,7 +124,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 | Manual de Estilos v2.0 | `frontend/design-system/MANUAL_ESTILOS.md` | ✅ Listo |
 | Screenshots de referencia (88) | `frontend/design-system/screenshots/` | ✅ Listos |
 | Proyecto Vue + Quasar | `frontend/app/` | ✅ Producción (puerto 9100, os-erp-frontend) |
-| URL pública ERP | erp.oscomunidad.com | ✅ Cloudflare tunnel activo |
+| URL pública ERP | menu.oscomunidad.com | ✅ Cloudflare tunnel activo |
 | Tabla sys_menu | Hostinger `u768061575_os_integracion` | ✅ 36 registros (7 módulos + 29 submenús) |
 | **API Express** | `frontend/api/` | ✅ Puerto 3002 (realmente sirve en puerto 9100 junto al frontend), systemd `os-erp-frontend` |
 | **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — dblclick navega a DetalleFacturacionMes |

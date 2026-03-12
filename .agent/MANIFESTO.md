@@ -134,7 +134,7 @@ Un agente que toque Producción manualmente comete una falta crítica.
 
 | BD | Propósito | Acceso permitido |
 |---|---|---|
-| `u768061575_os_comunidad` | ERP en producción | **NUNCA tocar — PROHIBICIÓN ABSOLUTA** |
+| `u768061575_os_comunidad` | ERP en producción (`menu.oscomunidad.com`)| **NUNCA tocar — PROHIBICIÓN ABSOLUTA** |
 | `u768061575_os_integracion` | Datos Effi + analíticas | Lectura/escritura solo por el pipeline |
 
 **`u768061575_os_comunidad`**: ni lectura masiva, ni escritura, ni DROP, ni ALTER sin autorización explícita de Santi. Falta crítica.
