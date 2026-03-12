@@ -147,11 +147,18 @@ Todas las tablas `zeffi_*` tienen:
 
 #### `zeffi_facturas_venta_detalle`
 - **`referencia` = NULL** en la mayoría de registros — usar `cod_articulo` para identificar productos
-- `descripcion_articulo` = nombre legible del producto
+- `descripcion_articulo` = nombre legible del producto. **⚠️ NO existe columna `nombre_articulo`** — error frecuente al escribir queries o endpoints.
+- **⚠️ NO existe columna `id_item`** — no usarla en ORDER BY ni SELECT.
+- **⚠️ Campo fecha = `fecha_creacion_factura`** (NO `fecha_de_creacion`). Diferencia con encabezados: los encabezados usan `fecha_de_creacion`, el detalle usa `fecha_creacion_factura`. Confundirlos da 0 resultados.
 - `fecha_creacion_factura` y `vigencia_factura` duplican el encabezado → no se requiere JOIN para queries mensuales
 - `precio_neto_total` = **INCLUYE IVA** (precio_bruto - descuento + impuesto). Para obtener valor SIN IVA usar `precio_bruto_total - descuento_total`. NUNCA usar `precio_neto_total` como "sin IVA" — es un nombre engañoso.
-- `id_numeracion` = número/código de la factura en esta tabla (NO existe columna `numero_factura`)
+- `id_numeracion` = número/código de la factura en esta tabla (NO existe columna `numero_factura`). En el ERP se muestra con label "No Fac".
 - `marketing_cliente` = canal de venta (e.g. `'1.3. Mercado Saludable'`). NULL o vacío → normalizar como `'Sin canal'`
+- `id_cliente` = formato `'CC 74084937'` o `'NIT 900982270'` (con prefijo tipo doc). Para JOIN con `zeffi_clientes.numero_de_identificacion` usar: `SUBSTRING_INDEX(d.id_cliente, ' ', -1)`.
+
+#### `zeffi_remisiones_venta_detalle`
+- **⚠️ Campo fecha = `fecha_creacion`** (sin `_de_` ni `_factura`). Diferente a los encabezados (`fecha_de_creacion`) y al detalle de facturas (`fecha_creacion_factura`). Confundirlos da error de columna.
+- `tipo_de_marketing_cliente` = canal de venta en detalle de remisiones (diferente a facturas que usa `marketing_cliente`).
 
 #### `zeffi_ordenes_venta_encabezados`
 - `vigencia` puede ser `'Vigente'` (en consignación activa) o `'Anulada'` (liquidada o error)

@@ -544,16 +544,38 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 ## 4. Skills / Comandos Claude (`.claude/commands/`)
 
 Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en la conversación.
+**⚠️ LEER ANTES de construir cualquier cosa — evitan errores ya documentados.**
 
-| Skill | Archivo | Contenido |
-|---|---|---|
-| `/playwright-effi` | `.claude/commands/playwright-effi.md` | Patrones, mecanismos de descarga y errores conocidos para scripts de exportación Effi con Playwright |
-| `/effi-database` | `.claude/commands/effi-database.md` | Credenciales, tablas `zeffi_*`, conexión desde host/Docker, por qué los comandos se cuelgan, patrones Python/Node, tablas espocrm/ciudad/crm_contactos |
-| `/effi-negocio` | `.claude/commands/effi-negocio.md` | Modelo de negocio Effi: qué significa "vigente", consignación, canales, tarifas, flujo de ventas, fechas a usar |
-| `/telegram-pipeline` | `.claude/commands/telegram-pipeline.md` | Configuración del bot Telegram para notificaciones del pipeline |
-| `/espocrm-integracion` | `.claude/commands/espocrm-integracion.md` | EspoCRM: integración bidireccional con Effi, campos custom Contact, entidad Ciudad, scripts de sync, queries diagnóstico, flujo CRM→Effi |
+### Skills de Base de Datos y Backend
 
-> **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla.
+| Skill | Cuándo usarlo |
+|---|---|
+| `/effi-database` | Credenciales MariaDB, tablas `zeffi_*`, gotchas críticos de columnas (fecha_creacion_factura, descripcion_articulo, id_numeracion), conexión desde host/Docker, patrones Python/Node para queries |
+| `/effi-negocio` | Modelo de negocio: qué significa "vigente", consignación, canales, tarifas, flujo de ventas, cómo interpretar los datos de Effi |
+
+### Skills de Frontend ERP
+
+| Skill | Cuándo usarlo |
+|---|---|
+| `/erp-frontend` | Arquitectura completa del ERP (Vue+Quasar+Express), URL pública, paths clave, todos los endpoints de la API, páginas existentes con árbol drill-down, cómo hacer deploy |
+| `/tabla-vista` | Construir cualquier vista con tablas: patrón completo de página de detalle con KPIs + acordeones, componente OsDataTable, CSS obligatorio, errores frecuentes, breadcrumb contextual |
+| `/menu-erp` | Estructura del menú dinámico desde `sys_menu` (Hostinger), cómo agregar módulos y submenús |
+
+### Skills de Integración
+
+| Skill | Cuándo usarlo |
+|---|---|
+| `/espocrm-integracion` | EspoCRM: campos custom en Contact, sistema de municipios, flujo CRM→Effi, scripts de sync, queries de diagnóstico |
+| `/playwright-effi` | Construir scripts de exportación Effi: mecanismos de descarga (window.open, HTML disfrazado), manejo de sesión, errores conocidos |
+| `/telegram-pipeline` | Notificaciones Telegram del pipeline: configuración del bot, formato de mensajes, cuándo enviar email vs Telegram |
+
+### Skill de Agentes IA
+
+| Skill | Cuándo usarlo |
+|---|---|
+| `.agent/skills/manejo_ia.md` | Regla de los 3 Pasos (anti-alucinación) para cualquier bot IA que consulte la BD. Arquitectura obligatoria para el bot Telegram. |
+
+> **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla. Archivo en `.claude/commands/nombre.md`.
 
 ---
 

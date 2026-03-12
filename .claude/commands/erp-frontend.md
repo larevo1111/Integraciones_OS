@@ -1,7 +1,7 @@
 # Skill: ERP Frontend — Origen Silvestre
 
 > Stack completo del ERP web: Vue 3 + Quasar + API Express + MySQL Hostinger.
-> URL pública: **erp.oscomunidad.com** — Cloudflare Tunnel → localhost:9100
+> URL pública: **menu.oscomunidad.com** — Cloudflare Tunnel → localhost:9100
 > Diseño: Linear.app (modo claro) — respetar `frontend/design-system/MANUAL_ESTILOS.md`
 
 ---
@@ -56,24 +56,54 @@ User MySQL: u768061575_osserver / Epist2487.
 - 8 tablas `resumen_ventas_*` (analíticas calculadas)
 - `crm_contactos` (488 contactos del CRM)
 
-**Gotcha importante:** `fecha_de_creacion` en `zeffi_facturas_venta_encabezados` es TEXT (`'YYYY-MM-DD HH:MM:SS'`). Para filtrar por mes usar `LEFT(fecha_de_creacion, 7)`.
+**Gotcha importante — nombres de columnas en tablas de detalle:**
+- `fecha_de_creacion` → solo en **encabezados** (facturas/remisiones/cotizaciones)
+- `fecha_creacion_factura` → en **zeffi_facturas_venta_detalle** (NO `fecha_de_creacion`)
+- `fecha_creacion` → en **zeffi_remisiones_venta_detalle** (otro nombre distinto)
+- `descripcion_articulo` → nombre del producto en detalle (NO existe `nombre_articulo`)
+- NO existe columna `id_item` en `zeffi_facturas_venta_detalle`
 
-### Endpoints actuales
-| Endpoint | Tabla | Filtro mes |
+### Endpoints activos en server.js
+
+**Resumen analítico (tablas Hostinger `resumen_ventas_*`)**
+| Endpoint | Tabla | Parámetros |
 |---|---|---|
-| `GET /api/ventas/resumen-mes` | `resumen_ventas_facturas_mes` | campo `mes` |
-| `GET /api/ventas/resumen-canal` | `resumen_ventas_facturas_canal_mes` | `?mes=YYYY-MM` |
-| `GET /api/ventas/resumen-cliente` | `resumen_ventas_facturas_cliente_mes` | `?mes=YYYY-MM` |
-| `GET /api/ventas/resumen-producto` | `resumen_ventas_facturas_producto_mes` | `?mes=YYYY-MM` |
-| `GET /api/ventas/facturas` | `zeffi_facturas_venta_encabezados` | `?mes=YYYY-MM` |
-| `GET /api/columnas/:tabla` | SHOW COLUMNS | — |
-| `GET /api/export/:recurso` | cualquier tabla del MAP | `?format=csv\|xlsx\|pdf` |
-| `GET /api/health` | — | — |
+| `GET /api/ventas/resumen-mes` | `resumen_ventas_facturas_mes` | `?mes=YYYY-MM&filters=[]` |
+| `GET /api/ventas/resumen-canal` | `resumen_ventas_facturas_canal_mes` | `?mes=YYYY-MM&filters=[]` |
+| `GET /api/ventas/resumen-cliente` | `resumen_ventas_facturas_cliente_mes` | `?mes=YYYY-MM&filters=[]` |
+| `GET /api/ventas/resumen-producto` | `resumen_ventas_facturas_producto_mes` | `?mes=YYYY-MM&filters=[]` |
+
+**Encabezados Effi (con filtro mes y filters genérico)**
+| Endpoint | Tabla |
+|---|---|
+| `GET /api/ventas/facturas` | `zeffi_facturas_venta_encabezados` |
+| `GET /api/ventas/remisiones` | `zeffi_remisiones_venta_encabezados` |
+| `GET /api/ventas/cotizaciones` | `zeffi_cotizaciones_ventas_encabezados` |
+
+**Ad-hoc de drill-down (usados en páginas de detalle)**
+| Endpoint | Descripción | Parámetros |
+|---|---|---|
+| `GET /api/ventas/cliente-productos` | Productos comprados por un cliente en un mes | `?mes&id_cliente` |
+| `GET /api/ventas/canal-clientes` | Clientes de un canal en un mes | `?mes&canal` |
+| `GET /api/ventas/canal-productos` | Productos de un canal en un mes | `?mes&canal` |
+| `GET /api/ventas/canal-facturas` | Encabezados de facturas del canal | `?mes&canal` |
+| `GET /api/ventas/canal-remisiones` | Encabezados de remisiones del canal | `?mes&canal` |
+| `GET /api/ventas/producto-canales` | Canales donde se vendió el producto | `?mes&cod_articulo` |
+| `GET /api/ventas/producto-clientes` | Clientes que compraron el producto | `?mes&cod_articulo` |
+| `GET /api/ventas/producto-facturas` | Facturas donde aparece el producto | `?mes&cod_articulo` |
+| `GET /api/ventas/factura/:id_interno/:id_numeracion` | Encabezado + ítems de una factura específica | path params |
+
+**Utilidad**
+| Endpoint | Descripción |
+|---|---|
+| `GET /api/columnas/:tabla` | Lista columnas de cualquier tabla Hostinger |
+| `GET /api/export/:recurso` | Export CSV/XLSX/PDF (`?format=csv\|xlsx\|pdf`) |
+| `GET /api/health` | Health check |
 
 Para agregar un endpoint nuevo:
 1. Agregar la ruta en `server.js`
-2. Agregar el recurso al MAP de exports si se necesita exportar
-3. Reiniciar: `systemctl restart os-erp-frontend`
+2. Reiniciar: `sudo systemctl restart os-erp-frontend`
+3. **NO requiere rebuild Quasar** — el rebuild solo es necesario cuando cambian archivos `.vue`
 
 ---
 
@@ -220,8 +250,69 @@ Clases utilitarias clave:
 
 ---
 
-## 8. PÁGINAS EXISTENTES
+## 8. PÁGINAS EXISTENTES Y NAVEGACIÓN DRILL-DOWN
+
+### Módulo Ventas — Jerarquía completa
+
+```
+ResumenFacturacionPage  →  /ventas/resumen-facturacion
+  └─ dblclick fila mes  →  DetalleFacturacionMesPage  /ventas/detalle-mes/:mes
+       ├─ dblclick canal    →  DetalleCanalMesPage    /ventas/detalle-canal/:mes/:canal
+       ├─ dblclick cliente  →  DetalleClienteMesPage  /ventas/detalle-cliente/:mes/:id_cliente
+       ├─ dblclick producto →  DetalleProductoMesPage /ventas/detalle-producto/:mes/:cod_articulo
+       └─ dblclick factura  →  DetalleFacturaPage     /ventas/detalle-factura/:id_interno/:id_numeracion
+```
 
 | Página | Ruta URL | Archivo |
 |---|---|---|
 | Resumen Facturación | `/ventas/resumen-facturacion` | `pages/ventas/ResumenFacturacionPage.vue` |
+| Detalle Mes | `/ventas/detalle-mes/:mes` | `pages/ventas/DetalleFacturacionMesPage.vue` |
+| Detalle Canal | `/ventas/detalle-canal/:mes/:canal` | `pages/ventas/DetalleCanalMesPage.vue` |
+| Detalle Cliente | `/ventas/detalle-cliente/:mes/:id_cliente` | `pages/ventas/DetalleClienteMesPage.vue` |
+| Detalle Producto | `/ventas/detalle-producto/:mes/:cod_articulo` | `pages/ventas/DetalleProductoMesPage.vue` |
+| Detalle Factura | `/ventas/detalle-factura/:id_interno/:id_numeracion` | `pages/ventas/DetalleFacturaPage.vue` |
+
+### Patrón de navegación drill-down con contexto
+
+Cuando se navega a `DetalleFacturaPage` desde cualquier página, se pasan query params para que el breadcrumb muestre el árbol completo:
+
+```javascript
+// Desde DetalleClienteMesPage:
+router.push({
+  path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`,
+  query: { mes, desde: 'cliente', desde_id: id_cliente, desde_label: kpi?.cliente || id_cliente }
+})
+
+// Desde DetalleCanalMesPage:
+router.push({
+  path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`,
+  query: { mes, desde: 'canal', desde_id: canal, desde_label: canal }
+})
+
+// Desde DetalleProductoMesPage:
+router.push({
+  path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`,
+  query: { mes, desde: 'producto', desde_id: cod_articulo, desde_label: kpi?.nombre || cod_articulo }
+})
+
+// Desde DetalleFacturacionMesPage (nivel mes directo):
+router.push({
+  path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`,
+  query: { mes, desde: 'mes' }
+})
+```
+
+El resultado visual en el breadcrumb:
+`Ventas > Resumen Facturación > Enero 2025 > MANDALAIRE > Factura #FEV-606`
+
+### Label especial: id_numeracion → "No Fac"
+
+En todas las páginas, `labelFromKey('id_numeracion')` debe retornar `'No Fac'`. Agregar siempre esta excepción al inicio de `labelFromKey`:
+
+```javascript
+function labelFromKey(key) {
+  if (key === 'id_numeracion') return 'No Fac'
+  if (key === 'descripcion_articulo') return 'Producto'
+  // ... resto de transformaciones
+}
+```

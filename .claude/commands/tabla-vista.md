@@ -33,10 +33,10 @@ Ubicación: `frontend/app/src/components/OsDataTable.vue`
 
 ### Eventos
 
-| Evento | Payload | Cuándo |
-|---|---|---|
-| `row-click` | objeto fila | Clic simple en una fila |
-| `row-dblclick` | objeto fila | Doble clic en una fila |
+| Evento | Payload | Cuándo | Uso típico |
+|---|---|---|---|
+| `row-click` | objeto fila | Clic simple | Seleccionar fila, filtrar acordeones |
+| `row-dblclick` | objeto fila | Doble clic | Navegar a vista de detalle |
 
 ### Formato de columnas
 
@@ -335,17 +335,167 @@ Todas usan `LEFT(fecha_de_creacion, 7) = ?mes` para filtrar (campo es TEXT `'YYY
 | Toda la tabla se selecciona | `isSelected` compara `undefined === undefined` | Ver el patrón actual en OsDataTable — siempre comparar con PK del item seleccionado |
 | Exportar abre misma pestaña | `window.location = url` | Usar `window.open(url, '_blank')` |
 | Cambios no se ven | Falta rebuild Quasar | `cd frontend/app && npx quasar build` |
+| Acordeón de productos retorna 0 resultados | `d.nombre_articulo` en SQL → columna no existe | Usar `d.descripcion_articulo` (es el nombre real del producto en Hostinger) |
+| Acordeón de facturas retorna 0 resultados | `d.fecha_de_creacion` en detalle → columna no existe | Detalle usa `d.fecha_creacion_factura`. Encabezados sí usan `e.fecha_de_creacion` |
+| Error en ORDER BY o SELECT de detalle factura | `ORDER BY id_item` → columna no existe | NO existe `id_item` en `zeffi_facturas_venta_detalle` — omitir ORDER BY o usar otro campo |
 
 ---
 
-## 9. PÁGINAS EXISTENTES
+## 9. PATRÓN COMPLETO: VISTA DE DETALLE CON KPIs + ACORDEONES
 
-| Página | Ruta | Archivo |
-|---|---|---|
-| Resumen Facturación | `/ventas/resumen-facturacion` | `pages/ventas/ResumenFacturacionPage.vue` |
-| Detalle Mes Facturación | `/ventas/detalle-mes/:mes` | `pages/ventas/DetalleFacturacionMesPage.vue` |
+Para páginas de 3er nivel (ej: DetalleCanalMesPage, DetalleClienteMesPage, DetalleProductoMesPage):
 
-### Flujo de navegación
-- Clic en fila de mes → selecciona mes, filtra acordeones en la misma página
-- Doble clic en fila de mes → navega a `/ventas/detalle-mes/YYYY-MM`
-- Breadcrumb en detalle → navega de vuelta al resumen
+### Estructura del script setup
+
+```javascript
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
+import { ChevronRightIcon } from 'lucide-vue-next'
+import OsDataTable from 'src/components/OsDataTable.vue'
+
+const route  = useRoute()
+const router = useRouter()
+const API    = '/api'
+const mes    = route.params.mes
+// Decodificar parámetros que pueden tener espacios o caracteres especiales:
+const canal  = decodeURIComponent(route.params.canal)
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+function nombreMes(m) {
+  if (!m) return m
+  const [y, mo] = m.split('-')
+  return `${MESES[parseInt(mo) - 1]} ${y}`
+}
+
+// KPI del resumen analítico
+const kpi        = ref(null)
+const loadingKpi = ref(true)
+
+async function loadKpi() {
+  loadingKpi.value = true
+  try {
+    const { data } = await axios.get(`${API}/ventas/resumen-canal`, {
+      params: { mes, filters: JSON.stringify([{ field: 'canal', op: 'eq', value: canal }]) }
+    })
+    kpi.value = data[0] || null
+  } finally { loadingKpi.value = false }
+}
+
+// Tablas de acordeón (cada una con su ref de datos y loading)
+const resFacturas  = ref([]); const loadingFacturas  = ref(false)
+const colsFacturas = ref([])
+
+// Columnas visibles por defecto para cada tipo de tabla
+const VISIBLE = {
+  'zeffi_facturas_venta_encabezados': ['id_numeracion','fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
+}
+
+function labelFromKey(key) {
+  if (key === 'id_numeracion') return 'No Fac'           // ← SIEMPRE incluir
+  if (key === 'descripcion_articulo') return 'Producto'  // ← si se usan productos
+  return key.replace(/^_pk$/, 'N°').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    .replace(/^Fin /, '').replace(/^Vol /, '').replace(/^Cli /, '').replace(/^Cto /, '').trim()
+}
+
+function colsFromData(data, tabla) {
+  if (!data.length) return []
+  const visible = VISIBLE[tabla] || []
+  return Object.keys(data[0]).map(key => ({ key, label: labelFromKey(key), visible: visible.includes(key) }))
+}
+
+async function loadColumns(tabla, destRef) {
+  const { data: cols } = await axios.get(`${API}/columnas/${tabla}`)
+  destRef.value = cols.map(key => ({ key, label: labelFromKey(key), visible: (VISIBLE[tabla] || []).includes(key) }))
+}
+
+// Acordeones lazy — solo cargan al abrirse
+const abiertos = ref({ facturas: false })
+
+async function toggleAcordeon(key) {
+  abiertos.value[key] = !abiertos.value[key]
+  if (!abiertos.value[key]) return
+  const loaders = {
+    facturas: () => loadAd(`${API}/ventas/canal-facturas`, resFacturas, loadingFacturas, 'zeffi_facturas_venta_encabezados'),
+  }
+  if (loaders[key]) loaders[key]()
+}
+
+async function loadAd(url, dataRef, loadingRef, tabla) {
+  if (loadingRef.value) return
+  loadingRef.value = true
+  try {
+    const { data } = await axios.get(url, { params: { mes, canal } })
+    dataRef.value = data
+    if (!colsFacturas.value.length) colsFacturas.value = colsFromData(data, tabla)
+  } finally { loadingRef.value = false }
+}
+
+onMounted(async () => {
+  await Promise.all([
+    loadKpi(),
+    loadColumns('zeffi_facturas_venta_encabezados', colsFacturas),
+  ])
+})
+```
+
+### Breadcrumb con árbol contextual
+
+Para DetalleFacturaPage (o cualquier página de 4to nivel), leer query params para construir el árbol:
+
+```javascript
+const qMes        = route.query.mes         || ''
+const qDesde      = route.query.desde       || ''
+const qDesdeId    = route.query.desde_id    || ''
+const qDesdeLabel = route.query.desde_label || ''
+```
+
+Template del breadcrumb contextual:
+```vue
+<div class="breadcrumb">
+  <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Ventas</span>
+  <template v-if="qMes">
+    <ChevronRightIcon :size="13" />
+    <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Resumen Facturación</span>
+    <ChevronRightIcon :size="13" />
+    <span class="bc-link" @click="router.push(`/ventas/detalle-mes/${qMes}`)">{{ nombreMes(qMes) }}</span>
+    <template v-if="qDesde !== 'mes' && desdeConfig[qDesde]?.path">
+      <ChevronRightIcon :size="13" />
+      <span class="bc-link" @click="router.push(desdeConfig[qDesde].path)">{{ desdeConfig[qDesde].label }}</span>
+    </template>
+  </template>
+  <ChevronRightIcon :size="13" />
+  <span class="bc-current">Título actual</span>
+</div>
+```
+
+---
+
+## 10. PÁGINAS EXISTENTES
+
+### Módulo Ventas — árbol drill-down completo
+
+```
+ResumenFacturacionPage       /ventas/resumen-facturacion
+  └─ dblclick mes → DetalleFacturacionMesPage  /ventas/detalle-mes/:mes
+       ├─ dblclick canal    → DetalleCanalMesPage    /ventas/detalle-canal/:mes/:canal
+       ├─ dblclick cliente  → DetalleClienteMesPage  /ventas/detalle-cliente/:mes/:id_cliente
+       ├─ dblclick producto → DetalleProductoMesPage /ventas/detalle-producto/:mes/:cod_articulo
+       └─ dblclick factura  → DetalleFacturaPage     /ventas/detalle-factura/:id_interno/:id_numeracion
+```
+
+| Página | Ruta | Archivo | Fuente KPI |
+|---|---|---|---|
+| Resumen Facturación | `/ventas/resumen-facturacion` | `ResumenFacturacionPage.vue` | `resumen_ventas_facturas_mes` |
+| Detalle Mes | `/ventas/detalle-mes/:mes` | `DetalleFacturacionMesPage.vue` | `resumen_ventas_facturas_mes` |
+| Detalle Canal | `/ventas/detalle-canal/:mes/:canal` | `DetalleCanalMesPage.vue` | `resumen_ventas_facturas_canal_mes` |
+| Detalle Cliente | `/ventas/detalle-cliente/:mes/:id_cliente` | `DetalleClienteMesPage.vue` | `resumen_ventas_facturas_cliente_mes` |
+| Detalle Producto | `/ventas/detalle-producto/:mes/:cod_articulo` | `DetalleProductoMesPage.vue` | `resumen_ventas_facturas_producto_mes` |
+| Detalle Factura | `/ventas/detalle-factura/:id_interno/:id_numeracion` | `DetalleFacturaPage.vue` | `zeffi_facturas_venta_encabezados` + detalle |
+
+### Registrar ruta nueva en routes.js
+
+```javascript
+// frontend/app/src/router/routes.js (dentro del children del MainLayout)
+{ path: 'ventas/detalle-canal/:mes/:canal', component: () => import('pages/ventas/DetalleCanalMesPage.vue') },
+```
