@@ -117,37 +117,56 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Flask server: `scripts/webhook_server.py`, systemd service `effi-webhook.service` (activo, auto-restart)
 - Archivos versionados en `espocrm-custom/` con instrucciones de deploy
 
-## Frontend — Estado actual
+## Frontend — Estado actual (2026-03-11)
 
 | Recurso | Ruta | Estado |
 |---|---|---|
 | Manual de Estilos v2.0 | `frontend/design-system/MANUAL_ESTILOS.md` | ✅ Listo |
 | Screenshots de referencia (88) | `frontend/design-system/screenshots/` | ✅ Listos |
-| Índice de screenshots | `frontend/design-system/screenshots/INDEX.md` | ✅ Listo |
 | Proyecto Vue + Quasar | `frontend/app/` | ✅ Producción (puerto 9100, os-erp-frontend) |
 | URL pública ERP | erp.oscomunidad.com | ✅ Cloudflare tunnel activo |
 | Tabla sys_menu | Hostinger `u768061575_os_integracion` | ✅ 36 registros (7 módulos + 29 submenús) |
-| **API Express** | `frontend/api/` | ✅ Puerto 3002, systemd `os-erp-api` |
-| **Página Resumen Facturación** | `frontend/app/src/pages/ventas/ResumenFacturacionPage.vue` | ✅ Activo en /ventas/resumen-facturacion |
-| **Componente OsDataTable** | `frontend/app/src/components/OsDataTable.vue` | ✅ Tabla reutilizable con filtros/campos/export |
-| **CSS modo claro** | `frontend/app/src/css/app.scss` | ✅ Variables Light Mode aplicadas |
+| **API Express** | `frontend/api/` | ✅ Puerto 3002 (realmente sirve en puerto 9100 junto al frontend), systemd `os-erp-frontend` |
+| **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — dblclick navega a DetalleFacturacionMes |
+| **Detalle Mes** | `pages/ventas/DetalleFacturacionMesPage.vue` | ✅ /ventas/detalle-mes/:mes — KPIs + 6 tablas acordeón + dblclick drill-down |
+| **Detalle Cliente** | `pages/ventas/DetalleClienteMesPage.vue` | ✅ /ventas/detalle-cliente/:mes/:id_cliente |
+| **Detalle Canal** | `pages/ventas/DetalleCanalMesPage.vue` | ✅ /ventas/detalle-canal/:mes/:canal |
+| **Detalle Producto** | `pages/ventas/DetalleProductoMesPage.vue` | ✅ /ventas/detalle-producto/:mes/:cod_articulo |
+| **Detalle Factura** | `pages/ventas/DetalleFacturaPage.vue` | ✅ /ventas/detalle-factura/:id_interno/:id_numeracion |
+| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + popups + row-click + row-dblclick |
 
 **⚠️ Antes de cualquier trabajo frontend: leer `frontend/design-system/MANUAL_ESTILOS.md`**
+**⚠️ Después de cualquier cambio Vue/JS: `cd frontend/app && npx quasar build`**
 
-### API Express (os-erp-api) — puerto 3002
-- `frontend/api/server.js` + `db.js` — SSH tunnel → Hostinger MySQL
-- Endpoints: `/api/ventas/resumen-mes|canal|cliente|producto|facturas`, `/api/columnas/:tabla`, `/api/export/:recurso`
-- Filtro facturas por mes: `LEFT(fecha_de_creacion, 7)` (campo TEXT, no hay mes_factura)
-- Export: CSV / XLSX / PDF
+### Jerarquía de navegación drill-down (módulo Ventas)
+```
+ResumenFacturacionPage (todos los meses)
+  └─ dblclick fila → DetalleFacturacionMesPage (mes)
+       ├─ dblclick canal → DetalleCanalMesPage (mes + canal)
+       ├─ dblclick cliente → DetalleClienteMesPage (mes + cliente)
+       ├─ dblclick producto → DetalleProductoMesPage (mes + producto)
+       └─ dblclick factura → DetalleFacturaPage (encabezado + ítems)
+```
+
+### API Express — endpoints activos en server.js
+- `/api/ventas/resumen-mes|canal|cliente|producto` — tablas resumen Hostinger (con filtros)
+- `/api/ventas/facturas|cotizaciones|remisiones` — encabezados zeffi (con filtro mes)
+- `/api/ventas/cliente-productos` — productos comprados por un cliente (ad-hoc SQL)
+- `/api/ventas/canal-clientes|canal-productos|canal-facturas|canal-remisiones` — datos por canal (ad-hoc)
+- `/api/ventas/producto-canales|producto-clientes|producto-facturas` — datos por producto (ad-hoc)
+- `/api/ventas/factura/:id_interno/:id_numeracion` — encabezado + ítems de una factura
+- `/api/columnas/:tabla` — columnas de cualquier tabla Hostinger
+- `/api/export/:recurso` — CSV / XLSX / PDF
 
 ### OsDataTable — componente reutilizable
 - Props: `rows`, `columns` (array {key,label,visible}), `loading`, `title`, `recurso`, `mes`
-- Emits: `row-click`
-- Features: filtros inline, selector de columnas visibles, export CSV/XLSX/PDF, ordenamiento, skeleton loading
+- Emits: `row-click` (selección), `row-dblclick` (drill-down)
+- Features: filtros inline, selector de columnas, export CSV/XLSX/PDF, ordenamiento, skeleton
 
 ## Próximos Pasos
-1. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. También borrar en Effi manualmente (3 clientes: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya).
-2. Continuar construyendo páginas del ERP (Remisiones, Clientes, etc.) siguiendo mismo patrón.
+1. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. Borrar en Effi manualmente: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya.
+2. **Bot Telegram** — ampliar más allá de notificaciones de error: consultas de KPIs, estado pipeline, alertas proactivas.
+3. Continuar construyendo módulo Ventas: páginas de Remisiones, módulo Clientes, módulo Productos.
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
