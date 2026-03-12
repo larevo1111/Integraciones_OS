@@ -126,7 +126,10 @@ def cargar_mapa_ciudad_display(cur_effi):
     mapa_simple = {}
     conteo_mun = {}
 
-    for mun, depto, display in cur_effi.fetchall():
+    for row in cur_effi.fetchall():
+        mun     = row['nombre_municipio']
+        depto   = row['nombre_departamento']
+        display = row['nombre_display']
         mn = normalizar_texto(mun)
         dn = normalizar_texto(depto)
         mapa_doble[(mn, dn)] = display
