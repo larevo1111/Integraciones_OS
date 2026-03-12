@@ -1,0 +1,89 @@
+[
+    {
+        "label": "",
+        "rows": [
+            [
+                {
+                    "name": "firstName"
+                },
+                {
+                    "name": "lastName"
+                }
+            ],
+            [
+                {
+                    "name": "emailAddress"
+                },
+                {
+                    "name": "phoneNumber"
+                }
+            ],
+            [
+                {
+                    "name": "tipoDeMarketing"
+                },
+                {
+                    "name": "tipoCliente"
+                }
+            ],
+            [
+                {
+                    "name": "calificacionNegocioAmigo"
+                },
+                false
+            ],
+            [
+                {
+                    "name": "numeroIdentificacion"
+                },
+                {
+                    "name": "tipoIdentificacion"
+                }
+            ],
+            [
+                {
+                    "name": "tipoPersona"
+                },
+                {
+                    "name": "vendedorEffi"
+                }
+            ],
+            [
+                {
+                    "name": "tarifaPrecios"
+                },
+                {
+                    "name": "formaPago"
+                }
+            ],
+            [
+                {
+                    "name": "ciudadNombre"
+                },
+                false
+            ],
+            [
+                {
+                    "name": "direccion"
+                },
+                {
+                    "name": "direccionLinea2"
+                }
+            ],
+            [
+                {
+                    "name": "fuente"
+                },
+                {
+                    "name": "enviadoAEffi"
+                }
+            ],
+            [
+                {
+                    "name": "description",
+                    "fullWidth": true
+                }
+            ]
+        ]
+    }
+]
