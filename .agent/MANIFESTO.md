@@ -192,6 +192,13 @@ Al crear o modificar cualquier script de resumen, correr queries V1–V7 del ski
 ### Cloudflare Tunnel
 - Configuración en `/etc/cloudflared/config.yml`. Agregar hostname + reiniciar servicio + CNAME en Cloudflare DNS.
 
+### 9.1 PREMISA CRÍTICA DE IA (Cero Alucinaciones)
+**Regla absoluta para cualquier Bot o Agente IA que consuma datos del ERP:**
+Para que la IA no invente respuestas o datos financieros, el flujo técnico obligado y el System Prompt de TODO agente debe seguir siempre estos 3 pasos (nunca intentar saltárselos):
+1. **Generar código:** El Agente lee la pregunta + esquema y devuelve SÓLO una consulta SQL válida (o script equivalente).
+2. **Ejecutar código:** El sistema/orquestador ejecuta el query ciegamente contra la BD MariaDB real y captura las filas retornadas.
+3. **Responder usando ese resultado:** El sistema entrega los datos crudos de vuelta al Agente IA, quien redacta la respuesta usando única y exclusivamente la información del paso 2.
+
 ---
 
 ## 10. ESTRUCTURA DE MEMORIA
@@ -231,3 +238,13 @@ Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
 - Nomenclatura en Español (coherente con ERP Effi).
 - Clientes Effi → `tipo_de_persona` distingue empresa/persona natural.
 - Campo de enlace clave: `clientes.numero_de_identificacion` ↔ `facturas_venta_encabezados.id_cliente` (gotcha: prefijo tipo doc en facturas).
+
+---
+
+## 13. GESTIÓN DE SCREENSHOTS TEMPORALES Y UI
+
+**Protocolo para Claude Code y Codex respecto a validación visual:**
+Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando capturas de pantalla en `/home/osserver/Proyectos_Antigravity/Integraciones_OS/screenshots_temporales/`.
+1. **Lectura:** Usen estas imágenes para entender el resultado final de la UI al hacer debug de componentes Vue (ej. alineación, tablas vacías, etc).
+2. **Ciclo de Vida:** Cuando la tarea o bug se dé por finalizado/resuelto, **tienen la obligación de borrar las capturas asociadas** de la carpeta temporal para no contaminar el repo.
+3. **Excepción:** Si una captura representa un patrón importante de diseño que debe recordarse a futuro, muévanla a `frontend/design-system/screenshots/` y actualicen su `INDEX.md`.

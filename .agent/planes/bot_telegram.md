@@ -26,29 +26,45 @@ Se debe crear una tabla dedicada en la base de datos local (ej. `nocodb_meta` o 
 - `id` (INT, PK, Auto-increment)
 - `telegram_user_id` (BIGINT, UNIQUE) - ID del usuario de Telegram.
 - `username` (VARCHAR) - Nombre del usuario para personalización.
-- `llm_seleccionado` (VARCHAR) - Agente actual seleccionado (ej. "claude-3-opus").
+- `agente_ia` (VARCHAR) - Agente actual seleccionado (ej. "claude-sonnet").
 - `ultima_pregunta` (TEXT) - Última entrada del usuario.
-- `ultima_respuesta` (TEXT) - Última respuesta generada por la IA ANTES de enviarla a Telegram (sirve para debug o regeneración).
-- `conversacion_actual` (JSON) - Historial corto de los últimos 5 mensajes (array de objetos `{role: 'user/assistant', content: '...'}`) para mantener el hilo del bot.
+- `ultima_respuesta` (TEXT) - Última respuesta generada por la IA ANTES de enviarla a Telegram.
+- `conversacion_actual` (JSON) - Historial de los últimos 14 mensajes (7 preguntas, 7 respuestas) para mantener el hilo corto.
+- `resumen_contexto` (TEXT) - Un resumen comprimido generado por el propio agente en cada turno, que consolida la información importante discutida mucho antes de los últimos 14 mensajes. Efecto de "memoria a largo plazo".
+- `fecha_inicio_conversacion` (TIMESTAMP) - Cuándo inició el hilo actual de contexto.
 - `updated_at` (TIMESTAMP)
 
-> 💡 **Nota sobre el flujo de respuesta:** El orquestador de Python guarda la `ultima_respuesta` y actualiza el JSON de `conversacion_actual` en la tabla justo antes o en el mismo momento en que transmite el mensaje final a la API de Telegram. Así, si la base de datos registra la respuesta, es porque ya es el contexto oficial para el próximo turno.
+> 💡 **Nota sobre el flujo de respuesta:** El orquestador de Python guarda la `ultima_respuesta`, actualiza el JSON de `conversacion_actual`, y pide al Agente que genere el `resumen_contexto` actualizado. Al guardar, se asegura la persistencia del turno.
 
 ---
 
 ## 3. Configuración de Agentes Disponibles
 
 **¿Dónde guardar los Agentes y sus API Keys?**
-Las claves (API Keys) **NUNCA** deben ir en la base de datos. Se deben almacenar en el archivo `.env` del orquestador Python (`scripts/.env`).
+Las claves (API Keys) **NUNCA** deben ir en la base de datos. Se almacenan en el `.env` del orquestador Python (`scripts/.env`).
 
-La configuración de qué agentes están "activos" o "disponibles" para elegir se define mejor en un diccionario estático en el propio script de Python o en un archivo JSON local (ej. `config_llms.json`). No amerita una tabla en SQL porque rara vez vas a crear un agente nuevo dinámicamente desde un panel.
+La configuración de qué agentes están "activos" se define en un diccionario estático en Python o un `config_ia.json`.
 
-**Agentes recomendados para Análisis SQL (Text-to-SQL y Text-to-Text):**
-1. **Claude 3.5 Sonnet / Claude 3 Opus (Pago - Anthropic):** El indiscutible líder para razonamiento complejo y SQL. Excelente siguiendo la estructura de tablas analíticas y formateando Markdown. *(Debe ser el Default)*.
-2. **GPT-4o (Pago - OpenAI):** Muy rápido y confiable para generación de SQL y análisis de KPI.
-3. **Gemini 1.5 Pro (Gratis/Pago - Google):** Excelente para procesar mucho contexto (por si envías muchos esquemas de tablas) y tier gratuito muy generoso.
-4. **Llama 3 (Gratis - Groq API):** Ideal para responder cosas rapidísimas que NO requieran un SQL denso, o como agente clasificador (ej. Agent Routing: "¿Esto requiere SQL o es un simple saludo?").
-5. **Mixtral 8x7B (Gratis - Groq API):** Otra excelente opción gratuita y ultrarrápida para enrutamiento o preguntas simples.
+**Lista de Agentes Oficiales (Modelos):**
+**Agentes de Pago (Premium):**
+1. **Claude Sonnet 3.5 (Anthropic):** El modelo por defecto y más capaz en código/SQL.
+2. **GPT-4o (OpenAI):** Alternativa fuerte y rápida.
+3. **DeepSeek-V3 / R1 (DeepSeek):** Modelos premium muy eficientes en razonamiento lógico y código.
+
+**Agentes Gratuitos (Free Tier):**
+4. **Gemini Free (Google):** Excelente para ventanas de contexto masivas.
+5. **DeepSeek Chat (Free):** Motor potente y económico para consultas regulares.
+6. **Groq (Llama / Mixtral):** Insuperables en velocidad; ideales para enrutamiento ("¿Esto es un saludo o pide datos?").
+
+---
+
+## 4. ⚠️ PREMISA CRÍTICA: REGLA DE LOS 3 PASOS (Cero Alucinación)
+
+Para garantizar que el Agente IA **jamás invente** (alucine) datos sobre facturación o KPIs, TODO el flujo del Bot y el **System Prompt** deben enforzar obligatoriamente este ciclo:
+
+1. **Generar código:** El Agente recibe la pregunta en lenguaje natural y la estructura de la base de datos. **Debe generar SÓLO la consulta SQL exacta**, nada más.
+2. **Ejecutar código:** El script de Python toma ese SQL, lo corre contra MariaDB (Hostinger o Local), y atrapa el diccionario de datos (JSON/filas).
+3. **Responder usando ese resultado:** Python le envía esos datos **crudos y reales** de vuelta al Agente IA, quien ahora sí, redacta el texto amigable formateado en Telegram basado estrictamente en el paso 2.
 
 ---
 
