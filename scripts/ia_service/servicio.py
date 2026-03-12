@@ -120,10 +120,12 @@ def consultar(
         system_prompt += f'\n\nEsquema de la base de datos:\n{ddl}'
 
     # ── 6. Ejecutar pasos ─────────────────────────────────────────────
-    sql_generado   = None
-    datos_crudos   = None
+    sql_generado    = None
+    datos_crudos    = None
     tabla_resultado = None
-    tokens_in_total = 0
+    imagen_b64      = None
+    imagen_mime     = None
+    tokens_in_total  = 0
     tokens_out_total = 0
     respuesta_final  = ''
     resumen_nuevo    = None
@@ -198,6 +200,22 @@ def consultar(
                 respuesta_final = parsed['respuesta']
                 resumen_nuevo   = parsed.get('resumen_nuevo')
 
+            elif paso == 'generar_imagen':
+                pasos_ejecutados.append('generar_imagen')
+                msgs = mensajes_base + [{'role': 'user', 'content': pregunta}]
+                res = _llamar_agente(agente_cfg, msgs, temperatura=temperatura, max_tokens=512)
+                tokens_in_total  += res.get('tokens_in', 0)
+                tokens_out_total += res.get('tokens_out', 0)
+
+                if not res['ok']:
+                    raise Exception(f"Error generando imagen: {res['error']}")
+
+                imagen_b64  = res.get('imagen_b64')
+                imagen_mime = res.get('imagen_mime', 'image/png')
+                respuesta_final = res.get('texto', 'Imagen generada.')
+                if not imagen_b64:
+                    raise Exception("El modelo no devolvió una imagen. Intenta con una descripción más específica.")
+
             elif paso == 'clasificar':
                 pasos_ejecutados.append('clasificar')
                 # Ya se hizo en 'analizar', nada más que hacer
@@ -241,6 +259,8 @@ def consultar(
         'formato':         tipo_cfg.get('formato_salida', 'texto'),
         'tabla':           tabla_resultado,
         'sql':             sql_generado,
+        'imagen_b64':      imagen_b64,   # base64 de imagen si formato='imagen'
+        'imagen_mime':     imagen_mime,  # 'image/png' o 'image/jpeg'
         'agente':          agente_slug,
         'tokens':          {'in': tokens_in_total, 'out': tokens_out_total},
         'costo_usd':       costo_usd,
@@ -278,7 +298,8 @@ def _enrutar(pregunta: str) -> str:
 
     if res['ok']:
         texto = res['texto'].strip().lower()
-        tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen', 'generacion_documento'}
+        tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
+                         'generacion_documento', 'generacion_imagen'}
         # Buscar cualquier slug válido en el texto (por si el modelo agrega palabras extra)
         for slug in tipos_validos:
             if slug in texto:
