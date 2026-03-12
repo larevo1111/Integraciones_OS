@@ -46,7 +46,7 @@ IMPORT_EFFI_SCRIPT                = SCRIPTS_DIR / 'import_clientes_effi.js'
 EXPORT_TIMEOUT        = 30 * 60   # 30 minutos
 IMPORT_TIMEOUT        =  5 * 60   # 5 minutos
 RESUMEN_TIMEOUT       =  2 * 60   # 2 minutos
-SYNC_TIMEOUT          =  5 * 60   # 5 minutos (sync Hostinger ~100s)
+SYNC_TIMEOUT          =  8 * 60   # 8 minutos (sync Hostinger ~300s con trazabilidad 64K filas)
 SYNC_ESPO_TIMEOUT     =  2 * 60   # 2 minutos (sync EspoCRM marketing)
 SYNC_ESPO_CON_TIMEOUT =  3 * 60   # 3 minutos (sync EspoCRM contactos)
 SYNC_ESPO_HOST_TIMEOUT = 2 * 60   # 2 minutos (sync EspoCRM → Hostinger)
@@ -472,23 +472,34 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
     if hay_error:
         partes = [f'<b>⚠️ Pipeline Effi — ERROR</b>', f'📅 {ahora}']
 
-        # Scripts que fallaron definitivamente (líneas "Falló definitivamente: export_X")
+        # Scripts de export que fallaron
         fallidos = [l for l in errores_exp if 'Falló definitivamente' in l]
         if fallidos:
-            partes.append('\n<b>Scripts fallidos:</b>')
+            partes.append('\n<b>Export fallidos:</b>')
             for f in fallidos:
                 nombre = f.split(':', 1)[-1].strip()
                 partes.append(f'  • {nombre}')
 
-        # Import
-        if exit_imp != 0:
-            partes.append(f'\n❌ Import: {resumen_imp}')
-        else:
-            partes.append(f'\n✅ Import: {resumen_imp}')
-
-        # Resumen
-        if exit_rsm != 0:
-            partes.append(f'\n❌ Resumen: {resumen_rsm}')
+        # Cada paso con su estado
+        pasos = [
+            ('Import', exit_imp, resumen_imp),
+            ('Resumen facturas mes', exit_rsm, resumen_rsm),
+            ('Resumen facturas canal', exit_rsm_canal, resumen_rsm_canal),
+            ('Resumen facturas cliente', exit_rsm_cliente, resumen_rsm_cliente),
+            ('Resumen facturas producto', exit_rsm_producto, resumen_rsm_producto),
+            ('Resumen remisiones mes', exit_rsm_rem, resumen_rsm_rem),
+            ('Sync Hostinger', exit_sync, resumen_sync),
+            ('Sync EspoCRM marketing', exit_espo, resumen_espo),
+            ('Sync EspoCRM contactos', exit_espo_con, resumen_espo_con),
+            ('Sync EspoCRM → Hostinger', exit_espo_host, resumen_espo_host),
+            ('Plantilla Effi', exit_gen, resumen_gen),
+            ('Import a Effi', exit_imp_effi, resumen_imp_effi),
+        ]
+        for nombre, exit_code, resumen in pasos:
+            icono_paso = '❌' if exit_code != 0 else '✅'
+            # Solo mostrar los que fallaron + import (siempre útil)
+            if exit_code != 0 or nombre == 'Import':
+                partes.append(f'{icono_paso} {nombre}: {resumen}')
 
         enviar_telegram(env, '\n'.join(partes))
 
