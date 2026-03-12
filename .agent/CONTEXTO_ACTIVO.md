@@ -197,6 +197,7 @@ ResumenFacturacionPage (todos los meses)
 **Estado del servicio (2026-03-12):** ✅ Activo — `sudo systemctl status ia-service`
 **Pruebas pasadas:** enrutamiento automático, redacción, resumen — todas con Gemini Flash.
 **Para agregar keys:** ver instrucciones en `.agent/planes/plan_ia_service.md` (sección Pendiente)
+**Manual completo de agentes:** `.agent/manuales/ia_service_manual.md` — límites, endpoints, API keys, gotchas por proveedor
 
 ### Función principal
 ```python
