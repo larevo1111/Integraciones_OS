@@ -129,6 +129,23 @@ nombre_departamento VARCHAR(100)  -- Nombre depto (ej: 'Antioquia')
 nombre_display VARCHAR(150)       -- 'Medellín - Antioquia' (lo que se muestra en EspoCRM)
 ```
 
+### Flujo circular de ciudades (NO se daña al ir y volver)
+
+```
+EspoCRM: ciudad_nombre = "Medellín - Antioquia"
+  ↓ generar_plantilla_import_effi.py busca en codigos_ciudades_dane
+  ↓ nombre_display "Medellín - Antioquia" → codigo_municipio "05001"
+XLSX para Effi: columna "Código DANE Ciudad" = 05001
+  ↓ Effi recibe el código numérico
+  ↓ Effi guarda internamente el nombre
+Effi exporta: zeffi_clientes.ciudad = "Medellín", .departamento = "Antioquia"
+  ↓ sync_espocrm_contactos.py traduce de vuelta
+  ↓ ("Medellín", "Antioquia") → normalización → "Medellín - Antioquia"
+EspoCRM: ciudad_nombre = "Medellín - Antioquia" ← mismo valor, sin pérdida
+```
+
+**El valor en EspoCRM NUNCA se sobreescribe con solo "Medellín"** — siempre pasa por el traductor.
+
 ### Matching Effi → display (sync_espocrm_contactos.py)
 
 El matching es robusto:
@@ -256,7 +273,13 @@ JS (client) → POST /api/v1/ImportEffi/action/triggerImport
 - **NO soporta filtrar opciones de un enum según otro enum** (no hay cascading nativo)
 - Por eso se usa formato "Municipio - Departamento" en vez de 2 dropdowns separados
 
-### 5. Mismatch tipo_de_marketing
+### 5. id_cliente en facturas tiene prefijo tipo doc
+- `zeffi_facturas_venta_detalle.id_cliente` = "CC 74084937" o "NIT 900982270"
+- `zeffi_clientes.numero_de_identificacion` = "74084937" (solo el número)
+- Para hacer JOIN: usar `SUBSTRING_INDEX(d.id_cliente, ' ', -1)`
+- El script `calcular_resumen_ventas_canal.py` NO tiene este problema (usa `marketing_cliente` del detalle)
+
+### 6. Mismatch tipo_de_marketing
 - Los contactos fuente='Effi' pueden tener valores de tipo_de_marketing que no coinciden con `zeffi_tipos_marketing` (porque Effi renombra tipos)
 - Solo afecta fuente='Effi' al generar plantilla (lookup devuelve None)
 - No afecta fuente='CRM'
