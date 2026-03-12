@@ -311,7 +311,8 @@ def main():
                 'numero_identificacion': num_id[:100],
                 'tipo_identificacion':  v(c['tipo_de_identificacion']),
                 'tipo_persona':         v(c['tipo_de_persona']),
-                'tipo_cliente':         v(c['tipo_de_cliente']),
+                # tipo_cliente NO se sincroniza — se gestiona manualmente en EspoCRM
+                # con valores: Negocio amigo, Red de amigos, Cliente directo, Interno, Otro
                 'tipo_de_marketing':    v(c['tipo_de_marketing']),
                 'tarifa_precios':       v(c['tarifa_de_precios']),
                 'forma_pago':           v(c['forma_de_pago']),

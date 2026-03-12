@@ -228,8 +228,10 @@ def construir_fila(c, tarifas_map, marketing_map, ciudades_id_map, vendedores_ma
     if c.get('ciudad_nombre'):
         codigo_dane_ciudad = ciudades_id_map.get(c['ciudad_nombre'].strip().lower())
 
-    # Tipo de cliente → ID numérico Effi
-    tipo_cliente = TIPO_CLIENTE_MAP.get(c.get('tipo_cliente') or '', None)
+    # Tipo de cliente → siempre 1 (Común) para Effi
+    # En EspoCRM tipo_cliente tiene valores propios (Negocio amigo, Red de amigos, etc.)
+    # pero Effi solo necesita un valor obligatorio — Común (1) sirve para todos
+    tipo_cliente = 1
 
     # Vendedor → código numérico Effi (lookup por nombre completo)
     vendedor_id = None
