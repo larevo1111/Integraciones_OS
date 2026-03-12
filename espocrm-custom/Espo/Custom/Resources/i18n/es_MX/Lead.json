@@ -1,0 +1,18 @@
+{
+    "fields": {
+        "tipoDeMarketing": "Tipo de Marketing",
+        "tipoCliente": "Tipo de Cliente",
+        "tarifaPrecios": "Tarifa de Precios",
+        "numeroIdentificacion": "N° Identificación",
+        "tipoIdentificacion": "Tipo Identificación",
+        "tipoPersona": "Tipo de Persona",
+        "formaPago": "Forma de Pago",
+        "vendedorEffi": "Vendedor (Effi)",
+        "fuente": "Fuente",
+        "enviadoAEffi": "Enviado a Effi",
+        "ciudadNombre": "Municipio",
+        "direccion": "Dirección",
+        "direccionLinea2": "Referencia / Línea 2",
+        "calificacionNegocioAmigo": "Clasificación Cliente"
+    }
+}

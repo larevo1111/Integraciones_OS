@@ -1,0 +1,67 @@
+[
+    {
+        "label": "Vista",
+        "rows": [
+            [
+                {"name": "name"},
+                {"name": "accountName"}
+            ],
+            [
+                {"name": "emailAddress"},
+                {"name": "phoneNumber"}
+            ],
+            [
+                {"name": "tipoDeMarketing"},
+                {"name": "tipoCliente"}
+            ],
+            [
+                {"name": "calificacionNegocioAmigo"},
+                false
+            ],
+            [
+                {"name": "numeroIdentificacion"},
+                {"name": "tipoIdentificacion"}
+            ],
+            [
+                {"name": "tipoPersona"},
+                {"name": "vendedorEffi"}
+            ],
+            [
+                {"name": "tarifaPrecios"},
+                {"name": "formaPago"}
+            ],
+            [
+                {"name": "ciudadNombre"},
+                false
+            ],
+            [
+                {"name": "direccion"},
+                {"name": "direccionLinea2"}
+            ],
+            [
+                {"name": "title"},
+                {"name": "website"}
+            ]
+        ]
+    },
+    {
+        "label": "Detalles",
+        "rows": [
+            [
+                {"name": "status"},
+                {"name": "source"}
+            ],
+            [
+                {"name": "opportunityAmount"},
+                {"name": "campaign"}
+            ],
+            [
+                {"name": "industry"},
+                false
+            ],
+            [
+                {"name": "description", "fullWidth": true}
+            ]
+        ]
+    }
+]
