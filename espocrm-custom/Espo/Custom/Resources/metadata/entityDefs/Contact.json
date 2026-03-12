@@ -59,7 +59,6 @@
         "tipoCliente": {
             "type": "enum",
             "options": [
-                "",
                 "Negocio amigo",
                 "Red de amigos",
                 "Cliente directo",
@@ -1285,27 +1284,11 @@
         "calificacionNegocioAmigo": {
             "type": "enum",
             "options": [
-                "",
                 "A",
                 "B",
                 "C"
             ],
             "default": ""
-        }
-    },
-    "dynamicLogic": {
-        "fields": {
-            "calificacionNegocioAmigo": {
-                "visible": {
-                    "conditionGroup": [
-                        {
-                            "type": "equals",
-                            "attribute": "tipoCliente",
-                            "value": "Negocio amigo"
-                        }
-                    ]
-                }
-            }
         }
     }
 }
