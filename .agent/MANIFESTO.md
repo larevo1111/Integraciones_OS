@@ -205,8 +205,10 @@ Para que la IA no invente respuestas o datos financieros, el flujo técnico obli
 
 - `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
 - `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
-- `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts. **Actualizar obligatoriamente al crear o modificar cualquier script.**
-- `.agent/skills/` — Skills individuales con conocimiento especializado.
+- `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts ejecutables (Python/JS). **Actualizar obligatoriamente al crear o modificar cualquier script.**
+- `.agent/catalogo-skills.md` — Catálogo de conocimientos fundacionales. Índice de cómo se hacen las cosas.
+- `.agent/skills/` — Skills individuales con conocimiento especializado (Ej. `.agent/skills/manejo_ia.md`).
+- `.agent/planes/` — Especificaciones de construcción técnica para las features (Ej. `.agent/planes/bot_telegram.md`).
 - `.agent/docs/` — Informes y documentación externa.
 
 ### Protocolo de documentación de scripts
