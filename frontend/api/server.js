@@ -169,14 +169,14 @@ app.get('/api/ventas/cliente-productos', async (req, res) => {
     if (!id_cliente) return res.status(400).json({ error: 'id_cliente requerido' })
     const params = [id_cliente]
     let sql = `
-      SELECT d.cod_articulo, d.nombre_articulo AS nombre,
+      SELECT d.cod_articulo, d.descripcion_articulo AS nombre,
              SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
              SUM(d.cantidad) AS vol_unidades_vendidas,
              COUNT(DISTINCT d.id_interno) AS vol_num_facturas
       FROM zeffi_facturas_venta_detalle d
       WHERE d.id_cliente = ?`
     if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
-    sql += ` GROUP BY d.cod_articulo, d.nombre_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
+    sql += ` GROUP BY d.cod_articulo, d.descripcion_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
     const rows = await query(sql, params)
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
@@ -209,14 +209,14 @@ app.get('/api/ventas/canal-productos', async (req, res) => {
     if (!canal) return res.status(400).json({ error: 'canal requerido' })
     const params = [canal]
     let sql = `
-      SELECT d.cod_articulo, d.nombre_articulo AS nombre,
+      SELECT d.cod_articulo, d.descripcion_articulo AS nombre,
              SUM(d.precio_bruto_total - d.descuento_total) AS fin_ventas_netas_sin_iva,
              SUM(d.cantidad) AS vol_unidades_vendidas,
              COUNT(DISTINCT d.id_interno) AS vol_num_facturas
       FROM zeffi_facturas_venta_detalle d
       WHERE d.marketing_cliente = ?`
     if (mes) { sql += ` AND LEFT(d.fecha_creacion_factura, 7) = ?`; params.push(mes) }
-    sql += ` GROUP BY d.cod_articulo, d.nombre_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
+    sql += ` GROUP BY d.cod_articulo, d.descripcion_articulo ORDER BY fin_ventas_netas_sin_iva DESC LIMIT 500`
     const rows = await query(sql, params)
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
