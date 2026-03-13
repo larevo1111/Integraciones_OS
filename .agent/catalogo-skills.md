@@ -11,6 +11,7 @@ Skills de arquitectura abstracta y reglas de negocio obligatorias.
 | Nombre de la Skill | Archivo Físico | Descripción | Regla Crítica |
 |--------------------|----------------|-------------|---------------|
 | **Servicio Central de IA** | `.agent/skills/manejo_ia.md` | Arquitectura completa del ia_service_os: agentes, enrutamiento, resumen vivo, consumo. Sirve a todos los proyectos OS. | **Regla de los 3 Pasos (Anti-Alucinaciones):** 1. Generar SQL 2. Ejecutar SQL 3. Responder con datos reales. NUNCA inventar cifras. |
+| **Integridad de Datos** | `.agent/skills/integridad_datos.md` | 8 checks universales para verificar cualquier tabla/vista resumen generada desde una fuente: muestreo manual, suma total vs fuente, consistencia entre granularidades, unicidad de PK, porcentajes, campos derivados, comparativos year_ant/mes_ant, NULLs. | **Obligatorio** ejecutar antes de dar por terminado cualquier script de agregación o resumen. |
 
 ---
 

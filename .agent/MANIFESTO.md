@@ -175,14 +175,7 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 - **id_cliente en facturas/remisiones**: formato "CC 74084937" (con prefijo tipo doc). `zeffi_clientes.numero_de_identificacion` = "74084937" (sin prefijo). Para JOIN: `SUBSTRING_INDEX(d.id_cliente, ' ', -1)`.
 
 ### Verificación obligatoria de scripts analíticos
-Al crear o modificar cualquier script de resumen, correr queries V1–V7 del skill `effi-database`:
-1. **V1** Comparar campo a campo contra tabla fuente (diff = 0)
-2. **V2** SUM(tabla_desglosada) vs tabla_total (diff ≤ 0.30 = solo redondeo DECIMAL)
-3. **V3** Porcentajes suman 1.0 por período
-4. **V4** `pry_*` NULL en períodos cerrados
-5. **V5** resumen_mes financiero vs fuente encabezados (diff = 0)
-6. **V6** `con_consignacion_pp` cliente_mes vs OVs fuente directa (0 filas con diff)
-7. **V7** `cli_clientes_nuevos` canal_mes vs fuente directa (0 filas con diff)
+Al crear o modificar cualquier script de resumen, ejecutar los checks de integridad documentados en **`.agent/skills/integridad_datos.md`** antes de dar la tarea por terminada. Ningún script analítico se considera completo sin haber pasado esas verificaciones.
 
 ### NocoDB
 - Tablas externas son solo lectura — relaciones entre tablas externas NO funcionan. Usar vistas SQL en MariaDB para JOINs.
