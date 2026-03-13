@@ -11,6 +11,7 @@ const path    = require('path')
 const mysql   = require('mysql2/promise')
 const jwt     = require('jsonwebtoken')
 const https   = require('https')
+const http    = require('http')
 const fs      = require('fs')
 const os      = require('os')
 const { exec } = require('child_process')
@@ -933,7 +934,7 @@ app.put('/api/ia/conexiones/:id', requireAdmin, async (req, res) => {
     if (base_datos !== undefined) { fields.push('base_datos = ?'); params.push(base_datos) }
     if (notas      !== undefined) { fields.push('notas = ?');      params.push(notas) }
     if (activo     !== undefined) { fields.push('activo = ?');     params.push(activo) }
-    fields.push('usuario_ult_mod = ?'); params.push(req.user)
+    fields.push('usuario_ult_mod = ?'); params.push(req.usuario?.email || null)
     params.push(req.params.id)
     await db.execute(`UPDATE ia_conexiones_bd SET ${fields.join(', ')} WHERE id = ?`, params)
     res.json({ ok: true })

@@ -24,6 +24,7 @@ const routes = [
       { path: 'ventas/cartera/:id_cliente',           component: () => import('pages/ventas/DetalleCarteraClientePage.vue') },
       { path: 'ventas/consignacion',                  component: () => import('pages/ventas/ConsignacionPage.vue') },
       { path: 'ventas/consignacion-cliente/:id_cliente', component: () => import('pages/ventas/ConsignacionClientePage.vue') },
+      { path: 'ventas/consignacion-producto/:cod_articulo', component: () => import('pages/ventas/ConsignacionProductoPage.vue') },
       { path: 'ventas/consignacion-orden/:id_orden',  component: () => import('pages/ventas/DetalleConsignacionPage.vue') },
       { path: 'ventas/pedidos-pendientes',  component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/facturas',            component: () => import('pages/PlaceholderPage.vue') },

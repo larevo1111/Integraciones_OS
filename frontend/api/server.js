@@ -470,6 +470,28 @@ app.get('/api/ventas/consignacion-por-producto', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ── CONSIGNACIÓN PRODUCTO: órdenes activas que contienen un producto (Nivel 2 desde producto) ─
+app.get('/api/ventas/consignacion-producto/:cod_articulo', async (req, res) => {
+  try {
+    const cod = decodeURIComponent(req.params.cod_articulo)
+    const rows = await query(`
+      SELECT e.id_orden, e.nombre_cliente, e.id_cliente, e.vendedor, e.ciudad,
+             CAST(REPLACE(COALESCE(e.total_neto,'0'),',','.') AS DECIMAL(15,2)) AS fin_total_orden,
+             e.fecha_de_creacion, e.fecha_de_entrega,
+             MIN(COALESCE(NULLIF(TRIM(d.descripcion_en_factura),''), d.descripcion_original)) AS descripcion_articulo,
+             ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4)))) AS cantidad_producto,
+             ROUND(SUM(CAST(REPLACE(COALESCE(d.total_neto,'0'),',','.') AS DECIMAL(15,2)))) AS fin_total_producto
+      FROM zeffi_ordenes_venta_encabezados e
+      JOIN zeffi_ordenes_venta_detalle d ON d.id_orden = e.id_orden
+      WHERE e.vigencia = 'Vigente' AND d.cod_articulo = ?
+      GROUP BY e.id_orden, e.nombre_cliente, e.id_cliente, e.vendedor, e.ciudad,
+               e.total_neto, e.fecha_de_creacion, e.fecha_de_entrega
+      ORDER BY e.fecha_de_creacion ASC`,
+      [cod])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 app.get('/api/ventas/consignacion-orden/:id_orden', async (req, res) => {
   try {
     const { id_orden } = req.params

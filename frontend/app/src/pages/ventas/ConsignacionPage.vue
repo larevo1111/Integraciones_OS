@@ -72,6 +72,7 @@
         :rows="rowsProductos"
         :columns="colsProductos"
         :loading="loadingProductos"
+        @row-click="onRowClickProducto"
       />
 
     </div>
@@ -149,6 +150,10 @@ function fmtMoney(n) {
 
 function onRowClickCliente(row) {
   router.push(`/ventas/consignacion-cliente/${encodeURIComponent(row.id_cliente)}`)
+}
+
+function onRowClickProducto(row) {
+  router.push(`/ventas/consignacion-producto/${encodeURIComponent(row.cod_articulo)}`)
 }
 
 onMounted(async () => {
