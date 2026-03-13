@@ -90,7 +90,7 @@ const inicial = computed(() => props.usuario.nombre?.charAt(0).toUpperCase() || 
 <style scoped>
 .sidebar {
   width: 220px;
-  height: 100vh;
+  height: 100%;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
   display: flex;

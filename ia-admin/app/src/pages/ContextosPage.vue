@@ -136,20 +136,46 @@
           <button class="btn-icon" @click="cerrarPanel"><XIcon :size="15" /></button>
         </div>
         <div class="side-panel-body">
+
+          <!-- Zona de carga de archivo (solo en nuevo documento) -->
+          <div v-if="!docSeleccionado" class="upload-section">
+            <div
+              class="upload-zone"
+              :class="{ 'drag-over': dragging, 'upload-done': archivoSeleccionado }"
+              @dragover.prevent="dragging = true"
+              @dragleave.prevent="dragging = false"
+              @drop.prevent="onDrop"
+              @click="$refs.inputArchivo.click()"
+            >
+              <input
+                ref="inputArchivo"
+                type="file"
+                accept=".pdf,.doc,.docx,.xlsx,.xls,.xlsm,.csv,.txt,.md,.jpg,.jpeg,.png,.webp,.gif,.bmp"
+                style="display:none"
+                @change="onFileChange"
+              />
+              <template v-if="archivoSeleccionado">
+                <FileTextIcon :size="20" />
+                <span class="upload-filename">{{ archivoSeleccionado.name }}</span>
+                <span class="upload-size text-muted">{{ formatBytes(archivoSeleccionado.size) }}</span>
+                <button class="btn-link text-muted" style="font-size:11px" @click.stop="limpiarArchivo">Cambiar archivo</button>
+              </template>
+              <template v-else>
+                <UploadIcon :size="20" />
+                <span class="upload-hint">Arrastra un archivo o <strong>haz clic</strong> para seleccionar</span>
+                <span class="upload-types">PDF · DOCX · XLSX · CSV · TXT · JPG · PNG · y más</span>
+              </template>
+            </div>
+            <div class="upload-divider"><span>o escribe el contenido manualmente</span></div>
+          </div>
+
           <div class="input-group">
-            <label class="input-label">Nombre *</label>
+            <label class="input-label">Nombre del documento *</label>
             <input class="input-field" v-model="formDoc.nombre" placeholder="Ej: Política de precios 2026" />
           </div>
-          <div class="input-group">
-            <label class="input-label">Tipo *</label>
-            <select class="input-field" v-model="formDoc.tipo">
-              <option value="texto">Texto</option>
-              <option value="manual">Manual</option>
-              <option value="url">URL</option>
-              <option value="pdf">PDF</option>
-            </select>
-          </div>
-          <div class="input-group">
+
+          <!-- Contenido solo si NO hay archivo seleccionado (o editando existente) -->
+          <div v-if="!archivoSeleccionado" class="input-group">
             <label class="input-label">Contenido *</label>
             <textarea
               class="input-field"
@@ -170,7 +196,12 @@
             </button>
           </div>
 
-          <div class="input-group" style="display:flex;align-items:center;gap:10px">
+          <!-- Estado de procesamiento -->
+          <div v-if="estadoUpload" class="upload-status" :class="uploadOk ? 'upload-status-ok' : 'upload-status-err'">
+            {{ estadoUpload }}
+          </div>
+
+          <div v-if="docSeleccionado" class="input-group" style="display:flex;align-items:center;gap:10px">
             <label class="toggle">
               <input type="checkbox" v-model="formDoc.activo" />
               <div class="toggle-track"></div>
@@ -183,7 +214,7 @@
           <button v-if="docSeleccionado" class="btn btn-danger" @click="eliminarDocPanel">Eliminar</button>
           <button class="btn btn-secondary" @click="cerrarPanel">Cancelar</button>
           <button class="btn btn-primary" @click="guardarDoc" :disabled="guardando">
-            {{ guardando ? 'Guardando...' : 'Guardar' }}
+            {{ guardando ? 'Procesando...' : (docSeleccionado ? 'Guardar' : (archivoSeleccionado ? 'Subir y procesar' : 'Guardar')) }}
           </button>
         </div>
       </div>
@@ -237,7 +268,7 @@
 <script setup>
 import { apiFetch, api } from 'src/services/api'
 import { ref, computed, onMounted } from 'vue'
-import { PlusIcon, PencilIcon, XIcon, TrashIcon } from 'lucide-vue-next'
+import { PlusIcon, PencilIcon, XIcon, TrashIcon, UploadIcon, FileTextIcon } from 'lucide-vue-next'
 
 // ── Estado ────────────────────────────────────────────────────────
 const temas        = ref([])
@@ -250,6 +281,13 @@ const docSeleccionado = ref(null)
 const cargandoDocs = ref(false)
 const guardando    = ref(false)
 const creandoTema  = ref(false)
+
+// Upload de archivos
+const archivoSeleccionado = ref(null)
+const dragging            = ref(false)
+const estadoUpload        = ref('')
+const uploadOk            = ref(true)
+const inputArchivo        = ref(null)
 
 const formDoc = ref({ nombre: '', tipo: 'texto', contenido: '', activo: true })
 const formTema = ref({ slug: '', nombre: '', descripcion: '', system_prompt: '', agente_preferido: '' })
@@ -327,38 +365,93 @@ async function abrirEditarDoc(doc) {
   } catch (e) {}
 }
 
+// ── Manejo de archivos ────────────────────────────────────────────
+function onFileChange(e) {
+  const file = e.target.files?.[0]
+  if (file) seleccionarArchivo(file)
+}
+function onDrop(e) {
+  dragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file) seleccionarArchivo(file)
+}
+function seleccionarArchivo(file) {
+  archivoSeleccionado.value = file
+  estadoUpload.value = ''
+  // Autocompletar nombre si está vacío
+  if (!formDoc.value.nombre) {
+    formDoc.value.nombre = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+  }
+}
+function limpiarArchivo() {
+  archivoSeleccionado.value = null
+  estadoUpload.value = ''
+  if (inputArchivo.value) inputArchivo.value.value = ''
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
 function cerrarPanel() {
   panelAbierto.value = false
   docSeleccionado.value = null
   formDoc.value = { nombre: '', tipo: 'texto', contenido: '', activo: true }
+  limpiarArchivo()
 }
 
 async function guardarDoc() {
   if (!formDoc.value.nombre?.trim()) { alert('El nombre es requerido'); return }
-  if (!formDoc.value.contenido?.trim()) { alert('El contenido es requerido'); return }
   guardando.value = true
+  estadoUpload.value = ''
   try {
     if (docSeleccionado.value) {
+      // Editar documento existente
+      if (!formDoc.value.contenido?.trim()) { alert('El contenido es requerido'); guardando.value = false; return }
       const res = await apiFetch(`/api/ia/rag/documentos/${docSeleccionado.value.id}`, {
         method: 'PUT',
         body: JSON.stringify(formDoc.value)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al guardar')
+    } else if (archivoSeleccionado.value) {
+      // Nuevo documento desde archivo
+      estadoUpload.value = 'Extrayendo texto del archivo...'
+      const fd = new FormData()
+      fd.append('archivo', archivoSeleccionado.value)
+      fd.append('nombre', formDoc.value.nombre.trim())
+      const token = localStorage.getItem('ia_jwt') || ''
+      const res = await fetch(`/api/ia/rag/temas/${temaActivo.value.id}/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al procesar archivo')
+      estadoUpload.value = `✓ ${data.fragmentos_creados} fragmentos indexados`
+      uploadOk.value = true
+      await cargarDocumentos()
+      await cargarTemas()
+      limpiarArchivo()
+      guardando.value = false
+      return
     } else {
+      // Nuevo documento desde texto
+      if (!formDoc.value.contenido?.trim()) { alert('El contenido es requerido'); guardando.value = false; return }
       const res = await apiFetch(`/api/ia/rag/temas/${temaActivo.value.id}/documentos`, {
         method: 'POST',
         body: JSON.stringify(formDoc.value)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al crear')
-      if (data.advertencia) console.warn(data.advertencia)
     }
     cerrarPanel()
     await cargarDocumentos()
     await cargarTemas()
   } catch (e) {
-    alert('Error: ' + e.message)
+    estadoUpload.value = '✗ Error: ' + e.message
+    uploadOk.value = false
   }
   guardando.value = false
 }
@@ -659,5 +752,67 @@ onMounted(cargarTemas)
 
 .text-muted {
   color: var(--text-tertiary);
+}
+
+/* ─── Upload de archivos ──────────────────────────────── */
+.upload-section { display: flex; flex-direction: column; gap: 0; margin-bottom: 16px; }
+
+.upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 16px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  transition: border-color 80ms, background 80ms;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+.upload-zone.upload-done {
+  border-style: solid;
+  border-color: var(--color-success);
+  background: transparent;
+  color: var(--text-primary);
+}
+.upload-hint { font-size: 12px; color: var(--text-secondary); }
+.upload-types { font-size: 10px; color: var(--text-tertiary); letter-spacing: 0.03em; }
+.upload-filename { font-size: 13px; font-weight: 500; color: var(--text-primary); word-break: break-all; }
+.upload-size { font-size: 11px; }
+
+.upload-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.upload-divider::before, .upload-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.upload-status {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.upload-status-ok  { background: var(--color-success-bg, #ecfdf5); color: var(--color-success); }
+.upload-status-err { background: var(--color-error-bg);  color: var(--color-error); }
+
+.btn-link {
+  background: none; border: none; cursor: pointer; padding: 0;
+  text-decoration: underline; font-family: inherit;
 }
 </style>

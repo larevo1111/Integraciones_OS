@@ -12,9 +12,44 @@ const mysql   = require('mysql2/promise')
 const jwt     = require('jsonwebtoken')
 const https   = require('https')
 const fs      = require('fs')
+const os      = require('os')
 const { exec } = require('child_process')
 const util     = require('util')
 const execAsync = util.promisify(exec)
+const multer   = require('multer')
+
+// Multer — archivos en /tmp, máx 50 MB
+const upload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 50 * 1024 * 1024 }
+})
+
+// Extraer texto de un archivo usando el extractor Python
+async function extraerTextoPython(rutaArchivo, nombreOriginal) {
+  const tmpFile = `/tmp/rag_ext_${Date.now()}.py`
+  const pyScript = `import sys, json
+sys.path.insert(0, 'scripts')
+from ia_service.extractor import extraer_texto
+try:
+    texto = extraer_texto(${JSON.stringify(rutaArchivo)}, ${JSON.stringify(nombreOriginal)})
+    print(json.dumps({'ok': True, 'texto': texto}))
+except Exception as e:
+    print(json.dumps({'ok': False, 'error': str(e)}))
+`
+  fs.writeFileSync(tmpFile, pyScript)
+  try {
+    const { stdout } = await execAsync(`python3 ${tmpFile}`, {
+      cwd: '/home/osserver/Proyectos_Antigravity/Integraciones_OS',
+      timeout: 120000
+    })
+    const result = JSON.parse(stdout.trim())
+    if (!result.ok) throw new Error(result.error)
+    return result.texto
+  } finally {
+    try { fs.unlinkSync(tmpFile) } catch {}
+    try { fs.unlinkSync(rutaArchivo) } catch {}
+  }
+}
 
 async function indexarEnPython(docId, contenido, temaId, empresa = 'ori_sil_2') {
   const escaped = contenido.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '')
@@ -735,6 +770,67 @@ app.delete('/api/ia/rag/documentos/:id', requireAdmin, async (req, res) => {
     await db.execute('DELETE FROM ia_rag_documentos WHERE id = ?', [req.params.id])
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/ia/rag/temas/:id/upload — subir archivo, extraer texto e indexar
+app.post('/api/ia/rag/temas/:id/upload', requireAdmin, upload.single('archivo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' })
+  const temaId = parseInt(req.params.id)
+  const nombreOriginal = req.file.originalname || 'archivo'
+  const { nombre } = req.body  // nombre opcional del documento (default = nombreOriginal sin ext)
+
+  try {
+    const [[tema]] = await db.execute('SELECT empresa FROM ia_temas WHERE id = ?', [temaId])
+    if (!tema) return res.status(404).json({ error: 'Tema no encontrado' })
+    if (req.empresa && tema.empresa !== req.empresa) {
+      return res.status(403).json({ error: 'No tienes acceso a este tema' })
+    }
+
+    // Extraer texto del archivo
+    let texto
+    try {
+      texto = await extraerTextoPython(req.file.path, nombreOriginal)
+    } catch (e) {
+      return res.status(422).json({ error: 'No se pudo extraer texto: ' + e.message })
+    }
+
+    if (!texto?.trim()) {
+      return res.status(422).json({ error: 'El archivo no contiene texto extraíble' })
+    }
+
+    // Detectar tipo por extensión
+    const ext = nombreOriginal.split('.').pop().toLowerCase()
+    const tipoMap = { pdf: 'pdf', docx: 'manual', doc: 'manual',
+                      xlsx: 'tabla', xls: 'tabla', xlsm: 'tabla',
+                      csv: 'tabla', txt: 'texto', md: 'texto',
+                      jpg: 'imagen', jpeg: 'imagen', png: 'imagen',
+                      webp: 'imagen', gif: 'imagen' }
+    const tipo = tipoMap[ext] || 'texto'
+    const nombreDoc = (nombre?.trim() || nombreOriginal.replace(/\.[^.]+$/, '')).slice(0, 200)
+
+    // Guardar documento en BD
+    const [result] = await db.execute(
+      'INSERT INTO ia_rag_documentos (empresa, tema_id, nombre, tipo, contenido_original) VALUES (?, ?, ?, ?, ?)',
+      [tema.empresa, temaId, nombreDoc, tipo, texto]
+    )
+    const docId = result.insertId
+
+    // Indexar fragmentos
+    let fragmentos = 0
+    try {
+      fragmentos = await indexarEnPython(docId, texto, temaId, tema.empresa)
+    } catch (e) {
+      // Documento creado pero sin fragmentos — advertir pero no fallar
+      return res.json({ ok: true, id: docId, fragmentos_creados: 0,
+        advertencia: 'Documento creado pero indexación falló: ' + e.message })
+    }
+
+    res.json({ ok: true, id: docId, fragmentos_creados: fragmentos,
+      nombre: nombreDoc, tipo, chars: texto.length })
+  } catch (e) {
+    try { fs.unlinkSync(req.file.path) } catch {}
+    res.status(500).json({ error: e.message })
+  }
 })
 
 // ─── RAG — BÚSQUEDA DE PRUEBA ─────────────────────────────────────
