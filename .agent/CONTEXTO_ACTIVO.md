@@ -279,7 +279,9 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
+1. **QA completo del módulo IA** — testeo con Antigravity: chat, enrutador, RAG upload, schema sync
+2. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
+3. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
 2. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 3. **DeepSeek** — Santi obtiene key en platform.deepseek.com → activar deepseek-chat + deepseek-reasoner
 4. **Claude Sonnet** — Santi recarga $5 en console.anthropic.com → activar claude-sonnet
@@ -291,6 +293,7 @@ resultado = consultar(
 - ✅ ia-admin: módulo Contextos RAG — UI Vue completa + 8 endpoints API
 - ✅ Documentación Antigravity Google Labs — `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`
 - ✅ Roles del equipo actualizados en MANIFESTO.md (Antigravity Google Labs ≠ Subagentes Claude)
+- ✅ **Módulo Conexiones BD** — ia_conexiones_bd + ia_esquemas por tema, conector.py multi-BD, UI ConexionesPage + editor schema en Contextos, endpoints Flask /ia/conexion/test + /ia/esquema/sync
 - ✅ **Multi-empresa (multi-tenant) completo** — BD migrada, backend con auth 2 pasos, frontend con header empresa + login 2 pasos
   - Nuevas tablas: `ia_empresas`, `ia_usuarios_empresas`
   - Todas las tablas existentes con campo `empresa` + auditoría
