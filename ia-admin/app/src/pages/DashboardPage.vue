@@ -7,6 +7,7 @@
 
     <div class="page-content">
       <!-- KPIs hoy -->
+      <div class="section-label">Hoy</div>
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-label">Llamadas hoy</div>
@@ -30,10 +31,30 @@
           </div>
           <div class="kpi-meta">llamadas fallidas</div>
         </div>
-        <div class="kpi-card">
+      </div>
+
+      <!-- KPIs del mes -->
+      <div class="section-label" style="margin-top:24px">Este mes</div>
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-highlight">
           <div class="kpi-label">Costo del mes</div>
-          <div class="kpi-value">${{ consumo?.por_agente?.filter(a=>a.estado=='ok').length ?? 0 }}</div>
-          <div class="kpi-meta">agentes en estado OK</div>
+          <div class="kpi-value">${{ costoMes.toFixed(4) }}</div>
+          <div class="kpi-meta">USD acumulado</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Llamadas del mes</div>
+          <div class="kpi-value">{{ fmt(llamadasMes) }}</div>
+          <div class="kpi-meta">total de llamadas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Tokens del mes</div>
+          <div class="kpi-value">{{ fmt(tokensMes) }}</div>
+          <div class="kpi-meta">acumulados</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ciclo de facturación</div>
+          <div class="kpi-value" style="font-size:18px">{{ cicloPeriodo }}</div>
+          <div class="kpi-meta">{{ diasRestantes }} días restantes</div>
         </div>
       </div>
 
@@ -45,17 +66,15 @@
         </div>
       </div>
 
-      <!-- Consumo por agente -->
+      <!-- Consumo por agente hoy -->
       <div class="tabla-wrap" style="margin-bottom:20px">
         <div class="tabla-header">
           <span class="tabla-titulo">Consumo por agente — hoy</span>
-          <button class="btn-icon" title="Actualizar" @click="cargarConsumo">
+          <button class="btn-icon" title="Actualizar" @click="cargar">
             <RefreshCwIcon :size="13" :class="{ 'spin': cargando }" />
           </button>
         </div>
-        <div v-if="cargando" class="empty-state">
-          <p>Cargando...</p>
-        </div>
+        <div v-if="cargando" class="empty-state"><p>Cargando...</p></div>
         <table v-else class="os-table">
           <thead>
             <tr>
@@ -80,7 +99,7 @@
                     <div class="progress-bar-fill" :style="{ width: `${Math.min(ag.pct_limite_hoy||0,100)}%`, background: colorBarra(ag.estado) }" />
                   </div>
                   <span :style="{ color: colorTexto(ag.estado), fontSize:'12px', fontWeight:500 }">
-                    {{ ag.pct_limite_hoy != null ? ag.pct_limite_hoy != null ? ag.pct_limite_hoy.toFixed(1)+'%' : '—' : '—' }}
+                    {{ ag.pct_limite_hoy != null ? ag.pct_limite_hoy.toFixed(1)+'%' : '—' }}
                   </span>
                 </div>
               </td>
@@ -91,6 +110,40 @@
             </tr>
             <tr v-if="!consumo?.por_agente?.length">
               <td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:24px">Sin datos hoy</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Histórico 30 días -->
+      <div class="tabla-wrap" style="margin-bottom:20px">
+        <div class="tabla-header">
+          <span class="tabla-titulo">Histórico — últimos 30 días por agente</span>
+        </div>
+        <table class="os-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Agente</th>
+              <th>Llamadas</th>
+              <th>Tokens</th>
+              <th>Costo USD</th>
+              <th>Latencia prom.</th>
+              <th>Errores</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in historico" :key="`${r.fecha}-${r.agente_slug}`">
+              <td class="mono">{{ fechaCorta(r.fecha) }}</td>
+              <td>{{ r.agente_slug }}</td>
+              <td>{{ r.llamadas }}</td>
+              <td>{{ fmt(r.tokens_total) }}</td>
+              <td>${{ Number(r.costo_usd).toFixed(4) }}</td>
+              <td>{{ r.latencia_prom_ms ? r.latencia_prom_ms+'ms' : '—' }}</td>
+              <td :style="{ color: r.errores > 0 ? 'var(--color-error)' : 'inherit' }">{{ r.errores }}</td>
+            </tr>
+            <tr v-if="!historico.length">
+              <td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:24px">Sin datos históricos</td>
             </tr>
           </tbody>
         </table>
@@ -139,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
 import { RefreshCwIcon, AlertTriangleIcon } from 'lucide-vue-next'
@@ -147,29 +200,65 @@ import { RefreshCwIcon, AlertTriangleIcon } from 'lucide-vue-next'
 const authStore = useAuthStore()
 const usuario = authStore.usuario
 
-const consumo = ref(null)
-const logs = ref([])
-const cargando = ref(true)
+const consumo   = ref(null)
+const historico = ref([])
+const logs      = ref([])
+const cargando  = ref(true)
 const cargandoLogs = ref(true)
 
-async function cargarConsumo() {
+// ─── Costo / llamadas / tokens del mes actual ──────────────────────
+const costoMes = computed(() => {
+  if (!historico.value.length) return 0
+  const mesActual = new Date().toISOString().slice(0, 7) // "2026-03"
+  return historico.value
+    .filter(r => r.fecha && r.fecha.slice(0, 7) === mesActual)
+    .reduce((acc, r) => acc + Number(r.costo_usd || 0), 0)
+})
+const llamadasMes = computed(() => {
+  const mesActual = new Date().toISOString().slice(0, 7)
+  return historico.value
+    .filter(r => r.fecha && r.fecha.slice(0, 7) === mesActual)
+    .reduce((acc, r) => acc + (r.llamadas || 0), 0)
+})
+const tokensMes = computed(() => {
+  const mesActual = new Date().toISOString().slice(0, 7)
+  return historico.value
+    .filter(r => r.fecha && r.fecha.slice(0, 7) === mesActual)
+    .reduce((acc, r) => acc + (r.tokens_total || 0), 0)
+})
+
+// ─── Ciclo de facturación: del 1 al último día del mes ────────────
+const cicloPeriodo = computed(() => {
+  const hoy = new Date()
+  const y = hoy.getFullYear(), m = hoy.getMonth()
+  const fin = new Date(y, m + 1, 0) // último día del mes
+  const opts = { day: 'numeric', month: 'short' }
+  return `1–${fin.getDate()} ${fin.toLocaleString('es-CO', { month: 'short' })} ${y}`
+})
+const diasRestantes = computed(() => {
+  const hoy = new Date()
+  const fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1)
+  return Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24))
+})
+
+async function cargar() {
   cargando.value = true
+  try { consumo.value = await api('/api/ia/consumo') } catch { consumo.value = null }
   try {
-    consumo.value = await api('/api/ia/consumo')
-  } catch (e) { consumo.value = null }
+    const res = await api('/api/ia/consumo/historico')
+    historico.value = (res.registros || []).sort((a, b) => b.fecha > a.fecha ? 1 : -1)
+  } catch { historico.value = [] }
   cargando.value = false
 }
 
 async function cargarLogs() {
   cargandoLogs.value = true
-  try {
-    logs.value = (await api('/api/ia/logs?limit=20')).rows
-  } catch (e) { logs.value = [] }
+  try { logs.value = (await api('/api/ia/logs?limit=20')).rows } catch { logs.value = [] }
   cargandoLogs.value = false
 }
 
 onMounted(() => {
-  cargarConsumo()
+  cargar()
   cargarLogs()
 })
 
@@ -177,12 +266,15 @@ function fmt(n) {
   if (n == null) return '—'
   return Number(n).toLocaleString('es-CO')
 }
-
 function horaCorta(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
-
+function fechaCorta(ts) {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+}
 function colorBarra(estado) {
   if (estado === 'critico') return 'var(--color-error)'
   if (estado === 'advertencia') return 'var(--color-warning)'
@@ -202,7 +294,18 @@ function badgeEstado(estado) {
 </script>
 
 <style scoped>
-.alertas-wrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.kpi-highlight {
+  border-color: var(--color-accent);
+}
+.alertas-wrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; margin-top: 16px; }
 .alerta-item {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px;

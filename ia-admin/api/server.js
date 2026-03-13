@@ -138,18 +138,31 @@ app.get('/api/health', async (req, res) => {
 // ─── A partir de aquí: TODOS los endpoints requieren auth ─────────
 app.use('/api/ia', requireAuth)
 
+// ─── helper proxy al ia-service ───────────────────────────────────
+function proxyIaService(path) {
+  return new Promise((resolve, reject) => {
+    const http = require('http')
+    http.get(`http://localhost:5100${path}`, r => {
+      let body = ''
+      r.on('data', d => body += d)
+      r.on('end', () => { try { resolve(JSON.parse(body)) } catch(e) { reject(e) } })
+    }).on('error', reject)
+  })
+}
+
 // ─── /api/ia/consumo (proxy al ia-service) ────────────────────────
 app.get('/api/ia/consumo', async (req, res) => {
   try {
-    const http = require('http')
-    const data = await new Promise((resolve, reject) => {
-      http.get('http://localhost:5100/ia/consumo', r => {
-        let body = ''
-        r.on('data', d => body += d)
-        r.on('end', () => resolve(JSON.parse(body)))
-      }).on('error', reject)
-    })
-    res.json(data)
+    res.json(await proxyIaService('/ia/consumo'))
+  } catch (e) {
+    res.status(502).json({ error: 'ia-service no disponible: ' + e.message })
+  }
+})
+
+// ─── /api/ia/consumo/historico (proxy al ia-service) ──────────────
+app.get('/api/ia/consumo/historico', async (req, res) => {
+  try {
+    res.json(await proxyIaService('/ia/consumo/historico'))
   } catch (e) {
     res.status(502).json({ error: 'ia-service no disponible: ' + e.message })
   }
