@@ -184,7 +184,25 @@ ResumenFacturacionPage (solo tabla de meses — sin acordeones)
 
 > **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
 > Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
-> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, **Contextos (pendiente Antigravity)**. Auth Google OAuth + JWT propio.
+> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT propio (2 pasos: Google → selección empresa → JWT final con `empresa_activa`).
+
+### Multi-empresa (multi-tenant) — IMPLEMENTADO 2026-03-13
+
+**Plan completo:** `.agent/planes/actuales/PLAN_MULTITENANT_IA.md`
+**Manual:** `.agent/docs/MANUAL_EMPRESAS_USUARIOS.md`
+
+- **Todas las tablas** tienen campo `empresa` (excepto `ia_agentes` — config global)
+- **Todos los campos de auditoría**: `usuario_creacion`, `usuario_ult_mod`, `created_at`, `updated_at`
+- **Nuevas tablas**: `ia_empresas` (uid PK, nombre, siglas) + `ia_usuarios_empresas` (email + empresa_uid + rol)
+- **JWT 2 pasos**: Google auth → JWT temporal con lista empresas → seleccionar empresa → JWT final con `empresa_activa`
+- **`empresa` NUNCA viene del cliente** — siempre inyectada desde JWT en middleware `requireAuth`
+- **Empresa activa**: `ori_sil_2` (Origen Silvestre). Santiago=admin, Jennifer=viewer.
+- **Frontend**: Header con nombre usuario + empresa, LoginPage con paso 2 selección, authStore con `empresa_activa`
+
+**Pendientes menores:**
+- 2.7 `GET /api/ia/empresa-activa` endpoint (datos de empresa actual)
+- 3.3 Filtro empresa en `/ia/logs` Flask
+- 4.5 Empresa switcher refresca datos en páginas (cuando haya >1 empresa)
 
 **Plan completo:** `.agent/planes/plan_ia_service.md`
 **Plan RAG/Contexto:** `.agent/planes/rag_contexto.md`
@@ -267,6 +285,11 @@ resultado = consultar(
 - ✅ ia-admin: módulo Contextos RAG — UI Vue completa + 8 endpoints API
 - ✅ Documentación Antigravity Google Labs — `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`
 - ✅ Roles del equipo actualizados en MANIFESTO.md (Antigravity Google Labs ≠ Subagentes Claude)
+- ✅ **Multi-empresa (multi-tenant) completo** — BD migrada, backend con auth 2 pasos, frontend con header empresa + login 2 pasos
+  - Nuevas tablas: `ia_empresas`, `ia_usuarios_empresas`
+  - Todas las tablas existentes con campo `empresa` + auditoría
+  - JWT temporal → JWT final con `empresa_activa`
+  - DashboardPage: bug fecha y optional chaining corregidos
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`

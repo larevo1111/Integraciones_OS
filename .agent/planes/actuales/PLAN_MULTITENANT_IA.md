@@ -1,7 +1,7 @@
 # PLAN: Arquitectura Multi-Empresa en ia_service_os + ia-admin
 
 **Creado**: 2026-03-13
-**Estado**: 🟡 En progreso
+**Estado**: 🟢 Completado (Fases 1-4) — pendientes menores: 2.7, 3.3, 4.5
 **Objetivo**: Implementar empresa como eje de seguridad y organización en todo el sistema IA, siguiendo el patrón de SOS_ERP.
 
 ---
@@ -54,15 +54,15 @@ updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIME
 - [x] **1.11** Seed: asignar Santiago y Jennifer a `ia_usuarios_empresas` con roles
 - [x] **1.12** Migrar datos existentes — poner empresa='ori_sil_2' en todos los registros existentes
 
-### FASE 2 — Backend (ia-admin API) ✅/🔲
+### FASE 2 — Backend (ia-admin API) ✅
 
-- [ ] **2.1** Actualizar endpoint `/api/ia/auth/google`:
+- [x] **2.1** Actualizar endpoint `/api/ia/auth/google`:
   - Paso 1: validar Google token → buscar usuario en ia_usuarios → obtener lista de empresas de ia_usuarios_empresas → emitir token TEMPORAL (15 min) con lista de empresas
   - Si solo 1 empresa → auto-seleccionar y emitir token final directo
-- [ ] **2.2** Crear endpoint `/api/ia/auth/seleccionar_empresa`:
+- [x] **2.2** Crear endpoint `/api/ia/auth/seleccionar_empresa`:
   - Valida token temporal + empresa elegida → verifica en ia_usuarios_empresas → emitir JWT final 7 días con `empresa_activa`
-- [ ] **2.3** Actualizar middleware `requireAuth` — extraer `empresa_activa` del JWT y agregar a `req.empresa`
-- [ ] **2.4** Actualizar todos los endpoints GET de ia-admin para filtrar por `req.empresa`:
+- [x] **2.3** Actualizar middleware `requireAuth` — extraer `empresa_activa` del JWT y agregar a `req.empresa`
+- [x] **2.4** Actualizar todos los endpoints GET de ia-admin para filtrar por `req.empresa`:
   - `/api/ia/rag/temas` → `WHERE empresa = req.empresa`
   - `/api/ia/rag/temas/:id/documentos` → verificar que tema pertenece a empresa
   - `/api/ia/consumo` → proxy a ia-service con empresa
@@ -70,31 +70,31 @@ updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIME
   - `/api/ia/logs` → filtrar por empresa
   - `/api/ia/agentes-admin` → global (sin filtro empresa)
   - `/api/ia/tipos` → filtrar por empresa (mostrar globales + de empresa)
-- [ ] **2.5** Actualizar endpoints POST/PUT/DELETE para inyectar empresa desde JWT (nunca del body)
-- [ ] **2.6** Agregar endpoint `GET /api/ia/mis-empresas` — lista empresas del usuario autenticado
+- [x] **2.5** Actualizar endpoints POST/PUT/DELETE para inyectar empresa desde JWT (nunca del body)
+- [x] **2.6** Agregar endpoint `GET /api/ia/mis-empresas` — lista empresas del usuario autenticado
 - [ ] **2.7** Agregar endpoint `GET /api/ia/empresa-activa` — datos de la empresa actual del JWT
 
-### FASE 3 — ia-service (Flask) ✅/🔲
+### FASE 3 — ia-service (Flask) ✅
 
-- [ ] **3.1** Endpoint `/ia/consumo` — aceptar parámetro `empresa` en query string → filtrar ia_consumo_diario
-- [ ] **3.2** Endpoint `/ia/consumo/historico` — igual, filtrar por empresa
+- [x] **3.1** Endpoint `/ia/consumo` — aceptar parámetro `empresa` en query string → filtrar ia_consumo_diario
+- [x] **3.2** Endpoint `/ia/consumo/historico` — igual, filtrar por empresa
 - [ ] **3.3** Endpoint `/ia/logs` (si existe) — filtrar por empresa
-- [ ] **3.4** Guardar `empresa` en ia_logs al registrar cada llamada (ya lo hace via consultar())
-- [ ] **3.5** Guardar `empresa` en ia_consumo_diario al agregar consumo diario
+- [x] **3.4** Guardar `empresa` en ia_logs al registrar cada llamada (ya lo hace via consultar())
+- [x] **3.5** Guardar `empresa` en ia_consumo_diario al agregar consumo diario
 
-### FASE 4 — Frontend Vue (ia-admin) ✅/🔲
+### FASE 4 — Frontend Vue (ia-admin) ✅
 
-- [ ] **4.1** Crear componente `AppHeader.vue` — header superior con:
+- [x] **4.1** Crear componente `AppHeader.vue` — header superior con:
   - Nombre del usuario (con foto/inicial)
   - Empresa activa (nombre + siglas)
   - Botón para cambiar empresa (si tiene más de 1)
-- [ ] **4.2** Actualizar `MainLayout.vue` — agregar header superior
-- [ ] **4.3** Actualizar `LoginPage.vue` — agregar paso 2 de selección de empresa:
+- [x] **4.2** Actualizar `MainLayout.vue` — agregar header superior
+- [x] **4.3** Actualizar `LoginPage.vue` — agregar paso 2 de selección de empresa:
   - Si usuario tiene 1 empresa → auto-selecciona y va al dashboard
   - Si tiene múltiples → muestra grid de empresas para elegir
-- [ ] **4.4** Actualizar `authStore.js` — agregar `empresa_activa`, `empresa_nombre`, `empresa_siglas`, `empresas_disponibles`
+- [x] **4.4** Actualizar `authStore.js` — agregar `empresa_activa`, `empresa_nombre`, `empresa_siglas`, `empresas_disponibles`
 - [ ] **4.5** Actualizar todas las páginas Vue para que el empresa switcher refresque los datos
-- [ ] **4.6** Actualizar `DashboardPage.vue` — mostrar empresa activa en el encabezado
+- [x] **4.6** Actualizar `DashboardPage.vue` — mostrar empresa activa en el encabezado
 
 ### FASE 5 — Documentación ✅/🔲
 
@@ -106,8 +106,8 @@ updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIME
   - Cómo cambiar de empresa en la UI
   - Reglas de seguridad
 - [x] **5.2** Actualizar `MANIFESTO.md` — agregar regla de empresas y campos auditoría
-- [ ] **5.3** Actualizar `CONTEXTO_ACTIVO.md` con el nuevo estado
-- [ ] **5.4** Commit + push final
+- [x] **5.3** Actualizar `CONTEXTO_ACTIVO.md` con el nuevo estado
+- [x] **5.4** Commit + push final
 
 ---
 
