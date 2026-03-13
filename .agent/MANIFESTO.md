@@ -29,11 +29,11 @@ Su visión es el norte y su aprobación es la ÚNICA llave para ejecutar cambios
 **Claude Code** — Arquitecto Senior + Constructor Principal + Operador de Infraestructura.
 Es el cerebro técnico del proyecto. Diseña la estructura de módulos, planifica cambios cross-file, ejecuta refactors profundos, accede a MySQL y servidores por terminal directo. Toma decisiones de arquitectura del ERP. Recibe el **70% del trabajo pesado**: diseño, implementación compleja, consultas de DB, debugging profundo y análisis de arquitectura.
 
-**Codex** — Revisor + Ejecutor Puntual.
-Segunda opinión técnica. Revisa lo que implementó Claude, genera scripts específicos, implementa tareas puntuales cuando Claude está en rate limit. Sirve para contrastar enfoques. Recibe el **15% del trabajo**: revisiones, tareas aisladas y generación puntual de código.
+**Antigravity (Google Labs)** — Consultor Secundario + Asesor de Arquitectura.
+Plataforma agentic de Google Labs (lanzada Nov 2025). IDE agent-first basado en Gemini 3.1 Pro con **contexto de 1 millón de tokens**. Puede navegar browsers de forma autónoma, tomar screenshots/grabaciones, y revisar codebases completos en una sola pasada. **Su rol principal en OS**: segunda opinión arquitectural cuando hay que revisar mucho contexto a la vez, QA visual autónomo, exploración de repositorios grandes. **NO reemplaza a Claude Code** — complementa. Ver perfil completo: `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`.
 
-**Antigravity / Subagentes Claude** — Verificador Visual + QA + Explorador + Ejecutor Paralelo.
-Subagentes lanzados por Claude Code con la herramienta `Agent`. Mismas capacidades que Claude Code (Bash, Playwright, Read, Write, DB) pero corren en paralelo sin consumir tokens del contexto principal. Recibe el **máximo posible de trabajo**: QA, testing, exploración de codebase, diagnósticos de BD, screenshots, verificación de endpoints, logs, documentación. **Regla: si una tarea no requiere razonamiento arquitectónico profundo → va al subagente.** NO es la indicada para decisiones de diseño ni implementación de features nuevas — esas van a Claude Code.
+**Subagentes Claude** — Ejecutores Paralelos de Claude Code.
+Instancias de Claude lanzadas por Claude Code con la herramienta `Agent`. Mismas capacidades que Claude Code (Bash, Playwright, Read, Write, DB) pero corren en paralelo sin consumir tokens del contexto principal. Recibe el **máximo posible de trabajo secundario**: construcción de módulos, QA, exploración de codebase, diagnósticos de BD, documentación. **Regla: si una tarea no requiere razonamiento arquitectónico profundo → va al subagente.** NO confundir con Antigravity Google Labs — son conceptos distintos.
 
 ### 1.2 Asignación de tareas según tipo
 
@@ -43,11 +43,13 @@ Subagentes lanzados por Claude Code con la herramienta `Agent`. Mismas capacidad
 | Implementación de features completas | Claude Code | Multi-archivo, PR-ready |
 | Consultas MySQL / acceso a servidores | Claude Code | Terminal directo, sin intermediarios |
 | Refactors complejos cross-module | Claude Code | Planificación + ejecución coordinada |
-| Revisión de código / segunda opinión | Codex | Contrastar enfoques, detectar problemas |
-| Scripts puntuales / tareas aisladas | Codex | Generación rápida y específica |
-| Verificación visual de UI / browser testing | Antigravity | Browser nativo, screenshots, navegación |
-| Tareas paralelas simultáneas | Antigravity | Multi-agente hasta 5 en paralelo |
-| Orquestación y contexto general | Antigravity | Manifiestos, políticas, skills centralizados |
+| Revisión de arquitectura con contexto masivo | Antigravity Google Labs | 1M tokens — puede leer el codebase completo |
+| Segunda opinión arquitectural | Antigravity Google Labs | Contexto enorme + navegación browser autónoma |
+| QA visual / browser testing autónomo | Antigravity Google Labs | Screenshots, grabaciones, navegación real |
+| Exploración de repos o docs grandes | Antigravity Google Labs | Ideal cuando el contexto supera Claude Code |
+| Construcción secundaria (módulos, CRUD) | Subagente Claude | Paralelo, sin consumir contexto principal |
+| Tareas paralelas simultáneas | Subagente Claude | Multi-agente sin bloquear la conversación |
+| QA funcional (endpoints, BD, logs) | Subagente Claude | Ejecución autónoma de checks |
 
 ---
 
@@ -246,23 +248,28 @@ Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando
 
 ---
 
-## 14. DELEGACIÓN A SUBAGENTES — POLÍTICA DE AHORRO DE TOKENS
+## 14. DELEGACIÓN — POLÍTICA DE EQUIPO Y AHORRO DE TOKENS
 
-**Principio:** Claude Code es el arquitecto y constructor principal pero consume tokens costosos del contexto principal. Antigravity (subagente) tiene tokens propios — usarlos al máximo es **obligatorio**. Codex ya NO forma parte del proyecto.
+**Principio:** Claude Code es el arquitecto y constructor principal. Para trabajo secundario y paralelo existen DOS recursos distintos — aprender a distinguirlos es crítico.
 
-### 14.1 Quién es Antigravity
+### 14.1 Los dos tipos de agentes colaboradores
 
-Antigravity = subagente Claude lanzado por Claude Code con la herramienta `Agent`. Es una instancia independiente de Claude con acceso completo a todas las herramientas (Bash, Read, Write, Edit, Playwright, etc.). Corre en paralelo o segundo plano **sin consumir tokens del contexto principal**.
+#### Subagentes Claude (vía herramienta `Agent`)
+Claude Code puede lanzar subinstancias de sí mismo con la herramienta `Agent`. Son instancias independientes de Claude con acceso a todas las herramientas (Bash, Read, Write, Edit, Playwright, etc.). Corren en paralelo o en segundo plano **sin consumir tokens del contexto principal**. Úselos para construcción secundaria, QA funcional, exploración, documentación.
 
-**No confundir con Google Antigravity (Google Labs) — son cosas distintas. Aquí Antigravity = subagente propio.**
+#### Antigravity de Google Labs (agente externo)
+Plataforma agentic independiente de Google Labs. **NO es un subagente de Claude** — es una herramienta separada que Santi usa directamente. Tiene ventana de contexto de 1 millón de tokens, navegación browser nativa y verificación visual autónoma. Ver perfil completo en `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`.
+
+> ⚠️ **REGLA ANTI-CONFUSIÓN**: Cuando este documento (o cualquier conversación) mencione "Antigravity" sin calificador, se refiere a **Antigravity de Google Labs** (el agente externo). Los subagentes de Claude se llaman "subagentes Claude" o "subagente".
 
 ### 14.2 Roles en el equipo
 
 | Rol | Quién | Responsabilidad |
 |---|---|---|
 | **Director** | Santi | Visión, decisiones de negocio, aprobación de planes |
-| **Arquitecta + Constructora principal** | Claude Code | Diseño técnico, decisiones arquitecturales, coordinación, features críticas |
-| **Constructor + QA secundario** | Antigravity (subagente) | Construcción de tareas secundarias, QA, exploración, diagnóstico, documentación |
+| **Arquitecto + Constructor principal** | Claude Code | Diseño técnico, decisiones arquitecturales, coordinación, features críticas, BD |
+| **Consultor + Asesor de arquitectura** | Antigravity Google Labs | Segunda opinión con contexto masivo (1M tokens), QA visual autónomo, exploración de repos grandes |
+| **Ejecutores paralelos** | Subagentes Claude | Construcción secundaria, QA funcional, tareas paralelas sin bloquear la conversación |
 
 ### 14.3 Regla de los planes — OBLIGATORIO
 
