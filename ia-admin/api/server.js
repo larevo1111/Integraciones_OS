@@ -877,12 +877,30 @@ print(json.dumps({'fragmentos': fix(result)}))
 // GET /api/ia/conexiones
 app.get('/api/ia/conexiones', requireAdmin, async (req, res) => {
   try {
+    const empresa = req.empresa || 'ori_sil_2'
     const [rows] = await db.execute(
       'SELECT id, empresa, nombre, tipo, host, puerto, usuario, base_datos, activo, notas, ultima_sync, updated_at FROM ia_conexiones_bd WHERE empresa = ? ORDER BY nombre',
-      [req.empresa]
+      [empresa]
     )
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/ia/conexiones/test-params — probar conexión con parámetros crudos (antes de guardar)
+app.post('/api/ia/conexiones/test-params', requireAdmin, async (req, res) => {
+  const body = JSON.stringify(req.body)
+  const options = { host: 'localhost', port: 5100, path: '/ia/conexion/test-params', method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }
+  const result = await new Promise((resolve) => {
+    const r = http.request(options, resp => {
+      let d = ''
+      resp.on('data', c => d += c)
+      resp.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve({ ok: false, mensaje: d }) } })
+    })
+    r.on('error', e => resolve({ ok: false, mensaje: e.message }))
+    r.write(body); r.end()
+  })
+  res.json(result)
 })
 
 // POST /api/ia/conexiones

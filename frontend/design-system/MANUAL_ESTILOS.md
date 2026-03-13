@@ -2155,5 +2155,67 @@ body {
 - [Linear Design System — Figma Community](https://www.figma.com/community/file/1222872653732371433/linear-design-system)
 - [Linear Typography — Typ.io](https://typ.io/s/2jmp)
 
+---
+
+## 27. BOTÓN DE AYUDA CONTEXTUAL — PATRÓN `?`
+
+### 27.1 Concepto
+Ayuda **inline y contextual** — sin modales, sin páginas separadas. Un `?` circular en el header que despliega un panel colapsable justo debajo con las instrucciones de la sección.
+
+### 27.2 Visual y posición
+- Botón circular `26×26px`, borde sutil `var(--border-default)`, ícono `?` sin texto
+- Posición: **top-right del header**, junto al botón de acción principal
+- Hover/activo: borde más visible, fondo ligero `var(--bg-surface)`
+- Panel: fondo `var(--bg-card)`, borde izquierdo violeta `3px solid #5e6ad2`, slide 180ms
+
+### 27.3 CSS
+```css
+.btn-help {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: none; border: 1px solid var(--border-default);
+  color: var(--text-tertiary); font-size: 12px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: border-color 120ms, color 120ms, background 120ms;
+}
+.btn-help:hover, .btn-help.active {
+  border-color: var(--border-strong); color: var(--text-primary); background: var(--bg-surface);
+}
+.ayuda-panel {
+  background: var(--bg-card); border: 1px solid var(--border-default);
+  border-left: 3px solid #5e6ad2; border-radius: var(--radius-lg);
+  padding: 16px 20px; font-size: 13px; color: var(--text-secondary);
+  line-height: 1.65; margin-bottom: 20px;
+}
+.ayuda-slide-enter-active, .ayuda-slide-leave-active { transition: all 180ms ease; overflow: hidden; }
+.ayuda-slide-enter-from, .ayuda-slide-leave-to { opacity: 0; max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+.ayuda-slide-enter-to, .ayuda-slide-leave-from { opacity: 1; max-height: 600px; margin-bottom: 20px; }
+```
+
+### 27.4 Vue Template
+```vue
+<div class="page-header">
+  <div><h1 class="page-title">Título</h1></div>
+  <div class="header-actions">
+    <button class="btn-help" @click="ayudaAbierta = !ayudaAbierta" :class="{ active: ayudaAbierta }" title="Ayuda">
+      <span>?</span>
+    </button>
+    <button class="btn btn-primary">Acción principal</button>
+  </div>
+</div>
+<transition name="ayuda-slide">
+  <div v-if="ayudaAbierta" class="ayuda-panel">
+    <!-- instrucciones -->
+  </div>
+</transition>
+```
+
+### 27.5 Reglas
+- NUNCA usar modales para ayuda — rompe el flujo
+- NUNCA poner el `?` con texto visible — solo ícono
+- El `?` va SIEMPRE junto al botón de acción principal en el header
+- Contenido máximo: qué hace, cómo usarla (≤5 pasos), advertencias clave
+- Componente reutilizable: `AyudaPanel.vue` en `ia-admin/app/src/components/`
+
+---
+
 > **Versión**: 2.0 — Actualizado con datos reales de 88 capturas de Linear.app
-> **Pendiente**: Sección 26 — requiere cuenta trial de Linear para capturar elementos internos

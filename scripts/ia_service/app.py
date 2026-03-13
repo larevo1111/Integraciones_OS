@@ -261,6 +261,41 @@ def endpoint_test_conexion():
     return jsonify(resultado)
 
 
+@app.route('/ia/conexion/test-params', methods=['POST'])
+def endpoint_test_conexion_params():
+    """Prueba conexión con parámetros crudos (sin guardar). Body: {tipo, host, puerto, usuario, password, base_datos}"""
+    from ia_service.conector import get_conexion_externa
+    data = request.get_json(silent=True) or {}
+    cfg = {
+        'tipo':       data.get('tipo', 'mariadb'),
+        'host':       data.get('host', ''),
+        'puerto':     int(data.get('puerto', 3306)),
+        'usuario':    data.get('usuario', ''),
+        'password':   data.get('password', ''),
+        'base_datos': data.get('base_datos', ''),
+    }
+    if not cfg['host'] or not cfg['usuario'] or not cfg['base_datos']:
+        return jsonify({'ok': False, 'mensaje': 'host, usuario y base_datos son obligatorios'}), 400
+    conn_ext = None
+    try:
+        conn_ext = get_conexion_externa(cfg)
+        tipo = cfg['tipo']
+        with conn_ext.cursor() as cur:
+            if tipo in ('mysql', 'mariadb'):
+                cur.execute("SHOW TABLES")
+                filas = cur.fetchall()
+                tablas = [list(f.values())[0] for f in filas]
+            else:
+                cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name")
+                tablas = [r['table_name'] for r in cur.fetchall()]
+        return jsonify({'ok': True, 'mensaje': f'Conexión exitosa. {len(tablas)} tablas.', 'tablas_disponibles': tablas})
+    except Exception as e:
+        return jsonify({'ok': False, 'mensaje': str(e), 'tablas_disponibles': []})
+    finally:
+        if conn_ext:
+            conn_ext.close()
+
+
 @app.route('/ia/esquema/sync', methods=['POST'])
 def endpoint_sync_esquema():
     """Sincroniza el schema de un tema. Body: {tema_id, empresa}"""
