@@ -41,9 +41,12 @@
 
 ---
 
-## Bugs reportados
-
-*(Sin bugs reportados aún — pendiente ejecución de Antigravity)*
+### BUG-003 — [Backend] Error SQL en /api/ventas/cartera-cliente
+**Fecha:** 2026-03-13
+**Estado:** 🟢 Resuelto
+**URL:** `/api/ventas/cartera-cliente`
+**Descripción:** El endpoint devolvía Error 500. `HAVING` estaba antes del `GROUP BY` en `frontend/api/server.js`.
+**Fix:** Invertido el orden — `GROUP BY id_cliente` primero, luego `HAVING total_pendiente > 0`. Verificado: devuelve 32 clientes correctamente.
 
 ---
 

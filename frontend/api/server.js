@@ -370,8 +370,8 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
              MAX(CAST(REPLACE(COALESCE(dias_mora,'0'),',','.') AS SIGNED)) AS max_dias_mora,
              MIN(fecha_de_creacion) AS factura_mas_antigua
       FROM zeffi_facturas_venta_encabezados${sql}
-      HAVING total_pendiente > 0
       GROUP BY id_cliente
+      HAVING total_pendiente > 0
       ORDER BY total_pendiente DESC
       LIMIT 1000`, params)
     res.json(rows)
