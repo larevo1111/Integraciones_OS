@@ -156,6 +156,21 @@ Todas las tablas `zeffi_*` tienen:
 - `marketing_cliente` = canal de venta (e.g. `'1.3. Mercado Saludable'`). NULL o vacío → normalizar como `'Sin canal'`
 - `id_cliente` = formato `'CC 74084937'` o `'NIT 900982270'` (con prefijo tipo doc). Para JOIN con `zeffi_clientes.numero_de_identificacion` usar: `SUBSTRING_INDEX(d.id_cliente, ' ', -1)`.
 
+#### `zeffi_clientes` — ⚠️ DUPLICADOS CONFIRMADOS
+- **La tabla tiene filas duplicadas por `numero_de_identificacion`** (NITs: `39440347`, `90173460334`, `9999999` — verificado 2026-03-13).
+- Un JOIN directo multiplica las filas y **infla sumas y conteos** sin dar error visible.
+- **SIEMPRE deduplicar antes del JOIN:**
+  ```sql
+  LEFT JOIN (
+    SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago
+    -- agregar MAX() de cada columna que se necesite
+    FROM zeffi_clientes
+    GROUP BY numero_de_identificacion
+  ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(f.id_cliente, ' ', -1)
+  ```
+- `forma_de_pago` = plazo del cliente (ej: `'7 días'`, `'Contado'`, `'Contado a 1 día'`)
+- Campos numéricos en texto con coma decimal: `pdte_de_cobro`, `total_neto`, `cupo_de_credito_cxc` → usar `CAST(REPLACE(COALESCE(campo,'0'),',','.') AS DECIMAL(15,2))`
+
 #### `zeffi_remisiones_venta_detalle`
 - **⚠️ Campo fecha = `fecha_creacion`** (sin `_de_` ni `_factura`). Diferente a los encabezados (`fecha_de_creacion`) y al detalle de facturas (`fecha_creacion_factura`). Confundirlos da error de columna.
 - `tipo_de_marketing_cliente` = canal de venta en detalle de remisiones (diferente a facturas que usa `marketing_cliente`).

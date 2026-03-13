@@ -120,6 +120,10 @@ Componente reutilizable para tablas. Ubicación: `frontend/app/src/components/Os
 | `loading` | Boolean | Activa skeleton rows |
 | `recurso` | String | Slug para export (ej: `'resumen-mes'`) |
 | `mes` | String | Mes activo para export filtrado (`'2026-02'`) |
+| `tooltips` | Object | Diccionario `{key: 'descripción'}` para atributo `title` en headers. **Opcional** — si no se pasa, el componente carga `/api/tooltips` automáticamente con caché global. |
+
+### Tooltips automáticos (desde 2026-03-13)
+OsDataTable carga `/api/tooltips` automáticamente al montarse — caché global entre instancias. **No se necesita pasar el prop `tooltips` en ninguna página.** Aparecen como tooltip nativo (atributo HTML `title`) al hacer hover sobre el header de columna. Para agregar o editar tooltips: modificar `COLUMN_TOOLTIPS` en `frontend/api/server.js`.
 
 ### Eventos
 | Evento | Payload |
