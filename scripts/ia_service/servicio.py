@@ -279,6 +279,7 @@ def _enrutar(pregunta: str) -> str:
     """
     agente_cfg = None
     # Orden: primero los de mayor RPD (groq 14400, gemma 14400), luego los más restrictivos
+    # gemini-pro NO se usa para enrutar — reservar sus 1000 RPD para análisis reales
     for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
         cand = _cargar_agente(slug)
         if cand and cand.get('api_key'):

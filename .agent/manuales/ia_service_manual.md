@@ -68,7 +68,7 @@ POST /ia/consultar (Flask :5100)
    - Configurar billing: [console.cloud.google.com/billing](https://console.cloud.google.com/billing)
 4. La key empieza con `AIzaSy...`
 
-> **Estado actual OS (2026-03-12)**: Billing vinculado ✅ — todos los límites del free tier activos.
+> **Estado actual OS (2026-03-12)**: **Nivel de pago 1 activo** ✅ — límites pagados desbloqueados.
 
 ### Endpoint base
 
@@ -78,29 +78,43 @@ https://generativelanguage.googleapis.com/v1beta
 
 Llamada: `POST /models/{modelo_id}:generateContent?key={API_KEY}`
 
-### Límites reales del Tier 1 (free con billing vinculado)
+### Límites — Nivel de pago 1 (tier pagado — estado actual del proyecto OS)
 
-> Fuente: datos directos de Google AI Studio del proyecto OS — 2026-03-12
+> Fuente: Google AI Studio → "Límite de frecuencia de la API de Gemini" → proyecto OS — 2026-03-12
+> El tier pago es DRÁSTICAMENTE superior al free tier — vale la pena absolutamente.
 
-| Modelo (display) | modelo_id para API | RPM | TPM | RPD | Notas |
+| Modelo (display) | modelo_id para API | RPM | TPM | RPD | Uso en OS |
 |---|---|---|---|---|---|
-| **Gemini 2.5 Flash** | `gemini-2.5-flash` | 5 | 250K | **20** | ⚠️ Muy restrictivo — 20/día |
-| **Gemini 2.5 Flash Lite** | `gemini-2.5-flash-lite-preview` | 10 | 250K | **20** | ⚠️ También 20/día |
-| **Gemini 3 Flash** | `gemini-3-flash` | 5 | 250K | **20** | Igual de restrictivo |
-| **Gemini 3.1 Flash Lite** | `gemini-3.1-flash-lite` | 15 | 250K | **500** | ✅ Recomendado — 500/día |
-| **Gemma 3 27B** | `gemma-3-27b-it` | 30 | 15K | **14,400** | ✅ Enrutador ideal — casi ilimitado |
-| **Gemma 3 12B** | `gemma-3-12b-it` | 30 | 15K | **14,400** | ✅ Alternativa ligera |
-| **Gemma 3 4B** | `gemma-3-4b-it` | 30 | 15K | **14,400** | ✅ El más rápido/ligero |
-| **Imagen 4 Generate** | `imagen-4.0-generate-preview` | — | — | **25** | Imágenes alta calidad |
-| **Imagen 4 Fast Generate** | `imagen-4.0-fast-generate-preview` | — | — | **25** | Imágenes rápidas |
-| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-tts` | 3 | 10K | 10 | Texto a voz |
-| **Gemini Embedding 1** | `text-embedding-004` | 100 | 30K | 1K | Embeddings |
-| **Gemini Embedding 2** | `gemini-embedding-exp` | 100 | 30K | 1K | Embeddings v2 |
-| **Gemini 2.5 Flash Audio** | `gemini-2.5-flash-exp-native-audio-dialog` | Ilimitado | 1M | Ilimitado | Solo audio live |
-
-> **⚠️ Insight crítico**: Los modelos "principales" (2.5 Flash, 3 Flash) tienen solo **20 RPD** en el free tier. Para el bot de Telegram y uso diario, usar **Gemini 3.1 Flash Lite (500 RPD)** o **Gemma 3 (14,400 RPD)**.
+| **Gemini 2.5 Pro** | `gemini-2.5-pro` | 150 | 2M | **1K** | ✅ `gemini-pro` — análisis SQL complejo |
+| **Gemini 2.5 Flash** | `gemini-2.5-flash` | 1K | 1M | **10K** | ✅ `gemini-flash` — consultas generales |
+| **Gemini 2 Flash** | `gemini-2.0-flash` | 2K | 4M | **Ilimitado** | Disponible si se necesita |
+| **Gemini 2 Flash Lite** | `gemini-2.0-flash-lite` | 4K | 4M | **Ilimitado** | Disponible si se necesita |
+| **Gemini 2.5 Flash Lite** | `gemini-2.5-flash-lite-preview` | 4K | 4M | **Ilimitado** | Disponible si se necesita |
+| **Gemini 3 Flash** | `gemini-3.0-flash` | 1K | 2M | **10K** | Similar a 2.5 Flash |
+| **Gemini 3.1 Flash Lite** | `gemini-3.1-flash-lite` | 4K | 4M | **150K** | ✅ `gemini-flash-lite` — volumen alto |
+| **Gemini 3.1 Pro** | `gemini-3.1-pro` | 25 | 2M | **250** | Disponible |
+| **Gemma 3 27B** | `gemma-3-27b-it` | 30 | 15K | **14.4K** | ✅ `gemma-router` — enrutador |
+| **Gemma 3 12B/4B/2B/1B** | `gemma-3-12b-it` etc. | 30 | 15K | **14.4K** | Alternativas |
+| **Imagen 4 Generate** | `imagen-4.0-generate-preview` | 10 | — | **70** | Imágenes alta calidad |
+| **Imagen 4 Fast Generate** | `imagen-4.0-fast-generate-preview` | 10 | — | **70** | ✅ `gemini-image` — imágenes |
+| **Imagen 4 Ultra Generate** | `imagen-4.0-ultra-generate-preview` | 5 | — | **30** | Máxima calidad imágenes |
+| **Nano Banana (2.5 Flash Image)** | `gemini-2.5-flash-preview-image-generation` | 500 | 500K | **2K** | Preview — mucho mejor que Imagen 4 en RPD |
+| **Gemini 2.5 Flash TTS** | `gemini-2.5-flash-tts` | 10 | 10K | 100 | Texto a voz |
+| **Gemini Embedding 1** | `text-embedding-004` | 3K | 1M | Ilimitado | Embeddings |
 
 > **Los límites son por PROYECTO**, no por API key. Crear más keys del mismo proyecto no aumenta los límites.
+
+### Comparativa free tier vs nivel de pago
+
+| Modelo | RPD free tier | RPD **nivel pago 1** |
+|---|---|---|
+| Gemini 2.5 Flash | 20 | **10,000** (500x más) |
+| Gemini 2.5 Flash Lite | 20 | **Ilimitado** |
+| Gemini 3.1 Flash Lite | 500 | **150,000** (300x más) |
+| Gemini 2.5 Pro | ~0 | **1,000** |
+| Imagen 4 Fast | 25 | **70** |
+
+> **Conclusión**: El tier gratuito no tiene casi nada en la práctica. El nivel de pago es el correcto para OS.
 
 > **Reset**: medianoche Pacific Time = **3:00 AM Colombia** (UTC-5)
 
@@ -352,28 +366,45 @@ curl -s http://localhost:5100/ia/agentes | python3 -m json.tool
 
 ## 7. Estrategia de uso — qué modelo para qué {#estrategia}
 
-### El problema con Gemini 2.5 Flash como modelo único
+### Estrategia recomendada (nivel de pago 1)
 
-Solo tiene **20 RPD**. Para un bot de Telegram con uso diario normal (10–20 consultas/día) eso se agota rápido. Solución: usar el modelo correcto para cada tarea.
+Con el tier pagado, la estrategia cambia: ahora el modelo Pro está disponible para lo que importa.
 
-### Estrategia recomendada
+| Tarea | Agente en BD | Modelo | RPD | Por qué |
+|---|---|---|---|---|
+| **Enrutador** (clasificar intención) | `gemma-router` → `groq-llama` | gemma-3-27b-it | 14,400 | Tarea simple, no gastar RPD de Pro |
+| **Análisis de datos SQL** | `gemini-pro` | gemini-2.5-pro | **1,000** | ✅ El mejor para SQL complejo, JOINs, aggregaciones |
+| **Conversación / redacción** | `gemini-flash` | gemini-2.5-flash | **10,000** | Excelente para texto, más que suficiente |
+| **Alto volumen / bot** | `gemini-flash-lite` | gemini-3.1-flash-lite | **150,000** | Prácticamente ilimitado |
+| **Generación de imágenes** | `gemini-image` | imagen-4.0-fast-generate-preview | **70** | Correcto para imágenes |
+| **SQL muy complejo futuro** | `claude-sonnet` (cuando esté activo) | claude-sonnet-4-6 | — | Máxima calidad, reservar para edge cases |
 
-| Tarea | Modelo | RPD disponible | Por qué |
-|---|---|---|---|
-| **Enrutador** (clasificar intención) | `gemma-3-27b-it` (Groq: `llama-3.1-8b-instant`) | 14,400 | Ultra-rápido, tarea simple, no necesita calidad premium |
-| **Conversación general** | `gemini-3.1-flash-lite` | 500 | Buen balance, 500 RPD suficientes para uso diario |
-| **Análisis de datos SQL** | `gemini-2.5-flash` | 20 | La mejor calidad para SQL complejo — usar con moderación |
-| **Generación de imágenes** | `imagen-4.0-fast-generate-preview` | 25 | Modelo correcto para imágenes |
-| **SQL muy complejo** | `claude-sonnet-4-6` (cuando esté activo) | Rate limit bajo | Máxima calidad, reservar para casos difíciles |
-
-### Configuración actual de ia_agentes (marzo 2026)
+### Configuración actual de ia_agentes (marzo 2026 — nivel pago 1)
 
 ```
-gemini-flash       → gemini-2.5-flash     → Para análisis complejos (20 RPD — usar con cuidado)
-gemini-flash-lite  → gemini-3.1-flash-lite → Para conversación/redacción (500 RPD) ← PRINCIPAL
-gemma-router       → gemma-3-27b-it        → Para enrutador (14,400 RPD) ← ENRUTADOR IDEAL
-gemini-image       → imagen-4.0-fast-...   → Para imágenes (25 RPD)
-groq-llama         → llama-3.1-8b-instant  → Enrutador alternativo (14,400 RPD)
+gemini-pro        → gemini-2.5-pro          → analisis_datos ← PRINCIPAL para SQL
+gemini-flash      → gemini-2.5-flash        → redaccion, resumen (10K RPD)
+gemini-flash-lite → gemini-3.1-flash-lite   → alto volumen, bot (150K RPD)
+gemma-router      → gemma-3-27b-it          → enrutador (14.4K RPD)
+gemini-image      → imagen-4.0-fast-...     → generacion_imagen (70 RPD)
+groq-llama        → llama-3.1-8b-instant    → enrutador alternativo (pendiente key)
+claude-sonnet     → claude-sonnet-4-6       → generacion_documento (pendiente key)
+```
+
+### ¿Cómo funciona la selección de modelo? (respuesta a la pregunta de Santi)
+
+```
+Cada modelo = una fila en ia_agentes con su modelo_id
+                        ↓
+El tipo de consulta (ia_tipos_consulta) tiene un agente_preferido
+  analisis_datos → gemini-pro
+  redaccion      → gemini-flash
+  enrutamiento   → groq-llama (fallback: gemma-router)
+                        ↓
+Si ese agente no tiene key o está inactivo → fallback automático al
+primero activo con key en orden de columna `orden`
+                        ↓
+El caller puede forzar cualquier agente pasando agente='gemini-pro'
 ```
 
 ---
@@ -516,44 +547,37 @@ curl -s http://localhost:5100/ia/health
 
 ## Anexo — Tabla completa de límites Gemini (datos reales del proyecto OS)
 
-> Capturado desde Google AI Studio → Rate Limits — 2026-03-12
-> Tier: **1 (free con billing vinculado)**
+> Capturado desde Google AI Studio → "Límite de frecuencia de la API de Gemini" — 2026-03-12
+> **Tier: Nivel de pago 1** (billing activo — límites DRÁSTICAMENTE superiores al free tier)
 
 | Modelo (display) | Categoría | RPM | TPM | RPD |
 |---|---|---|---|---|
-| Gemini 2.5 Flash | Texto | 5 | 250K | 20 |
-| Gemini 2.5 Pro | Texto | 0 | 0 | 0 |
-| Gemini 2 Flash | Texto | 0 | 0 | 0 |
-| Gemini 2 Flash Exp | Texto | 0 | 0 | 0 |
-| Gemini 2 Flash Lite | Texto | 0 | 0 | 0 |
-| Gemini 2.5 Flash TTS | Multimodal | 3 | 10K | 10 |
-| Gemini 2.5 Pro TTS | Multimodal | 0 | 0 | 0 |
+| **Gemini 2.5 Flash** | Texto | 1,000 | 1M | **10,000** |
+| **Gemini 2.5 Pro** | Texto | 150 | 2M | **1,000** |
+| **Gemini 2 Flash** | Texto | 2,000 | 4M | **Ilimitado** |
+| Gemini 2 Flash Exp | Texto | 10 | 250K | 500 |
+| **Gemini 2 Flash Lite** | Texto | 4,000 | 4M | **Ilimitado** |
+| Gemini 2.5 Flash TTS | Multimodal | 10 | 10K | 100 |
+| Gemini 2.5 Pro TTS | Multimodal | 10 | 10K | 50 |
 | Gemma 3 1B | Otros | 30 | 15K | 14,400 |
 | Gemma 3 2B | Otros | 30 | 15K | 14,400 |
 | Gemma 3 4B | Otros | 30 | 15K | 14,400 |
 | Gemma 3 12B | Otros | 30 | 15K | 14,400 |
-| Gemma 3 27B | Otros | 30 | 15K | 14,400 |
-| Imagen 4 Generate | Multimodal | — | — | 25 |
-| Imagen 4 Ultra Generate | Multimodal | — | — | 25 |
-| Imagen 4 Fast Generate | Multimodal | — | — | 25 |
-| Gemini Embedding 1 | Otros | 100 | 30K | 1K |
-| Gemini Embedding 2 | Otros | 100 | 30K | 1K |
-| Gemini 3 Flash | Texto | 5 | 250K | 20 |
-| Gemini 2.5 Flash Lite | Texto | 10 | 250K | 20 |
-| Gemini 3.1 Flash Lite | Texto | 15 | 250K | 500 |
-| Gemini 3.1 Pro | Texto | 0 | 0 | 0 |
-| Nano Banana (2.5 Flash Preview Image) | Multimodal | 0 | 0 | 0 |
-| Nano Banana Pro (3 Pro Image) | Multimodal | 0 | 0 | 0 |
-| Nano Banana 2 (3.1 Flash Image) | Multimodal | 0 | 0 | 0 |
-| Gemini Robotics ER 1.5 Preview | Otros | 10 | 250K | 20 |
-| Computer Use Preview | Otros | 0 | 0 | 0 |
-| Deep Research Pro Preview | Agentes | 0 | 0 | 0 |
-| Gemini 2.5 Flash Native Audio Dialog | Live API | Ilimitado | 1M | Ilimitado |
-| Veo 3 Generate | Multimodal | 0 | — | 0 |
-| Veo 3 Fast Generate | Multimodal | 0 | — | 0 |
+| **Gemma 3 27B** | Otros | 30 | 15K | **14,400** |
+| **Imagen 4 Generate** | Multimodal | 10 | — | **70** |
+| Imagen 4 Ultra Generate | Multimodal | 5 | — | 30 |
+| **Imagen 4 Fast Generate** | Multimodal | 10 | — | **70** |
+| Gemini Embedding 1 | Otros | 3,000 | 1M | Ilimitado |
+| **Gemini 3 Flash** | Texto | 1,000 | 2M | **10,000** |
+| **Gemini 2.5 Flash Lite** | Texto | 4,000 | 4M | **Ilimitado** |
+| Gemini 3.1 Pro | Texto | 25 | 2M | 250 |
+| **Nano Banana** (Gemini 2.5 Flash Preview Image) | Multimodal | 500 | 500K | **2,000** |
+| **Gemini 3.1 Flash Lite** | Texto | 4,000 | 4M | **150,000** |
+| Nano Banana Pro (Gemini 3 Pro Image) | Multimodal | 20 | 100K | 250 |
+| Nano Banana 2 (Gemini 3.1 Flash Image) | Multimodal | 100 | 200K | 1,000 |
 
-> Los modelos con 0/0/0 no están disponibles en este tier o son preview cerrada.
-> "Nano Banana" es el código interno de modelos de imagen en preview — no usar por ahora.
+> **Negrita** = modelos relevantes para el proyecto OS.
+> "Nano Banana" = código interno de modelos de generación de imágenes en preview. Interesante: 2K RPD vs 70 de Imagen 4.
 > Para referencia oficial: [ai.google.dev/gemini-api/docs/rate-limits](https://ai.google.dev/gemini-api/docs/rate-limits?hl=es-419)
 
 ---
