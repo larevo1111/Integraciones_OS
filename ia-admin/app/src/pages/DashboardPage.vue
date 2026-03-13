@@ -139,11 +139,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, inject } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useAuthStore } from 'src/stores/authStore'
+import { api } from 'src/services/api'
 import { RefreshCwIcon, AlertTriangleIcon } from 'lucide-vue-next'
 
-// usuario inyectado desde el layout (via provide/inject o prop route)
-const usuario = inject('usuario', ref({ nombre: 'Admin', rol: 'admin' }))
+const authStore = useAuthStore()
+const usuario = authStore.usuario
 
 const consumo = ref(null)
 const logs = ref([])
@@ -153,8 +155,7 @@ const cargandoLogs = ref(true)
 async function cargarConsumo() {
   cargando.value = true
   try {
-    const res = await fetch('/api/ia/consumo')
-    consumo.value = await res.json()
+    consumo.value = await api('/api/ia/consumo')
   } catch (e) { consumo.value = null }
   cargando.value = false
 }
@@ -162,8 +163,7 @@ async function cargarConsumo() {
 async function cargarLogs() {
   cargandoLogs.value = true
   try {
-    const res = await fetch('/api/ia/logs?limit=20')
-    logs.value = await res.json()
+    logs.value = (await api('/api/ia/logs?limit=20')).rows
   } catch (e) { logs.value = [] }
   cargandoLogs.value = false
 }

@@ -1,6 +1,6 @@
 <template>
   <div class="app-shell">
-    <AppSidebar :usuario="usuario" />
+    <AppSidebar :usuario="authStore.usuario" @logout="logout" />
     <div class="main-area">
       <router-view />
     </div>
@@ -8,19 +8,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import AppSidebar from 'src/components/AppSidebar.vue'
+import { useAuthStore } from 'src/stores/authStore'
 
-const usuario = ref({ nombre: 'Admin', email: '', rol: 'admin' })
+const router    = useRouter()
+const authStore = useAuthStore()
 
-onMounted(async () => {
-  try {
-    const res = await fetch('/api/ia/me')
-    if (res.ok) usuario.value = await res.json()
-  } catch (e) {
-    // Sin auth (dev local) — usuario por defecto
-  }
-})
+function logout() {
+  authStore.cerrarSesion()
+  router.push('/login')
+}
 </script>
 
 <style scoped>

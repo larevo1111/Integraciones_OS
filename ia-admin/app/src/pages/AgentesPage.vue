@@ -176,6 +176,7 @@
 </template>
 
 <script setup>
+import { apiFetch } from 'src/services/api'
 import { ref, onMounted } from 'vue'
 import { PlusIcon, PencilIcon, XIcon, EyeIcon, EyeOffIcon } from 'lucide-vue-next'
 
@@ -190,7 +191,7 @@ const mostrarKey = ref(false)
 async function cargar() {
   cargando.value = true
   try {
-    const res = await fetch('/api/ia/agentes-admin')
+    const res = await apiFetch('/api/ia/agentes-admin')
     agentes.value = await res.json()
   } catch (e) { agentes.value = [] }
   cargando.value = false
@@ -235,7 +236,7 @@ function cerrar() {
 
 async function toggleActivo(ag) {
   try {
-    await fetch(`/api/ia/agentes-admin/${ag.slug}`, {
+    await apiFetch(`/api/ia/agentes-admin/${ag.slug}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activo: !ag.activo })
@@ -249,7 +250,7 @@ async function guardar() {
   try {
     const url = esNuevo.value ? '/api/ia/agentes-admin' : `/api/ia/agentes-admin/${form.value.slug}`
     const method = esNuevo.value ? 'POST' : 'PUT'
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value)
@@ -266,7 +267,7 @@ async function guardar() {
 async function eliminar() {
   if (!confirm(`¿Eliminar agente "${seleccionado.value.slug}"?`)) return
   try {
-    await fetch(`/api/ia/agentes-admin/${seleccionado.value.slug}`, { method: 'DELETE' })
+    await apiFetch(`/api/ia/agentes-admin/${seleccionado.value.slug}`, { method: 'DELETE' })
     cerrar()
     await cargar()
   } catch (e) { alert('Error al eliminar') }

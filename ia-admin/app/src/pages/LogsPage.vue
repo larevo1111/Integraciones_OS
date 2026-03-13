@@ -136,6 +136,7 @@
 </template>
 
 <script setup>
+import { apiFetch } from 'src/services/api'
 import { ref, onMounted } from 'vue'
 import { SearchIcon, XIcon } from 'lucide-vue-next'
 
@@ -161,7 +162,7 @@ async function cargar() {
     if (filtros.value.fecha_desde) params.set('fecha_desde', filtros.value.fecha_desde)
     if (filtros.value.fecha_hasta) params.set('fecha_hasta', filtros.value.fecha_hasta)
     if (filtros.value.solo_errores) params.set('solo_errores', '1')
-    const res = await fetch(`/api/ia/logs?${params}`)
+    const res = await apiFetch(`/api/ia/logs?${params}`)
     const data = await res.json()
     logs.value = Array.isArray(data) ? data : (data.rows ?? [])
     total.value = data.total ?? logs.value.length
@@ -172,8 +173,8 @@ async function cargar() {
 async function cargarFiltros() {
   try {
     const [ra, rt] = await Promise.all([
-      fetch('/api/ia/agentes-admin').then(r => r.json()),
-      fetch('/api/ia/tipos-admin').then(r => r.json())
+      apiFetch('/api/ia/agentes-admin').then(r => r.json()),
+      apiFetch('/api/ia/tipos-admin').then(r => r.json())
     ])
     slugsAgentes.value = ra.map(a => a.slug)
     tiposList.value = rt.map(t => t.tipo)

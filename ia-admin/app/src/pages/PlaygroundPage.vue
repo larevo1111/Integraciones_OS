@@ -145,6 +145,7 @@
 </template>
 
 <script setup>
+import { apiFetch } from 'src/services/api'
 import { ref, onMounted } from 'vue'
 import { BotIcon, XIcon } from 'lucide-vue-next'
 
@@ -163,8 +164,8 @@ const tipos = ref([])
 async function cargarOpciones() {
   try {
     const [ra, rt] = await Promise.all([
-      fetch('/api/ia/agentes-admin').then(r => r.json()),
-      fetch('/api/ia/tipos-admin').then(r => r.json())
+      apiFetch('/api/ia/agentes-admin').then(r => r.json()),
+      apiFetch('/api/ia/tipos-admin').then(r => r.json())
     ])
     agentes.value = ra
     tipos.value = rt
@@ -185,7 +186,7 @@ async function enviar() {
   if (tipoSeleccionado.value) body.tipo = tipoSeleccionado.value
 
   try {
-    const res = await fetch('http://localhost:5100/ia/consultar', {
+    const res = await apiFetch('http://localhost:5100/ia/consultar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)

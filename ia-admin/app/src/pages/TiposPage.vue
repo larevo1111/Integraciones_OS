@@ -157,6 +157,7 @@
 </template>
 
 <script setup>
+import { apiFetch } from 'src/services/api'
 import { ref, onMounted } from 'vue'
 import { PlusIcon, PencilIcon, XIcon } from 'lucide-vue-next'
 
@@ -172,8 +173,8 @@ async function cargar() {
   cargando.value = true
   try {
     const [rt, ra] = await Promise.all([
-      fetch('/api/ia/tipos-admin').then(r => r.json()),
-      fetch('/api/ia/agentes-admin').then(r => r.json())
+      apiFetch('/api/ia/tipos-admin').then(r => r.json()),
+      apiFetch('/api/ia/agentes-admin').then(r => r.json())
     ])
     tipos.value = rt
     slugsAgentes.value = ra.map(a => a.slug)
@@ -201,7 +202,7 @@ function cerrar() { seleccionado.value = null; form.value = {} }
 
 async function toggleActivo(t) {
   try {
-    await fetch(`/api/ia/tipos-admin/${t.tipo}`, {
+    await apiFetch(`/api/ia/tipos-admin/${t.tipo}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activo: !t.activo })
@@ -215,7 +216,7 @@ async function guardar() {
   try {
     const url = esNuevo.value ? '/api/ia/tipos-admin' : `/api/ia/tipos-admin/${form.value.tipo}`
     const method = esNuevo.value ? 'POST' : 'PUT'
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value)
@@ -229,7 +230,7 @@ async function guardar() {
 async function eliminar() {
   if (!confirm(`¿Eliminar tipo "${seleccionado.value.tipo}"?`)) return
   try {
-    await fetch(`/api/ia/tipos-admin/${seleccionado.value.tipo}`, { method: 'DELETE' })
+    await apiFetch(`/api/ia/tipos-admin/${seleccionado.value.tipo}`, { method: 'DELETE' })
     cerrar(); await cargar()
   } catch (e) { alert('Error') }
 }

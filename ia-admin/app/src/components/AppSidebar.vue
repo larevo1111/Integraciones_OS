@@ -53,15 +53,19 @@
       </div>
     </nav>
 
-    <!-- Footer: perfil -->
+    <!-- Footer: perfil + logout -->
     <div class="sidebar-footer">
       <div class="nav-item" style="cursor:default">
         <div class="avatar-sm">{{ inicial }}</div>
         <div class="user-info">
-          <span class="user-name">{{ usuario.nombre }}</span>
-          <span class="user-rol">{{ usuario.rol }}</span>
+          <span class="user-name">{{ usuario?.nombre }}</span>
+          <span class="user-rol">{{ usuario?.rol }}</span>
         </div>
       </div>
+      <button class="nav-item logout-btn" @click="$emit('logout')" title="Cerrar sesión">
+        <LogOutIcon :size="14" class="nav-icon" />
+        <span>Cerrar sesión</span>
+      </button>
     </div>
 
   </div>
@@ -71,9 +75,10 @@
 import { computed } from 'vue'
 import {
   LayoutDashboardIcon, BotIcon, SettingsIcon, UsersIcon,
-  ScrollIcon, PlayIcon
+  ScrollIcon, PlayIcon, LogOutIcon
 } from 'lucide-vue-next'
 
+const emit = defineEmits(["logout"])
 const props = defineProps({ usuario: { type: Object, default: () => ({ nombre: 'Admin', rol: 'admin' }) } })
 const inicial = computed(() => props.usuario.nombre?.charAt(0).toUpperCase() || 'A')
 </script>
@@ -197,5 +202,13 @@ const inicial = computed(() => props.usuario.nombre?.charAt(0).toUpperCase() || 
   font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
+}
+.logout-btn {
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+.logout-btn:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
 }
 </style>

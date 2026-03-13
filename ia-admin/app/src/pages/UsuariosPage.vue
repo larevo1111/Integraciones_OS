@@ -117,6 +117,7 @@
 </template>
 
 <script setup>
+import { apiFetch } from 'src/services/api'
 import { ref, onMounted } from 'vue'
 import { PlusIcon, PencilIcon, XIcon, ShieldCheckIcon } from 'lucide-vue-next'
 
@@ -130,7 +131,7 @@ const guardando = ref(false)
 async function cargar() {
   cargando.value = true
   try {
-    const res = await fetch('/api/ia/usuarios')
+    const res = await apiFetch('/api/ia/usuarios')
     usuarios.value = await res.json()
   } catch (e) { usuarios.value = [] }
   cargando.value = false
@@ -152,7 +153,7 @@ function cerrar() { seleccionado.value = null; form.value = {} }
 
 async function toggleActivo(u) {
   try {
-    await fetch(`/api/ia/usuarios/${encodeURIComponent(u.email)}`, {
+    await apiFetch(`/api/ia/usuarios/${encodeURIComponent(u.email)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activo: !u.activo })
@@ -166,7 +167,7 @@ async function guardar() {
   try {
     const url = esNuevo.value ? '/api/ia/usuarios' : `/api/ia/usuarios/${encodeURIComponent(form.value.email)}`
     const method = esNuevo.value ? 'POST' : 'PUT'
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value)
@@ -180,7 +181,7 @@ async function guardar() {
 async function eliminar() {
   if (!confirm(`¿Eliminar usuario "${seleccionado.value.email}"?`)) return
   try {
-    await fetch(`/api/ia/usuarios/${encodeURIComponent(seleccionado.value.email)}`, { method: 'DELETE' })
+    await apiFetch(`/api/ia/usuarios/${encodeURIComponent(seleccionado.value.email)}`, { method: 'DELETE' })
     cerrar(); await cargar()
   } catch (e) { alert('Error') }
 }

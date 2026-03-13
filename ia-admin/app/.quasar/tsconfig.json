@@ -60,6 +60,9 @@
       "stores": [
         "./../src/stores"
       ],
+      "stores/*": [
+        "./../src/stores/*"
+      ],
       "#q-app": [
         "./../node_modules/@quasar/app-vite/types/index.d.ts"
       ],
