@@ -74,16 +74,42 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_canal_mes (
     -- Proyeccion (solo mes corriente, NULL si mes cerrado)
     pry_dia_del_mes          INT           COMMENT 'Dia actual del mes (solo mes corriente)',
     pry_proyeccion_mes       DECIMAL(15,2) COMMENT 'Proyeccion lineal al cierre del mes',
-    pry_ritmo_pct            DECIMAL(8,4)  COMMENT 'pry_proyeccion_mes / ant_ventas_netas (decimal 0-1)',
+    pry_ritmo_pct            DECIMAL(8,4)  COMMENT 'pry_proyeccion_mes / year_ant_ventas_netas (decimal 0-1)',
 
     -- Consignaciones (OVs atribuidas via id_cliente → canal historico)
     con_consignacion_pp      DECIMAL(15,2) COMMENT 'SUM total_neto OVs atribuidas al canal via id_cliente',
 
-    -- Ano anterior
-    ant_ventas_netas         DECIMAL(15,2) COMMENT 'fin_ventas_netas_sin_iva del mismo canal-mes ano anterior',
-    ant_var_ventas_pct       DECIMAL(8,4)  COMMENT '(ventas - ant) / ant (decimal 0-1)',
-    ant_consignacion_pp      DECIMAL(15,2) COMMENT 'con_consignacion_pp del mismo canal-mes ano anterior',
-    ant_var_consignacion_pct DECIMAL(8,4)  COMMENT '(con - ant_con) / ant_con (decimal 0-1)',
+    -- Año anterior (year_ant_): mismo mes, año -1
+    year_ant_ventas_netas         DECIMAL(15,2) COMMENT 'Ventas netas del mismo mes y canal, año anterior',
+    year_ant_var_ventas_pct       DECIMAL(8,4)  COMMENT 'Variación % ventas netas vs año anterior',
+    year_ant_ticket_promedio      DECIMAL(15,2) COMMENT 'Ticket promedio del mismo mes y canal, año anterior',
+    year_ant_var_ticket_promedio_pct DECIMAL(8,4) COMMENT 'Variación % ticket promedio vs año anterior',
+    year_ant_clientes_activos     INT           COMMENT 'Clientes activos del mismo mes y canal, año anterior',
+    year_ant_var_clientes_activos_pct DECIMAL(8,4) COMMENT 'Variación % clientes activos vs año anterior',
+    year_ant_clientes_nuevos      INT           COMMENT 'Clientes nuevos del mismo mes y canal, año anterior',
+    year_ant_var_clientes_nuevos_pct DECIMAL(8,4) COMMENT 'Variación % clientes nuevos vs año anterior',
+    year_ant_consignacion_pp      DECIMAL(15,2) COMMENT 'Consignación PP del mismo mes y canal, año anterior',
+    year_ant_var_consignacion_pct DECIMAL(8,4)  COMMENT 'Variación % consignación vs año anterior',
+    year_ant_costo_total          DECIMAL(15,2) COMMENT 'Costo total del mismo mes y canal, año anterior',
+    year_ant_var_costo_total_pct  DECIMAL(8,4)  COMMENT 'Variación % costo total vs año anterior',
+    year_ant_margen_utilidad_pct  DECIMAL(8,4)  COMMENT 'Margen utilidad del mismo mes y canal, año anterior',
+    year_ant_var_margen_pct       DECIMAL(8,4)  COMMENT 'Diferencia en pp del margen vs año anterior',
+
+    -- Mes anterior (mes_ant_): mes inmediatamente anterior
+    mes_ant_ventas_netas          DECIMAL(15,2) COMMENT 'Ventas netas del mes anterior para este canal',
+    mes_ant_var_ventas_pct        DECIMAL(8,4)  COMMENT 'Variación % ventas netas vs mes anterior',
+    mes_ant_ticket_promedio       DECIMAL(15,2) COMMENT 'Ticket promedio del mes anterior para este canal',
+    mes_ant_var_ticket_promedio_pct DECIMAL(8,4) COMMENT 'Variación % ticket promedio vs mes anterior',
+    mes_ant_clientes_activos      INT           COMMENT 'Clientes activos del mes anterior para este canal',
+    mes_ant_var_clientes_activos_pct DECIMAL(8,4) COMMENT 'Variación % clientes activos vs mes anterior',
+    mes_ant_clientes_nuevos       INT           COMMENT 'Clientes nuevos del mes anterior para este canal',
+    mes_ant_var_clientes_nuevos_pct DECIMAL(8,4) COMMENT 'Variación % clientes nuevos vs mes anterior',
+    mes_ant_consignacion_pp       DECIMAL(15,2) COMMENT 'Consignación PP del mes anterior para este canal',
+    mes_ant_var_consignacion_pct  DECIMAL(8,4)  COMMENT 'Variación % consignación vs mes anterior',
+    mes_ant_costo_total           DECIMAL(15,2) COMMENT 'Costo total del mes anterior para este canal',
+    mes_ant_var_costo_total_pct   DECIMAL(8,4)  COMMENT 'Variación % costo total vs mes anterior',
+    mes_ant_margen_utilidad_pct   DECIMAL(8,4)  COMMENT 'Margen utilidad del mes anterior para este canal',
+    mes_ant_var_margen_pct        DECIMAL(8,4)  COMMENT 'Diferencia en pp del margen vs mes anterior',
 
     _key                     VARCHAR(100) NOT NULL COMMENT 'PK único: CONCAT(mes, |, canal)',
 
@@ -101,14 +127,52 @@ def main():
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute(DDL)
-    # Agregar columnas nuevas si la tabla ya existía
-    for col_ddl in [
-        "ALTER TABLE resumen_ventas_facturas_canal_mes ADD COLUMN IF NOT EXISTS _key VARCHAR(100) NOT NULL DEFAULT '' AFTER mes",
-        "ALTER TABLE resumen_ventas_facturas_canal_mes ADD COLUMN IF NOT EXISTS con_consignacion_pp DECIMAL(15,2) COMMENT 'SUM total_neto OVs atribuidas al canal via id_cliente' AFTER fin_pct_del_mes",
-        "ALTER TABLE resumen_ventas_facturas_canal_mes ADD COLUMN IF NOT EXISTS ant_consignacion_pp DECIMAL(15,2) COMMENT 'con_consignacion_pp del mismo canal-mes ano anterior' AFTER ant_var_ventas_pct",
-        "ALTER TABLE resumen_ventas_facturas_canal_mes ADD COLUMN IF NOT EXISTS ant_var_consignacion_pct DECIMAL(8,4) COMMENT '(con - ant_con) / ant_con (decimal 0-1)' AFTER ant_consignacion_pp",
-    ]:
-        cursor.execute(col_ddl)
+    # Migración: eliminar viejas ant_* y agregar columnas nuevas
+    migration_cols = [
+        # Eliminar viejas ant_*
+        "DROP COLUMN IF EXISTS ant_ventas_netas",
+        "DROP COLUMN IF EXISTS ant_var_ventas_pct",
+        "DROP COLUMN IF EXISTS ant_consignacion_pp",
+        "DROP COLUMN IF EXISTS ant_var_consignacion_pct",
+        # Asegurar columnas base que se agregaron después del DDL original
+        "ADD COLUMN IF NOT EXISTS _key VARCHAR(100) NOT NULL DEFAULT '' AFTER mes",
+        "ADD COLUMN IF NOT EXISTS con_consignacion_pp DECIMAL(15,2) COMMENT 'SUM total_neto OVs atribuidas al canal via id_cliente' AFTER fin_pct_del_mes",
+        # year_ant_*
+        "ADD COLUMN IF NOT EXISTS year_ant_ventas_netas DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_ventas_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_ticket_promedio DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_ticket_promedio_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_clientes_activos INT",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_clientes_activos_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_clientes_nuevos INT",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_clientes_nuevos_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_consignacion_pp DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_consignacion_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_costo_total DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_costo_total_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_margen_utilidad_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS year_ant_var_margen_pct DECIMAL(8,4)",
+        # mes_ant_*
+        "ADD COLUMN IF NOT EXISTS mes_ant_ventas_netas DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_ventas_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_ticket_promedio DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_ticket_promedio_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_clientes_activos INT",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_clientes_activos_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_clientes_nuevos INT",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_clientes_nuevos_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_consignacion_pp DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_consignacion_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_costo_total DECIMAL(15,2)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_costo_total_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_margen_utilidad_pct DECIMAL(8,4)",
+        "ADD COLUMN IF NOT EXISTS mes_ant_var_margen_pct DECIMAL(8,4)",
+    ]
+    for col_sql in migration_cols:
+        try:
+            cursor.execute(f"ALTER TABLE resumen_ventas_facturas_canal_mes {col_sql}")
+        except Exception:
+            pass  # columna ya existe o ya fue eliminada
     conn.commit()
 
     resumen = {}   # key: (mes, canal) → dict de campos
@@ -281,29 +345,63 @@ def main():
     for (mes, canal), d in resumen.items():
         totales_mes[mes] = totales_mes.get(mes, 0.0) + d.get('fin_ventas_netas_sin_iva', 0.0)
 
-    # Año anterior
+    # ── Helper para calcular comparativos ──────────────────────────────────────
+    def calc_comparativo(d, prev, prefix, campos):
+        """Calcula columnas de comparativo (year_ant_ o mes_ant_).
+        campos: lista de tuplas (nombre_destino, campo_fuente, es_margen[, var_nombre])
+        """
+        for item in campos:
+            nombre, fuente, es_margen = item[0], item[1], item[2]
+            var_nombre = item[3] if len(item) > 3 else nombre
+            col_val = f'{prefix}_{nombre}'
+            col_var = f'{prefix}_var_{var_nombre}_pct' if not es_margen else f'{prefix}_var_{var_nombre.replace("margen_utilidad_pct","margen")}_pct'
+            prev_val = (prev or {}).get(fuente)
+            cur_val  = d.get(fuente)
+            d[col_val] = prev_val if prev else None
+            if es_margen:
+                # Margen: diferencia en puntos porcentuales
+                if prev_val is not None and cur_val is not None:
+                    d[col_var] = cur_val - prev_val
+                else:
+                    d[col_var] = None
+            else:
+                # Variación porcentual estándar
+                if prev_val:
+                    v = ((cur_val or 0) - prev_val) / prev_val
+                    d[col_var] = max(-9999.9999, min(9999.9999, v))
+                else:
+                    d[col_var] = None
+
+    # Campos a comparar para resumen CANAL (sin devoluciones ni ingresos_netos)
+    CAMPOS_COMP_CANAL = [
+        # (nombre_destino, campo_fuente, es_margen, var_nombre_override)
+        ('ventas_netas',       'fin_ventas_netas_sin_iva', False, 'ventas'),
+        ('ticket_promedio',    'vol_ticket_promedio',      False),
+        ('clientes_activos',   'cli_clientes_activos',     False),
+        ('clientes_nuevos',    'cli_clientes_nuevos',      False),
+        ('consignacion_pp',    'con_consignacion_pp',      False, 'consignacion'),
+        ('costo_total',        'cto_costo_total',          False),
+        ('margen_utilidad_pct','cto_margen_utilidad_pct',   True),
+    ]
+
+    # Año anterior (year_ant_) — mismo mes, año -1
     for (mes, canal) in sorted(resumen.keys()):
         year, month = map(int, mes.split('-'))
-        prev_mes    = f'{year-1:04d}-{month:02d}'
-        d           = resumen[(mes, canal)]
-        prev        = resumen.get((prev_mes, canal))
+        prev_year_mes = f'{year-1:04d}-{month:02d}'
+        d    = resumen[(mes, canal)]
+        prev = resumen.get((prev_year_mes, canal))
+        calc_comparativo(d, prev, 'year_ant', CAMPOS_COMP_CANAL)
 
-        d['ant_ventas_netas'] = prev.get('fin_ventas_netas_sin_iva') if prev else None
-        if prev and prev.get('fin_ventas_netas_sin_iva'):
-            d['ant_var_ventas_pct'] = (
-                (d['fin_ventas_netas_sin_iva'] - prev['fin_ventas_netas_sin_iva'])
-                / prev['fin_ventas_netas_sin_iva']
-            )
+    # Mes anterior (mes_ant_) — mes inmediatamente anterior
+    for (mes, canal) in sorted(resumen.keys()):
+        year, month = map(int, mes.split('-'))
+        if month == 1:
+            prev_month = f'{year-1:04d}-12'
         else:
-            d['ant_var_ventas_pct'] = None
-
-        prev_con = (prev or {}).get('con_consignacion_pp')
-        cur_con  = d.get('con_consignacion_pp')
-        d['ant_consignacion_pp'] = prev_con
-        if prev_con and cur_con is not None:
-            d['ant_var_consignacion_pct'] = (cur_con - prev_con) / prev_con
-        else:
-            d['ant_var_consignacion_pct'] = None
+            prev_month = f'{year:04d}-{month-1:02d}'
+        d    = resumen[(mes, canal)]
+        prev = resumen.get((prev_month, canal))
+        calc_comparativo(d, prev, 'mes_ant', CAMPOS_COMP_CANAL)
 
     # Resto de derivados
     for (mes, canal), d in resumen.items():
@@ -329,75 +427,54 @@ def main():
             d['pry_dia_del_mes']    = day_today
             d['pry_proyeccion_mes'] = netas / day_today * days_in_month if day_today else None
             proy = d.get('pry_proyeccion_mes')
-            ant  = d.get('ant_ventas_netas')
+            ant  = d.get('year_ant_ventas_netas')
             d['pry_ritmo_pct'] = proy / ant if (proy is not None and ant) else None
         else:
             d['pry_dia_del_mes']    = None
             d['pry_proyeccion_mes'] = None
             d['pry_ritmo_pct']      = None
 
-    # ── 6. UPSERT ─────────────────────────────────────────────────────────────
-    upsert_sql = """
-        INSERT INTO resumen_ventas_facturas_canal_mes (
-            _key, mes, canal, fecha_actualizacion,
-            fin_ventas_brutas, fin_descuentos, fin_pct_descuento,
-            fin_ventas_netas_sin_iva, fin_impuestos, fin_pct_del_mes,
-            cto_costo_total, cto_utilidad_bruta, cto_margen_utilidad_pct,
-            vol_unidades_vendidas, vol_num_facturas, vol_ticket_promedio,
-            cli_clientes_activos, cli_clientes_nuevos, cli_vtas_por_cliente,
-            cat_num_referencias,
-            top_cliente, top_cliente_ventas,
-            top_producto_cod, top_producto_nombre, top_producto_ventas,
-            pry_dia_del_mes, pry_proyeccion_mes, pry_ritmo_pct,
-            con_consignacion_pp,
-            ant_ventas_netas, ant_var_ventas_pct,
-            ant_consignacion_pp, ant_var_consignacion_pct
-        ) VALUES (
-            %(_key)s, %(mes)s, %(canal)s, %(fecha_actualizacion)s,
-            %(fin_ventas_brutas)s, %(fin_descuentos)s, %(fin_pct_descuento)s,
-            %(fin_ventas_netas_sin_iva)s, %(fin_impuestos)s, %(fin_pct_del_mes)s,
-            %(cto_costo_total)s, %(cto_utilidad_bruta)s, %(cto_margen_utilidad_pct)s,
-            %(vol_unidades_vendidas)s, %(vol_num_facturas)s, %(vol_ticket_promedio)s,
-            %(cli_clientes_activos)s, %(cli_clientes_nuevos)s, %(cli_vtas_por_cliente)s,
-            %(cat_num_referencias)s,
-            %(top_cliente)s, %(top_cliente_ventas)s,
-            %(top_producto_cod)s, %(top_producto_nombre)s, %(top_producto_ventas)s,
-            %(pry_dia_del_mes)s, %(pry_proyeccion_mes)s, %(pry_ritmo_pct)s,
-            %(con_consignacion_pp)s,
-            %(ant_ventas_netas)s, %(ant_var_ventas_pct)s,
-            %(ant_consignacion_pp)s, %(ant_var_consignacion_pct)s
-        )
-        ON DUPLICATE KEY UPDATE
-            fecha_actualizacion      = VALUES(fecha_actualizacion),
-            fin_ventas_brutas        = VALUES(fin_ventas_brutas),
-            fin_descuentos           = VALUES(fin_descuentos),
-            fin_pct_descuento        = VALUES(fin_pct_descuento),
-            fin_ventas_netas_sin_iva = VALUES(fin_ventas_netas_sin_iva),
-            fin_impuestos            = VALUES(fin_impuestos),
-            fin_pct_del_mes          = VALUES(fin_pct_del_mes),
-            cto_costo_total          = VALUES(cto_costo_total),
-            cto_utilidad_bruta       = VALUES(cto_utilidad_bruta),
-            cto_margen_utilidad_pct  = VALUES(cto_margen_utilidad_pct),
-            vol_unidades_vendidas    = VALUES(vol_unidades_vendidas),
-            vol_num_facturas         = VALUES(vol_num_facturas),
-            vol_ticket_promedio      = VALUES(vol_ticket_promedio),
-            cli_clientes_activos     = VALUES(cli_clientes_activos),
-            cli_clientes_nuevos      = VALUES(cli_clientes_nuevos),
-            cli_vtas_por_cliente     = VALUES(cli_vtas_por_cliente),
-            cat_num_referencias      = VALUES(cat_num_referencias),
-            top_cliente              = VALUES(top_cliente),
-            top_cliente_ventas       = VALUES(top_cliente_ventas),
-            top_producto_cod         = VALUES(top_producto_cod),
-            top_producto_nombre      = VALUES(top_producto_nombre),
-            top_producto_ventas      = VALUES(top_producto_ventas),
-            pry_dia_del_mes          = VALUES(pry_dia_del_mes),
-            pry_proyeccion_mes       = VALUES(pry_proyeccion_mes),
-            pry_ritmo_pct            = VALUES(pry_ritmo_pct),
-            con_consignacion_pp      = VALUES(con_consignacion_pp),
-            ant_ventas_netas         = VALUES(ant_ventas_netas),
-            ant_var_ventas_pct       = VALUES(ant_var_ventas_pct),
-            ant_consignacion_pp      = VALUES(ant_consignacion_pp),
-            ant_var_consignacion_pct = VALUES(ant_var_consignacion_pct)
+    # ── 8. UPSERT ─────────────────────────────────────────────────────────────
+
+    COLS_BASE = [
+        '_key', 'mes', 'canal', 'fecha_actualizacion',
+        'fin_ventas_brutas', 'fin_descuentos', 'fin_pct_descuento',
+        'fin_ventas_netas_sin_iva', 'fin_impuestos', 'fin_pct_del_mes',
+        'cto_costo_total', 'cto_utilidad_bruta', 'cto_margen_utilidad_pct',
+        'vol_unidades_vendidas', 'vol_num_facturas', 'vol_ticket_promedio',
+        'cli_clientes_activos', 'cli_clientes_nuevos', 'cli_vtas_por_cliente',
+        'cat_num_referencias',
+        'top_cliente', 'top_cliente_ventas',
+        'top_producto_cod', 'top_producto_nombre', 'top_producto_ventas',
+        'pry_dia_del_mes', 'pry_proyeccion_mes', 'pry_ritmo_pct',
+        'con_consignacion_pp',
+    ]
+
+    # Generar columnas de comparativo dinámicamente
+    COMP_NAMES_CANAL = [
+        'ventas_netas', 'var_ventas_pct',
+        'ticket_promedio', 'var_ticket_promedio_pct',
+        'clientes_activos', 'var_clientes_activos_pct',
+        'clientes_nuevos', 'var_clientes_nuevos_pct',
+        'consignacion_pp', 'var_consignacion_pct',
+        'costo_total', 'var_costo_total_pct',
+        'margen_utilidad_pct', 'var_margen_pct',
+    ]
+    COLS_COMP = []
+    for prefix in ('year_ant', 'mes_ant'):
+        for name in COMP_NAMES_CANAL:
+            COLS_COMP.append(f'{prefix}_{name}')
+
+    ALL_COLS = COLS_BASE + COLS_COMP
+
+    col_list    = ', '.join(ALL_COLS)
+    val_list    = ', '.join(f'%({c})s' for c in ALL_COLS)
+    update_list = ', '.join(f'{c} = VALUES({c})' for c in ALL_COLS if c != '_key')
+
+    upsert_sql = f"""
+        INSERT INTO resumen_ventas_facturas_canal_mes ({col_list})
+        VALUES ({val_list})
+        ON DUPLICATE KEY UPDATE {update_list}
     """
 
     now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -405,40 +482,14 @@ def main():
     for (mes, canal) in sorted(resumen.keys()):
         d = resumen[(mes, canal)]
         row = {
-            '_key':                     f'{mes}|{canal}',
-            'mes':                      mes,
-            'canal':                    canal,
-            'fecha_actualizacion':      now,
-            'fin_ventas_brutas':        d.get('fin_ventas_brutas'),
-            'fin_descuentos':           d.get('fin_descuentos'),
-            'fin_pct_descuento':        d.get('fin_pct_descuento'),
-            'fin_ventas_netas_sin_iva': d.get('fin_ventas_netas_sin_iva'),
-            'fin_impuestos':            d.get('fin_impuestos'),
-            'fin_pct_del_mes':          d.get('fin_pct_del_mes'),
-            'cto_costo_total':          d.get('cto_costo_total'),
-            'cto_utilidad_bruta':       d.get('cto_utilidad_bruta'),
-            'cto_margen_utilidad_pct':  d.get('cto_margen_utilidad_pct'),
-            'vol_unidades_vendidas':    d.get('vol_unidades_vendidas'),
-            'vol_num_facturas':         d.get('vol_num_facturas'),
-            'vol_ticket_promedio':      d.get('vol_ticket_promedio'),
-            'cli_clientes_activos':     d.get('cli_clientes_activos'),
-            'cli_clientes_nuevos':      d.get('cli_clientes_nuevos'),
-            'cli_vtas_por_cliente':     d.get('cli_vtas_por_cliente'),
-            'cat_num_referencias':      d.get('cat_num_referencias'),
-            'top_cliente':              d.get('top_cliente'),
-            'top_cliente_ventas':       d.get('top_cliente_ventas'),
-            'top_producto_cod':         d.get('top_producto_cod'),
-            'top_producto_nombre':      d.get('top_producto_nombre'),
-            'top_producto_ventas':      d.get('top_producto_ventas'),
-            'pry_dia_del_mes':          d.get('pry_dia_del_mes'),
-            'pry_proyeccion_mes':       d.get('pry_proyeccion_mes'),
-            'pry_ritmo_pct':            d.get('pry_ritmo_pct'),
-            'con_consignacion_pp':       d.get('con_consignacion_pp'),
-            'ant_ventas_netas':          d.get('ant_ventas_netas'),
-            'ant_var_ventas_pct':        d.get('ant_var_ventas_pct'),
-            'ant_consignacion_pp':       d.get('ant_consignacion_pp'),
-            'ant_var_consignacion_pct':  d.get('ant_var_consignacion_pct'),
+            '_key':                f'{mes}|{canal}',
+            'mes':                 mes,
+            'canal':               canal,
+            'fecha_actualizacion': now,
         }
+        for c in ALL_COLS:
+            if c not in row:
+                row[c] = d.get(c)
         cursor.execute(upsert_sql, row)
 
     conn.commit()

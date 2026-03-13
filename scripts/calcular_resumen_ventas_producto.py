@@ -247,9 +247,11 @@ def main():
         """Calcula columnas de comparativo (year_ant_ o mes_ant_).
         campos: lista de tuplas (nombre_destino, campo_fuente, es_margen)
         """
-        for nombre, fuente, es_margen in campos:
+        for item in campos:
+            nombre, fuente, es_margen = item[0], item[1], item[2]
+            var_nombre = item[3] if len(item) > 3 else nombre
             col_val = f'{prefix}_{nombre}'
-            col_var = f'{prefix}_var_{nombre}_pct' if not es_margen else f'{prefix}_var_{nombre.replace("margen_utilidad_pct","margen")}_pct'
+            col_var = f'{prefix}_var_{var_nombre}_pct' if not es_margen else f'{prefix}_var_{var_nombre.replace("margen_utilidad_pct","margen")}_pct'
             prev_val = (prev or {}).get(fuente)
             cur_val  = d.get(fuente)
             d[col_val] = prev_val if prev else None
@@ -260,13 +262,15 @@ def main():
                     d[col_var] = None
             else:
                 if prev_val:
-                    d[col_var] = ((cur_val or 0) - prev_val) / prev_val
+                    v = ((cur_val or 0) - prev_val) / prev_val
+                    d[col_var] = max(-9999.9999, min(9999.9999, v))
                 else:
                     d[col_var] = None
 
     # Campos a comparar para resumen PRODUCTO (incluye unidades, sin clientes)
     CAMPOS_COMP_PRODUCTO = [
-        ('ventas_netas',       'fin_ventas_netas_sin_iva', False),
+        # (nombre_destino, campo_fuente, es_margen, var_nombre_override)
+        ('ventas_netas',       'fin_ventas_netas_sin_iva', False, 'ventas'),
         ('unidades',           'vol_unidades_vendidas',    False),
         ('costo_total',        'cto_costo_total',          False),
         ('margen_utilidad_pct','cto_margen_utilidad_pct',   True),
