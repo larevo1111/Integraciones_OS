@@ -353,7 +353,7 @@ Ejemplo: {{"tipo": "analisis_datos", "tema": "comercial"}}"""
     ]
     res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=50)
 
-    tipo_default = 'analisis_datos'
+    tipo_default = 'conversacion'
     tema_default = 'general'
 
     if res['ok']:
@@ -365,7 +365,7 @@ Ejemplo: {{"tipo": "analisis_datos", "tema": "comercial"}}"""
             if match:
                 data = json.loads(match.group())
                 tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                                 'generacion_documento', 'generacion_imagen', 'enrutamiento'}
+                                 'generacion_documento', 'generacion_imagen', 'conversacion', 'enrutamiento'}
                 temas_validos  = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
                 tipo_ret = data.get('tipo', tipo_default)
                 tema_ret = data.get('tema', tema_default)
@@ -379,7 +379,7 @@ Ejemplo: {{"tipo": "analisis_datos", "tema": "comercial"}}"""
         # Fallback: buscar tipo en texto plano
         texto_lower = texto.lower()
         for slug in ('analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                     'generacion_documento', 'generacion_imagen'):
+                     'generacion_documento', 'generacion_imagen', 'conversacion'):
             if slug in texto_lower:
                 return (slug, tema_default)
 

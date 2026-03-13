@@ -8,9 +8,18 @@ SEGURIDAD — DOS CAPAS INDEPENDIENTES:
 
 Solo se permiten SELECT. Devuelve filas como lista de dicts.
 """
+import re
 import sqlglot
 import sqlglot.expressions as exp
 from .config import get_local_conn, get_hostinger_conn
+
+
+def _limpiar_sql(sql: str) -> str:
+    """Elimina ANSI escape codes y caracteres de control que el LLM a veces inyecta."""
+    sql = re.sub(r'\x1b\[[0-9;]*[mGKHF]', '', sql)   # ANSI con ESC
+    sql = re.sub(r'\[[\d;]+[mGKHF]', '', sql)          # ANSI sin ESC (artefacto markdown)
+    sql = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', sql)
+    return sql.strip()
 
 MAX_FILAS = 500
 
@@ -27,7 +36,7 @@ def _validar_sql_ast(sql: str) -> str | None:
         return 'Solo se permiten consultas SELECT.'
 
     try:
-        statements = sqlglot.parse(sql_clean)
+        statements = sqlglot.parse(sql_clean, dialect='mysql')
     except Exception as e:
         return f'SQL inválido: {e}'
 
@@ -38,15 +47,20 @@ def _validar_sql_ast(sql: str) -> str | None:
         if stmt is None:
             continue
         # Verificar que el statement raíz sea un SELECT
-        if not isinstance(stmt, exp.Select):
+        # SELECT puro + operaciones de conjunto (UNION/INTERSECT/EXCEPT) son todas read-only
+        # sqlglot parsea "SELECT ... UNION SELECT ..." como exp.Union, no exp.Select
+        RAIZ_OK = (exp.Select, exp.Union, exp.Intersect, exp.Except)
+        MUTANTES = (exp.Insert, exp.Update, exp.Delete,
+                    exp.Drop, exp.Create, exp.Alter,
+                    exp.DDL, exp.Grant, exp.Revoke, exp.Command)
+
+        if not isinstance(stmt, RAIZ_OK):
             tipo = type(stmt).__name__
             return f'Solo SELECT permitido. Se detectó: {tipo}.'
 
-        # Verificar que no haya subqueries mutantes dentro del SELECT
+        # Verificar que no haya operaciones mutantes en ningún nodo del árbol
         for node in stmt.walk():
-            if isinstance(node, (exp.Insert, exp.Update, exp.Delete,
-                                 exp.Drop, exp.Create, exp.Alter,
-                                 exp.DDL, exp.Grant, exp.Revoke)):
+            if isinstance(node, MUTANTES):
                 tipo = type(node).__name__
                 return f'SQL contiene operación no permitida: {tipo}.'
 
@@ -64,7 +78,7 @@ def ejecutar(sql: str, conexion_id: int = None) -> dict:
     Returns:
         {ok, filas, columnas, total, truncado, error}
     """
-    sql = sql.strip()
+    sql = _limpiar_sql(sql)
 
     # ── Capa 1: validación AST ────────────────────────────────────────
     error = _validar_sql_ast(sql)

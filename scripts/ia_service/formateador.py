@@ -37,17 +37,27 @@ def parsear_respuesta(texto_crudo: str) -> dict:
     }
 
 
+def _limpiar_sql(sql: str) -> str:
+    """Elimina artefactos de formato: ANSI escape codes, caracteres de control."""
+    # ANSI escape codes (ej: \x1b[4m, \x1b[0m, [4m, [0m del markdown del LLM)
+    sql = re.sub(r'\x1b\[[0-9;]*m', '', sql)
+    sql = re.sub(r'\[[\d;]+m', '', sql)
+    # Caracteres de control excepto newline y tab
+    sql = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', sql)
+    return sql.strip()
+
+
 def extraer_sql(texto: str) -> str | None:
     """Extrae SQL de un bloque ```sql ... ``` o de texto plano si parece SQL."""
     # Bloque markdown
     match = re.search(r'```(?:sql)?\s*(SELECT\s.*?)```', texto, re.DOTALL | re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        return _limpiar_sql(match.group(1))
 
     # SQL sin markdown (línea que empieza con SELECT)
     match = re.search(r'(SELECT\s.+)', texto, re.DOTALL | re.IGNORECASE)
     if match:
-        candidate = match.group(1).strip()
+        candidate = _limpiar_sql(match.group(1).strip())
         # Limitar a la primera sentencia
         candidate = candidate.split(';')[0].strip()
         if len(candidate) > 10:
