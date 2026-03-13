@@ -125,7 +125,7 @@
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
             <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
-              @row-dblclick="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'cliente', desde_id: id_cliente, desde_label: kpi?.cliente || id_cliente } })" />
+              @row-click="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'cliente', desde_id: id_cliente, desde_label: kpi?.cliente || id_cliente } })" />
           </div>
         </div>
 

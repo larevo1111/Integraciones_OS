@@ -106,7 +106,7 @@
           </button>
           <div v-if="abiertos.canales" class="acordeon-body">
             <OsDataTable title="Canales" :rows="resCanales" :columns="colsCanales" :loading="loadingCanales"
-              @row-dblclick="row => router.push(`/ventas/detalle-canal/${mes}/${encodeURIComponent(row.canal)}`)" />
+              @row-click="row => router.push(`/ventas/detalle-canal/${mes}/${encodeURIComponent(row.canal)}`)" />
           </div>
         </div>
 
@@ -122,7 +122,7 @@
           </button>
           <div v-if="abiertos.clientes" class="acordeon-body">
             <OsDataTable title="Clientes" :rows="resClientes" :columns="colsClientes" :loading="loadingClientes"
-              @row-dblclick="row => router.push(`/ventas/detalle-cliente/${mes}/${encodeURIComponent(row.id_cliente)}`)" />
+              @row-click="row => router.push(`/ventas/detalle-cliente/${mes}/${encodeURIComponent(row.id_cliente)}`)" />
           </div>
         </div>
 
@@ -138,7 +138,7 @@
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
             <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
-              @row-dblclick="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'producto', desde_id: cod_articulo, desde_label: kpi?.nombre || cod_articulo } })" />
+              @row-click="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'producto', desde_id: cod_articulo, desde_label: kpi?.nombre || cod_articulo } })" />
           </div>
         </div>
 

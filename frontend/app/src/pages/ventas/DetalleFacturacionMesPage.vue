@@ -192,7 +192,7 @@
           </button>
           <div v-if="abiertos.canal" class="acordeon-body">
             <OsDataTable title="Por canal" recurso="resumen-canal" :rows="resCanal" :columns="colsCanal" :loading="loadingCanal" :mes="mes"
-              @row-dblclick="row => router.push(`/ventas/detalle-canal/${mes}/${encodeURIComponent(row.canal)}`)" />
+              @row-click="row => router.push(`/ventas/detalle-canal/${mes}/${encodeURIComponent(row.canal)}`)" />
           </div>
         </div>
 
@@ -208,7 +208,7 @@
           </button>
           <div v-if="abiertos.cliente" class="acordeon-body">
             <OsDataTable title="Por cliente" recurso="resumen-cliente" :rows="resCliente" :columns="colsCliente" :loading="loadingCliente" :mes="mes"
-              @row-dblclick="row => router.push(`/ventas/detalle-cliente/${mes}/${encodeURIComponent(row.id_cliente)}`)" />
+              @row-click="row => router.push(`/ventas/detalle-cliente/${mes}/${encodeURIComponent(row.id_cliente)}`)" />
           </div>
         </div>
 
@@ -224,7 +224,7 @@
           </button>
           <div v-if="abiertos.producto" class="acordeon-body">
             <OsDataTable title="Por producto" recurso="resumen-producto" :rows="resProducto" :columns="colsProducto" :loading="loadingProducto" :mes="mes"
-              @row-dblclick="row => router.push(`/ventas/detalle-producto/${mes}/${encodeURIComponent(row.cod_articulo)}`)" />
+              @row-click="row => router.push(`/ventas/detalle-producto/${mes}/${encodeURIComponent(row.cod_articulo)}`)" />
           </div>
         </div>
 
@@ -240,7 +240,7 @@
           </button>
           <div v-if="abiertos.facturas" class="acordeon-body">
             <OsDataTable title="Facturas" recurso="facturas" :rows="resFacturas" :columns="colsFacturas" :loading="loadingFacturas" :mes="mes"
-              @row-dblclick="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'mes' } })" />
+              @row-click="row => router.push({ path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`, query: { mes, desde: 'mes' } })" />
           </div>
         </div>
 
