@@ -2,10 +2,12 @@
 Flask API — Servicio Central de IA
 Puerto: 5100
 Endpoints:
-  POST /ia/consultar  — consulta principal
-  GET  /ia/agentes    — lista agentes disponibles
-  GET  /ia/tipos      — lista tipos de consulta
-  GET  /ia/health     — health check
+  POST /ia/consultar           — consulta principal
+  GET  /ia/agentes             — lista agentes disponibles
+  GET  /ia/tipos               — lista tipos de consulta
+  GET  /ia/health              — health check
+  GET  /ia/consumo             — consumo real por agente (hoy/ayer/semana/mes)
+  GET  /ia/consumo/historico   — consumo día a día últimos N días
 """
 import sys
 import os
@@ -89,6 +91,144 @@ def endpoint_tipos():
             )
             tipos = cur.fetchall()
         return jsonify({'ok': True, 'tipos': tipos})
+    finally:
+        conn.close()
+
+
+@app.route('/ia/consumo', methods=['GET'])
+def endpoint_consumo():
+    """
+    Consumo real por agente con % del límite diario usado.
+    Query params:
+      ?periodo=hoy|ayer|semana|mes|todo  (default: hoy)
+      ?agente=gemini-pro                 (opcional, filtra por agente)
+    """
+    periodo = request.args.get('periodo', 'hoy')
+    agente_filtro = request.args.get('agente')
+
+    filtros_fecha = {
+        'hoy':    "c.fecha = CURDATE()",
+        'ayer':   "c.fecha = CURDATE() - INTERVAL 1 DAY",
+        'semana': "c.fecha >= CURDATE() - INTERVAL 6 DAY",
+        'mes':    "c.fecha >= DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+        'todo':   "1=1",
+    }
+    cond_fecha = filtros_fecha.get(periodo, "c.fecha = CURDATE()")
+
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            params = []
+            cond_agente = ""
+            if agente_filtro:
+                cond_agente = " AND c.agente_slug = %s"
+                params.append(agente_filtro)
+
+            cur.execute(f"""
+                SELECT
+                    c.agente_slug,
+                    a.nombre              AS agente_nombre,
+                    a.modelo_id,
+                    a.tipo,
+                    SUM(c.llamadas)       AS llamadas,
+                    SUM(c.errores)        AS errores,
+                    ROUND(SUM(c.errores) * 100.0 / GREATEST(SUM(c.llamadas), 1), 1) AS pct_error,
+                    SUM(c.tokens_in)      AS tokens_in,
+                    SUM(c.tokens_out)     AS tokens_out,
+                    SUM(c.tokens_total)   AS tokens_total,
+                    ROUND(SUM(c.costo_usd), 6)   AS costo_usd,
+                    ROUND(AVG(c.latencia_prom_ms)) AS latencia_prom_ms,
+                    a.rate_limit_rpd      AS limite_rpd_diario,
+                    CASE
+                        WHEN a.rate_limit_rpd IS NULL OR a.rate_limit_rpd = 0 THEN NULL
+                        WHEN a.rate_limit_rpd >= 999999 THEN 0.0
+                        ELSE ROUND(SUM(c.llamadas) * 100.0 / a.rate_limit_rpd, 1)
+                    END AS pct_limite_hoy,
+                    CASE
+                        WHEN a.rate_limit_rpd IS NULL OR a.rate_limit_rpd = 0 THEN 'sin_limite'
+                        WHEN a.rate_limit_rpd >= 999999 THEN 'ilimitado'
+                        WHEN SUM(c.llamadas) * 100.0 / a.rate_limit_rpd >= 90 THEN 'critico'
+                        WHEN SUM(c.llamadas) * 100.0 / a.rate_limit_rpd >= 70 THEN 'advertencia'
+                        ELSE 'ok'
+                    END AS estado
+                FROM ia_consumo_diario c
+                JOIN ia_agentes a ON a.slug = c.agente_slug
+                WHERE {cond_fecha}{cond_agente}
+                GROUP BY c.agente_slug, a.nombre, a.modelo_id, a.tipo, a.rate_limit_rpd
+                ORDER BY llamadas DESC
+            """, params)
+            filas = cur.fetchall()
+
+            totales = {
+                'llamadas':     sum(int(f['llamadas'] or 0) for f in filas),
+                'tokens_total': sum(int(f['tokens_total'] or 0) for f in filas),
+                'costo_usd':    round(sum(float(f['costo_usd'] or 0) for f in filas), 6),
+                'errores':      sum(int(f['errores'] or 0) for f in filas),
+            }
+
+            alertas = [
+                {
+                    'agente':   f['agente_slug'],
+                    'estado':   f['estado'],
+                    'pct':      f['pct_limite_hoy'],
+                    'llamadas': f['llamadas'],
+                    'limite':   f['limite_rpd_diario'],
+                }
+                for f in filas if f['estado'] in ('critico', 'advertencia')
+            ]
+
+        return jsonify({
+            'ok':        True,
+            'periodo':   periodo,
+            'totales':   totales,
+            'por_agente': filas,
+            'alertas':   alertas,
+        })
+    finally:
+        conn.close()
+
+
+@app.route('/ia/consumo/historico', methods=['GET'])
+def endpoint_consumo_historico():
+    """
+    Consumo histórico día a día.
+    Query params:
+      ?dias=30   (default: 30, max: 365)
+      ?agente=gemini-pro  (opcional)
+    """
+    dias = min(int(request.args.get('dias', 30)), 365)
+    agente_filtro = request.args.get('agente')
+
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            params = [dias]
+            cond_agente = ""
+            if agente_filtro:
+                cond_agente = " AND c.agente_slug = %s"
+                params.append(agente_filtro)
+
+            cur.execute(f"""
+                SELECT
+                    c.fecha,
+                    c.agente_slug,
+                    a.nombre        AS agente_nombre,
+                    a.modelo_id,
+                    c.llamadas,
+                    c.errores,
+                    c.tokens_in,
+                    c.tokens_out,
+                    c.tokens_total,
+                    c.costo_usd,
+                    c.latencia_prom_ms
+                FROM ia_consumo_diario c
+                JOIN ia_agentes a ON a.slug = c.agente_slug
+                WHERE c.fecha >= CURDATE() - INTERVAL %s DAY{cond_agente}
+                ORDER BY c.fecha DESC, c.llamadas DESC
+            """, params)
+            filas = cur.fetchall()
+
+        return jsonify({'ok': True, 'dias': dias, 'registros': filas})
     finally:
         conn.close()
 

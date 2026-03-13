@@ -398,7 +398,38 @@ def _guardar_log(**kwargs) -> int | None:
                 )
             )
             cur.execute("SELECT LAST_INSERT_ID() AS id")
-            return cur.fetchone()['id']
+            log_id = cur.fetchone()['id']
+
+            # Actualizar consumo diario agregado
+            agente_slug = kwargs.get('agente_slug', '')
+            es_error = 1 if kwargs.get('error') else 0
+            cur.execute(
+                """INSERT INTO ia_consumo_diario
+                       (fecha, agente_slug, modelo_id, llamadas, errores,
+                        tokens_in, tokens_out, costo_usd, latencia_prom_ms)
+                   SELECT CURDATE(), %s, modelo_id, 1, %s, %s, %s, %s, %s
+                   FROM ia_agentes WHERE slug = %s
+                   ON DUPLICATE KEY UPDATE
+                       llamadas = llamadas + 1,
+                       errores  = errores  + VALUES(errores),
+                       tokens_in  = tokens_in  + VALUES(tokens_in),
+                       tokens_out = tokens_out + VALUES(tokens_out),
+                       costo_usd  = costo_usd  + VALUES(costo_usd),
+                       latencia_prom_ms = ROUND(
+                           (latencia_prom_ms * (llamadas - 1) + VALUES(latencia_prom_ms)) / llamadas
+                       )""",
+                (
+                    agente_slug,
+                    es_error,
+                    kwargs.get('tokens_in', 0) or 0,
+                    kwargs.get('tokens_out', 0) or 0,
+                    kwargs.get('costo_usd', 0) or 0,
+                    kwargs.get('latencia_ms', 0) or 0,
+                    agente_slug,
+                )
+            )
+            conn.commit()
+            return log_id
     except Exception:
         return None
     finally:

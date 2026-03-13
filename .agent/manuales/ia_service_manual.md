@@ -411,7 +411,70 @@ El caller puede forzar cualquier agente pasando agente='gemini-pro'
 
 ## 8. Monitoreo del consumo {#monitoreo}
 
-### Opción A — Google AI Studio (consumo Gemini en tiempo real)
+### Opción A — Endpoints propios (consumo real desde ia_consumo_diario)
+
+**Tabla `ia_consumo_diario`**: se actualiza automáticamente con cada llamada al servicio.
+Guarda: llamadas, errores, tokens_in/out, costo_usd, latencia promedio — por día y por agente.
+
+```bash
+# Consumo de hoy (todos los agentes)
+curl -s "http://localhost:5100/ia/consumo"
+
+# Consumo de la semana
+curl -s "http://localhost:5100/ia/consumo?periodo=semana"
+
+# Consumo de hoy solo para gemini-pro
+curl -s "http://localhost:5100/ia/consumo?agente=gemini-pro"
+
+# Histórico últimos 30 días
+curl -s "http://localhost:5100/ia/consumo/historico"
+
+# Histórico últimos 7 días para un agente
+curl -s "http://localhost:5100/ia/consumo/historico?dias=7&agente=gemini-flash"
+```
+
+**Respuesta del endpoint `/ia/consumo`:**
+```json
+{
+  "ok": true,
+  "periodo": "hoy",
+  "totales": {
+    "llamadas": 5,
+    "tokens_total": 45000,
+    "costo_usd": 0.056,
+    "errores": 0
+  },
+  "por_agente": [{
+    "agente_slug": "gemini-pro",
+    "modelo_id": "gemini-2.5-pro",
+    "llamadas": 3,
+    "tokens_total": 40000,
+    "costo_usd": 0.050,
+    "limite_rpd_diario": 1000,
+    "pct_limite_hoy": 0.3,
+    "estado": "ok"   // ok | advertencia (70%) | critico (90%) | ilimitado
+  }],
+  "alertas": []  // agentes en estado critico o advertencia
+}
+```
+
+**Periodos disponibles**: `hoy`, `ayer`, `semana`, `mes`, `todo`
+
+### Opción B — SQL directo en ia_consumo_diario
+
+```sql
+-- Resumen de hoy
+SELECT agente_slug, llamadas, tokens_total, costo_usd,
+       ROUND(llamadas * 100.0 / a.rate_limit_rpd, 1) AS pct_limite
+FROM ia_consumo_diario c JOIN ia_agentes a ON a.slug = c.agente_slug
+WHERE fecha = CURDATE() ORDER BY llamadas DESC;
+
+-- Costo acumulado del mes
+SELECT SUM(costo_usd) AS costo_mes FROM ia_consumo_diario
+WHERE fecha >= DATE_FORMAT(CURDATE(), '%Y-%m-01');
+```
+
+### Opción C — Google AI Studio (consumo Gemini en tiempo real)
 
 URL: [aistudio.google.com/u/0/usage](https://aistudio.google.com/u/0/usage)
 
