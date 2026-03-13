@@ -9,12 +9,14 @@ Claude Code implementa. Antigravity verifica. Santi aprueba o rechaza.
 
 ## Herramientas disponibles para testing
 
-| Herramienta | Uso |
+| Herramienta | Cuándo usarla |
 |---|---|
-| **Playwright** (Node.js v24, v1.49.1) | Navegar app, capturar screenshots, interactuar con UI |
-| **curl / axios** | Verificar endpoints API |
-| **mysql CLI** | Verificar datos en BD (local `effi_data` o Hostinger vía SSH) |
-| **Bash** | Verificar logs, servicios, archivos |
+| **curl** | **Primera opción siempre.** Verificar endpoints API: status, cantidad de registros, campos presentes, valores coherentes. |
+| **mysql CLI** | Verificar integridad de datos directamente en BD: sumas, muestras, comparativos. Los checks del skill `integridad_datos.md` se corren aquí. |
+| **Bash** | Verificar servicios activos, logs, archivos generados. |
+| **Playwright** | **Solo cuando sea estrictamente necesario ver el browser**: hover de tooltips, verificar animaciones, capturar layout visual. Si se puede verificar con curl o mysql → NO usar Playwright. |
+
+**Regla:** curl + mysql primero. Playwright solo si no hay otra forma.
 
 **App en producción:** `http://menu.oscomunidad.com` (Cloudflare tunnel → puerto 9100 local)
 **API local:** `http://localhost:9100/api/...`
