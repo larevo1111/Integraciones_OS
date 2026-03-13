@@ -255,13 +255,18 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **[ANTIGRAVITY — URGENTE]** QA de features 2026-03-13 — ver `.agent/QA_REGISTRO.md` (Cartera CxC, tooltips, year_ant/mes_ant)
-2. **[ANTIGRAVITY]** Módulo Contextos en ia-admin — ver `.agent/tareas_antigravity_rag.md` (UI + endpoints RAG)
-2. **DeepSeek** — Santi obtiene key en platform.deepseek.com → activar deepseek-chat + deepseek-reasoner
-3. **Claude Sonnet** — Santi recarga $5 en console.anthropic.com → activar claude-sonnet
-4. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
-5. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`.
-6. Continuar app temporal (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
+1. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
+2. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
+3. **DeepSeek** — Santi obtiene key en platform.deepseek.com → activar deepseek-chat + deepseek-reasoner
+4. **Claude Sonnet** — Santi recarga $5 en console.anthropic.com → activar claude-sonnet
+5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual (Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya)
+
+## Completado 2026-03-13
+- ✅ ia-service: arquitectura RAG multitema+empresa — ia_temas, ia_rag_documentos, ia_rag_fragmentos
+- ✅ ia-service: enrutador dual (tipo+tema), 6 capas de contexto, empresa multi-tenant
+- ✅ ia-admin: módulo Contextos RAG — UI Vue completa + 8 endpoints API
+- ✅ Documentación Antigravity Google Labs — `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`
+- ✅ Roles del equipo actualizados en MANIFESTO.md (Antigravity Google Labs ≠ Subagentes Claude)
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
