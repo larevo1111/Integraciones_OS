@@ -17,6 +17,7 @@ const routes = [
       { path: 'logs',       component: () => import('pages/LogsPage.vue') },
       { path: 'playground', component: () => import('pages/PlaygroundPage.vue') },
       { path: 'usuarios',   component: () => import('pages/UsuariosPage.vue') },
+      { path: 'contextos',  component: () => import('pages/ContextosPage.vue') },
     ]
   },
   { path: '/:catchAll(.*)*', redirect: '/dashboard' }

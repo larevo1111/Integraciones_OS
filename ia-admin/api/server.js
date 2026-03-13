@@ -11,6 +11,33 @@ const mysql   = require('mysql2/promise')
 const jwt     = require('jsonwebtoken')
 const https   = require('https')
 const fs      = require('fs')
+const { exec } = require('child_process')
+const util     = require('util')
+const execAsync = util.promisify(exec)
+
+async function indexarEnPython(docId, contenido, temaId, empresa = 'ori_sil_2') {
+  const escaped = contenido.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '')
+  const script = `import sys, json\nsys.path.insert(0, 'scripts')\nfrom ia_service import rag\nn = rag.indexar_documento(${docId}, """${contenido.replace(/"""/g, "\\\"\\\"\\\"").replace(/\\/g, '\\\\')}""", ${temaId}, "${empresa}")\nprint(json.dumps({'fragmentos': n}))`
+  // Usar archivo temporal para evitar problemas de escape con contenido largo
+  const tmpFile = `/tmp/rag_idx_${Date.now()}.py`
+  const pyScript = `import sys, json
+sys.path.insert(0, 'scripts')
+from ia_service import rag
+contenido = ${JSON.stringify(contenido)}
+n = rag.indexar_documento(${docId}, contenido, ${temaId}, ${JSON.stringify(empresa)})
+print(json.dumps({'fragmentos': n}))
+`
+  fs.writeFileSync(tmpFile, pyScript)
+  try {
+    const { stdout } = await execAsync(`python3 ${tmpFile}`, {
+      cwd: '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
+    })
+    const data = JSON.parse(stdout.trim())
+    return data.fragmentos
+  } finally {
+    try { fs.unlinkSync(tmpFile) } catch(e) {}
+  }
+}
 
 // ─── Config desde .env ────────────────────────────────────────────
 const envPath = path.join(__dirname, '.env')
@@ -389,6 +416,189 @@ app.post('/api/ia/consultar', async (req, res) => {
     })
     res.json(data)
   } catch (e) { res.status(502).json({ error: 'ia-service no disponible: ' + e.message }) }
+})
+
+// ─── RAG — TEMAS ─────────────────────────────────────────────────
+
+// GET /api/ia/rag/temas?empresa=ori_sil_2
+app.get('/api/ia/rag/temas', requireAuth, async (req, res) => {
+  const empresa = req.query.empresa || 'ori_sil_2'
+  try {
+    const [rows] = await db.execute(`
+      SELECT t.*,
+             COUNT(DISTINCT d.id)                      AS total_documentos,
+             COALESCE(SUM(d.fragmentos_total), 0)      AS total_fragmentos,
+             COALESCE(SUM(d.tokens_estimados), 0)      AS total_tokens
+      FROM ia_temas t
+      LEFT JOIN ia_rag_documentos d ON d.tema_id = t.id AND d.activo = 1 AND d.empresa = t.empresa
+      WHERE t.empresa = ?
+      GROUP BY t.id
+      ORDER BY t.nombre
+    `, [empresa])
+    res.json({ ok: true, temas: rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/ia/rag/temas — crear tema
+app.post('/api/ia/rag/temas', requireAdmin, async (req, res) => {
+  const { empresa = 'ori_sil_2', slug, nombre, descripcion = '', system_prompt = '', agente_preferido = null } = req.body
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ error: 'slug inválido (solo minúsculas, guiones y números)' })
+  if (!nombre?.trim()) return res.status(400).json({ error: 'nombre es requerido' })
+  try {
+    const [result] = await db.execute(
+      'INSERT INTO ia_temas (empresa, slug, nombre, descripcion, system_prompt, agente_preferido) VALUES (?, ?, ?, ?, ?, ?)',
+      [empresa, slug, nombre.trim(), descripcion, system_prompt, agente_preferido || null]
+    )
+    res.json({ ok: true, id: result.insertId })
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe un tema con ese slug en esta empresa' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// PUT /api/ia/rag/temas/:id — editar tema
+app.put('/api/ia/rag/temas/:id', requireAdmin, async (req, res) => {
+  const { nombre, descripcion, system_prompt, agente_preferido, activo } = req.body
+  const fields = [], params = []
+  if (nombre !== undefined)          { fields.push('nombre = ?');           params.push(nombre) }
+  if (descripcion !== undefined)     { fields.push('descripcion = ?');      params.push(descripcion) }
+  if (system_prompt !== undefined)   { fields.push('system_prompt = ?');    params.push(system_prompt) }
+  if (agente_preferido !== undefined){ fields.push('agente_preferido = ?'); params.push(agente_preferido || null) }
+  if (activo !== undefined)          { fields.push('activo = ?');           params.push(activo ? 1 : 0) }
+  if (!fields.length) return res.status(400).json({ error: 'Nada que actualizar' })
+  params.push(req.params.id)
+  try {
+    await db.execute(`UPDATE ia_temas SET ${fields.join(', ')} WHERE id = ?`, params)
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// DELETE /api/ia/rag/temas/:id — eliminar solo si no tiene documentos
+app.delete('/api/ia/rag/temas/:id', requireAdmin, async (req, res) => {
+  try {
+    const [[{ total }]] = await db.execute('SELECT COUNT(*) AS total FROM ia_rag_documentos WHERE tema_id = ?', [req.params.id])
+    if (total > 0) return res.status(400).json({ error: `No se puede eliminar: el tema tiene ${total} documento(s). Elimínalos primero.` })
+    await db.execute('DELETE FROM ia_temas WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── RAG — DOCUMENTOS ─────────────────────────────────────────────
+
+// GET /api/ia/rag/temas/:id/documentos
+app.get('/api/ia/rag/temas/:id/documentos', requireAuth, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, nombre, tipo, tokens_estimados, fragmentos_total, activo, created_at FROM ia_rag_documentos WHERE tema_id = ? ORDER BY nombre',
+      [req.params.id]
+    )
+    res.json({ ok: true, documentos: rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/ia/rag/temas/:id/documentos — crear + indexar
+app.post('/api/ia/rag/temas/:id/documentos', requireAdmin, async (req, res) => {
+  const { nombre, tipo = 'texto', contenido } = req.body
+  if (!nombre?.trim()) return res.status(400).json({ error: 'nombre es requerido' })
+  if (!contenido?.trim()) return res.status(400).json({ error: 'contenido es requerido' })
+  const temaId = parseInt(req.params.id)
+  try {
+    const [[tema]] = await db.execute('SELECT empresa FROM ia_temas WHERE id = ?', [temaId])
+    if (!tema) return res.status(404).json({ error: 'Tema no encontrado' })
+
+    const [result] = await db.execute(
+      'INSERT INTO ia_rag_documentos (empresa, tema_id, nombre, tipo, contenido_original) VALUES (?, ?, ?, ?, ?)',
+      [tema.empresa, temaId, nombre.trim(), tipo, contenido]
+    )
+    const docId = result.insertId
+
+    try {
+      const fragmentos = await indexarEnPython(docId, contenido, temaId, tema.empresa)
+      res.json({ ok: true, id: docId, fragmentos_creados: fragmentos })
+    } catch (e) {
+      res.json({ ok: true, id: docId, fragmentos_creados: 0, advertencia: 'Documento creado pero indexación falló: ' + e.message })
+    }
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/ia/rag/documentos/:id — con contenido_original
+app.get('/api/ia/rag/documentos/:id', requireAuth, async (req, res) => {
+  try {
+    const [[doc]] = await db.execute('SELECT * FROM ia_rag_documentos WHERE id = ?', [req.params.id])
+    if (!doc) return res.status(404).json({ error: 'Documento no encontrado' })
+    res.json({ ok: true, documento: doc })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/ia/rag/documentos/:id — actualizar, re-indexar si cambia contenido
+app.put('/api/ia/rag/documentos/:id', requireAdmin, async (req, res) => {
+  const { nombre, tipo, contenido, activo } = req.body
+  try {
+    const [[doc]] = await db.execute('SELECT * FROM ia_rag_documentos WHERE id = ?', [req.params.id])
+    if (!doc) return res.status(404).json({ error: 'Documento no encontrado' })
+
+    const fields = [], params = []
+    if (nombre !== undefined)    { fields.push('nombre = ?');              params.push(nombre) }
+    if (tipo !== undefined)      { fields.push('tipo = ?');                params.push(tipo) }
+    if (activo !== undefined)    { fields.push('activo = ?');              params.push(activo ? 1 : 0) }
+    if (contenido !== undefined) { fields.push('contenido_original = ?'); params.push(contenido) }
+
+    if (fields.length) {
+      params.push(req.params.id)
+      await db.execute(`UPDATE ia_rag_documentos SET ${fields.join(', ')} WHERE id = ?`, params)
+    }
+
+    let fragmentos_creados = null
+    if (contenido !== undefined) {
+      fragmentos_creados = await indexarEnPython(doc.id, contenido, doc.tema_id, doc.empresa)
+    }
+
+    res.json({ ok: true, fragmentos_creados })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// DELETE /api/ia/rag/documentos/:id
+app.delete('/api/ia/rag/documentos/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.execute('DELETE FROM ia_rag_documentos WHERE id = ?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── RAG — BÚSQUEDA DE PRUEBA ─────────────────────────────────────
+
+// POST /api/ia/rag/buscar
+app.post('/api/ia/rag/buscar', requireAuth, async (req, res) => {
+  const { pregunta, tema_id, empresa = 'ori_sil_2' } = req.body
+  if (!pregunta?.trim()) return res.status(400).json({ error: 'pregunta es requerida' })
+  try {
+    const tmpFile = `/tmp/rag_buscar_${Date.now()}.py`
+    const pyScript = `import sys, json, decimal
+sys.path.insert(0, 'scripts')
+from ia_service import rag
+
+def fix(o):
+    if isinstance(o, decimal.Decimal): return float(o)
+    if isinstance(o, dict): return {k: fix(v) for k, v in o.items()}
+    if isinstance(o, list): return [fix(i) for i in o]
+    return o
+
+result = rag.buscar(${JSON.stringify(pregunta)}, empresa=${JSON.stringify(empresa)}${tema_id ? `, tema_id=${parseInt(tema_id)}` : ''})
+print(json.dumps({'fragmentos': fix(result)}))
+`
+    fs.writeFileSync(tmpFile, pyScript)
+    try {
+      const { stdout } = await execAsync(`python3 ${tmpFile}`, {
+        cwd: '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
+      })
+      const data = JSON.parse(stdout.trim())
+      res.json({ ok: true, ...data })
+    } finally {
+      try { fs.unlinkSync(tmpFile) } catch(e) {}
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
 })
 
 // ─── Frontend estático ────────────────────────────────────────────
