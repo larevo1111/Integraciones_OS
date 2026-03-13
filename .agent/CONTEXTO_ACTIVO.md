@@ -120,7 +120,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Flask server: `scripts/webhook_server.py`, systemd service `effi-webhook.service` (activo, auto-restart)
 - Archivos versionados en `espocrm-custom/` con instrucciones de deploy
 
-## Frontend — Estado actual (2026-03-11)
+## Frontend — Estado actual (2026-03-12)
 
 > **IMPORTANTE**: `menu.oscomunidad.com` NO es el ERP definitivo. Es una **app temporal de visualización de datos** mientras se construye el ERP real. La usan Santi y Jen para ver información de ventas.
 > El **ERP real** está en `u768061575_os_comunidad` (Hostinger) — **⚠️ NO TOCAR**.
@@ -134,25 +134,25 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 | **App IA Admin** | ia.oscomunidad.com | ✅ Activa — puerto 9200, systemd `os-ia-admin.service` |
 | Tabla sys_menu | Hostinger `u768061575_os_integracion` | ✅ 36 registros (7 módulos + 29 submenús) |
 | **API Express** | `frontend/api/` | ✅ Puerto 3002 (realmente sirve en puerto 9100 junto al frontend), systemd `os-erp-frontend` |
-| **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — dblclick navega a DetalleFacturacionMes |
-| **Detalle Mes** | `pages/ventas/DetalleFacturacionMesPage.vue` | ✅ /ventas/detalle-mes/:mes — KPIs + 6 tablas acordeón + dblclick drill-down |
+| **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — solo tabla principal, click navega |
+| **Detalle Mes** | `pages/ventas/DetalleFacturacionMesPage.vue` | ✅ /ventas/detalle-mes/:mes — KPIs + 6 tablas acordeón + click drill-down |
 | **Detalle Cliente** | `pages/ventas/DetalleClienteMesPage.vue` | ✅ /ventas/detalle-cliente/:mes/:id_cliente |
 | **Detalle Canal** | `pages/ventas/DetalleCanalMesPage.vue` | ✅ /ventas/detalle-canal/:mes/:canal |
 | **Detalle Producto** | `pages/ventas/DetalleProductoMesPage.vue` | ✅ /ventas/detalle-producto/:mes/:cod_articulo |
 | **Detalle Factura** | `pages/ventas/DetalleFacturaPage.vue` | ✅ /ventas/detalle-factura/:id_interno/:id_numeracion |
-| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + popups + row-click + row-dblclick |
+| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + mini-popup por columna + filtros con operador + subtotales + row-click |
 
 **⚠️ Antes de cualquier trabajo frontend: leer `frontend/design-system/MANUAL_ESTILOS.md`**
 **⚠️ Después de cualquier cambio Vue/JS: `cd frontend/app && npx quasar build`**
 
 ### Jerarquía de navegación drill-down (módulo Ventas)
 ```
-ResumenFacturacionPage (todos los meses)
-  └─ dblclick fila → DetalleFacturacionMesPage (mes)
-       ├─ dblclick canal → DetalleCanalMesPage (mes + canal)
-       ├─ dblclick cliente → DetalleClienteMesPage (mes + cliente)
-       ├─ dblclick producto → DetalleProductoMesPage (mes + producto)
-       └─ dblclick factura → DetalleFacturaPage (encabezado + ítems)
+ResumenFacturacionPage (solo tabla de meses — sin acordeones)
+  └─ click fila → DetalleFacturacionMesPage (mes)
+       ├─ click canal → DetalleCanalMesPage (mes + canal)
+       ├─ click cliente → DetalleClienteMesPage (mes + cliente)
+       ├─ click producto → DetalleProductoMesPage (mes + producto)
+       └─ click factura → DetalleFacturaPage (encabezado + ítems)
 ```
 
 ### API Express — endpoints activos en server.js
@@ -167,8 +167,14 @@ ResumenFacturacionPage (todos los meses)
 
 ### OsDataTable — componente reutilizable
 - Props: `rows`, `columns` (array {key,label,visible}), `loading`, `title`, `recurso`, `mes`
-- Emits: `row-click` (selección), `row-dblclick` (drill-down)
-- Features: filtros inline, selector de columnas, export CSV/XLSX/PDF, ordenamiento, skeleton
+- Emits: `row-click` (navegación / drill-down con single click)
+- **Mini-popup por columna**: click en header abre popup (Teleport al body, z-index 9999) con:
+  - Filtro con selector de operador: Igual (default), Contiene, >, <, >=, <=, Entre
+  - Ordenamiento: Ascendente / Descendente (toggle)
+  - Subtotal (solo numéricas): Suma Σ, Promedio x̄, Máximo ↑, Mínimo ↓
+- **Formato numérico estándar**: separador miles con punto, decimales con coma, automático (0–3 decimales)
+  - Moneda: `$1.234.567` | Porcentajes: `12,5%` | Enteros: `1.234` | Decimales: `1.234,56`
+- Features: selector de columnas, export CSV/XLSX/PDF, skeleton, fila de subtotales al pie
 
 ## Servicio Central de IA — `ia_service_os` (activo 2026-03-12)
 

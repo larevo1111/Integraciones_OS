@@ -35,8 +35,9 @@ Ubicación: `frontend/app/src/components/OsDataTable.vue`
 
 | Evento | Payload | Cuándo | Uso típico |
 |---|---|---|---|
-| `row-click` | objeto fila | Clic simple | Seleccionar fila, filtrar acordeones |
-| `row-dblclick` | objeto fila | Doble clic | Navegar a vista de detalle |
+| `row-click` | objeto fila | Clic simple en fila | Navegar a vista de detalle (drill-down) |
+
+> **IMPORTANTE**: Ya NO existe `row-dblclick`. Toda navegación es con click simple.
 
 ### Formato de columnas
 
@@ -58,31 +59,142 @@ columnas.value = cols.map(key => ({
 }))
 ```
 
-### Selección de filas — cómo funciona `isSelected`
-- Si la fila seleccionada tiene `_pk` → compara por `_pk`
-- Si tiene `_key` → compara por `_key` (tablas compuestas `mes|col`)
-- Si tiene `mes` → compara por `mes`
+---
 
-**Importante**: si se quieren usar `_pk` o `_key` como identificadores sin mostrarlos, incluirlos en `columns` con `visible: false`.
+## 2. FORMATO NUMÉRICO ESTÁNDAR
 
-### Formateo automático de celdas
+**Regla global**: todos los campos numéricos/decimales del ERP usan:
+- **Separador de miles**: `.` (punto)
+- **Separador decimales**: `,` (coma)
+- **Decimales automáticos**: 0 si es entero, hasta 3 máximo
+
+### Función `fmtNum()` (implementada en OsDataTable)
+
+```javascript
+function fmtNum(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—'
+  let decimals = 0
+  const abs = Math.abs(n)
+  const remainder = abs - Math.floor(abs)
+  if (remainder > 0.0005) {
+    const s = n.toFixed(3)
+    const trimmed = s.replace(/0+$/, '').replace(/\.$/, '')
+    const parts = trimmed.split('.')
+    decimals = parts[1] ? parts[1].length : 0
+    if (decimals > 3) decimals = 3
+  }
+  return n.toLocaleString('de-DE', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+}
+```
+
+> Usa locale `de-DE` porque produce `.` para miles y `,` para decimales (mismo estándar colombiano de OS).
+
+### Formateo automático de celdas en OsDataTable
+
 | Patrón de key | Formato |
 |---|---|
 | `*_pct*` o `*_margen*` | `(n * 100).toFixed(1) + '%'` — valores en BD son 0–1 |
-| `fin_*`, `cto_*`, `car_*`, `*ventas*`, `*ticket*`, `*costo*`, `*utilidad*` | `$` + `toLocaleString('es-CO', {maximumFractionDigits: 0})` |
+| `fin_*`, `cto_*`, `car_*`, `*ventas*`, `*ticket*`, `*costo*`, `*utilidad*` | `$` + `fmtNum(n)` |
+| Otros numéricos | `fmtNum(n)` |
 | `null` o `undefined` | `'—'` |
 
-### Popups (Filtrar / Campos / Exportar)
-**Bug crítico evitado**: los botones del toolbar usan `@click.stop` para evitar que el click burbujee al `document` y el `handleOutsideClick` cierre el popup de inmediato.
+### Formatters para KPIs (en páginas de detalle)
 
-Los popups siguen el estilo Linear.app:
-- **Filtrar**: filas [campo ▾] [op ▾] [valor] [×] + footer "Añadir filtro / Limpiar todo"
-- **Campos**: pills clicables (violeta = visible, gris = oculto) + "Mostrar todos / Ocultar todos"
-- **Exportar**: 3 filas limpias con ícono + label + descripción corta
+```javascript
+function fmt$(v)   { const n = parseFloat(v); return isNaN(n) ? '—' : '$' + fmtNum(n) }
+function fmtPct(v) { const n = parseFloat(v); return isNaN(n) ? '—' : (n * 100).toFixed(1) + '%' }
+function fmtNum(v) {
+  const n = parseFloat(v); if (isNaN(n)) return '—'
+  let decimals = 0
+  const remainder = Math.abs(n) - Math.floor(Math.abs(n))
+  if (remainder > 0.0005) {
+    const s = n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '').split('.')
+    decimals = Math.min(s[1]?.length || 0, 3)
+  }
+  return n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+```
 
 ---
 
-## 2. ESTRUCTURA DE UNA VISTA CON TABLAS
+## 3. MINI-POPUP POR COLUMNA (filtros + sort + subtotales)
+
+### Comportamiento
+
+- **Click en header de columna** → abre mini-popup anclado debajo del `<th>`
+- Solo **un popup abierto** a la vez (click en otra columna cierra el anterior)
+- Se renderiza con `<Teleport to="body">` para evitar problemas de z-index/overflow
+- Overlay transparente cierra el popup al hacer click fuera
+
+### Contenido del popup
+
+1. **Filtro con operador** — select de operador + input(s) de valor:
+   - `eq` — Igual a (por defecto)
+   - `contains` — Contiene
+   - `gt` — Mayor que
+   - `lt` — Menor que
+   - `gte` — Mayor o igual
+   - `lte` — Menor o igual
+   - `between` — Entre (muestra 2 inputs: Desde / Hasta)
+
+2. **Ordenamiento** — dos botones toggle: Ascendente ↑ / Descendente ↓
+
+3. **Subtotal** (solo columnas numéricas) — 4 opciones toggle:
+   - Σ Suma
+   - x̄ Promedio
+   - ↑ Máximo
+   - ↓ Mínimo
+
+### Estado interno
+
+```javascript
+const columnFilters    = ref({})  // { [key]: { op: 'eq', val: '', val2: '' } }
+const columnAggregates = ref({})  // { [key]: 'sum'|'avg'|'max'|'min'|null }
+const colPopup         = ref(null)  // key de columna activa o null
+const colPopupStyle    = ref({})    // { top, left } calculado desde getBoundingClientRect()
+```
+
+### Detección de columnas numéricas
+
+```javascript
+function isNumeric(key) {
+  const prefijos = ['fin_','cto_','vol_','car_','cli_','pry_','ant_','con_','cat_']
+  if (prefijos.some(p => key.startsWith(p))) return true
+  if (key.match(/_pct|_margen|_total|_neto|_bruto|_iva|_promedio|_dias/)) return true
+  // + muestreo de primeras 5 filas de datos
+  const sample = rows.slice(0, 5)
+  return sample.length > 0 && sample.every(r => r[key] === null || r[key] === undefined || typeof r[key] === 'number' || !isNaN(parseFloat(r[key])))
+}
+```
+
+### Fila de subtotales
+
+- Se renderiza al pie de la tabla si hay al menos 1 columna con aggregate activo
+- Cada celda muestra el valor agregado formateado con `fmtNum()`
+- Label pequeño encima del valor: "Σ", "x̄", "↑", "↓" según tipo
+
+### CSS del popup (NO scoped — va en `<style>` sin scoped porque usa Teleport)
+
+```css
+.col-popup-overlay {
+  position: fixed; inset: 0; z-index: 9999; background: transparent;
+}
+.col-popup {
+  position: fixed; z-index: 10000;
+  background: var(--bg-card); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  padding: 10px 12px; min-width: 200px;
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 12px; color: var(--text-primary);
+}
+```
+
+---
+
+## 4. ESTRUCTURA DE UNA VISTA CON TABLAS
 
 ### Layout obligatorio
 
@@ -90,7 +202,7 @@ Los popups siguen el estilo Linear.app:
 <template>
   <div class="page-wrap">
 
-    <!-- HEADER fijo: breadcrumb + título + badges de filtros activos -->
+    <!-- HEADER fijo: breadcrumb + título -->
     <div class="page-header">
       <div class="page-header-inner">
         <div class="breadcrumb">
@@ -100,10 +212,6 @@ Los popups siguen el estilo Linear.app:
         </div>
         <div class="page-title-row">
           <h1 class="page-title">Nombre Vista</h1>
-          <div v-if="seleccion" class="sel-badge">
-            <span>{{ seleccion }}</span>
-            <button @click="seleccion = null"><XIcon :size="11" /></button>
-          </div>
         </div>
       </div>
     </div>
@@ -113,24 +221,7 @@ Los popups siguen el estilo Linear.app:
       <OsDataTable
         ...
         @row-click="onRowClick"
-        @row-dblclick="onRowDblclick"
       />
-
-      <div class="acordeones">
-        <div class="acordeon">
-          <button class="acordeon-header" @click="toggleAcordeon('detalle')">
-            <div class="ac-left">
-              <ChevronRightIcon :size="14" class="ac-chevron" :class="{open: abiertos.detalle}" />
-              <span class="ac-title">Título acordeón</span>
-              <span v-if="seleccion" class="ac-mes-tag">{{ seleccion }}</span>
-            </div>
-            <span class="ac-count">{{ datos.length }} registros</span>
-          </button>
-          <div v-if="abiertos.detalle" class="acordeon-body">
-            <OsDataTable ... />
-          </div>
-        </div>
-      </div>
     </div>
 
   </div>
@@ -150,63 +241,27 @@ Los popups siguen el estilo Linear.app:
 .bc-current        { color: var(--text-secondary); }
 .page-title-row    { display: flex; align-items: center; gap: 12px; }
 .page-title        { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
-
-/* Badge de selección activa */
-.sel-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px 3px 7px; border-radius: var(--radius-full);
-  background: var(--accent-muted); border: 1px solid var(--accent-border);
-  font-size: 12px; font-weight: 500; color: var(--accent);
-}
-
-/* Acordeones */
-.acordeones       { display: flex; flex-direction: column; gap: 8px; }
-.acordeon         { border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-card); }
-.acordeon-header  {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%; padding: 0 14px; height: 42px;
-  border: none; background: transparent; cursor: pointer;
-  transition: background 80ms; font-family: var(--font-sans);
-}
-.acordeon-header:hover { background: var(--bg-card-hover); }
-.ac-left     { display: flex; align-items: center; gap: 8px; }
-.ac-chevron  { color: var(--text-tertiary); transition: transform 150ms ease-out; }
-.ac-chevron.open { transform: rotate(90deg); }
-.ac-title    { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.ac-mes-tag  { font-size: 11px; font-weight: 500; color: var(--accent); background: var(--accent-muted); border: 1px solid var(--accent-border); padding: 1px 7px; border-radius: var(--radius-full); }
-.ac-count    { font-size: 12px; color: var(--text-tertiary); }
-.acordeon-body { border-top: 1px solid var(--border-subtle); }
 ```
 
 ---
 
-## 3. PATRÓN: DRILL-DOWN POR FILA (click) + NAVEGACIÓN (doble click)
+## 5. PATRÓN: NAVEGACIÓN POR CLICK (drill-down directo)
 
 ```javascript
 import { useRouter } from 'vue-router'
 const router = useRouter()
 
-const seleccion = ref(null)
-
-// Click simple: selecciona/deselecciona → filtra acordeones
+// Click simple: navega directamente a vista de detalle
 function onRowClick(row) {
-  seleccion.value = row.campo_id === seleccion.value ? null : row.campo_id
-}
-
-// Doble click: navega a vista de detalle
-function onRowDblclick(row) {
   router.push(`/modulo/detalle/${row.campo_id}`)
 }
-
-// Watcher: recarga acordeones abiertos cuando cambia la selección
-watch(seleccion, () => {
-  if (abiertos.value.detalle) loadDetalle()
-})
 ```
+
+> **Estándar**: click simple = navegar. No hay doble click en ninguna tabla del ERP.
 
 ---
 
-## 4. PATRÓN: VISTA DE DETALLE CON KPI CARDS
+## 6. PATRÓN: VISTA DE DETALLE CON KPI CARDS
 
 Para vistas de detalle de un ítem (ej: detalle de un mes), usar tarjetas KPI agrupadas por tema.
 
@@ -249,17 +304,9 @@ Para vistas de detalle de un ítem (ej: detalle de un mes), usar tarjetas KPI ag
 .kpi-warn   { color: var(--color-warning); }
 ```
 
-### Formatters estándar para KPIs
-
-```javascript
-function fmt$(v)   { const n = parseFloat(v); return isNaN(n) ? '—' : '$' + n.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }
-function fmtPct(v) { const n = parseFloat(v); return isNaN(n) ? '—' : (n * 100).toFixed(1) + '%' }
-function fmtNum(v) { const n = parseFloat(v); return isNaN(n) ? '—' : n.toLocaleString('es-CO', { maximumFractionDigits: 0 }) }
-```
-
 ---
 
-## 5. AGRUPACIÓN DE CAMPOS POR PREFIJO (tabla `resumen_ventas_facturas_mes`)
+## 7. AGRUPACIÓN DE CAMPOS POR PREFIJO (tabla `resumen_ventas_facturas_mes`)
 
 | Prefijo | Grupo | Descripción |
 |---|---|---|
@@ -278,14 +325,55 @@ Los valores `_pct` van de 0 a 1 → multiplicar por 100 para mostrar.
 
 ---
 
-## 6. CARGA LAZY DE ACORDEONES (patrón óptimo)
+## 8. ACORDEONES (patrón para vistas con sub-tablas)
+
+### Estructura
+
+```vue
+<div class="acordeones">
+  <div class="acordeon">
+    <button class="acordeon-header" @click="toggleAcordeon('detalle')">
+      <div class="ac-left">
+        <ChevronRightIcon :size="14" class="ac-chevron" :class="{open: abiertos.detalle}" />
+        <span class="ac-title">Título acordeón</span>
+      </div>
+      <span class="ac-count">{{ datos.length }} registros</span>
+    </button>
+    <div v-if="abiertos.detalle" class="acordeon-body">
+      <OsDataTable ... @row-click="onRowClick" />
+    </div>
+  </div>
+</div>
+```
+
+### CSS
+
+```css
+.acordeones       { display: flex; flex-direction: column; gap: 8px; }
+.acordeon         { border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-card); }
+.acordeon-header  {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 0 14px; height: 42px;
+  border: none; background: transparent; cursor: pointer;
+  transition: background 80ms; font-family: var(--font-sans);
+}
+.acordeon-header:hover { background: var(--bg-card-hover); }
+.ac-left     { display: flex; align-items: center; gap: 8px; }
+.ac-chevron  { color: var(--text-tertiary); transition: transform 150ms ease-out; }
+.ac-chevron.open { transform: rotate(90deg); }
+.ac-title    { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.ac-count    { font-size: 12px; color: var(--text-tertiary); }
+.acordeon-body { border-top: 1px solid var(--border-subtle); }
+```
+
+### Carga lazy
 
 ```javascript
 const abiertos = ref({ canal: false, facturas: false })
 
 async function toggleAcordeon(key) {
   abiertos.value[key] = !abiertos.value[key]
-  if (!abiertos.value[key]) return    // solo cargar al abrir, nunca al cerrar
+  if (!abiertos.value[key]) return    // solo cargar al abrir
 
   const loaders = {
     canal:    () => load(`/api/ventas/resumen-canal`,  resCanal,    loadingCanal),
@@ -293,20 +381,11 @@ async function toggleAcordeon(key) {
   }
   if (loaders[key]) loaders[key]()
 }
-
-async function load(url, dataRef, loadingRef) {
-  if (loadingRef.value) return        // evitar doble carga
-  loadingRef.value = true
-  try {
-    const { data } = await axios.get(url, { params: { mes: mesActivo } })
-    dataRef.value = data
-  } finally { loadingRef.value = false }
-}
 ```
 
 ---
 
-## 7. ENDPOINTS DE LA API
+## 9. ENDPOINTS DE LA API
 
 Ver skill `/erp-frontend` para la lista completa de endpoints.
 Endpoints de tablas de encabezado con filtro `?mes=YYYY-MM`:
@@ -325,164 +404,36 @@ Todas usan `LEFT(fecha_de_creacion, 7) = ?mes` para filtrar (campo es TEXT `'YYY
 
 ---
 
-## 8. ERRORES FRECUENTES — NO REPETIR
+## 10. ERRORES FRECUENTES — NO REPETIR
 
 | Error | Causa | Solución |
 |---|---|---|
-| Popups no aparecen | Botones del toolbar sin `@click.stop` | Siempre usar `@click.stop` en los 3 botones de toolbar |
+| Popup de columna se esconde | Popup dentro de `<th>` con overflow | Usar `<Teleport to="body">` con z-index 10000 + overlay |
+| Popups de toolbar no aparecen | Botones sin `@click.stop` | Siempre usar `@click.stop` en botones de toolbar |
 | Tabla principal se oculta al abrir acordeón | `.page-content` con `height` fija + `overflow-y: auto` | Usar `min-height` y quitar `overflow-y` de `.page-content` |
 | Scroll no funciona | Scroll en `.page-content` | El único scroll es en `MainLayout.vue > .main-area` |
-| Toda la tabla se selecciona | `isSelected` compara `undefined === undefined` | Ver el patrón actual en OsDataTable — siempre comparar con PK del item seleccionado |
 | Exportar abre misma pestaña | `window.location = url` | Usar `window.open(url, '_blank')` |
 | Cambios no se ven | Falta rebuild Quasar | `cd frontend/app && npx quasar build` |
-| Acordeón de productos retorna 0 resultados | `d.nombre_articulo` en SQL → columna no existe | Usar `d.descripcion_articulo` (es el nombre real del producto en Hostinger) |
-| Acordeón de facturas retorna 0 resultados | `d.fecha_de_creacion` en detalle → columna no existe | Detalle usa `d.fecha_creacion_factura`. Encabezados sí usan `e.fecha_de_creacion` |
-| Error en ORDER BY o SELECT de detalle factura | `ORDER BY id_item` → columna no existe | NO existe `id_item` en `zeffi_facturas_venta_detalle` — omitir ORDER BY o usar otro campo |
+| Acordeón de productos retorna 0 | `d.nombre_articulo` en SQL | Usar `d.descripcion_articulo` |
+| Detalle factura 0 resultados | `d.fecha_de_creacion` | Detalle usa `d.fecha_creacion_factura` |
+| Error en ORDER BY detalle | `ORDER BY id_item` | NO existe en `zeffi_facturas_venta_detalle` — omitir |
 
 ---
 
-## 9. PATRÓN COMPLETO: VISTA DE DETALLE CON KPIs + ACORDEONES
-
-Para páginas de 3er nivel (ej: DetalleCanalMesPage, DetalleClienteMesPage, DetalleProductoMesPage):
-
-### Estructura del script setup
-
-```javascript
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
-import { ChevronRightIcon } from 'lucide-vue-next'
-import OsDataTable from 'src/components/OsDataTable.vue'
-
-const route  = useRoute()
-const router = useRouter()
-const API    = '/api'
-const mes    = route.params.mes
-// Decodificar parámetros que pueden tener espacios o caracteres especiales:
-const canal  = decodeURIComponent(route.params.canal)
-
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-function nombreMes(m) {
-  if (!m) return m
-  const [y, mo] = m.split('-')
-  return `${MESES[parseInt(mo) - 1]} ${y}`
-}
-
-// KPI del resumen analítico
-const kpi        = ref(null)
-const loadingKpi = ref(true)
-
-async function loadKpi() {
-  loadingKpi.value = true
-  try {
-    const { data } = await axios.get(`${API}/ventas/resumen-canal`, {
-      params: { mes, filters: JSON.stringify([{ field: 'canal', op: 'eq', value: canal }]) }
-    })
-    kpi.value = data[0] || null
-  } finally { loadingKpi.value = false }
-}
-
-// Tablas de acordeón (cada una con su ref de datos y loading)
-const resFacturas  = ref([]); const loadingFacturas  = ref(false)
-const colsFacturas = ref([])
-
-// Columnas visibles por defecto para cada tipo de tabla
-const VISIBLE = {
-  'zeffi_facturas_venta_encabezados': ['id_numeracion','fecha_de_creacion','cliente','ciudad','vendedor','subtotal','total_neto','estado_cxc','dias_mora'],
-}
-
-function labelFromKey(key) {
-  if (key === 'id_numeracion') return 'No Fac'           // ← SIEMPRE incluir
-  if (key === 'descripcion_articulo') return 'Producto'  // ← si se usan productos
-  return key.replace(/^_pk$/, 'N°').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-    .replace(/^Fin /, '').replace(/^Vol /, '').replace(/^Cli /, '').replace(/^Cto /, '').trim()
-}
-
-function colsFromData(data, tabla) {
-  if (!data.length) return []
-  const visible = VISIBLE[tabla] || []
-  return Object.keys(data[0]).map(key => ({ key, label: labelFromKey(key), visible: visible.includes(key) }))
-}
-
-async function loadColumns(tabla, destRef) {
-  const { data: cols } = await axios.get(`${API}/columnas/${tabla}`)
-  destRef.value = cols.map(key => ({ key, label: labelFromKey(key), visible: (VISIBLE[tabla] || []).includes(key) }))
-}
-
-// Acordeones lazy — solo cargan al abrirse
-const abiertos = ref({ facturas: false })
-
-async function toggleAcordeon(key) {
-  abiertos.value[key] = !abiertos.value[key]
-  if (!abiertos.value[key]) return
-  const loaders = {
-    facturas: () => loadAd(`${API}/ventas/canal-facturas`, resFacturas, loadingFacturas, 'zeffi_facturas_venta_encabezados'),
-  }
-  if (loaders[key]) loaders[key]()
-}
-
-async function loadAd(url, dataRef, loadingRef, tabla) {
-  if (loadingRef.value) return
-  loadingRef.value = true
-  try {
-    const { data } = await axios.get(url, { params: { mes, canal } })
-    dataRef.value = data
-    if (!colsFacturas.value.length) colsFacturas.value = colsFromData(data, tabla)
-  } finally { loadingRef.value = false }
-}
-
-onMounted(async () => {
-  await Promise.all([
-    loadKpi(),
-    loadColumns('zeffi_facturas_venta_encabezados', colsFacturas),
-  ])
-})
-```
-
-### Breadcrumb con árbol contextual
-
-Para DetalleFacturaPage (o cualquier página de 4to nivel), leer query params para construir el árbol:
-
-```javascript
-const qMes        = route.query.mes         || ''
-const qDesde      = route.query.desde       || ''
-const qDesdeId    = route.query.desde_id    || ''
-const qDesdeLabel = route.query.desde_label || ''
-```
-
-Template del breadcrumb contextual:
-```vue
-<div class="breadcrumb">
-  <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Ventas</span>
-  <template v-if="qMes">
-    <ChevronRightIcon :size="13" />
-    <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Resumen Facturación</span>
-    <ChevronRightIcon :size="13" />
-    <span class="bc-link" @click="router.push(`/ventas/detalle-mes/${qMes}`)">{{ nombreMes(qMes) }}</span>
-    <template v-if="qDesde !== 'mes' && desdeConfig[qDesde]?.path">
-      <ChevronRightIcon :size="13" />
-      <span class="bc-link" @click="router.push(desdeConfig[qDesde].path)">{{ desdeConfig[qDesde].label }}</span>
-    </template>
-  </template>
-  <ChevronRightIcon :size="13" />
-  <span class="bc-current">Título actual</span>
-</div>
-```
-
----
-
-## 10. PÁGINAS EXISTENTES
+## 11. PÁGINAS EXISTENTES
 
 ### Módulo Ventas — árbol drill-down completo
 
 ```
 ResumenFacturacionPage       /ventas/resumen-facturacion
-  └─ dblclick mes → DetalleFacturacionMesPage  /ventas/detalle-mes/:mes
-       ├─ dblclick canal    → DetalleCanalMesPage    /ventas/detalle-canal/:mes/:canal
-       ├─ dblclick cliente  → DetalleClienteMesPage  /ventas/detalle-cliente/:mes/:id_cliente
-       ├─ dblclick producto → DetalleProductoMesPage /ventas/detalle-producto/:mes/:cod_articulo
-       └─ dblclick factura  → DetalleFacturaPage     /ventas/detalle-factura/:id_interno/:id_numeracion
+  └─ click mes → DetalleFacturacionMesPage  /ventas/detalle-mes/:mes
+       ├─ click canal    → DetalleCanalMesPage    /ventas/detalle-canal/:mes/:canal
+       ├─ click cliente  → DetalleClienteMesPage  /ventas/detalle-cliente/:mes/:id_cliente
+       ├─ click producto → DetalleProductoMesPage /ventas/detalle-producto/:mes/:cod_articulo
+       └─ click factura  → DetalleFacturaPage     /ventas/detalle-factura/:id_interno/:id_numeracion
 ```
+
+> **Estándar**: toda navegación drill-down es con click simple (no doble click).
 
 | Página | Ruta | Archivo | Fuente KPI |
 |---|---|---|---|
@@ -498,4 +449,13 @@ ResumenFacturacionPage       /ventas/resumen-facturacion
 ```javascript
 // frontend/app/src/router/routes.js (dentro del children del MainLayout)
 { path: 'ventas/detalle-canal/:mes/:canal', component: () => import('pages/ventas/DetalleCanalMesPage.vue') },
+```
+
+### Breadcrumb contextual (páginas de detalle)
+
+```javascript
+const qMes        = route.query.mes         || ''
+const qDesde      = route.query.desde       || ''
+const qDesdeId    = route.query.desde_id    || ''
+const qDesdeLabel = route.query.desde_label || ''
 ```

@@ -743,6 +743,39 @@ Your teams ▼                       ← section
 .empty-state .hint    { font-size: 13px; color: var(--text-tertiary); }
 ```
 
+### 9.3 Formato numérico estándar
+
+**Regla global para todos los datos numéricos del ERP:**
+
+| Concepto | Formato | Ejemplo |
+|---|---|---|
+| Separador de miles | `.` (punto) | `1.234.567` |
+| Separador decimal | `,` (coma) | `1.234,56` |
+| Decimales | Automático: 0 si entero, hasta 3 máximo | `1.234` / `1.234,5` / `1.234,567` |
+| Moneda | `$` + formato numérico | `$1.234.567` |
+| Porcentaje | `(valor * 100).toFixed(1) + '%'` | `45,3%` |
+| Nulo/vacío | `—` (em dash) | `—` |
+
+**Implementación**: usar `toLocaleString('de-DE')` que produce el formato punto/coma correcto.
+
+```javascript
+function fmtNum(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—'
+  let decimals = 0
+  const remainder = Math.abs(n) - Math.floor(Math.abs(n))
+  if (remainder > 0.0005) {
+    const s = n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '').split('.')
+    decimals = Math.min(s[1]?.length || 0, 3)
+  }
+  return n.toLocaleString('de-DE', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+}
+```
+
+> **Nota:** NO usar `es-CO` — produce coma para miles en algunos entornos. `de-DE` siempre produce `.` miles y `,` decimales.
+
 ---
 
 ## 10. PANEL DE DETALLE
