@@ -413,22 +413,45 @@ app.get('/api/ventas/cartera-cliente/:id_cliente', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ── CONSIGNACIÓN: órdenes activas (Generada + Pendiente) ─
+// ── CONSIGNACIÓN: resumen agrupado por cliente (Nivel 1) ─
 app.get('/api/ventas/consignacion', async (req, res) => {
   try {
+    const rows = await query(`
+      SELECT
+        id_cliente,
+        MAX(nombre_cliente)  AS nombre_cliente,
+        MAX(ciudad)          AS ciudad,
+        MAX(vendedor)        AS vendedor,
+        COUNT(*)             AS num_ordenes,
+        ROUND(SUM(CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))),2) AS fin_total_consignacion,
+        MIN(fecha_de_creacion) AS fecha_primera_orden,
+        MAX(fecha_de_creacion) AS fecha_ultima_orden
+      FROM zeffi_ordenes_venta_encabezados
+      WHERE vigencia = 'Vigente'
+      GROUP BY id_cliente
+      ORDER BY fin_total_consignacion DESC`)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── CONSIGNACIÓN CLIENTE: órdenes activas de un cliente (Nivel 2) ─
+app.get('/api/ventas/consignacion-cliente/:id_cliente', async (req, res) => {
+  try {
+    const id_cliente = decodeURIComponent(req.params.id_cliente)
     const rows = await query(`
       SELECT id_orden, nombre_cliente, id_cliente, vendedor, ciudad,
              CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2)) AS total_neto_num,
              fecha_de_creacion, fecha_de_entrega, vigencia
       FROM zeffi_ordenes_venta_encabezados
-      WHERE vigencia = 'Vigente'
-      ORDER BY fecha_de_creacion ASC`)
+      WHERE vigencia = 'Vigente' AND id_cliente = ?
+      ORDER BY fecha_de_creacion ASC`,
+      [id_cliente])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ── CONSIGNACIÓN DETALLE: encabezado + ítems de una orden ─
-app.get('/api/ventas/consignacion/:id_orden', async (req, res) => {
+// ── CONSIGNACIÓN ORDEN: encabezado + ítems de una orden (Nivel 3) ─
+app.get('/api/ventas/consignacion-orden/:id_orden', async (req, res) => {
   try {
     const { id_orden } = req.params
     const [encabezado] = await query(

@@ -5,11 +5,13 @@
     <div class="page-header">
       <div class="page-header-inner">
         <div class="breadcrumb">
-          <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Ventas</span>
+          <span class="bc-link" @click="router.push('/ventas/consignacion')">Ventas</span>
           <ChevronRightIcon :size="13" />
           <span class="bc-link" @click="router.push('/ventas/consignacion')">Consignación</span>
           <ChevronRightIcon :size="13" />
-          <span class="bc-current">{{ encabezado?.nombre_cliente || id_orden }} ({{ id_orden }})</span>
+          <span class="bc-link" @click="goBack">{{ encabezado?.nombre_cliente || '…' }}</span>
+          <ChevronRightIcon :size="13" />
+          <span class="bc-current">{{ id_orden }}</span>
         </div>
         <div class="page-title-row">
           <h1 class="page-title">{{ encabezado?.nombre_cliente || id_orden }}</h1>
@@ -99,9 +101,17 @@ function fmtFecha(v) {
   return String(v).slice(0, 10)
 }
 
+function goBack() {
+  if (encabezado.value?.id_cliente) {
+    router.push(`/ventas/consignacion-cliente/${encodeURIComponent(encabezado.value.id_cliente)}`)
+  } else {
+    router.push('/ventas/consignacion')
+  }
+}
+
 onMounted(async () => {
   try {
-    const { data } = await axios.get(`${API}/ventas/consignacion/${encodeURIComponent(id_orden)}`)
+    const { data } = await axios.get(`${API}/ventas/consignacion-orden/${encodeURIComponent(id_orden)}`)
     encabezado.value = data.encabezado
     items.value = data.items || []
     if (data.items?.length > 0) {

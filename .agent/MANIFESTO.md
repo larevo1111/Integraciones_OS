@@ -11,11 +11,38 @@
 3. **Seguir el manual al pie de la letra**: colores, tipografía, espaciado, componentes — todo definido ahí.
 4. **Si el elemento NO está en el manual**: DETENERSE. Preguntar a Santi y definir juntos antes de implementar. Luego actualizar el manual.
 
-**⚠️ BUILD OBLIGATORIO:** Después de cualquier modificación Vue/Quasar:
+**⚠️ BUILD OBLIGATORIO:** Después de cualquier modificación Vue/Quasar, los fuentes NO se sirven directamente. El servidor sirve `dist/spa/` compilado. Sin rebuild = cambios invisibles en producción.
+
+### Cómo hacer el build correctamente
+
+**IMPORTANTE: El build corre en el HOST, NO en Docker. Nunca usar `docker exec`.**
+
+**App ERP (`menu.oscomunidad.com`):**
 ```bash
-cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/frontend/app && npx quasar build
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/frontend/app
+npx quasar build
+# Output: frontend/app/dist/spa/
 ```
-El servidor sirve `dist/spa/` compilado, NO los fuentes. Sin rebuild = cambios invisibles en producción.
+
+**App IA Admin (`ia.oscomunidad.com`):**
+```bash
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/ia-admin/app
+npx quasar build
+# Output: ia-admin/app/dist/spa/
+```
+
+**Reglas del build:**
+1. Esperar a que termine completamente — puede tardar 30–60 segundos. No interrumpir.
+2. El build es exitoso cuando aparece `Output folder...` al final, sin errores en rojo.
+3. Si hay errores de TypeScript/lint, corregirlos antes de continuar — un build con errores NO actualiza `dist/`.
+4. No es necesario reiniciar ningún servidor después del build (Node/Express sirve los archivos estáticos directamente desde `dist/spa/`).
+5. No usar `npm run build` — usar siempre `npx quasar build` (es la forma correcta para Quasar).
+6. Si el build se cuelga sin output por más de 2 minutos: `Ctrl+C`, luego `rm -rf node_modules/.vite` y volver a intentar.
+
+**Verificar que el build aplicó:**
+- Abrir la URL en el browser
+- Hard refresh: `Ctrl+Shift+R` (o `Cmd+Shift+R` en Mac) para limpiar caché
+- Revisar DevTools → Console para errores JS
 
 ---
 
@@ -310,7 +337,49 @@ Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
 
 ---
 
-## 12. DICCIONARIO DE NEGOCIO
+## 12. ESTÁNDAR DE NAVEGACIÓN DRILL-DOWN — ERP
+
+### Regla universal: toda tabla tiene drill-down
+
+**En este ERP, CUALQUIER fila de CUALQUIER tabla es clickeable y navega al siguiente nivel.**
+No existe tabla decorativa. Si hay filas, hay drill-down.
+
+### Patrón obligatorio de 3 niveles
+
+```
+Nivel 1 — Resumen agrupado        (1 fila = 1 cliente / 1 mes / 1 canal)
+  └─ click → Nivel 2 — Lista de documentos    (facturas, órdenes, remisiones del agrupador)
+                └─ click → Nivel 3 — Detalle del documento   (ítems, campos completos)
+```
+
+**Regla crítica:** el Nivel 3 siempre reutiliza la vista de detalle canónica del tipo de documento.
+- Factura → siempre `/ventas/detalle-factura/:id_interno/:id_numeracion` (DetalleFacturaPage)
+- Orden de venta → siempre `/ventas/consignacion-orden/:id_orden` (DetalleConsignacionPage)
+- Remisión → (pendiente) cuando se construya, su propia vista canónica
+
+**NUNCA crear una vista de detalle ad-hoc para el mismo tipo de documento.** Reutilizar la existente.
+
+### Catálogo de vistas — referencia obligatoria
+
+Ver `.agent/CATALOGO_VISTAS.md` — **leer antes de crear cualquier página nueva**.
+Contiene todas las vistas existentes, sus rutas, propósito y jerarquía de navegación.
+
+### Nomenclatura de rutas drill-down
+
+```
+/ventas/{modulo}                          → Nivel 1: resumen
+/ventas/{modulo}-cliente/:id_cliente      → Nivel 2: documentos del cliente
+/ventas/{modulo}-orden/:id_orden          → Nivel 3: detalle documento (si aplica)
+```
+O para módulos con mes:
+```
+/ventas/{modulo}/:mes                     → Nivel 1: por mes
+/ventas/{modulo}/:mes/:id_cliente         → Nivel 2: por cliente en ese mes
+```
+
+---
+
+## 13. DICCIONARIO DE NEGOCIO
 
 - Nomenclatura en Español (coherente con ERP Effi).
 - Clientes Effi → `tipo_de_persona` distingue empresa/persona natural.
@@ -318,7 +387,7 @@ Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
 
 ---
 
-## 13. GESTIÓN DE SCREENSHOTS TEMPORALES Y UI
+## 14. GESTIÓN DE SCREENSHOTS TEMPORALES Y UI
 
 **Protocolo para Claude Code y Codex respecto a validación visual:**
 Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando capturas de pantalla en `/home/osserver/Proyectos_Antigravity/Integraciones_OS/screenshots_temporales/`.
@@ -415,7 +484,7 @@ Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente
 
 ---
 
-## 15. PROTOCOLO DE QA Y TESTING
+## 16. PROTOCOLO DE QA Y TESTING
 
 ### Archivos clave
 - `.agent/INSTRUCCIONES_TESTING.md` — **política y protocolo completo de QA** (leer antes de cualquier sesión de testing)

@@ -21,6 +21,10 @@
       <!-- KPIs -->
       <div v-if="!loading && rows.length > 0" class="kpi-section">
         <div class="kpi-card">
+          <span class="kpi-label">Clientes con consignación</span>
+          <span class="kpi-value">{{ kpis.numClientes }}</span>
+        </div>
+        <div class="kpi-card">
           <span class="kpi-label">Órdenes activas</span>
           <span class="kpi-value">{{ kpis.numOrdenes }}</span>
         </div>
@@ -28,15 +32,11 @@
           <span class="kpi-label">Total en consignación</span>
           <span class="kpi-value">{{ fmtMoney(kpis.totalConsignacion) }}</span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Clientes</span>
-          <span class="kpi-value">{{ kpis.numClientes }}</span>
-        </div>
       </div>
 
-      <!-- Tabla órdenes -->
+      <!-- Tabla resumen por cliente -->
       <OsDataTable
-        title="Órdenes en consignación"
+        title="Consignación por cliente"
         recurso="consignacion"
         :rows="rows"
         :columns="cols"
@@ -62,20 +62,20 @@ const cols    = ref([])
 const loading = ref(true)
 
 const VISIBLE = [
-  'id_orden', 'nombre_cliente', 'ciudad', 'vendedor',
-  'total_neto_num', 'fecha_de_creacion', 'fecha_de_entrega', 'vigencia', 'dias_en_calle'
+  'nombre_cliente', 'ciudad', 'vendedor',
+  'num_ordenes', 'fin_total_consignacion',
+  'fecha_primera_orden', 'fecha_ultima_orden'
 ]
 
 const LABELS = {
-  id_orden:         'N° Orden',
-  nombre_cliente:   'Cliente',
-  ciudad:           'Ciudad',
-  vendedor:         'Vendedor',
-  total_neto_num:   'Total',
-  fecha_de_creacion:'Fecha creación',
-  fecha_de_entrega: 'Fecha entrega',
-  vigencia:         'Vigencia',
-  dias_en_calle:    'Días en calle',
+  nombre_cliente:        'Cliente',
+  ciudad:                'Ciudad',
+  vendedor:              'Vendedor',
+  num_ordenes:           'Órdenes',
+  fin_total_consignacion:'Total consignación',
+  fecha_primera_orden:   'Primera orden',
+  fecha_ultima_orden:    'Última orden',
+  id_cliente:            'ID Cliente',
 }
 
 function labelFromKey(key) {
@@ -83,9 +83,9 @@ function labelFromKey(key) {
 }
 
 const kpis = computed(() => ({
-  numOrdenes:        rows.value.length,
-  totalConsignacion: rows.value.reduce((s, r) => s + (parseFloat(r.total_neto_num) || 0), 0),
-  numClientes:       new Set(rows.value.map(r => r.id_cliente)).size,
+  numClientes:       rows.value.length,
+  numOrdenes:        rows.value.reduce((s, r) => s + (parseInt(r.num_ordenes) || 0), 0),
+  totalConsignacion: rows.value.reduce((s, r) => s + (parseFloat(r.fin_total_consignacion) || 0), 0),
 }))
 
 function fmtMoney(n) {
@@ -94,21 +94,12 @@ function fmtMoney(n) {
 }
 
 function onRowClick(row) {
-  router.push(`/ventas/consignacion/${encodeURIComponent(row.id_orden)}`)
+  router.push(`/ventas/consignacion-cliente/${encodeURIComponent(row.id_cliente)}`)
 }
 
 onMounted(async () => {
   try {
     const { data } = await axios.get(`${API}/ventas/consignacion`)
-    const today = new Date()
-    data.forEach(r => {
-      if (r.fecha_de_creacion) {
-        const d = new Date(r.fecha_de_creacion.replace(' ', 'T'))
-        r.dias_en_calle = Math.floor((today - d) / 86400000)
-      } else {
-        r.dias_en_calle = null
-      }
-    })
     rows.value = data
     if (data.length > 0) {
       cols.value = Object.keys(data[0]).map(key => ({

@@ -5,9 +5,9 @@
     <div class="page-header">
       <div class="page-header-inner">
         <div class="breadcrumb">
-          <span class="bc-link" @click="router.push('/ventas/resumen-facturacion')">Ventas</span>
+          <span class="bc-link" @click="router.push('/ventas/consignacion')">Ventas</span>
           <ChevronRightIcon :size="13" />
-          <span class="bc-link" @click="router.push('/ventas/cartera')">Cuentas por Cobrar</span>
+          <span class="bc-link" @click="router.push('/ventas/consignacion')">Consignación</span>
           <ChevronRightIcon :size="13" />
           <span class="bc-current">{{ nombreCliente }}</span>
         </div>
@@ -23,23 +23,23 @@
       <!-- KPIs -->
       <div v-if="!loading && rows.length > 0" class="kpi-section">
         <div class="kpi-card">
-          <span class="kpi-label">Total pendiente</span>
-          <span class="kpi-value">{{ fmtMoney(kpis.totalPendiente) }}</span>
+          <span class="kpi-label">Órdenes activas</span>
+          <span class="kpi-value">{{ rows.length }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Facturas pendientes</span>
-          <span class="kpi-value">{{ kpis.numFacturas }}</span>
+          <span class="kpi-label">Total consignación</span>
+          <span class="kpi-value">{{ fmtMoney(kpis.totalConsignacion) }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Antigüedad máx.</span>
-          <span class="kpi-value kpi-danger">{{ kpis.antiguedadMax }} días</span>
+          <span class="kpi-label">Días máx. en calle</span>
+          <span class="kpi-value">{{ kpis.diasMax }}</span>
         </div>
       </div>
 
-      <!-- Tabla facturas -->
+      <!-- Tabla órdenes del cliente -->
       <OsDataTable
-        :title="`Facturas pendientes — ${nombreCliente || id_cliente}`"
-        recurso="cartera"
+        :title="`Órdenes — ${nombreCliente || id_cliente}`"
+        recurso="consignacion"
         :rows="rows"
         :columns="cols"
         :loading="loading"
@@ -67,36 +67,36 @@ const cols    = ref([])
 const loading = ref(true)
 
 const VISIBLE = [
-  'id_numeracion', 'fecha_de_creacion', 'vendedor',
-  'fin_total_neto', 'fin_pendiente', 'dias_antiguedad', 'estado_cxc'
+  'id_orden', 'ciudad', 'vendedor',
+  'total_neto_num', 'fecha_de_creacion', 'fecha_de_entrega', 'dias_en_calle'
 ]
 
 const LABELS = {
-  id_numeracion:    'No Fac',
-  fecha_de_creacion:'Fecha',
-  vendedor:         'Vendedor',
-  fin_total_neto:   'Total factura',
-  fin_pendiente:    'Pendiente',
-  dias_antiguedad:  'Días antigüedad',
-  estado_cxc:       'Estado CxC',
-  cliente:          'Cliente',
-  id_cliente:       'ID Cliente',
+  id_orden:         'N° Orden',
   ciudad:           'Ciudad',
-  formas_de_pago:   'Forma de pago',
-  id_interno:       'ID Interno',
+  vendedor:         'Vendedor',
+  total_neto_num:   'Total',
+  fecha_de_creacion:'Fecha creación',
+  fecha_de_entrega: 'Fecha entrega',
+  dias_en_calle:    'Días en calle',
+  nombre_cliente:   'Cliente',
+  id_cliente:       'ID Cliente',
+  vigencia:         'Vigencia',
 }
 
 function labelFromKey(key) {
   return LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
-const nombreCliente = computed(() => rows.value[0]?.cliente || '')
+const nombreCliente = computed(() => rows.value[0]?.nombre_cliente || '')
 
-const kpis = computed(() => ({
-  totalPendiente: rows.value.reduce((s, r) => s + (parseFloat(r.fin_pendiente) || 0), 0),
-  numFacturas:    rows.value.length,
-  antiguedadMax:  rows.value.reduce((m, r) => Math.max(m, parseInt(r.dias_antiguedad) || 0), 0),
-}))
+const kpis = computed(() => {
+  const today = new Date()
+  return {
+    totalConsignacion: rows.value.reduce((s, r) => s + (parseFloat(r.total_neto_num) || 0), 0),
+    diasMax: rows.value.reduce((m, r) => Math.max(m, r.dias_en_calle || 0), 0),
+  }
+})
 
 function fmtMoney(n) {
   if (!n && n !== 0) return '$0'
@@ -104,15 +104,21 @@ function fmtMoney(n) {
 }
 
 function onRowClick(row) {
-  router.push({
-    path: `/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`,
-    query: { desde: 'cartera', desde_id: id_cliente, desde_label: nombreCliente.value || id_cliente }
-  })
+  router.push(`/ventas/consignacion-orden/${encodeURIComponent(row.id_orden)}`)
 }
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get(`${API}/ventas/cartera-cliente/${encodeURIComponent(id_cliente)}`)
+    const { data } = await axios.get(`${API}/ventas/consignacion-cliente/${encodeURIComponent(id_cliente)}`)
+    const today = new Date()
+    data.forEach(r => {
+      if (r.fecha_de_creacion) {
+        const d = new Date(r.fecha_de_creacion.replace(' ', 'T'))
+        r.dias_en_calle = Math.floor((today - d) / 86400000)
+      } else {
+        r.dias_en_calle = null
+      }
+    })
     rows.value = data
     if (data.length > 0) {
       cols.value = Object.keys(data[0]).map(key => ({
@@ -145,7 +151,6 @@ onMounted(async () => {
   padding: 14px 16px;
   display: flex; flex-direction: column; gap: 4px;
 }
-.kpi-label  { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
-.kpi-value  { font-size: 20px; font-weight: 700; color: var(--text-primary); }
-.kpi-danger { color: var(--color-error, #ef4444); }
+.kpi-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-value { font-size: 20px; font-weight: 700; color: var(--text-primary); }
 </style>
