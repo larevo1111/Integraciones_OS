@@ -30,16 +30,18 @@ def health():
 @app.route('/ia/consultar', methods=['POST'])
 def endpoint_consultar():
     """
-    Body JSON esperado:
+    Body JSON:
     {
-        "pregunta":        "¿Cuánto vendimos ayer?",   -- requerido
-        "tipo":            "analisis_datos",            -- opcional
-        "agente":          "gemini-flash",              -- opcional
+        "pregunta":        "¿Cuánto vendimos ayer?",   -- REQUERIDO
         "usuario_id":      "santi",                     -- opcional (default: "anonimo")
         "canal":           "telegram",                  -- opcional (default: "api")
+        "empresa":         "ori_sil_2",                 -- opcional (default: "ori_sil_2")
+        "tema":            "comercial",                 -- opcional (el enrutador lo detecta si no viene)
+        "tipo":            "analisis_datos",            -- opcional (el enrutador lo detecta si no viene)
+        "agente":          "gemini-flash",              -- opcional
         "conversacion_id": 42,                          -- opcional
         "nombre_usuario":  "Santiago",                  -- opcional
-        "contexto_extra":  "..."                        -- opcional
+        "contexto_extra":  "Vista: Resumen Ventas..."   -- opcional (contexto de pantalla del ERP)
     }
     """
     data = request.get_json(silent=True) or {}
@@ -54,6 +56,8 @@ def endpoint_consultar():
         agente          = data.get('agente'),
         usuario_id      = data.get('usuario_id', 'anonimo'),
         canal           = data.get('canal', 'api'),
+        empresa         = data.get('empresa', 'ori_sil_2'),
+        tema            = data.get('tema'),
         conversacion_id = data.get('conversacion_id'),
         nombre_usuario  = data.get('nombre_usuario'),
         contexto_extra  = data.get('contexto_extra', ''),

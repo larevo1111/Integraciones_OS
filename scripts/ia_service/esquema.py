@@ -41,14 +41,22 @@ _NOTAS = """
 """
 
 
-def obtener_ddl(forzar: bool = False) -> str:
+def obtener_ddl(forzar: bool = False, tablas: list = None) -> str:
     """
     Devuelve el DDL de las tablas relevantes para análisis.
-    Usa caché en memoria con TTL de 1 hora.
+
+    Args:
+        forzar: Ignorar caché y refrescar desde Hostinger.
+        tablas: Lista de tablas específicas (del tema). None = TABLAS_RELEVANTES completo.
+
+    Usa caché en memoria con TTL de 1 hora (solo para el set completo).
     """
     global _cache
 
-    if not forzar and _cache['ddl'] and (time.time() - _cache['ts']) < _CACHE_TTL:
+    tablas_a_usar = tablas if tablas else TABLAS_RELEVANTES
+
+    # Caché solo para el set completo
+    if not tablas and not forzar and _cache['ddl'] and (time.time() - _cache['ts']) < _CACHE_TTL:
         return _cache['ddl']
 
     conn = None
@@ -57,7 +65,7 @@ def obtener_ddl(forzar: bool = False) -> str:
     try:
         conn = get_hostinger_conn()
         with conn.cursor() as cur:
-            for tabla in TABLAS_RELEVANTES:
+            for tabla in tablas_a_usar:
                 try:
                     cur.execute(f"SHOW CREATE TABLE `{tabla}`")
                     row = cur.fetchone()
@@ -68,7 +76,8 @@ def obtener_ddl(forzar: bool = False) -> str:
                     ddl_partes.append(f"\n-- Tabla {tabla}: no disponible en este momento.\n")
 
         ddl = '\n'.join(ddl_partes)
-        _cache = {'ddl': ddl, 'ts': time.time()}
+        if not tablas:
+            _cache = {'ddl': ddl, 'ts': time.time()}
         return ddl
 
     except Exception as e:

@@ -29,6 +29,8 @@ def consultar(
     agente:          str  = None,
     usuario_id:      str  = 'anonimo',
     canal:           str  = 'api',
+    empresa:         str  = 'ori_sil_2',
+    tema:            str  = None,
     conversacion_id: int  = None,
     nombre_usuario:  str  = None,
     contexto_extra:  str  = '',
@@ -39,12 +41,14 @@ def consultar(
     Args:
         pregunta:        Pregunta o instrucción del usuario.
         tipo:            Slug de ia_tipos_consulta. None = enrutar automáticamente.
-        agente:          Slug de ia_agentes. None = usar preferido del tipo.
+        agente:          Slug de ia_agentes. None = usar preferido del tema/tipo.
         usuario_id:      ID del usuario (telegram_id, email, etc.)
         canal:           Canal de origen: telegram, erp, api, script.
+        empresa:         Empresa del caller. Filtra RAG y temas (default: 'ori_sil_2').
+        tema:            Slug del tema (comercial, finanzas, etc.). None = enrutar automáticamente.
         conversacion_id: ID de conversación existente. None = buscar por usuario+canal.
         nombre_usuario:  Nombre para personalizar respuestas.
-        contexto_extra:  Contexto adicional libre (instrucciones específicas del caller).
+        contexto_extra:  Contexto adicional libre — pantalla activa del ERP, datos clave, etc.
 
     Returns:
         {
@@ -52,9 +56,10 @@ def consultar(
             "conversacion_id": int,
             "respuesta":       str,
             "formato":         str,    # texto|tabla|texto_tabla|json|documento
-            "tabla":           dict|None,  # {columnas, filas} si hay datos tabulares
+            "tabla":           dict|None,
             "sql":             str|None,
             "agente":          str,
+            "tema":            str,
             "tokens":          {"in": int, "out": int},
             "costo_usd":       float,
             "pasos":           list[str],
@@ -70,9 +75,13 @@ def consultar(
     conv_id = conv['id']
     resumen_anterior = conv.get('resumen') or ''
 
-    # ── 2. Enrutar si no viene tipo ───────────────────────────────────
-    if not tipo:
-        tipo = _enrutar(pregunta)
+    # ── 2. Enrutar: detectar tipo Y tema si no vienen ─────────────────
+    if not tipo or not tema:
+        tipo_enrutado, tema_enrutado = _enrutar(pregunta, empresa)
+        if not tipo:
+            tipo = tipo_enrutado
+        if not tema:
+            tema = tema_enrutado
         pasos_ejecutados.append('enrutar')
 
     # ── 3. Cargar tipo de consulta ────────────────────────────────────
@@ -87,9 +96,12 @@ def consultar(
     temperatura = float(tipo_cfg.get('temperatura', 0.3))
 
     # ── 4. Resolver agente ────────────────────────────────────────────
+    # Prioridad: caller > conversación activa > tema preferido > tipo preferido > default
+    tema_cfg = rag_module.obtener_tema_por_slug(tema, empresa) if tema else None
     agente_slug = (
         agente
         or conv.get('agente_activo')
+        or (tema_cfg.get('agente_preferido') if tema_cfg else None)
         or tipo_cfg.get('agente_preferido')
         or 'gemini-flash'
     )
@@ -108,17 +120,32 @@ def consultar(
         agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash'
 
     # ── 5. Construir contexto de sistema (6 capas) ───────────────────
-    # CAPA 1: System prompt base del tipo de consulta
-    system_prompt = tipo_cfg.get('system_prompt', '')
+    # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
+    system_prompt = ''
+    if tema_cfg and tema_cfg.get('system_prompt'):
+        system_prompt = tema_cfg['system_prompt']
+    elif tipo_cfg.get('system_prompt'):
+        system_prompt = tipo_cfg['system_prompt']
 
-    # CAPA 2: RAG — fragmentos relevantes de la base de conocimiento
-    rag_ctx = rag_module.obtener_contexto_rag(pregunta)
+    # CAPA 2: RAG — fragmentos relevantes filtrados por empresa y tema
+    tema_id_rag = tema_cfg['id'] if tema_cfg else None
+    rag_ctx = rag_module.obtener_contexto_rag(pregunta, empresa, tema_id_rag)
     if rag_ctx:
         system_prompt += f'\n\n{rag_ctx}'
 
-    # CAPA 3: Schema BD (DDL tablas analíticas) — solo si el tipo lo requiere
+    # CAPA 3: Schema BD — tablas del tema si lo tiene, sino schema completo
     if tipo_cfg.get('requiere_estructura'):
-        ddl = esquema.obtener_ddl()
+        if tema_cfg and tema_cfg.get('schema_tablas'):
+            try:
+                tablas_tema = json.loads(tema_cfg['schema_tablas']) if isinstance(tema_cfg['schema_tablas'], str) else tema_cfg['schema_tablas']
+                if tablas_tema:
+                    ddl = esquema.obtener_ddl(tablas=tablas_tema)
+                else:
+                    ddl = esquema.obtener_ddl()
+            except Exception:
+                ddl = esquema.obtener_ddl()
+        else:
+            ddl = esquema.obtener_ddl()
         system_prompt += f'\n\nEsquema de la base de datos:\n{ddl}'
 
     # CAPA 4: Resumen comprimido de la conversación (historial antiguo)
@@ -276,9 +303,11 @@ def consultar(
         'formato':         tipo_cfg.get('formato_salida', 'texto'),
         'tabla':           tabla_resultado,
         'sql':             sql_generado,
-        'imagen_b64':      imagen_b64,   # base64 de imagen si formato='imagen'
-        'imagen_mime':     imagen_mime,  # 'image/png' o 'image/jpeg'
+        'imagen_b64':      imagen_b64,
+        'imagen_mime':     imagen_mime,
         'agente':          agente_slug,
+        'tema':            tema,
+        'empresa':         empresa,
         'tokens':          {'in': tokens_in_total, 'out': tokens_out_total},
         'costo_usd':       costo_usd,
         'pasos':           pasos_ejecutados,
@@ -289,42 +318,72 @@ def consultar(
 
 # ── Funciones internas ────────────────────────────────────────────────────────
 
-def _enrutar(pregunta: str) -> str:
+def _enrutar(pregunta: str, empresa: str = 'ori_sil_2') -> tuple:
     """
-    Clasifica la intención de la pregunta usando el agente más rápido disponible.
-    Prefiere Groq (velocidad), fallback a Gemini, fallback a 'analisis_datos'.
+    Detecta tipo de consulta Y tema en una sola llamada al enrutador.
+    Prefiere Groq (velocidad), fallback a Gemma, fallback a valores default.
+
+    Returns:
+        (tipo: str, tema: str)  — ej: ('analisis_datos', 'comercial')
     """
     agente_cfg = None
-    # Orden: primero los de mayor RPD (groq 14400, gemma 14400), luego los más restrictivos
-    # gemini-pro NO se usa para enrutar — reservar sus 1000 RPD para análisis reales
     for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
         cand = _cargar_agente(slug)
         if cand and cand.get('api_key'):
             agente_cfg = cand
             break
     if not agente_cfg:
-        return 'analisis_datos'
+        return ('analisis_datos', 'general')
 
     tipo_enrut = _cargar_tipo('enrutamiento')
-    system = tipo_enrut.get('system_prompt', '') if tipo_enrut else ''
+    system_base = tipo_enrut.get('system_prompt', '') if tipo_enrut else ''
+
+    # Ampliar system prompt con temas disponibles para esta empresa
+    temas_disponibles = rag_module.listar_temas(empresa)
+    temas_str = ', '.join([f"{t['slug']} ({t['nombre']})" for t in temas_disponibles]) if temas_disponibles else 'general'
+    system = system_base + f"""
+
+Adicionalmente, clasifica el TEMA de la pregunta. Temas disponibles: {temas_str}.
+Responde en formato JSON exacto: {{"tipo": "slug_tipo", "tema": "slug_tema"}}
+Ejemplo: {{"tipo": "analisis_datos", "tema": "comercial"}}"""
 
     msgs = [
         {'role': 'system', 'content': system},
         {'role': 'user',   'content': pregunta},
     ]
-    # 200 tokens: suficiente para el slug incluso con modelos "thinking" como Gemini 2.5
-    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=200)
+    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=50)
+
+    tipo_default = 'analisis_datos'
+    tema_default = 'general'
 
     if res['ok']:
-        texto = res['texto'].strip().lower()
-        tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                         'generacion_documento', 'generacion_imagen'}
-        # Buscar cualquier slug válido en el texto (por si el modelo agrega palabras extra)
-        for slug in tipos_validos:
-            if slug in texto:
-                return slug
+        texto = res['texto'].strip()
+        # Intentar parsear JSON {"tipo": "...", "tema": "..."}
+        try:
+            import re
+            match = re.search(r'\{[^}]+\}', texto)
+            if match:
+                data = json.loads(match.group())
+                tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
+                                 'generacion_documento', 'generacion_imagen', 'enrutamiento'}
+                temas_validos  = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
+                tipo_ret = data.get('tipo', tipo_default)
+                tema_ret = data.get('tema', tema_default)
+                return (
+                    tipo_ret if tipo_ret in tipos_validos else tipo_default,
+                    tema_ret if tema_ret in temas_validos  else tema_default,
+                )
+        except Exception:
+            pass
 
-    return 'analisis_datos'
+        # Fallback: buscar tipo en texto plano
+        texto_lower = texto.lower()
+        for slug in ('analisis_datos', 'redaccion', 'clasificacion', 'resumen',
+                     'generacion_documento', 'generacion_imagen'):
+            if slug in texto_lower:
+                return (slug, tema_default)
+
+    return (tipo_default, tema_default)
 
 
 def _cargar_agente(slug: str) -> dict | None:

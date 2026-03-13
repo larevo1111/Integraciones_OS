@@ -216,9 +216,9 @@ CAPA 6 — Pregunta actual del usuario        → input directo
 | `ia_logs` | Auditoría completa: SQL generado, tokens, costo, latencia, errores |
 | `ia_consumo_diario` | Agregado diario por agente |
 | `ia_usuarios` | Usuarios del admin (Santiago admin, Jennifer viewer) |
-| `ia_rag_colecciones` | Espacios de conocimiento (ej: 'negocio-os') |
-| `ia_rag_documentos` | Documentos subidos por colección |
-| `ia_rag_fragmentos` | Chunks ~500 palabras con FULLTEXT index |
+| `ia_temas` | Temas/espacios de conocimiento por empresa+slug (7 temas para ori_sil_2) |
+| `ia_rag_documentos` | Documentos subidos por tema (campo tema_id, empresa) |
+| `ia_rag_fragmentos` | Chunks ~500 palabras con FULLTEXT index (campo tema_id, empresa) |
 
 ### Agentes configurados
 | slug | modelo | Estado |
@@ -232,11 +232,12 @@ CAPA 6 — Pregunta actual del usuario        → input directo
 | `deepseek-reasoner` | deepseek-reasoner | 🔲 Pendiente (misma key que deepseek-chat) |
 | `claude-sonnet` | claude-sonnet-4-6 | 🔲 Pendiente key: console.anthropic.com |
 
-**Estado del servicio (2026-03-13):** ✅ Activo con RAG y mensajes recientes integrados
-**Módulo RAG:** `scripts/ia_service/rag.py` — fragmentación + búsqueda FULLTEXT
-**Colección inicial:** `negocio-os` creada, sin documentos aún
+**Estado del servicio (2026-03-13):** ✅ Activo — RAG + temas + empresa + enrutador dual (tipo+tema)
+**Módulo RAG:** `scripts/ia_service/rag.py` — fragmentación + búsqueda FULLTEXT por empresa+tema
+**Temas seeded:** 7 temas para ori_sil_2 (comercial, finanzas, produccion, administracion, marketing, estrategia, general)
+**⚠️ `ia_rag_colecciones` fue eliminada** — reemplazada por `ia_temas` (con empresa, schema_tablas, system_prompt)
 
-### Función principal
+### Función principal (firma actualizada 2026-03-13)
 ```python
 resultado = consultar(
     pregunta="¿Cuánto vendimos ayer?",
@@ -244,9 +245,13 @@ resultado = consultar(
     agente=None,         # None = usar preferido del tipo
     usuario_id="santi",
     canal="telegram",
-    conversacion_id=None # None = buscar por (usuario_id+canal)
+    empresa="ori_sil_2", # ← NUEVO: multi-empresa
+    tema=None,           # ← NUEVO: None = enrutador detecta automáticamente
+    conversacion_id=None,
+    nombre_usuario=None,
+    contexto_extra="",   # ← para ERP: contexto de pantalla activa
 )
-# Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id
+# Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id, tema, empresa
 ```
 
 ## Próximos Pasos
