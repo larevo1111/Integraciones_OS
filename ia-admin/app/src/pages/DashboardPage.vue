@@ -2,7 +2,7 @@
   <div class="page-wrap">
     <div class="page-header">
       <h1 class="page-title">Dashboard</h1>
-      <p class="page-subtitle">Hola, {{ usuario.nombre }} — consumo en tiempo real del servicio de IA</p>
+      <p class="page-subtitle">Hola, {{ usuario?.nombre ?? 'Admin' }} — consumo en tiempo real del servicio de IA</p>
     </div>
 
     <div class="page-content">
@@ -207,23 +207,28 @@ const cargando  = ref(true)
 const cargandoLogs = ref(true)
 
 // ─── Costo / llamadas / tokens del mes actual ──────────────────────
+// fecha del historico llega como "Fri, 13 Mar 2026 00:00:00 GMT" — normalizar
+function fechaMes(f) {
+  if (!f) return ''
+  return new Date(f).toISOString().slice(0, 7) // "2026-03"
+}
 const costoMes = computed(() => {
   if (!historico.value.length) return 0
-  const mesActual = new Date().toISOString().slice(0, 7) // "2026-03"
+  const mesActual = new Date().toISOString().slice(0, 7)
   return historico.value
-    .filter(r => r.fecha && r.fecha.slice(0, 7) === mesActual)
+    .filter(r => fechaMes(r.fecha) === mesActual)
     .reduce((acc, r) => acc + Number(r.costo_usd || 0), 0)
 })
 const llamadasMes = computed(() => {
   const mesActual = new Date().toISOString().slice(0, 7)
   return historico.value
-    .filter(r => r.fecha && r.fecha.slice(0, 7) === mesActual)
+    .filter(r => fechaMes(r.fecha) === mesActual)
     .reduce((acc, r) => acc + (r.llamadas || 0), 0)
 })
 const tokensMes = computed(() => {
   const mesActual = new Date().toISOString().slice(0, 7)
   return historico.value
-    .filter(r => r.fecha && r.fecha.slice(0, 7) === mesActual)
+    .filter(r => fechaMes(r.fecha) === mesActual)
     .reduce((acc, r) => acc + (r.tokens_total || 0), 0)
 })
 
