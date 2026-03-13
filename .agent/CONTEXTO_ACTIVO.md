@@ -131,7 +131,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 | Screenshots de referencia (88) | `frontend/design-system/screenshots/` | ✅ Listos |
 | Proyecto Vue + Quasar | `frontend/app/` | ✅ Producción (puerto 9100, os-erp-frontend) |
 | URL pública app temporal | menu.oscomunidad.com | ✅ Cloudflare tunnel activo |
-| **App IA Admin (pendiente)** | ia.oscomunidad.com | 🔲 Por construir — app separada |
+| **App IA Admin** | ia.oscomunidad.com | ✅ Activa — puerto 9200, systemd `os-ia-admin.service` |
 | Tabla sys_menu | Hostinger `u768061575_os_integracion` | ✅ 36 registros (7 módulos + 29 submenús) |
 | **API Express** | `frontend/api/` | ✅ Puerto 3002 (realmente sirve en puerto 9100 junto al frontend), systemd `os-erp-frontend` |
 | **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — dblclick navega a DetalleFacturacionMes |
@@ -174,7 +174,7 @@ ResumenFacturacionPage (todos los meses)
 
 > **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
 > Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
-> **Admin panel**: app separada en `ia.oscomunidad.com` (Vue + Quasar, mismo design system) — por construir.
+> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. 6 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios. Auth vía Cloudflare Access (pendiente configurar en Cloudflare ZeroTrust dashboard).
 
 
 **Plan completo:** `.agent/planes/plan_ia_service.md`
@@ -222,7 +222,7 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **App IA Admin** (`ia.oscomunidad.com`) — app separada Vue+Quasar con: dashboard consumo, gestión agentes, tipos de consulta, logs, playground. Misma arquitectura que menu.oscomunidad.com pero independiente.
+1. **Cloudflare Access** (`ia.oscomunidad.com`) — configurar en Cloudflare Zero Trust Dashboard: Access → Applications → `ia.oscomunidad.com` → Google Auth → emails permitidos. ⚠️ Santi lo configura manualmente (5 min, no requiere código).
 2. **Activar más agentes**: Groq (gratis, console.groq.com), DeepSeek ($5, platform.deepseek.com), Claude ($5, console.anthropic.com)
 3. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
 4. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`.
