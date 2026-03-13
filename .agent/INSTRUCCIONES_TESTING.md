@@ -1,22 +1,26 @@
 # Instrucciones de Testing — ERP Origen Silvestre
 
-## Quién ejecuta los tests
+## Roles y división de responsabilidades
 
-**Antigravity** (subagente Claude) es el responsable exclusivo de QA visual y funcional.
-Claude Code implementa. Antigravity verifica. Santi aprueba o rechaza.
+| Rol | Hace |
+|---|---|
+| **Claude Code** | Implementa la feature, hace build, reinicia el servicio, y **asigna la tarea de QA a Antigravity** con contexto claro: qué se construyó, qué endpoints existen, qué tablas se modificaron, qué debe verificarse. **No dicta cómo usar las herramientas.** |
+| **Antigravity** | Recibe la tarea y decide autónomamente cómo verificarla — qué herramientas usar, en qué orden, qué queries correr. Reporta hallazgos y documenta bugs. |
+| **Santi** | Aprueba o rechaza el resultado final. |
+
+**Principio clave: Claude Code asigna la tarea con contexto. Antigravity decide cómo ejecutarla.**
 
 ---
 
-## Herramientas disponibles para testing
+## Herramientas disponibles para Antigravity
 
-| Herramienta | Cuándo usarla |
-|---|---|
-| **curl** | **Primera opción siempre.** Verificar endpoints API: status, cantidad de registros, campos presentes, valores coherentes. |
-| **mysql CLI** | Verificar integridad de datos directamente en BD: sumas, muestras, comparativos. Los checks del skill `integridad_datos.md` se corren aquí. |
-| **Bash** | Verificar servicios activos, logs, archivos generados. |
-| **Playwright** | **Solo cuando sea estrictamente necesario ver el browser**: hover de tooltips, verificar animaciones, capturar layout visual. Si se puede verificar con curl o mysql → NO usar Playwright. |
+Antigravity tiene acceso completo a Bash, mysql, curl, Read, Write, y Playwright. Decide cuál usar según la tarea:
 
-**Regla:** curl + mysql primero. Playwright solo si no hay otra forma.
+- **curl / mysql** — para la mayoría de verificaciones: endpoints, integridad de datos, sumas, comparativos
+- **Playwright** — solo cuando sea estrictamente necesario ver el browser (hover de tooltips, layout visual)
+- **Bash / Read** — logs, servicios, archivos
+
+**Regla de oro:** si se puede verificar sin abrir un browser → no abrir el browser.
 
 **App en producción:** `http://menu.oscomunidad.com` (Cloudflare tunnel → puerto 9100 local)
 **API local:** `http://localhost:9100/api/...`
