@@ -1,52 +1,132 @@
 ---
-description: Regla de los 3 Pasos (Anti-Alucinaciones) para Bots de IA y NLP a SQL
+description: Arquitectura del Servicio Central de IA — ia_service_os (multi-proyecto)
 ---
 
-# Skill: Manejo de Agentes de Inteligencia Artificial
+# Skill: Servicio Central de IA — ia_service_os
 
-Este skill define la **arquitectura obligatoria** y las reglas de sistema (System Prompts) para cualquier integración de IA conversacional (ej. Bot de Telegram, Chatbots internos) que consulte datos del ERP (MariaDB).
+> **ACTUALIZADO 2026-03-12**: Este documento reemplaza la versión anterior (Regla de los 3 Pasos simple).
+> El servicio está implementado y operativo. Ver implementación en `scripts/ia_service/`.
 
-## Problema a Evitar: La Alucinación
-Los LLMs (Modelos de Lenguaje Grande) tienen la tendencia a intentar adivinar los saldos, ventas o nombres de clientes si se les pide directamente mediante un prompt ingenuo. **NUNCA debes permitir que la IA responda directamente con información de negocio basándose solo en su lógica interna**.
+## ¿Qué es ia_service_os?
 
-## LA REGLA DE LOS 3 PASOS (Premisa Inviolable)
+Es el **servicio de IA centralizado de Origen Silvestre** — corre en el servidor OS y sirve a TODOS los proyectos de la empresa (bot de Telegram, ERP, integraciones, futuros proyectos). No es exclusivo de Integraciones_OS.
 
-Todo pipeline de IA en este proyecto debe operar como una **máquina de estados dividida**:
+- **Puerto**: 5100 (systemd `ia-service.service`)
+- **BD**: `ia_service_os` en MariaDB local
+- **Código**: `scripts/ia_service/` en este repo
+- **Admin panel (pendiente)**: app separada en `ia.oscomunidad.com`
 
-### PASO 1: Generar Código (IA)
-- **Actores:** Usuario -> Orquestador de Python -> Agente IA (Claude/GPT/DeepSeek)
-- **Contexto Injectado:** Pregunta del usuario + **DDL (Esquema SQL)** de las tablas analíticas (`resumen_ventas_*`) + Regiones/Gotchas.
-- **Acción:** La IA **DEBE** limitarse exclusivamente a devolver String de código (una consulta SQL válida).
-- **Control:** La respuesta de la IA en este paso NO se muestra al usuario.
+## Punto de entrada único
 
-### PASO 2: Ejecutar Código (Sistema)
-- **Actores:** Orquestador de Python -> Base de Datos MariaDB -> Orquestador de Python.
-- **Acción:** El script de Python intercepta el SQL de la IA, lo sanitiza (ej. comprobar que usa tablas de solo lectura o NUNCA modifica producción), se conecta a MariaDB (vía PyMySQL/SQLAlchemy) y ejecuta.
-- **Salida:** Obtiene una lista de diccionarios (JSON) con los resultados reales de la base de datos (Ej. `[{"VentasNetasSinIva": 2993795, "Canal": "1.5. Mercados"}]`).
+```python
+from ia_service import consultar
 
-### PASO 3: Responder Usando el Resultado (IA)
-- **Actores:** Orquestador (Data) -> Agente IA -> Usuario (Telegram)
-- **Acción:** Python llama *otra vez* a la IA enviándole: `Mensaje Original` + `[DATOS DE BASE DE DATOS]`. 
-- **System Prompt:** *"Redacta una respuesta concisa a la pregunta del usuario usando ESTRICTAMENTE los datos proporcionados. Si los datos están vacíos, indica que no hay registros. NO inventes cifras."*
-- **Salida Final:** La IA formatea el markdown y Python lo empuja al Telegram.
+resultado = consultar(
+    pregunta     = "¿Cuánto vendimos ayer?",
+    tipo         = None,           # None = enrutador detecta automáticamente
+    agente       = None,           # None = usa agente preferido del tipo
+    usuario_id   = "santi",
+    canal        = "telegram",     # telegram | erp | api | script
+    conversacion_id = None,        # None = busca por usuario+canal
+)
+# resultado = {ok, conversacion_id, respuesta, formato, tabla, sql, imagen_b64, agente, tokens, costo_usd}
+```
 
----
+O vía HTTP desde cualquier proyecto:
+```bash
+POST http://localhost:5100/ia/consultar
+{"pregunta": "¿Cuánto vendimos?", "usuario_id": "santi", "canal": "telegram"}
+```
 
-## Estructura de Memoria Requerida
+## Regla de los 3 Pasos (Anti-Alucinaciones) — sigue vigente
 
-Cualquier motor de chat continuado (Telegram) debe almacenar su contexto en MariaDB (`bot_contexto`) con los siguientes campos clave para mantener coherencia en las conversaciones de los usuarios:
+El servicio implementa esto internamente para `analisis_datos`:
 
-1. **`agente_ia`**: Modelo seleccionado actualmente en uso (ej. `claude-sonnet`, `gemini-free`, `deepseek-chat`). Permite switch dinámico.
-2. **`conversacion_actual` (JSON)**: Ventana deslizante con los últimos **14 mensajes** estrictos (7 request del User, 7 respuestas validadas del Assistant) para dar memoria a corto plazo táctica.
-3. **`resumen_contexto`**: Generado por el Agente cada par de interacciones. Comprime el contexto antiguo que "sale" de la ventana de 14 mensajes para formar la memoria semántica a largo plazo de la conversación.
-4. **`fecha_inicio_conversacion`**: Timestamp para calcular edad de la sesión lógica y forzar reseteos semanales/mensuales o por comando `/reiniciar`.
+1. **Generar SQL**: LLM recibe pregunta + DDL de tablas → devuelve SQL puro
+2. **Ejecutar SQL**: Sistema ejecuta en Hostinger (solo SELECT, MAX 500 filas)
+3. **Redactar respuesta**: LLM recibe datos reales → redacta respuesta humana
 
----
+**NUNCA la IA responde con cifras de negocio inventadas.** Solo con datos reales de la BD.
 
-## Arquitectura de Orquestación
+## Arquitectura de 4 tablas (BD ia_service_os)
 
-- Los flujos deben construirse en Python (Scripts asíncronos).
-- Al elegir APIs:
-  - **Uso Estándar/Análisis Profundo:** Modelos premium (`Claude Sonnet 3.5`, `DeepSeek-V3`).
-  - **Uso Masivo/Routing rápido:** Modelos free/ultra-fast (`Groq Llama 3`, `Gemini Free`).
-- **Dónde Guardar Keys:** `.env` encriptado. NUNCA en la base de datos de NocoDB o tablas.
+| Tabla | Propósito |
+|---|---|
+| `ia_agentes` | Catálogo de modelos con API key, endpoint, límites RPD/RPM, costos |
+| `ia_tipos_consulta` | Reglas por tipo: pasos, system_prompt, agente_preferido, temperatura |
+| `ia_conversaciones` | Contexto vivo: resumen ≤1000 palabras + agente activo por usuario/canal |
+| `ia_logs` | Auditoría completa por llamada: SQL, tokens, costo, latencia, error |
+| `ia_consumo_diario` | Agregado diario: llamadas, tokens, costo, % del límite RPD |
+
+## Resumen Vivo (reemplaza historial de mensajes)
+
+En lugar de guardar todos los mensajes, cada conversación tiene un **resumen vivo de ≤1000 palabras** que se actualiza en cada turno. El LLM extrae el resumen entre tags `[RESUMEN_CONTEXTO]...[/RESUMEN_CONTEXTO]`.
+
+Ventaja: contexto compacto, sin límites de tokens acumulados.
+
+## Agentes activos (marzo 2026 — Nivel Pago 1 Gemini)
+
+| slug | modelo | RPD | Uso |
+|---|---|---|---|
+| `gemini-pro` | gemini-2.5-pro | 1,000 | **analisis_datos** — SQL complejo |
+| `gemini-flash` | gemini-2.5-flash | 10,000 | redaccion, resumen |
+| `gemini-flash-lite` | gemini-3.1-flash-lite | 150,000 | alto volumen, bot |
+| `gemma-router` | gemma-3-27b-it | 14,400 | **enrutador** — clasificar intención |
+| `gemini-image` | imagen-4.0-fast-generate-preview | 70 | generacion_imagen |
+| `groq-llama` | llama-3.1-8b-instant | 14,400 | enrutador alternativo (pendiente key) |
+| `claude-sonnet` | claude-sonnet-4-6 | — | documentos (pendiente key) |
+
+## Enrutamiento automático
+
+El servicio detecta el tipo de consulta automáticamente sin que el caller lo especifique.
+Flujo del enrutador: `groq-llama` → `gemma-router` → `gemini-flash-lite` → `gemini-flash` (primero con key activa).
+**Gemini Pro NO se usa para enrutar** — se reservan sus 1,000 RPD para análisis reales.
+
+## Selección de modelo — cómo funciona
+
+```
+Cada modelo = una fila en ia_agentes
+                    ↓
+ia_tipos_consulta.agente_preferido define qué modelo usa cada tipo
+  analisis_datos → gemini-pro
+  redaccion      → gemini-flash
+  enrutamiento   → groq-llama / gemma-router
+                    ↓
+Si ese agente no tiene key → fallback al primero activo con key (ORDER BY orden)
+                    ↓
+El caller puede forzar: agente='gemini-pro' en la llamada
+```
+
+## Monitoreo de consumo
+
+```bash
+# Ver consumo de hoy con % del límite usado
+curl http://localhost:5100/ia/consumo
+
+# Histórico 30 días
+curl http://localhost:5100/ia/consumo/historico
+
+# SQL directo
+mysql ia_service_os -e "SELECT agente_slug, llamadas, costo_usd FROM ia_consumo_diario WHERE fecha=CURDATE();"
+```
+
+## Dónde van las API keys
+
+**SOLO** en la BD (`ia_agentes.api_key`) y en `scripts/.env`.
+NUNCA en código, manuales, comentarios o commits.
+
+Para agregar una key:
+```bash
+mysql -u osadmin -pEpist2487. ia_service_os -e \
+  "UPDATE ia_agentes SET api_key='TU_KEY', activo=1 WHERE slug='groq-llama';" 2>/dev/null
+```
+
+## Manual completo
+
+Ver `.agent/manuales/ia_service_manual.md` — límites por modelo, endpoints, costos, troubleshooting.
+
+## Panel de administración (pendiente — próxima prioridad)
+
+App separada en `ia.oscomunidad.com` (Vue + Quasar, mismo design system).
+Vistas planeadas: Dashboard consumo, Agentes, Tipos de consulta, Logs, Playground.
+Razón app separada: ia_service_os sirve a múltiples proyectos OS — no es parte de ningún proyecto específico.

@@ -10,7 +10,7 @@ Skills de arquitectura abstracta y reglas de negocio obligatorias.
 
 | Nombre de la Skill | Archivo Físico | Descripción | Regla Crítica |
 |--------------------|----------------|-------------|---------------|
-| **Manejo de IA (Anti-Alucinaciones)** | `.agent/skills/manejo_ia.md` | Define cómo estructurar el System Prompt y el flujo de los bots LLM conversacionales (ej. Bot de Telegram) para consultar el ERP. | **Regla de los 3 Pasos:** 1. Generar SQL 2. Ejecutar SQL 3. Responder con esos datos crudos. NUNCA inventar cifras. |
+| **Servicio Central de IA** | `.agent/skills/manejo_ia.md` | Arquitectura completa del ia_service_os: agentes, enrutamiento, resumen vivo, consumo. Sirve a todos los proyectos OS. | **Regla de los 3 Pasos (Anti-Alucinaciones):** 1. Generar SQL 2. Ejecutar SQL 3. Responder con datos reales. NUNCA inventar cifras. |
 
 ---
 
@@ -19,6 +19,7 @@ Estos son "skills" en formato de slash-commands (`/nombre-skill`) nativos para C
 
 | Comando | Archivo Físico | Enfoque Principal |
 |---------|----------------|-------------------|
+| `/ia-service` | `.claude/commands/ia-service.md` | Operar el Servicio Central de IA: consultar, configurar agentes, monitorear consumo, agregar keys. |
 | `/playwright-effi` | `.claude/commands/playwright-effi.md` | Trucos y selectores para hacer scraping de los exports de Effi usando Playwright. |
 | `/effi-database` | `.claude/commands/effi-database.md` | Mapas estructurales para consultar y hacer JOINs en las 41 tablas `zeffi_*` y tablas analíticas. |
 | `/effi-negocio` | `.claude/commands/effi-negocio.md` | Reglas duras de ventas: Vigencia, Mapeo de canales, y Atribución de Consignaciones. |

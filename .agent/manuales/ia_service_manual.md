@@ -1,5 +1,9 @@
 # Manual del Servicio Central de IA — ia_service_os
 
+> **SCOPE**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a **TODOS** los proyectos de la empresa: bot de Telegram, apps, integraciones, ERP. No es exclusivo de Integraciones_OS.
+>
+> **Admin panel**: app separada `ia.oscomunidad.com` — por construir (Vue + Quasar, mismo design system de OS).
+>
 > **REGLA DE SEGURIDAD ABSOLUTA**: Las API keys van SOLO en la BD (`ia_agentes.api_key`) y en `scripts/.env`.
 > NUNCA en archivos .md, código commiteado, ni en ningún otro lugar.
 

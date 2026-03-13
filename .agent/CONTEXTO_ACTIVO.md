@@ -122,12 +122,16 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 
 ## Frontend — Estado actual (2026-03-11)
 
+> **IMPORTANTE**: `menu.oscomunidad.com` NO es el ERP definitivo. Es una **app temporal de visualización de datos** mientras se construye el ERP real. La usan Santi y Jen para ver información de ventas.
+> El **ERP real** está en `u768061575_os_comunidad` (Hostinger) — **⚠️ NO TOCAR**.
+
 | Recurso | Ruta | Estado |
 |---|---|---|
 | Manual de Estilos v2.0 | `frontend/design-system/MANUAL_ESTILOS.md` | ✅ Listo |
 | Screenshots de referencia (88) | `frontend/design-system/screenshots/` | ✅ Listos |
 | Proyecto Vue + Quasar | `frontend/app/` | ✅ Producción (puerto 9100, os-erp-frontend) |
-| URL pública ERP | menu.oscomunidad.com | ✅ Cloudflare tunnel activo |
+| URL pública app temporal | menu.oscomunidad.com | ✅ Cloudflare tunnel activo |
+| **App IA Admin (pendiente)** | ia.oscomunidad.com | 🔲 Por construir — app separada |
 | Tabla sys_menu | Hostinger `u768061575_os_integracion` | ✅ 36 registros (7 módulos + 29 submenús) |
 | **API Express** | `frontend/api/` | ✅ Puerto 3002 (realmente sirve en puerto 9100 junto al frontend), systemd `os-erp-frontend` |
 | **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — dblclick navega a DetalleFacturacionMes |
@@ -166,7 +170,12 @@ ResumenFacturacionPage (todos los meses)
 - Emits: `row-click` (selección), `row-dblclick` (drill-down)
 - Features: filtros inline, selector de columnas, export CSV/XLSX/PDF, ordenamiento, skeleton
 
-## Servicio Central de IA — `ia_service_os` (en construcción 2026-03-12)
+## Servicio Central de IA — `ia_service_os` (activo 2026-03-12)
+
+> **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
+> Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
+> **Admin panel**: app separada en `ia.oscomunidad.com` (Vue + Quasar, mismo design system) — por construir.
+
 
 **Plan completo:** `.agent/planes/plan_ia_service.md`
 
@@ -213,10 +222,11 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **Servicio IA** — ver plan detallado en `.agent/planes/plan_ia_service.md`
-2. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`. Borrar en Effi manualmente: Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya.
-3. **Bot Telegram** — construir sobre el servicio de IA una vez esté listo. Spec: `.agent/planes/bot_telegram.md`
-4. Continuar construyendo módulo Ventas: páginas de Remisiones, módulo Clientes, módulo Productos.
+1. **App IA Admin** (`ia.oscomunidad.com`) — app separada Vue+Quasar con: dashboard consumo, gestión agentes, tipos de consulta, logs, playground. Misma arquitectura que menu.oscomunidad.com pero independiente.
+2. **Activar más agentes**: Groq (gratis, console.groq.com), DeepSeek ($5, platform.deepseek.com), Claude ($5, console.anthropic.com)
+3. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
+4. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`.
+5. Continuar app temporal (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
