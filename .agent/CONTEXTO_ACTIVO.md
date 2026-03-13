@@ -141,7 +141,10 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 | **Detalle Producto** | `pages/ventas/DetalleProductoMesPage.vue` | ✅ /ventas/detalle-producto/:mes/:cod_articulo |
 | **Detalle Factura** | `pages/ventas/DetalleFacturaPage.vue` | ✅ /ventas/detalle-factura/:id_interno/:id_numeracion |
 | **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + mini-popup + filtros + subtotales + row-click + **tooltips por columna (prop `tooltips`)** |
-| **Cartera CxC** | `pages/ventas/CarteraPage.vue` | ✅ /ventas/cartera — KPIs + tabla facturas pendientes + tabla resumen por cliente |
+| **Cartera CxC** | `pages/ventas/CarteraPage.vue` | ✅ /ventas/cartera — KPIs + tabla resumen por cliente (click → detalle) |
+| **Detalle Cartera Cliente** | `pages/ventas/DetalleCarteraClientePage.vue` | ✅ /ventas/cartera/:id_cliente — KPIs + facturas pendientes del cliente |
+| **Consignación** | `pages/ventas/ConsignacionPage.vue` | ✅ /ventas/consignacion — 13 órdenes vigentes, KPIs + tabla (click → detalle). Filtro: `vigencia='Vigente'` |
+| **Detalle Consignación** | `pages/ventas/DetalleConsignacionPage.vue` | ✅ /ventas/consignacion/:id_orden — encabezado KPIs + ítems de la orden |
 
 **⚠️ Antes de cualquier trabajo frontend: leer `frontend/design-system/MANUAL_ESTILOS.md`**
 **⚠️ Después de cualquier cambio Vue/JS: `cd frontend/app && npx quasar build`**
@@ -165,6 +168,9 @@ ResumenFacturacionPage (solo tabla de meses — sin acordeones)
 - `/api/ventas/factura/:id_interno/:id_numeracion` — encabezado + ítems de una factura
 - `/api/ventas/cartera` — facturas con `pdte_de_cobro > 0`, order by dias_mora DESC
 - `/api/ventas/cartera-cliente` — resumen CxC agrupado por id_cliente con total_pendiente, total_mora, max_dias_mora
+- `/api/ventas/cartera-cliente/:id_cliente` — facturas pendientes del cliente (CAST + dias_antiguedad en SQL)
+- `/api/ventas/consignacion` — OVs activas filtro: `vigencia='Vigente'` (13 órdenes, total bruto $7.380.375, total neto $7.763.832)
+- `/api/ventas/consignacion/:id_orden` — `{ encabezado, items }` con descripciones y montos casteados
 - `/api/tooltips` — diccionario estático de ~60 descripciones de columnas (year_ant, mes_ant, pry, cto, etc.)
 - `/api/columnas/:tabla` — columnas de cualquier tabla Hostinger
 - `/api/export/:recurso` — CSV / XLSX / PDF

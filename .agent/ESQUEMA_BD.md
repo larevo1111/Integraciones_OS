@@ -205,14 +205,26 @@ guia_interna_de_transporte | estado_global_guia | valor_flete_guia
 
 ---
 
-### zeffi_ordenes_venta_encabezados — ~694 filas
+### zeffi_ordenes_venta_encabezados — ~698 filas
 ```
 _pk | sucursal | centro_de_costos | id_orden | id_venta_ecommerce | ecommerce | bodega
 nombre_cliente | id_cliente | telefono | pais | departamento | ciudad | direccion
 vendedor | total_bruto | descuentos | subtotal | impuestos | retenciones | total_neto
-ultimo_estado | estado_facturacion | vigencia
-fecha_de_creacion | responsable_de_creacion | fecha_de_anulacion | responsable_de_anulacion
+observacion | vigencia | ultimo_estado | estado_facturacion
+fecha_de_entrega | fecha_de_creacion | responsable_de_creacion
+observacion_de_anulacion | fecha_de_anulacion | responsable_de_anulacion
 ```
+
+**⚠️ SEMÁNTICA DE ESTADOS — TABLA DE CONSIGNACIÓN:**
+| vigencia | estado_facturacion | Significado | n (2026-03-13) |
+|---|---|---|---|
+| `Vigente` | `Pendiente` | **Consignación activa** — mercancía en calle | 13 |
+| `Anulada` | `Pendiente` | OV anulada sin venta — errores, devoluciones | 462 |
+| `Anulada` | `Remisionada` | OV convertida a remisión — venta consolidada | 223 |
+
+**Filtro correcto para consignación activa: `WHERE vigencia = 'Vigente'`**
+NUNCA filtrar solo por `ultimo_estado + estado_facturacion` — devuelve filas cerradas.
+Verificación 2026-03-13: 13 vigentes, total_bruto=$7.380.375, total_neto=$7.763.832 (diff=IVA $383.457)
 
 ---
 
