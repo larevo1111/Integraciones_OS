@@ -1,32 +1,53 @@
-# Catálogo de Skills — Integraciones_OS
+# Catálogo de Skills y Manuales — Integraciones_OS
 
-> **Índice de todas las skills disponibles para los agentes (Antigravity, Claude Code, Codex).**
-> Antes de intentar realizar una tarea nueva (especialmente de conexiones, despliegue o IA), **SIEMPRE** revisa este catálogo para no reinventar la rueda y evitar errores graves documentados.
-
----
-
-## 🧠 Skills Generales Estandarizadas (`.agent/skills/`)
-Skills de arquitectura abstracta y reglas de negocio obligatorias.
-
-| Nombre de la Skill | Archivo Físico | Descripción | Regla Crítica |
-|--------------------|----------------|-------------|---------------|
-| **Servicio Central de IA** | `.agent/skills/manejo_ia.md` | Arquitectura completa del ia_service_os: agentes, enrutamiento, resumen vivo, consumo. Sirve a todos los proyectos OS. | **Regla de los 3 Pasos (Anti-Alucinaciones):** 1. Generar SQL 2. Ejecutar SQL 3. Responder con datos reales. NUNCA inventar cifras. |
-| **Integridad de Datos** | `.agent/skills/integridad_datos.md` | 8 checks universales para verificar cualquier tabla/vista resumen generada desde una fuente: muestreo manual, suma total vs fuente, consistencia entre granularidades, unicidad de PK, porcentajes, campos derivados, comparativos year_ant/mes_ant, NULLs. | **Obligatorio** ejecutar antes de dar por terminado cualquier script de agregación o resumen. |
+> **Índice de TODO el conocimiento institucionalizado del proyecto.**
+> Antes de implementar cualquier cosa, revisar este catálogo. Si ya existe una skill o manual relevante → usarlo. Si se aprende algo nuevo → registrarlo aquí antes de terminar la tarea.
 
 ---
 
-## 🤖 Comandos Interactivos para Claude Code (`.claude/commands/`)
-Estos son "skills" en formato de slash-commands (`/nombre-skill`) nativos para Claude Code, enfocados en ejecución directa.
+## 🧠 Skills Generales (`.agent/skills/`)
+Patrones técnicos reutilizables y reglas de negocio obligatorias. Aplican a cualquier agente o sesión.
 
-| Comando | Archivo Físico | Enfoque Principal |
-|---------|----------------|-------------------|
-| `/ia-service` | `.claude/commands/ia-service.md` | Operar el Servicio Central de IA: consultar, configurar agentes, monitorear consumo, agregar keys. |
-| `/playwright-effi` | `.claude/commands/playwright-effi.md` | Trucos y selectores para hacer scraping de los exports de Effi usando Playwright. |
-| `/effi-database` | `.claude/commands/effi-database.md` | Mapas estructurales para consultar y hacer JOINs en las 41 tablas `zeffi_*` y tablas analíticas. |
-| `/effi-negocio` | `.claude/commands/effi-negocio.md` | Reglas duras de ventas: Vigencia, Mapeo de canales, y Atribución de Consignaciones. |
-| `/telegram-pipeline`| `.claude/commands/telegram-pipeline.md` | Variables asíncronas para disparar alertas del estado del orquestador Python. |
-| `/espocrm-integracion` | `.claude/commands/espocrm-integracion.md` | Flujo de normalización de la sincronía bidireccional Effi <-> EspoCRM. |
+| Nombre | Archivo | Descripción | Regla Crítica |
+|--------|---------|-------------|---------------|
+| **Servicio Central de IA** | `.agent/skills/manejo_ia.md` | Arquitectura ia_service_os: agentes, enrutamiento, RAG, multi-empresa. Sirve a todos los proyectos OS. | Regla 3 Pasos: Generar SQL → Ejecutar SQL → Responder con datos reales. NUNCA inventar cifras. |
+| **Integridad de Datos** | `.agent/skills/integridad_datos.md` | 8 checks universales para verificar cualquier tabla/vista resumen: muestreo manual, suma total vs fuente, unicidad PK, porcentajes, comparativos year_ant/mes_ant, NULLs. | **Obligatorio** antes de dar por terminado cualquier script de agregación o resumen. |
 
 ---
 
-> **⚠️ REGLA DE ACTUALIZACIÓN:** Si un agente de IA (Claude Code o Antigravity) resuelve un problema complejo nuevo de infraestructura, conexión a una Base de Datos, o establece un patrón de arquitectura novedoso, tiene la **obligación** de documentarlo como un `.md` en `.agent/skills/` y agregar la fila correspondiente en este catálogo ANTES de terminar su tarea.
+## 🤖 Skills Interactivas para Claude Code (`.claude/commands/`)
+Skills en formato slash-command (`/nombre`). Claude Code las carga con la herramienta Skill.
+
+| Comando | Archivo | Enfoque |
+|---------|---------|---------|
+| `/effi-database` | `.claude/commands/effi-database.md` | Estructura y gotchas de las 41 tablas `zeffi_*`. JOINs, campos de texto numérico, duplicados en `zeffi_clientes`, fechas. |
+| `/effi-negocio` | `.claude/commands/effi-negocio.md` | Reglas de negocio: vigencia de facturas, mapeo de canales, atribución de consignaciones OV. |
+| `/erp-frontend` | `.claude/commands/erp-frontend.md` | Stack Vue+Quasar, OsDataTable (tooltips automáticos, formateo, filtros), patrón de páginas, endpoints API. |
+| `/ia-service` | `.claude/commands/ia-service.md` | Operar el Servicio Central de IA: consultar, configurar agentes, monitorear consumo, agregar API keys. |
+| `/playwright-effi` | `.claude/commands/playwright-effi.md` | Selectores y trucos para scraping de exports de Effi con Playwright. |
+| `/telegram-pipeline` | `.claude/commands/telegram-pipeline.md` | Variables asíncronas para alertas del orquestador Python vía Telegram. |
+| `/espocrm-integracion` | `.claude/commands/espocrm-integracion.md` | Flujo de sincronía bidireccional Effi ↔ EspoCRM: campos custom, normalización de ciudades, mapeos. |
+| `/tabla-vista` | `.claude/commands/tabla-vista.md` | Diseño de vistas de tablas en el ERP. |
+| `/menu-erp` | `.claude/commands/menu-erp.md` | Diseño y estructura del menú del ERP. |
+
+---
+
+## 📖 Manuales (archivos de referencia detallada)
+Guías de referencia para humanos y agentes. Más extensos que las skills — contienen estándares, políticas y ejemplos completos.
+
+| Manual | Archivo | Contenido |
+|--------|---------|-----------|
+| **Estilos Frontend** | `frontend/design-system/MANUAL_ESTILOS.md` | Fuente de verdad única del diseño visual: colores, tipografía, espaciado, componentes, CSS variables. **Leer obligatoriamente antes de cualquier tarea de UI.** |
+| **Testing y QA** | `.agent/INSTRUCCIONES_TESTING.md` | Política completa de QA: roles, herramientas, protocolo de screenshots, ciclo de vida de bugs, checklist por módulo. **Leer antes de cualquier sesión de QA.** |
+
+---
+
+## ⚠️ REGLA DE ACTUALIZACIÓN
+
+**Obligatorio para Claude Code y Antigravity:**
+- Al resolver un bug no trivial → documentar el gotcha en la skill del dominio + MANIFESTO sección 9
+- Al crear un patrón técnico nuevo → crear/actualizar skill + agregar entrada aquí
+- Al crear un manual nuevo → agregar entrada en la sección Manuales
+- Al crear o modificar un script → actualizar `.agent/CATALOGO_SCRIPTS.md`
+
+**Esta regla aplica ANTES de dar la tarea por terminada, no después.**

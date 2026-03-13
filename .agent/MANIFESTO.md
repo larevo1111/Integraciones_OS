@@ -94,11 +94,36 @@ Una vez que Santi dio la orden, no interrumpir para pedir permiso en cada comand
 
 ---
 
-## 5. FILOSOFÍA DE MEMORIA EXTERNA
+## 5. FILOSOFÍA DE MEMORIA EXTERNA Y PROTOCOLO DE REGISTRO
 
-- **No confiar en la memoria del chat.** La verdad reside en los archivos físicos del repositorio, principalmente en `.agent/`.
-- Cualquier problema resuelto = actualizar documentación. No se trata solo de resolver sino de resolver Y documentar.
-- **Cualquier conocimiento nuevo debe institucionalizarse en Skills o en este Manifesto.** El proyecto debe ser independiente del contexto de una sola conversación.
+**Principio:** No confiar en la memoria del chat. La verdad reside en los archivos del repositorio. Resolver sin documentar es resolver a medias.
+
+### 5.1 Jerarquía de dónde registrar
+
+| Dónde | Qué va ahí |
+|---|---|
+| **MANIFESTO.md** | Reglas generales, gotchas críticos de BD, decisiones arquitecturales permanentes |
+| **Skills** (`.agent/skills/` o `.claude/commands/`) | Patrones técnicos específicos reutilizables, procedimientos por dominio |
+| **Manuales** (`MANUAL_*.md`, `INSTRUCCIONES_*.md`) | Guías de referencia detalladas para humanos y agentes |
+| **CONTEXTO_ACTIVO.md** | Estado actual del sistema, qué funciona, próximos pasos |
+| **CATALOGO_SCRIPTS.md** | Scripts ejecutables con comando exacto y parámetros |
+
+### 5.2 Protocolo de registro — OBLIGATORIO al terminar cualquier tarea
+
+Antes de dar una tarea por terminada, responder estas preguntas:
+
+1. ¿Corregí un bug o encontré un comportamiento inesperado de la BD/Effi/API? → **MANIFESTO sección 9 + skill del dominio**
+2. ¿Cambié arquitectura o estructura de datos? → **CONTEXTO_ACTIVO**
+3. ¿Creé o modifiqué un script? → **CATALOGO_SCRIPTS**
+4. ¿Aprendí algo sobre Effi, la BD o el frontend que no estaba documentado? → **Skill del dominio correspondiente**
+5. ¿Definí un patrón nuevo reutilizable? → **Crear/actualizar skill + entrada en catálogo**
+
+**Regla absoluta: ningún problema resuelto queda sin registrar. Si se descubrió en esta sesión, se documenta en esta sesión.**
+
+### 5.3 El catálogo es el índice de TODO el conocimiento
+
+`.agent/catalogo-skills.md` lista **todas** las skills Y manuales disponibles.
+Toda skill o manual nuevo → entrada en el catálogo antes de terminar.
 
 ---
 
@@ -110,15 +135,31 @@ VISIÓN → BASE DE DATOS (estructura) → IMPLEMENTACIÓN
 ```
 No se puede construir sin entender qué quiere Santi. No se debe generar código sin que la base de datos esté estructurada primero. Siempre partir del estado de la BD, sus campos y reglas.
 
+### ⚠️ REGLA ABSOLUTA: NINGUNA TAREA SIN PLAN
+
+**Antes de iniciar CUALQUIER tarea no trivial (más de 1 archivo o 1 endpoint):**
+
+1. Crear un archivo de plan en `.agent/planes/actuales/<NOMBRE_PLAN>.md` con:
+   - Objetivo y decisiones de diseño
+   - Checklist numerado de pasos (`- [ ] 1.1 ...`)
+   - Schema SQL si aplica
+   - Notas y consideraciones
+2. Mostrar el plan a Santi y esperar confirmación
+3. Solo entonces ejecutar — ir tildando `[x]` a medida que se completa cada paso
+4. Al terminar: mover el archivo a `.agent/planes/` (fuera de `actuales/`) y actualizar `CONTEXTO_ACTIVO.md`
+
+**Esta regla aplica a todos los agentes**: Claude Code, subagentes Claude, y cualquier otro. Ningún agente puede iniciar implementación sin que exista un plan aprobado en `.agent/planes/actuales/`.
+
 **Antes de cualquier tarea:**
 1. Leer manifiesto y contexto activo
-2. Verificar si existe skill relevante en el catálogo
-3. Confirmar con Santi si hay dudas
-4. Definir plan claro antes de empezar
-5. Asignar al agente correcto según la tabla de roles
+2. Verificar si existe plan activo en `.agent/planes/actuales/`
+3. Verificar si existe skill relevante en el catálogo
+4. Confirmar con Santi si hay dudas
+5. Crear plan → aprobación → ejecutar
 
 **Al asignar tareas a agentes:**
-- Ser totalmente específico: qué hacer, en qué archivos, con qué skill, qué resultado se espera
+- Siempre referenciar el archivo de plan activo
+- Ser totalmente específico: qué hacer, en qué archivos, qué pasos del plan
 - Referenciar archivos de contexto relevantes
 - Indicar explícitamente cuándo el plan está aprobado para ejecución autónoma
 
@@ -169,12 +210,51 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 
 ## 9. REGLAS TÉCNICAS APRENDIDAS
 
+### ⚠️ REGLA ARQUITECTURAL: EMPRESA Y AUDITORÍA EN TODA TABLA
+
+**Patrón multi-tenant** (igual que SOS_ERP — ver `.agent/docs/MANUAL_EMPRESAS_USUARIOS.md`):
+
+**TODA tabla de datos (no solo config global) DEBE tener:**
+```sql
+empresa               VARCHAR(50) NOT NULL DEFAULT 'ori_sil_2'  -- filtro principal
+usuario_creacion      VARCHAR(150)  -- email del creador (inyectado del JWT)
+usuario_ult_mod       VARCHAR(150)  -- email del último modificador (inyectado del JWT)
+created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+```
+
+**Excepción**: Tablas de configuración global que apliquen a todo el sistema (ej: `ia_agentes`).
+
+**Reglas de seguridad — no negociables:**
+1. `empresa` NUNCA viene del body del request → siempre se inyecta del JWT en el backend
+2. Todo SELECT/UPDATE/DELETE en tablas por-empresa → `WHERE empresa = :empresa`
+3. INSERT → inyectar empresa + usuario_creacion + usuario_ult_mod desde JWT
+4. Si `empresa_activa` falta en JWT → rechazar con 403
+
+**Tablas de empresa y acceso:**
+- `ia_empresas` — catálogo de empresas del sistema
+- `ia_usuarios_empresas` — qué empresas puede ver cada usuario y con qué rol
+- Plan de migración: `.agent/planes/actuales/PLAN_MULTITENANT_IA.md`
+
+
+
 ### Gotchas críticos — zeffi_facturas_venta_detalle
 - **`precio_neto_total` INCLUYE IVA**: usar `precio_bruto_total - descuento_total` para "ventas sin IVA". Nombre engañoso — nunca asumir.
 - **Número de factura**: en detalle se llama `id_numeracion`.
 - **Canal**: campo `marketing_cliente` — NULL/vacío se normaliza como `'Sin canal'`.
 - **`vigencia_factura = 'Vigente'`**: filtro obligatorio en detalle para excluir anuladas.
 - **id_cliente en facturas/remisiones**: formato "CC 74084937" (con prefijo tipo doc). `zeffi_clientes.numero_de_identificacion` = "74084937" (sin prefijo). Para JOIN: `SUBSTRING_INDEX(d.id_cliente, ' ', -1)`.
+
+### Gotchas críticos — zeffi_clientes
+- **Duplicados por `numero_de_identificacion`**: la tabla puede tener múltiples filas con el mismo NIT/CC (al menos 3 casos confirmados: `39440347`, `90173460334`, `9999999`). Un JOIN directo multiplica las filas de la tabla que se une, inflando sumas y conteos.
+- **Regla obligatoria**: SIEMPRE deduplicar `zeffi_clientes` antes de hacer JOIN:
+  ```sql
+  LEFT JOIN (
+    SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago
+    FROM zeffi_clientes GROUP BY numero_de_identificacion
+  ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(f.id_cliente, ' ', -1)
+  ```
+- **Campos numéricos como texto**: `pdte_de_cobro`, `total_neto`, `cupo_de_credito_cxc` usan coma decimal → castear siempre: `CAST(REPLACE(COALESCE(campo,'0'),',','.') AS DECIMAL(15,2))`
 
 ### Verificación obligatoria de scripts analíticos
 Al crear o modificar cualquier script de resumen, ejecutar los checks de integridad documentados en **`.agent/skills/integridad_datos.md`** antes de dar la tarea por terminada. Ningún script analítico se considera completo sin haber pasado esas verificaciones.
