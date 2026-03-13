@@ -138,6 +138,8 @@ createQuasarApp(createApp, quasarUserOptions)
 
     return Promise[ method ]([
       
+      import('boot/pinia'),
+      
       import('boot/googleAuth')
       
     ]).then(bootFiles => {

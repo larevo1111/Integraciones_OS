@@ -164,17 +164,19 @@ app.get('/api/ia/logs', async (req, res) => {
 
     if (req.query.agente)      { conds.push('agente_slug = ?');       vals.push(req.query.agente) }
     if (req.query.tipo)        { conds.push('tipo_consulta = ?');      vals.push(req.query.tipo) }
-    if (req.query.usuario)     { conds.push('usuario_id LIKE ?');      vals.push(`%${req.query.usuario}%`) }
+    if (req.query.usuario)     { conds.push('canal LIKE ?');           vals.push(`%${req.query.usuario}%`) }
     if (req.query.fecha_desde) { conds.push('DATE(created_at) >= ?'); vals.push(req.query.fecha_desde) }
     if (req.query.fecha_hasta) { conds.push('DATE(created_at) <= ?'); vals.push(req.query.fecha_hasta) }
-    if (req.query.solo_errores){ conds.push('error_mensaje IS NOT NULL') }
+    if (req.query.solo_errores){ conds.push('error IS NOT NULL') }
 
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
     const [[{ total }]] = await db.query(`SELECT COUNT(*) as total FROM ia_logs ${where}`, vals)
     const [rows] = await db.query(
-      `SELECT id, created_at, usuario_id, canal, agente_slug, tipo_consulta,
-              tokens_in, tokens_out, tokens_total, costo_usd, latencia_ms,
-              error_mensaje, pregunta_usuario, sql_generado, respuesta_texto
+      `SELECT id, created_at, canal, agente_slug, tipo_consulta,
+              tokens_in, tokens_out, (IFNULL(tokens_in,0)+IFNULL(tokens_out,0)) AS tokens_total,
+              costo_usd, latencia_ms,
+              error AS error_mensaje, pregunta AS pregunta_usuario,
+              sql_generado, respuesta AS respuesta_texto
        FROM ia_logs ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       [...vals, limit, offset]
     )
@@ -186,8 +188,9 @@ app.get('/api/ia/logs', async (req, res) => {
 app.get('/api/ia/agentes-admin', async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT slug, nombre, proveedor, modelo_id, rate_limit_rpd, rate_limit_rpm,
-              costo_input_1k, costo_output_1k, capacidades, orden, activo,
+      `SELECT slug, nombre, proveedor, modelo_id, tipo, capacidades, orden, activo,
+              rate_limit_rpd, rate_limit_rpm,
+              costo_input, costo_output,
               (LENGTH(api_key) > 0) AS tiene_key
        FROM ia_agentes ORDER BY orden, slug`
     )
@@ -202,11 +205,11 @@ app.post('/api/ia/agentes-admin', requireAdmin, async (req, res) => {
   try {
     await db.query(
       `INSERT INTO ia_agentes (slug, nombre, proveedor, modelo_id, api_key, rate_limit_rpd,
-        rate_limit_rpm, costo_input_1k, costo_output_1k, capacidades, orden, activo)
+        rate_limit_rpm, costo_input, costo_output, capacidades, orden, activo)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [slug, nombre, proveedor || 'google', modelo_id, api_key || '',
        rate_limit_rpd || null, rate_limit_rpm || null,
-       costo_input_1k || 0, costo_output_1k || 0,
+       req.body.costo_input || 0, req.body.costo_output || 0,
        capacidades || '["texto"]', orden ?? 99, activo ? 1 : 0]
     )
     res.json({ ok: true })
@@ -218,9 +221,9 @@ app.put('/api/ia/agentes-admin/:slug', requireAdmin, async (req, res) => {
           costo_input_1k, costo_output_1k, capacidades, orden, activo } = req.body
   try {
     const sets = ['nombre=?','proveedor=?','modelo_id=?','rate_limit_rpd=?','rate_limit_rpm=?',
-                  'costo_input_1k=?','costo_output_1k=?','capacidades=?','orden=?','activo=?']
+                  'costo_input=?','costo_output=?','capacidades=?','orden=?','activo=?']
     const vals = [nombre, proveedor, modelo_id, rate_limit_rpd || null, rate_limit_rpm || null,
-                  costo_input_1k || 0, costo_output_1k || 0,
+                  req.body.costo_input || 0, req.body.costo_output || 0,
                   capacidades || '["texto"]', orden ?? 99, activo ? 1 : 0]
     if (api_key && api_key.length > 5) { sets.push('api_key=?'); vals.push(api_key) }
     vals.push(req.params.slug)
@@ -247,7 +250,11 @@ app.delete('/api/ia/agentes-admin/:slug', requireAdmin, async (req, res) => {
 // ─── TIPOS DE CONSULTA ────────────────────────────────────────────
 app.get('/api/ia/tipos-admin', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM ia_tipos_consulta ORDER BY tipo')
+    const [rows] = await db.query(
+      `SELECT slug, nombre, descripcion, agente_preferido, system_prompt,
+              requiere_estructura, requiere_ejecucion, formato_salida, temperatura, activo
+       FROM ia_tipos_consulta ORDER BY slug`
+    )
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -257,12 +264,16 @@ app.post('/api/ia/tipos-admin', requireAdmin, async (req, res) => {
           puede_generar_imagen, max_tokens_respuesta, activo } = req.body
   if (!tipo || !agente_preferido) return res.status(400).send('tipo y agente_preferido son requeridos')
   try {
+    const { slug: tSlug, nombre: tNombre, agente_preferido: tAgente, system_prompt: tPrompt,
+            requiere_estructura, requiere_ejecucion, formato_salida, temperatura, activo: tActivo } = req.body
+    if (!tSlug || !tAgente) return res.status(400).send('slug y agente_preferido son requeridos')
     await db.query(
-      `INSERT INTO ia_tipos_consulta (tipo, descripcion, agente_preferido, system_prompt,
-        requiere_bd, puede_generar_imagen, max_tokens_respuesta, activo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tipo, descripcion || '', agente_preferido, system_prompt || '',
-       requiere_bd ? 1 : 0, puede_generar_imagen ? 1 : 0, max_tokens_respuesta || 2048, activo ? 1 : 0]
+      `INSERT INTO ia_tipos_consulta (slug, nombre, descripcion, agente_preferido, system_prompt,
+        requiere_estructura, requiere_ejecucion, formato_salida, temperatura, activo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [tSlug, tNombre || tSlug, descripcion || '', tAgente, tPrompt || '',
+       requiere_estructura ? 1 : 0, requiere_ejecucion ? 1 : 0,
+       formato_salida || 'texto', temperatura || 0.3, tActivo ? 1 : 0]
     )
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
@@ -272,12 +283,15 @@ app.put('/api/ia/tipos-admin/:tipo', requireAdmin, async (req, res) => {
   const { descripcion, agente_preferido, system_prompt, requiere_bd,
           puede_generar_imagen, max_tokens_respuesta, activo } = req.body
   try {
+    const { nombre: pNombre, agente_preferido: pAgente, system_prompt: pPrompt, descripcion: pDesc,
+            requiere_estructura: pReqEst, requiere_ejecucion: pReqEjec, formato_salida: pFormato,
+            temperatura: pTemp, activo: pActivo } = req.body
     await db.query(
-      `UPDATE ia_tipos_consulta SET descripcion=?, agente_preferido=?, system_prompt=?,
-        requiere_bd=?, puede_generar_imagen=?, max_tokens_respuesta=?, activo=? WHERE tipo=?`,
-      [descripcion || '', agente_preferido, system_prompt || '',
-       requiere_bd ? 1 : 0, puede_generar_imagen ? 1 : 0,
-       max_tokens_respuesta || 2048, activo ? 1 : 0, req.params.tipo]
+      `UPDATE ia_tipos_consulta SET nombre=?, descripcion=?, agente_preferido=?, system_prompt=?,
+        requiere_estructura=?, requiere_ejecucion=?, formato_salida=?, temperatura=?, activo=? WHERE slug=?`,
+      [pNombre || req.params.tipo, pDesc || '', pAgente, pPrompt || '',
+       pReqEst ? 1 : 0, pReqEjec ? 1 : 0,
+       pFormato || 'texto', pTemp || 0.3, pActivo ? 1 : 0, req.params.tipo]
     )
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
@@ -338,6 +352,30 @@ app.delete('/api/ia/usuarios/:email', requireAdmin, async (req, res) => {
     await db.query('DELETE FROM ia_usuarios WHERE email=?', [req.params.email])
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
+})
+
+
+// ─── PLAYGROUND — proxy a ia-service ────────────────────────────────────────
+app.post('/api/ia/consultar', async (req, res) => {
+  try {
+    const http = require('http')
+    const body = JSON.stringify(req.body)
+    const data = await new Promise((resolve, reject) => {
+      const r = http.request(
+        { host: 'localhost', port: 5100, path: '/ia/consultar', method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } },
+        (rsp) => {
+          let d = ''
+          rsp.on('data', c => d += c)
+          rsp.on('end', () => resolve(JSON.parse(d)))
+        }
+      )
+      r.on('error', reject)
+      r.write(body)
+      r.end()
+    })
+    res.json(data)
+  } catch (e) { res.status(502).json({ error: 'ia-service no disponible: ' + e.message }) }
 })
 
 // ─── Frontend estático ────────────────────────────────────────────

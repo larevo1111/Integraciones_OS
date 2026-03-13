@@ -2,7 +2,7 @@ import { defineConfig } from '#q-app/wrappers'
 
 export default defineConfig((/* ctx */) => {
   return {
-    boot: ['googleAuth'],
+    boot: ['pinia', 'googleAuth'],
     css: ['app.scss'],
     extras: [],
     build: {

@@ -105,10 +105,10 @@
             <!-- Meta -->
             <div class="respuesta-meta">
               <div class="meta-chips">
-                <span class="badge badge-info">{{ respuesta.agente_usado }}</span>
-                <span class="badge badge-neutral">{{ respuesta.tipo_detectado }}</span>
+                <span class="badge badge-info">{{ respuesta.agente }}</span>
+                <span class="badge badge-neutral">{{ respuesta.formato }}</span>
                 <span v-if="respuesta.latencia_ms" class="badge badge-neutral">{{ respuesta.latencia_ms }}ms</span>
-                <span v-if="respuesta.tokens_total" class="badge badge-neutral">{{ respuesta.tokens_total }} tokens</span>
+                <span v-if="((respuesta.tokens?.in||0)+(respuesta.tokens?.out||0))" class="badge badge-neutral">{{ ((respuesta.tokens?.in||0)+(respuesta.tokens?.out||0)) }} tokens</span>
                 <span v-if="respuesta.costo_usd" class="badge badge-neutral">${{ respuesta.costo_usd.toFixed(5) }}</span>
               </div>
               <button class="btn-icon" @click="limpiar" title="Nueva consulta"><XIcon :size="13" /></button>
@@ -121,9 +121,9 @@
             </div>
 
             <!-- SQL generado -->
-            <div v-if="respuesta.sql_generado" style="padding:0 16px">
+            <div v-if="respuesta.sql" style="padding:0 16px">
               <div class="log-section-label">SQL generado</div>
-              <pre class="log-pre mono">{{ respuesta.sql_generado }}</pre>
+              <pre class="log-pre mono">{{ respuesta.sql }}</pre>
             </div>
 
             <!-- Imagen -->
@@ -186,9 +186,8 @@ async function enviar() {
   if (tipoSeleccionado.value) body.tipo = tipoSeleccionado.value
 
   try {
-    const res = await apiFetch('http://localhost:5100/ia/consultar', {
+    const res = await apiFetch('/api/ia/consultar', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
     const data = await res.json()
