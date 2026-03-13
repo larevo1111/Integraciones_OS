@@ -92,6 +92,7 @@
                 'th-agg': !!columnAggregates[col.key],
                 'th-popup-open': colPopup === col.key
               }"
+              :title="props.tooltips[col.key] || ''"
               @click.stop="openColPopup(col.key)"
             >
               <div class="th-inner">
@@ -266,8 +267,9 @@ const props = defineProps({
   columns: { type: Array,   default: () => [] },
   loading: { type: Boolean, default: false },
   title:   { type: String,  default: '' },
-  recurso: { type: String,  default: '' },
-  mes:     { type: String,  default: '' },
+  recurso:  { type: String,  default: '' },
+  mes:      { type: String,  default: '' },
+  tooltips: { type: Object,  default: () => ({}) },
 })
 
 const emit = defineEmits(['row-click'])
@@ -456,6 +458,7 @@ function isNumeric(key) {
   if (key.startsWith('fin_') || key.startsWith('cto_') || key.startsWith('vol_') ||
       key.startsWith('cli_') || key.startsWith('car_') || key.startsWith('cat_') ||
       key.startsWith('con_') || key.startsWith('pry_') || key.startsWith('ant_') ||
+      key.startsWith('year_ant_') || key.startsWith('mes_ant_') ||
       key.startsWith('rem_') ||
       key.includes('_pct') || key.includes('ventas') || key.includes('costo') ||
       key.includes('ticket') || key.includes('utilidad') || key.includes('margen') ||

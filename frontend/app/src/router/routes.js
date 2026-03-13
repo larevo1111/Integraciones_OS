@@ -26,6 +26,7 @@ const routes = [
       { path: 'ventas/facturas',            component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/remisiones',          component: () => import('pages/PlaceholderPage.vue') },
       { path: 'ventas/cotizaciones',        component: () => import('pages/PlaceholderPage.vue') },
+      { path: 'ventas/cartera',            component: () => import('pages/ventas/CarteraPage.vue') },
 
       // Tareas
       { path: 'tareas',       component: () => import('pages/PlaceholderPage.vue') },

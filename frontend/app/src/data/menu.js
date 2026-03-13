@@ -21,6 +21,7 @@ export const MENU = [
       { uid: 'ventas_facturas',     titulo: 'Facturas',                   icono: 'FileText',    ruta: '/ventas/facturas' },
       { uid: 'ventas_remisiones',   titulo: 'Remisiones',                 icono: 'FileOutput',  ruta: '/ventas/remisiones' },
       { uid: 'ventas_cotizaciones', titulo: 'Cotizaciones',               icono: 'FilePlus',    ruta: '/ventas/cotizaciones' },
+      { uid: 'ventas_cartera',      titulo: 'Cartera CxC',                icono: 'Wallet',      ruta: '/ventas/cartera' },
     ]
   },
   {

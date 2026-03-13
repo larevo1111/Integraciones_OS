@@ -331,6 +331,165 @@ app.get('/api/ventas/factura/:id_interno/:id_numeracion', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ── CARTERA CxC ──────────────────────────────────────
+
+// Cartera: facturas con saldo pendiente
+app.get('/api/ventas/cartera', async (req, res) => {
+  try {
+    const filters = req.query.filters ? JSON.parse(req.query.filters) : []
+    if (req.query.mes) filters.push({ field: 'fecha_de_creacion', op: 'mes', value: req.query.mes })
+    const { sql, params } = buildWhere(filters)
+    const rows = await query(`
+      SELECT id_interno, id_numeracion, fecha_de_creacion, cliente, id_cliente,
+             ciudad, vendedor, formas_de_pago,
+             CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2)) AS total_neto,
+             CAST(REPLACE(COALESCE(subtotal,'0'),',','.') AS DECIMAL(15,2)) AS subtotal,
+             CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_de_cobro,
+             estado_cxc,
+             CAST(REPLACE(COALESCE(dias_mora,'0'),',','.') AS SIGNED) AS dias_mora,
+             CAST(REPLACE(COALESCE(valor_mora,'0'),',','.') AS DECIMAL(15,2)) AS valor_mora
+      FROM zeffi_facturas_venta_encabezados${sql}
+      HAVING pdte_de_cobro > 0
+      ORDER BY dias_mora DESC, pdte_de_cobro DESC
+      LIMIT 2000`, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Resumen cartera por cliente
+app.get('/api/ventas/cartera-cliente', async (req, res) => {
+  try {
+    const filters = req.query.filters ? JSON.parse(req.query.filters) : []
+    if (req.query.mes) filters.push({ field: 'fecha_de_creacion', op: 'mes', value: req.query.mes })
+    const { sql, params } = buildWhere(filters)
+    const rows = await query(`
+      SELECT id_cliente, MAX(cliente) AS cliente, MAX(ciudad) AS ciudad, MAX(vendedor) AS vendedor,
+             COUNT(*) AS num_facturas_pendientes,
+             SUM(CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2))) AS total_pendiente,
+             SUM(CAST(REPLACE(COALESCE(valor_mora,'0'),',','.') AS DECIMAL(15,2))) AS total_mora,
+             MAX(CAST(REPLACE(COALESCE(dias_mora,'0'),',','.') AS SIGNED)) AS max_dias_mora,
+             MIN(fecha_de_creacion) AS factura_mas_antigua
+      FROM zeffi_facturas_venta_encabezados${sql}
+      HAVING total_pendiente > 0
+      GROUP BY id_cliente
+      ORDER BY total_pendiente DESC
+      LIMIT 1000`, params)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── TOOLTIPS — diccionario de columnas ───────────────
+
+const COLUMN_TOOLTIPS = {
+  // Identificación
+  mes: 'Período en formato YYYY-MM',
+  _key: 'Clave única compuesta (mes|dimensión)',
+  fecha_actualizacion: 'Última vez que se recalculó este registro',
+
+  // Financiero
+  fin_ventas_brutas: 'Suma total antes de descuentos (precio de lista)',
+  fin_descuentos: 'Total de descuentos aplicados',
+  fin_pct_descuento: 'Porcentaje de descuento promedio sobre ventas brutas',
+  fin_ventas_netas_sin_iva: 'Ventas brutas menos descuentos, sin incluir IVA',
+  fin_impuestos: 'Total de IVA facturado (va a la DIAN)',
+  fin_ventas_netas: 'Total neto facturado incluyendo IVA',
+  fin_devoluciones: 'Notas crédito emitidas en el período (sin IVA)',
+  fin_ingresos_netos: 'Ventas netas sin IVA menos devoluciones — ingreso real',
+  fin_pct_del_mes: 'Participación de este ítem en el total del mes',
+
+  // Costo
+  cto_costo_total: 'Costo de la mercancía vendida',
+  cto_utilidad_bruta: 'Ventas netas menos costo = ganancia bruta',
+  cto_margen_utilidad_pct: 'Margen de utilidad bruta como porcentaje',
+
+  // Volumen
+  vol_unidades_vendidas: 'Cantidad total de unidades vendidas',
+  vol_num_facturas: 'Número de facturas emitidas',
+  vol_ticket_promedio: 'Valor promedio por factura',
+  vol_precio_unitario_prom: 'Precio promedio por unidad vendida',
+
+  // Clientes
+  cli_clientes_activos: 'Clientes distintos con compra en el período',
+  cli_clientes_nuevos: 'Clientes cuya primera compra fue en este período',
+  cli_vtas_por_cliente: 'Venta promedio por cliente activo',
+  cli_es_nuevo: '1 si es la primera compra histórica del cliente',
+
+  // Cartera
+  car_saldo: 'Saldo pendiente de cobro',
+
+  // Catálogo
+  cat_num_referencias: 'Productos distintos (SKUs) vendidos',
+  cat_vtas_por_referencia: 'Venta promedio por referencia de producto',
+  cat_num_canales: 'Canales de marketing activos',
+
+  // Consignación
+  con_consignacion_pp: 'Mercancía entregada en consignación (órdenes de venta)',
+
+  // Proyección
+  pry_dia_del_mes: 'Día del mes actual (para calcular proyección)',
+  pry_proyeccion_mes: 'Proyección lineal de ventas al cierre del mes',
+  pry_ritmo_pct: 'Proyección vs mismo mes del año anterior',
+
+  // Comparativos — año anterior
+  year_ant_ventas_netas: 'Ventas netas del mismo período, un año antes',
+  year_ant_var_ventas_pct: 'Variación % de ventas vs el año anterior',
+  year_ant_devoluciones: 'Devoluciones del mismo período, año anterior',
+  year_ant_var_devoluciones_pct: 'Variación % devoluciones vs año anterior',
+  year_ant_ingresos_netos: 'Ingresos netos del mismo período, año anterior',
+  year_ant_var_ingresos_netos_pct: 'Variación % ingresos netos vs año anterior',
+  year_ant_ticket_promedio: 'Ticket promedio del mismo período, año anterior',
+  year_ant_var_ticket_promedio_pct: 'Variación % ticket promedio vs año anterior',
+  year_ant_clientes_activos: 'Clientes activos del mismo período, año anterior',
+  year_ant_var_clientes_activos_pct: 'Variación % clientes activos vs año anterior',
+  year_ant_clientes_nuevos: 'Clientes nuevos del mismo período, año anterior',
+  year_ant_var_clientes_nuevos_pct: 'Variación % clientes nuevos vs año anterior',
+  year_ant_consignacion_pp: 'Consignación del mismo período, año anterior',
+  year_ant_var_consignacion_pct: 'Variación % consignación vs año anterior',
+  year_ant_costo_total: 'Costo total del mismo período, año anterior',
+  year_ant_var_costo_total_pct: 'Variación % costo vs año anterior',
+  year_ant_margen_utilidad_pct: 'Margen de utilidad del año anterior',
+  year_ant_var_margen_pct: 'Diferencia en puntos porcentuales del margen vs año anterior',
+  year_ant_unidades: 'Unidades vendidas del mismo período, año anterior',
+  year_ant_var_unidades_pct: 'Variación % unidades vs año anterior',
+
+  // Comparativos — mes anterior
+  mes_ant_ventas_netas: 'Ventas netas del mes inmediatamente anterior',
+  mes_ant_var_ventas_pct: 'Variación % ventas vs mes anterior',
+  mes_ant_devoluciones: 'Devoluciones del mes anterior',
+  mes_ant_var_devoluciones_pct: 'Variación % devoluciones vs mes anterior',
+  mes_ant_ingresos_netos: 'Ingresos netos del mes anterior',
+  mes_ant_var_ingresos_netos_pct: 'Variación % ingresos netos vs mes anterior',
+  mes_ant_ticket_promedio: 'Ticket promedio del mes anterior',
+  mes_ant_var_ticket_promedio_pct: 'Variación % ticket promedio vs mes anterior',
+  mes_ant_clientes_activos: 'Clientes activos del mes anterior',
+  mes_ant_var_clientes_activos_pct: 'Variación % clientes activos vs mes anterior',
+  mes_ant_clientes_nuevos: 'Clientes nuevos del mes anterior',
+  mes_ant_var_clientes_nuevos_pct: 'Variación % clientes nuevos vs mes anterior',
+  mes_ant_consignacion_pp: 'Consignación del mes anterior',
+  mes_ant_var_consignacion_pct: 'Variación % consignación vs mes anterior',
+  mes_ant_costo_total: 'Costo total del mes anterior',
+  mes_ant_var_costo_total_pct: 'Variación % costo vs mes anterior',
+  mes_ant_margen_utilidad_pct: 'Margen de utilidad del mes anterior',
+  mes_ant_var_margen_pct: 'Diferencia en pp del margen vs mes anterior',
+  mes_ant_unidades: 'Unidades del mes anterior',
+  mes_ant_var_unidades_pct: 'Variación % unidades vs mes anterior',
+
+  // Cartera CxC
+  pdte_de_cobro: 'Saldo pendiente de cobro de la factura',
+  estado_cxc: 'Estado de la cuenta por cobrar',
+  dias_mora: 'Días de mora desde el vencimiento',
+  valor_mora: 'Valor de intereses por mora',
+  total_pendiente: 'Suma total pendiente de cobro del cliente',
+  total_mora: 'Suma total de mora del cliente',
+  max_dias_mora: 'Mayor cantidad de días en mora',
+  num_facturas_pendientes: 'Facturas con saldo pendiente',
+  factura_mas_antigua: 'Fecha de la factura más antigua pendiente',
+}
+
+app.get('/api/tooltips', (req, res) => {
+  res.json(COLUMN_TOOLTIPS)
+})
+
 // Columnas de una tabla
 app.get('/api/columnas/:tabla', async (req, res) => {
   try {
@@ -355,6 +514,7 @@ app.get('/api/export/:recurso', async (req, res) => {
       'facturas':         { tabla: 'zeffi_facturas_venta_encabezados',          order: 'fecha_de_creacion DESC' },
       'cotizaciones':     { tabla: 'zeffi_cotizaciones_ventas_encabezados',     order: 'fecha_de_creacion DESC' },
       'remisiones':       { tabla: 'zeffi_remisiones_venta_encabezados',        order: 'fecha_de_creacion DESC' },
+      'cartera':          { tabla: 'zeffi_facturas_venta_encabezados',          order: 'fecha_de_creacion DESC' },
     }
     if (!MAP[recurso]) return res.status(404).json({ error: 'recurso no encontrado' })
 
