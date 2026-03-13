@@ -1,6 +1,6 @@
 # Manual de Estilos — ERP Origen Silvestre
 ### Basado en Linear.app · Versión 2.0 · 2026-03-11
-### ✅ Verificado con 88 capturas reales de Linear.app
+### ✅ Verificado con 90 capturas reales de Linear.app
 
 > **Para agentes IA**: Este documento es la fuente de verdad absoluta del estilo visual del ERP.
 > Antes de crear cualquier componente frontend, consultar este manual.
@@ -1889,7 +1889,118 @@ opacity: 1;
 
 ---
 
-## 26. ELEMENTOS PENDIENTES DE DEFINIR
+## 26. PILL TABS — PESTAÑAS DE FILTRO/CATEGORÍA
+
+> ✅ Definido con captura real de Linear.app — ver `screenshots/90_tabs_pestanas.png`
+> **Usar cuando**: hay que navegar entre categorías/temas/vistas dentro de una misma página (p.ej. Contextos RAG, filtros de lista).
+> **NO confundir con**: tabs del topbar (sección 8) que son más pequeños y sin borde.
+
+### 26.1 Visual
+
+```
+[ Overview ]  ( Updates )  ( Issues )  +
+  activo        inactivo    inactivo
+```
+
+- Forma: **pill** — border-radius 20px (completamente redondeado)
+- Inactivo: fondo transparente, borde `1px solid var(--border-subtle)`, texto `var(--text-tertiary)`
+- Hover: borde `var(--border-default)`, texto `var(--text-secondary)`
+- Activo: fondo `var(--bg-surface)`, borde `var(--border-default)`, texto `var(--text-primary)`, font-weight 500
+- Padding: `4px 12px`
+- Font: 12px, sin negrita en inactivo
+- Gap entre pills: 4px
+- Badge de conteo (cuando aplica): círculo `var(--accent)` blanco, 10px, pegado al texto con gap 6px
+
+### 26.2 CSS
+
+```css
+/* Contenedor */
+.pill-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+/* Pill individual */
+.pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: inherit;
+  transition: border-color 70ms, color 70ms, background 70ms;
+  white-space: nowrap;
+}
+.pill-tab:hover {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+.pill-tab.active {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Badge de conteo opcional */
+.pill-tab-badge {
+  background: var(--color-accent);
+  color: white;
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+/* Pill especial: agregar nuevo (borde dashed) */
+.pill-tab-nuevo {
+  border-style: dashed;
+  color: var(--text-tertiary);
+}
+.pill-tab-nuevo:hover {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+```
+
+### 26.3 Vue Template
+
+```vue
+<div class="pill-tabs">
+  <button
+    v-for="tab in tabs"
+    :key="tab.id"
+    class="pill-tab"
+    :class="{ active: tabActivo?.id === tab.id }"
+    @click="tabActivo = tab"
+  >
+    {{ tab.nombre }}
+    <span v-if="tab.count > 0" class="pill-tab-badge">{{ tab.count }}</span>
+  </button>
+  <button class="pill-tab pill-tab-nuevo" @click="agregar">
+    <PlusIcon :size="12" /> Nuevo
+  </button>
+</div>
+```
+
+### 26.4 Reglas
+
+- **NUNCA mostrar el slug/ID** en el texto del pill — solo el nombre legible
+- No usar fondo de color (azul/verde) en activo — solo fondo blanco (`bg-surface`) con borde más oscuro
+- En modo oscuro: fondo `var(--bg-surface)` sigue siendo el card surface, no blanco puro
+
+---
+
+## 27. ELEMENTOS PENDIENTES DE DEFINIR
 
 > Requieren cuenta trial de Linear o investigación adicional.
 
@@ -1900,7 +2011,7 @@ opacity: 1;
 | Gráficos / charts | Alta | ECharts con colores del manual |
 | File upload drag & drop | Media | Crear con nuestro propio estilo |
 | Progress bar / steps | Media | Basado en principios de este manual |
-| Tabs avanzados con contenido | Media | Basado en estilos de topbar tabs |
+| ~~Tabs avanzados con contenido~~ | ~~Media~~ | ✅ Definido en sección 26 — Pill Tabs |
 | Breadcrumbs expandibles | Baja | Basado en topbar breadcrumb |
 | Filtros avanzados (Linear tiene sistema complejo) | Alta | Requiere pantallazos con login |
 | Modal de creación de registro | Alta | Requiere login Linear |

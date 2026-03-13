@@ -61,6 +61,18 @@ if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
 const app = express()
 app.use(express.json())
 
+// ─── Request logger (diagnóstico) ─────────────────────────────────
+app.use((req, res, next) => {
+  const orig = res.json.bind(res)
+  res.json = function(body) {
+    if (res.statusCode >= 400) {
+      console.log(`[${res.statusCode}] ${req.method} ${req.path} | auth: ${(req.headers.authorization||'').slice(0,30)}... | body: ${JSON.stringify(body)}`)
+    }
+    return orig(body)
+  }
+  next()
+})
+
 // ─── BD ia_service_os ──────────────────────────────────────────────
 const db = mysql.createPool({
   host: 'localhost', user: 'osadmin', password: 'Epist2487.',

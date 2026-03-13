@@ -89,6 +89,8 @@ Este directorio contiene capturas de pantalla de **linear.app** (sitio público,
 | `88_shortcuts_doc.png` | Documentación de shortcuts con search activado |
 | `33_shortcuts_doc.png` | Shortcuts doc — variante |
 
+| `90_tabs_pestanas.png` | **Pill Tabs** — estilo de pestañas redondeadas Linear.app (sección 26) |
+
 ---
 
 ## 🎨 TIPOGRAFÍA

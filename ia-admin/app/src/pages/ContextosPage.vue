@@ -16,8 +16,7 @@
           :class="{ active: temaActivo?.id === tema.id }"
           @click="seleccionarTema(tema)"
         >
-          <span class="tema-slug">{{ tema.slug }}</span>
-          <span class="tema-nombre">{{ tema.nombre }}</span>
+          {{ tema.nombre }}
           <span v-if="tema.total_documentos > 0" class="tema-badge">{{ tema.total_documentos }}</span>
         </button>
         <button class="tema-btn tema-nuevo-btn" @click="abrirModalTema">
@@ -471,50 +470,45 @@ onMounted(cargarTemas)
 .temas-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   margin-bottom: 20px;
 }
 
+/* Estilo Linear.app — ver 90_tabs_pestanas.png */
 .tema-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  border-radius: var(--radius-md);
+  padding: 4px 12px;
+  border-radius: 20px;
   border: 1px solid var(--border-subtle);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   cursor: pointer;
   font-size: 12px;
-  transition: all 70ms;
+  font-weight: 400;
   font-family: inherit;
+  transition: border-color 70ms, color 70ms, background 70ms;
+  white-space: nowrap;
 }
 .tema-btn:hover {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
   border-color: var(--border-default);
+  color: var(--text-secondary);
 }
 .tema-btn.active {
-  background: var(--accent-muted);
-  color: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+  background: var(--bg-surface);
   font-weight: 500;
-}
-.tema-slug {
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  opacity: 0.7;
-}
-.tema-nombre {
-  font-size: 12px;
 }
 .tema-badge {
   background: var(--accent);
   color: white;
   border-radius: 10px;
-  padding: 1px 6px;
+  padding: 0px 5px;
   font-size: 10px;
   font-weight: 600;
+  line-height: 16px;
 }
 .tema-nuevo-btn {
   border-style: dashed;
