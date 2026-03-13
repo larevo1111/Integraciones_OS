@@ -1,6 +1,7 @@
 """
 Manejo del contexto de conversación.
-Lee y escribe ia_conversaciones: resumen vivo (≤1000 palabras) + agente activo.
+Lee y escribe ia_conversaciones: resumen vivo (≤1000 palabras) + agente activo
++ mensajes_recientes (últimos 5 pares pregunta/respuesta verbatim).
 """
 from .config import get_local_conn
 
@@ -79,13 +80,77 @@ def cambiar_agente(conversacion_id: int, agente_slug: str):
 
 
 def resetear(conversacion_id: int):
-    """Borra el resumen y reinicia la conversación."""
+    """Borra el resumen y los mensajes recientes — reinicia la conversación."""
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE ia_conversaciones SET resumen = NULL WHERE id = %s",
+                "UPDATE ia_conversaciones SET resumen = NULL, mensajes_recientes = '[]' "
+                "WHERE id = %s",
                 (conversacion_id,)
             )
     finally:
         conn.close()
+
+
+def guardar_mensajes_recientes(conversacion_id: int, pregunta: str, respuesta: str, max_pares: int = 5):
+    """
+    Agrega el par pregunta/respuesta al historial reciente verbatim.
+    Rota automáticamente: mantiene solo los últimos max_pares.
+    Se llama DESPUÉS de cada consulta exitosa.
+    """
+    import json as _json
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT mensajes_recientes FROM ia_conversaciones WHERE id = %s",
+                (conversacion_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return
+
+            try:
+                mensajes = _json.loads(row['mensajes_recientes'] or '[]')
+            except Exception:
+                mensajes = []
+
+            mensajes.append({
+                'pregunta':  pregunta[:1000],
+                'respuesta': respuesta[:2000],
+            })
+
+            if len(mensajes) > max_pares:
+                mensajes = mensajes[-max_pares:]
+
+            cur.execute(
+                "UPDATE ia_conversaciones SET mensajes_recientes = %s WHERE id = %s",
+                (_json.dumps(mensajes, ensure_ascii=False), conversacion_id)
+            )
+            conn.commit()
+    finally:
+        conn.close()
+
+
+def obtener_mensajes_recientes_formateados(conversacion: dict) -> str:
+    """
+    Convierte mensajes_recientes (JSON) en texto para el system prompt.
+    Retorna string vacío si no hay historial.
+    """
+    import json as _json
+    raw = conversacion.get('mensajes_recientes')
+    if not raw:
+        return ''
+    try:
+        mensajes = _json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return ''
+    if not mensajes:
+        return ''
+
+    partes = ['## Últimos intercambios de esta conversación (verbatim):\n']
+    for i, m in enumerate(mensajes, 1):
+        partes.append(f"**Pregunta {i}:** {m.get('pregunta', '')}")
+        partes.append(f"**Respuesta {i}:** {m.get('respuesta', '')}\n")
+    return '\n'.join(partes)

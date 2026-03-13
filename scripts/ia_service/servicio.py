@@ -5,7 +5,7 @@ Expone la función consultar() que es el punto de entrada único.
 import json
 import time
 from .config import get_local_conn
-from . import contexto, ejecutor_sql, formateador, esquema
+from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
 from .proveedores import openai_compat, google, anthropic_prov
 
 # Prompt de resumen — se agrega al final de cada turno
@@ -107,17 +107,32 @@ def consultar(
             conn.close()
         agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash'
 
-    # ── 5. Construir contexto de sistema ─────────────────────────────
+    # ── 5. Construir contexto de sistema (6 capas) ───────────────────
+    # CAPA 1: System prompt base del tipo de consulta
     system_prompt = tipo_cfg.get('system_prompt', '')
-    if contexto_extra:
-        system_prompt += f'\n\nContexto adicional: {contexto_extra}'
-    if resumen_anterior:
-        system_prompt += f'\n\nResumen de la conversación hasta ahora:\n{resumen_anterior}'
 
-    # DDL si el tipo lo requiere
+    # CAPA 2: RAG — fragmentos relevantes de la base de conocimiento
+    rag_ctx = rag_module.obtener_contexto_rag(pregunta)
+    if rag_ctx:
+        system_prompt += f'\n\n{rag_ctx}'
+
+    # CAPA 3: Schema BD (DDL tablas analíticas) — solo si el tipo lo requiere
     if tipo_cfg.get('requiere_estructura'):
         ddl = esquema.obtener_ddl()
         system_prompt += f'\n\nEsquema de la base de datos:\n{ddl}'
+
+    # CAPA 4: Resumen comprimido de la conversación (historial antiguo)
+    if resumen_anterior:
+        system_prompt += f'\n\nResumen de la conversación hasta ahora:\n{resumen_anterior}'
+
+    # CAPA 5: Últimos 5 intercambios verbatim (historial reciente exacto)
+    mensajes_recientes_ctx = contexto.obtener_mensajes_recientes_formateados(conv)
+    if mensajes_recientes_ctx:
+        system_prompt += f'\n\n{mensajes_recientes_ctx}'
+
+    # Contexto extra del caller (instrucciones específicas del canal)
+    if contexto_extra:
+        system_prompt += f'\n\nContexto adicional: {contexto_extra}'
 
     # ── 6. Ejecutar pasos ─────────────────────────────────────────────
     sql_generado    = None
@@ -225,9 +240,11 @@ def consultar(
         if not respuesta_final:
             respuesta_final = f"Lo siento, ocurrió un error procesando tu consulta: {error}"
 
-    # ── 7. Guardar resumen de contexto ────────────────────────────────
+    # ── 7. Guardar contexto (resumen comprimido + mensajes recientes) ─
     if resumen_nuevo:
         contexto.guardar_resumen(conv_id, resumen_nuevo)
+    if respuesta_final and not error:
+        contexto.guardar_mensajes_recientes(conv_id, pregunta, respuesta_final)
 
     # ── 8. Calcular costo ─────────────────────────────────────────────
     costo_usd = _calcular_costo(agente_cfg, tokens_in_total, tokens_out_total)

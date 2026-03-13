@@ -176,43 +176,61 @@ ResumenFacturacionPage (solo tabla de meses — sin acordeones)
   - Moneda: `$1.234.567` | Porcentajes: `12,5%` | Enteros: `1.234` | Decimales: `1.234,56`
 - Features: selector de columnas, export CSV/XLSX/PDF, skeleton, fila de subtotales al pie
 
-## Servicio Central de IA — `ia_service_os` (activo 2026-03-12)
+## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-13)
 
 > **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
 > Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
-> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. 6 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios. Auth vía Cloudflare Access (pendiente configurar en Cloudflare ZeroTrust dashboard).
-
+> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, **Contextos (pendiente Antigravity)**. Auth Google OAuth + JWT propio.
 
 **Plan completo:** `.agent/planes/plan_ia_service.md`
+**Plan RAG/Contexto:** `.agent/planes/rag_contexto.md`
+**Tareas Antigravity:** `.agent/tareas_antigravity_rag.md`
 
 ### Arquitectura
 - **Código:** `scripts/ia_service/` — módulo Python con función `consultar()`
-- **BD:** `ia_service_os` en MariaDB local (4 tablas)
+- **BD:** `ia_service_os` en MariaDB local (8 tablas: 5 originales + 3 RAG)
 - **API Flask:** puerto 5100, systemd `ia-service.service`
+- **Admin:** Express puerto 9200, `os-ia-admin.service`, sirve frontend Quasar compilado
 - **Uso:** cualquier proyecto llama `POST http://localhost:5100/ia/consultar`
 
-### 4 tablas en `ia_service_os`
+### Stack de Contexto en 6 Capas (IMPLEMENTADO 2026-03-13)
+```
+CAPA 1 — System prompt base del tipo        → ia_tipos_consulta.system_prompt
+CAPA 2 — RAG (fragmentos relevantes)        → ia_rag_fragmentos (FULLTEXT search) ← NUEVO
+CAPA 3 — Schema BD (DDL tablas analíticas)  → esquema.py caché 1h desde Hostinger
+CAPA 4 — Resumen conversación comprimido    → ia_conversaciones.resumen (≤1000 palabras)
+CAPA 5 — Últimos 5 mensajes verbatim        → ia_conversaciones.mensajes_recientes ← NUEVO
+CAPA 6 — Pregunta actual del usuario        → input directo
+```
+
+### 8 tablas en `ia_service_os`
 | Tabla | Para qué |
 |---|---|
 | `ia_agentes` | Catálogo de modelos con API key, endpoint, capacidades, costos |
 | `ia_tipos_consulta` | Tipos con reglas, pasos, system_prompt y agente preferido |
-| `ia_conversaciones` | Contexto vivo: resumen (≤1000 palabras) + agente activo por usuario/canal |
+| `ia_conversaciones` | Contexto vivo: resumen + agente activo + mensajes_recientes (JSON) |
 | `ia_logs` | Auditoría completa: SQL generado, tokens, costo, latencia, errores |
+| `ia_consumo_diario` | Agregado diario por agente |
+| `ia_usuarios` | Usuarios del admin (Santiago admin, Jennifer viewer) |
+| `ia_rag_colecciones` | Espacios de conocimiento (ej: 'negocio-os') |
+| `ia_rag_documentos` | Documentos subidos por colección |
+| `ia_rag_fragmentos` | Chunks ~500 palabras con FULLTEXT index |
 
 ### Agentes configurados
-| slug | modelo | tipo | Estado |
-|---|---|---|---|
-| `gemini-flash` | gemini-2.5-flash | free | ✅ Activo (key en BD + .env solamente) |
-| `gemini-flash-lite` | gemini-2.5-flash | free | ✅ Activo (misma key) |
-| `deepseek-chat` | deepseek-chat | free* | 🔲 Pendiente key: platform.deepseek.com |
-| `deepseek-reasoner` | deepseek-reasoner | premium | 🔲 Pendiente (misma key que deepseek-chat) |
-| `groq-llama` | llama-3.3-70b-versatile | free | 🔲 Pendiente key: console.groq.com |
-| `claude-sonnet` | claude-sonnet-4-6 | premium | 🔲 Pendiente key: console.anthropic.com |
+| slug | modelo | Estado |
+|---|---|---|
+| `gemini-pro` | gemini-2.5-pro | ✅ Activo — SQL complejo |
+| `gemini-flash` | gemini-2.5-flash | ✅ Activo — redacción |
+| `gemini-flash-lite` | gemini-3.1-flash-lite | ✅ Activo — alto volumen |
+| `gemma-router` | gemma-3-27b-it | ✅ Activo — enrutador fallback |
+| `groq-llama` | llama-3.3-70b-versatile | ✅ Activo — enrutador principal (key configurada 2026-03-13) |
+| `deepseek-chat` | deepseek-chat | 🔲 Pendiente key: platform.deepseek.com |
+| `deepseek-reasoner` | deepseek-reasoner | 🔲 Pendiente (misma key que deepseek-chat) |
+| `claude-sonnet` | claude-sonnet-4-6 | 🔲 Pendiente key: console.anthropic.com |
 
-**Estado del servicio (2026-03-12):** ✅ Activo — `sudo systemctl status ia-service`
-**Pruebas pasadas:** enrutamiento automático, redacción, resumen — todas con Gemini Flash.
-**Para agregar keys:** ver instrucciones en `.agent/planes/plan_ia_service.md` (sección Pendiente)
-**Manual completo de agentes:** `.agent/manuales/ia_service_manual.md` — límites, endpoints, API keys, gotchas por proveedor
+**Estado del servicio (2026-03-13):** ✅ Activo con RAG y mensajes recientes integrados
+**Módulo RAG:** `scripts/ia_service/rag.py` — fragmentación + búsqueda FULLTEXT
+**Colección inicial:** `negocio-os` creada, sin documentos aún
 
 ### Función principal
 ```python
@@ -228,11 +246,12 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **Cloudflare Access** (`ia.oscomunidad.com`) — configurar en Cloudflare Zero Trust Dashboard: Access → Applications → `ia.oscomunidad.com` → Google Auth → emails permitidos. ⚠️ Santi lo configura manualmente (5 min, no requiere código).
-2. **Activar más agentes**: Groq (gratis, console.groq.com), DeepSeek ($5, platform.deepseek.com), Claude ($5, console.anthropic.com)
-3. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
-4. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`.
-5. Continuar app temporal (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
+1. **[ANTIGRAVITY]** Módulo Contextos en ia-admin — ver `.agent/tareas_antigravity_rag.md` (UI + endpoints RAG)
+2. **DeepSeek** — Santi obtiene key en platform.deepseek.com → activar deepseek-chat + deepseek-reasoner
+3. **Claude Sonnet** — Santi recarga $5 en console.anthropic.com → activar claude-sonnet
+4. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
+5. **Limpiar contactos de prueba**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm`.
+6. Continuar app temporal (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
