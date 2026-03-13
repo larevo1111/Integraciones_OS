@@ -92,7 +92,7 @@
                 'th-agg': !!columnAggregates[col.key],
                 'th-popup-open': colPopup === col.key
               }"
-              :title="props.tooltips[col.key] || ''"
+              :title="effectiveTooltips[col.key] || ''"
               @click.stop="openColPopup(col.key)"
             >
               <div class="th-inner">
@@ -548,12 +548,26 @@ function formatCell(val, key) {
   return val
 }
 
+// ── Tooltips — caché global, se carga una sola vez ───
+let _tooltipsCache = null
+const autoTooltips = ref({})
+const effectiveTooltips = computed(() => Object.keys(props.tooltips).length ? props.tooltips : autoTooltips.value)
+
 // ── Cerrar popups al hacer clic fuera ────────────────
 function handleOutsideClick() {
   showFields.value = false
   showExport.value = false
 }
-onMounted(() => document.addEventListener('click', handleOutsideClick))
+onMounted(async () => {
+  document.addEventListener('click', handleOutsideClick)
+  if (!_tooltipsCache) {
+    try {
+      const r = await fetch('/api/tooltips')
+      _tooltipsCache = await r.json()
+    } catch { _tooltipsCache = {} }
+  }
+  autoTooltips.value = _tooltipsCache
+})
 onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 </script>
 

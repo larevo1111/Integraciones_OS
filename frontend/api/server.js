@@ -356,24 +356,36 @@ app.get('/api/ventas/cartera', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Resumen cartera por cliente
+// Resumen cartera por cliente (con tramos de antigüedad y plazo del cliente)
 app.get('/api/ventas/cartera-cliente', async (req, res) => {
   try {
-    const filters = req.query.filters ? JSON.parse(req.query.filters) : []
-    if (req.query.mes) filters.push({ field: 'fecha_de_creacion', op: 'mes', value: req.query.mes })
-    const { sql, params } = buildWhere(filters)
     const rows = await query(`
-      SELECT id_cliente, MAX(cliente) AS cliente, MAX(ciudad) AS ciudad, MAX(vendedor) AS vendedor,
-             COUNT(*) AS num_facturas_pendientes,
-             SUM(CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2))) AS total_pendiente,
-             SUM(CAST(REPLACE(COALESCE(valor_mora,'0'),',','.') AS DECIMAL(15,2))) AS total_mora,
-             MAX(CAST(REPLACE(COALESCE(dias_mora,'0'),',','.') AS SIGNED)) AS max_dias_mora,
-             MIN(fecha_de_creacion) AS factura_mas_antigua
-      FROM zeffi_facturas_venta_encabezados${sql}
-      GROUP BY id_cliente
-      HAVING total_pendiente > 0
+      SELECT
+        sub.id_cliente,
+        MAX(sub.cliente)                                                          AS cliente,
+        MAX(sub.ciudad)                                                           AS ciudad,
+        MAX(sub.vendedor)                                                         AS vendedor,
+        MAX(c.forma_de_pago)                                                      AS plazo,
+        COUNT(*)                                                                  AS num_facturas_pendientes,
+        SUM(sub.pdte_num)                                                         AS total_pendiente,
+        SUM(CASE WHEN sub.ant BETWEEN  1 AND  30 THEN sub.pdte_num ELSE 0 END)   AS saldo_1_30,
+        SUM(CASE WHEN sub.ant BETWEEN 31 AND  60 THEN sub.pdte_num ELSE 0 END)   AS saldo_31_60,
+        SUM(CASE WHEN sub.ant BETWEEN 61 AND  90 THEN sub.pdte_num ELSE 0 END)   AS saldo_61_90,
+        SUM(CASE WHEN sub.ant > 90               THEN sub.pdte_num ELSE 0 END)   AS saldo_mas_90,
+        ROUND(AVG(sub.ant), 0)                                                    AS promedio_antiguedad,
+        MAX(sub.ant)                                                              AS antiguedad_max
+      FROM (
+        SELECT *,
+               CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
+               DATEDIFF(CURDATE(), fecha_de_creacion)                               AS ant
+        FROM zeffi_facturas_venta_encabezados
+        WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
+      ) sub
+      LEFT JOIN zeffi_clientes c
+             ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
+      GROUP BY sub.id_cliente
       ORDER BY total_pendiente DESC
-      LIMIT 1000`, params)
+      LIMIT 1000`)
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -414,8 +426,20 @@ const COLUMN_TOOLTIPS = {
   cli_vtas_por_cliente: 'Venta promedio por cliente activo',
   cli_es_nuevo: '1 si es la primera compra histórica del cliente',
 
-  // Cartera
-  car_saldo: 'Saldo pendiente de cobro',
+  // Cartera CxC
+  total_pendiente:         'Suma total de saldos pendientes del cliente',
+  num_facturas_pendientes: 'Cantidad de facturas con saldo sin cobrar',
+  plazo:                   'Plazo de pago acordado con el cliente (ej: 30 días, Contado)',
+  saldo_1_30:              'Saldo en facturas con antigüedad de 1 a 30 días',
+  saldo_31_60:             'Saldo en facturas con antigüedad de 31 a 60 días',
+  saldo_61_90:             'Saldo en facturas con antigüedad de 61 a 90 días',
+  saldo_mas_90:            'Saldo en facturas con más de 90 días de antigüedad',
+  promedio_antiguedad:     'Promedio de días transcurridos desde la fecha de cada factura pendiente',
+  antiguedad_max:          'Días transcurridos desde la factura pendiente más antigua del cliente',
+  pdte_de_cobro:           'Saldo pendiente de cobro de esta factura',
+  estado_cxc:              'Estado actual de la cuenta por cobrar',
+  dias_mora:               'Días en mora según el sistema Effi',
+  valor_mora:              'Valor de intereses o penalización por mora',
 
   // Catálogo
   cat_num_referencias: 'Productos distintos (SKUs) vendidos',
