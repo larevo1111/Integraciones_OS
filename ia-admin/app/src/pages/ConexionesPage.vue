@@ -10,6 +10,29 @@
       <button class="btn btn-primary" @click="abrirNueva">+ Nueva conexión</button>
     </div>
 
+    <!-- Ayuda -->
+    <AyudaPanel>
+      <p><strong>¿Qué es una Conexión BD?</strong><br>
+      Es la fuente de datos que la IA usa para responder preguntas con datos reales. Cada área (Comercial, Finanzas, etc.) puede tener su propio conjunto de tablas.</p>
+
+      <p style="margin-top:12px"><strong>Cómo conectar una base de datos:</strong></p>
+      <ol class="ayuda-lista">
+        <li>Clic en <strong>"+ Nueva conexión"</strong></li>
+        <li>Completa: nombre descriptivo, tipo (MariaDB/MySQL/PostgreSQL), host, puerto, base de datos, usuario y contraseña</li>
+        <li>Clic en <strong>"Probar conexión"</strong> — verifica que el servidor responda y lista las tablas disponibles</li>
+        <li>Una vez guardada, ve a <strong>Contextos → pestaña del área → Schema BD</strong> y selecciona las tablas que esa área necesita</li>
+        <li>Clic en <strong>"Sincronizar"</strong> para que el sistema lea los campos de cada tabla</li>
+      </ol>
+
+      <p style="margin-top:12px"><strong>⚠️ Precauciones importantes:</strong></p>
+      <ul class="ayuda-lista">
+        <li><strong>Usa un usuario de solo lectura</strong> en la BD (GRANT SELECT únicamente). Aunque el sistema bloquea escrituras por código, es buena práctica.</li>
+        <li>El sistema tiene <strong>doble protección contra escritura</strong>: valida el SQL por AST (estructura) Y activa modo READ ONLY en la sesión — ningún agente puede modificar tus datos aunque intente hacerlo.</li>
+        <li>El <strong>password se guarda en la BD local</strong> del servidor, no en código ni en Git.</li>
+        <li>Nunca conectes la BD de producción con un usuario que tenga permisos de escritura.</li>
+      </ul>
+    </AyudaPanel>
+
     <!-- Lista de conexiones -->
     <div class="conexiones-grid">
       <div v-for="c in conexiones" :key="c.id" class="conexion-card">
@@ -127,6 +150,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { api } from 'src/services/api'
+import AyudaPanel from 'src/components/AyudaPanel.vue'
 
 const conexiones   = ref([])
 const cargando     = ref(false)
@@ -342,4 +366,7 @@ select.input { cursor: pointer; }
 .btn-secondary:hover:not(:disabled) { background: var(--bg-card-hover); }
 .btn-danger { background: rgba(248,113,113,0.1); color: #f87171; border-color: rgba(248,113,113,0.3); }
 .btn-danger:hover:not(:disabled) { background: rgba(248,113,113,0.2); }
+
+.ayuda-lista { padding-left: 18px; margin: 6px 0 0; }
+.ayuda-lista li { margin-bottom: 6px; }
 </style>

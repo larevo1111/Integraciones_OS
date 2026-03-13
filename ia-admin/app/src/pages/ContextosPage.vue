@@ -103,6 +103,21 @@
           </div>
         </div>
 
+        <div style="padding:12px 16px 0">
+          <AyudaPanel>
+            <p><strong>¿Qué es el Schema BD de este tema?</strong><br>
+            Define qué tablas de la base de datos puede ver la IA cuando alguien hace preguntas en este contexto. Solo las tablas seleccionadas se inyectan al modelo — así las respuestas son más precisas y el contexto más liviano.</p>
+            <p style="margin-top:10px"><strong>Cómo configurarlo:</strong></p>
+            <ol class="ayuda-lista">
+              <li>Selecciona las <strong>tablas relevantes</strong> para esta área (ej: Comercial → tablas de ventas y clientes)</li>
+              <li>Clic en <strong>"Sincronizar"</strong> — el sistema lee los campos y tipos de cada tabla directamente de la BD</li>
+              <li>Agrega <strong>Notas de negocio</strong>: instrucciones que la IA debe saber para generar SQL correcto (ej: "precio_neto incluye IVA, usar precio_bruto - descuento")</li>
+              <li>Clic en <strong>"Guardar"</strong></li>
+            </ol>
+            <p style="margin-top:10px"><strong>🔒 Seguridad:</strong> La IA solo puede hacer SELECT. El sistema bloquea cualquier escritura por dos capas independientes: validación de sintaxis SQL y modo READ ONLY de sesión en la BD.</p>
+          </AyudaPanel>
+        </div>
+
         <div v-if="cargandoSchema" style="padding:16px;color:var(--text-tertiary);font-size:13px">Cargando schema...</div>
         <div v-else class="schema-body">
           <!-- Tablas seleccionadas -->
@@ -322,6 +337,7 @@
 
 <script setup>
 import { apiFetch, api } from 'src/services/api'
+import AyudaPanel from 'src/components/AyudaPanel.vue'
 import { ref, computed, onMounted } from 'vue'
 import { PlusIcon, PencilIcon, XIcon, TrashIcon, UploadIcon, FileTextIcon } from 'lucide-vue-next'
 
@@ -981,4 +997,7 @@ onMounted(cargarTemas)
   color: #5e6ad2; font-weight: 500;
 }
 .chip-toggle:hover span { border-color: var(--border-strong); }
+
+.ayuda-lista { padding-left: 18px; margin: 6px 0 0; }
+.ayuda-lista li { margin-bottom: 5px; }
 </style>

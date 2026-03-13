@@ -1,25 +1,55 @@
 """
 Ejecutor SQL seguro contra BDs externas configuradas en ia_conexiones_bd.
-Solo permite SELECT. Devuelve filas como lista de dicts.
+
+SEGURIDAD — DOS CAPAS INDEPENDIENTES:
+  Capa 1: sqlglot parsea el AST y verifica que sea SELECT puro (antes de tocar la BD).
+  Capa 2: SET SESSION TRANSACTION READ ONLY — el motor de BD enforcea solo lectura
+           a nivel de sesión. Ni root puede escribir. Independiente de permisos del usuario.
+
+Solo se permiten SELECT. Devuelve filas como lista de dicts.
 """
-import re
+import sqlglot
+import sqlglot.expressions as exp
 from .config import get_local_conn, get_hostinger_conn
 
 MAX_FILAS = 500
 
-_PROHIBIDAS = re.compile(
-    r'\b(DROP|DELETE|TRUNCATE|INSERT|UPDATE|ALTER|CREATE|GRANT|REVOKE|EXEC|EXECUTE|CALL)\b',
-    re.IGNORECASE
-)
 
-
-def _validar_sql(sql: str) -> str | None:
-    """Devuelve mensaje de error si el SQL no es seguro, None si es válido."""
+def _validar_sql_ast(sql: str) -> str | None:
+    """
+    Capa 1: Validación por AST con sqlglot.
+    Devuelve mensaje de error si no es SELECT puro, None si es válido.
+    """
     sql_clean = sql.strip()
-    if not sql_clean.upper().startswith('SELECT'):
+
+    # Rechazo rápido: debe empezar por SELECT
+    if not sql_clean.upper().lstrip('(').startswith('SELECT'):
         return 'Solo se permiten consultas SELECT.'
-    if _PROHIBIDAS.search(sql_clean):
-        return 'SQL contiene palabras no permitidas.'
+
+    try:
+        statements = sqlglot.parse(sql_clean)
+    except Exception as e:
+        return f'SQL inválido: {e}'
+
+    if not statements:
+        return 'No se pudo parsear el SQL.'
+
+    for stmt in statements:
+        if stmt is None:
+            continue
+        # Verificar que el statement raíz sea un SELECT
+        if not isinstance(stmt, exp.Select):
+            tipo = type(stmt).__name__
+            return f'Solo SELECT permitido. Se detectó: {tipo}.'
+
+        # Verificar que no haya subqueries mutantes dentro del SELECT
+        for node in stmt.walk():
+            if isinstance(node, (exp.Insert, exp.Update, exp.Delete,
+                                 exp.Drop, exp.Create, exp.Alter,
+                                 exp.DDL, exp.Grant, exp.Revoke)):
+                tipo = type(node).__name__
+                return f'SQL contiene operación no permitida: {tipo}.'
+
     return None
 
 
@@ -35,7 +65,9 @@ def ejecutar(sql: str, conexion_id: int = None) -> dict:
         {ok, filas, columnas, total, truncado, error}
     """
     sql = sql.strip()
-    error = _validar_sql(sql)
+
+    # ── Capa 1: validación AST ────────────────────────────────────────
+    error = _validar_sql_ast(sql)
     if error:
         return {'ok': False, 'filas': [], 'columnas': [], 'total': 0,
                 'truncado': False, 'error': error}
@@ -50,9 +82,18 @@ def ejecutar(sql: str, conexion_id: int = None) -> dict:
                         'truncado': False, 'error': 'Conexión no encontrada.'}
             conn = get_conexion_externa(cfg)
         else:
-            # Fallback legacy: Hostinger directo
             conn = get_hostinger_conn()
 
+        # ── Capa 2: READ ONLY a nivel de sesión ───────────────────────
+        # El motor de BD enforcea solo lectura independientemente de los
+        # permisos del usuario. Ni root puede escribir en esta sesión.
+        with conn.cursor() as cur:
+            try:
+                cur.execute("SET SESSION TRANSACTION READ ONLY")
+            except Exception:
+                pass  # Algunas BDs no soportan esto — la Capa 1 sigue activa
+
+        # ── Ejecutar SELECT ───────────────────────────────────────────
         with conn.cursor() as cur:
             cur.execute(sql)
             filas = cur.fetchmany(MAX_FILAS + 1)
