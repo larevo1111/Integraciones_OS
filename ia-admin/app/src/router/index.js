@@ -14,28 +14,7 @@ export default route(function () {
   })
 
   Router.beforeEach((to) => {
-    let token = localStorage.getItem('ia_jwt')
-
-    // Si hay token, verificar que no esté expirado (client-side decode)
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          // Expirado — limpiar localStorage y tratar como sin sesión
-          localStorage.removeItem('ia_jwt')
-          localStorage.removeItem('ia_usuario')
-          localStorage.removeItem('ia_empresa')
-          token = null
-        }
-      } catch {
-        // Token malformado — limpiar
-        localStorage.removeItem('ia_jwt')
-        localStorage.removeItem('ia_usuario')
-        localStorage.removeItem('ia_empresa')
-        token = null
-      }
-    }
-
+    const token = localStorage.getItem('ia_jwt')
     if (to.meta.requiresAuth && !token) return '/login'
     if (to.path === '/login' && token) return '/dashboard'
   })
