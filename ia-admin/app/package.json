@@ -1,0 +1,35 @@
+{
+  "name": "os-ia-admin",
+  "version": "1.0.0",
+  "description": "Admin Panel — Servicio Central de IA — Origen Silvestre",
+  "productName": "OS IA Admin",
+  "scripts": {
+    "dev": "quasar dev",
+    "build": "quasar build"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.12",
+    "axios": "^1.7.2",
+    "lucide-vue-next": "^0.378.0",
+    "pinia": "^2.1.7",
+    "quasar": "^2.16.4",
+    "vue": "^3.4.29",
+    "vue-router": "^4.3.3"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "^2.0.0",
+    "autoprefixer": "^10.4.19",
+    "sass": "^1.77.6",
+    "vite": "^5.3.1"
+  },
+  "engines": {
+    "node": "^20 || ^22 || ^24",
+    "npm": ">= 6.13.4"
+  },
+  "browserslist": [
+    "last 10 Chrome versions",
+    "last 10 Firefox versions",
+    "last 4 Edge versions",
+    "last 7 Safari versions"
+  ]
+}

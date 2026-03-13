@@ -1,0 +1,15 @@
+[Unit]
+Description=OS IA Admin — Panel de Administración del Servicio de IA
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=osserver
+WorkingDirectory=/home/osserver/Proyectos_Antigravity/Integraciones_OS/ia-admin/api
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
