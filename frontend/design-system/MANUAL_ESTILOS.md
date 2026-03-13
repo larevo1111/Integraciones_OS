@@ -1998,32 +1998,6 @@ opacity: 1;
 - No usar fondo de color (azul/verde) en activo — solo fondo blanco (`bg-surface`) con borde más oscuro
 - En modo oscuro: fondo `var(--bg-surface)` sigue siendo el card surface, no blanco puro
 
-### 26.5 ⚠️ Variables CSS críticas — diferencia entre proyectos
-
-| Variable | `frontend/app` (ERP) | `ia-admin/app` |
-|---|---|---|
-| `--bg-surface` | **`#f0f1f5`** (gris claro) | `#ffffff` (blanco) |
-
-**REGLA OBLIGATORIA para el ERP frontend:**
-En modo claro, `--bg-app`, `--bg-card` y `--bg-modal` son todos `#ffffff`. Por eso el pill tab activo **NO puede usar solo `--bg-surface`** para distinguirse — debe usar TAMBIÉN `--accent-muted` como fondo y `--accent` como color de texto:
-
-```css
-/* ✅ CORRECTO para ERP (frontend/app) */
-.pill-tab.active {
-  border-color: var(--accent-border);
-  background: var(--accent-muted);    /* rgba(94,106,210,0.10) — tinte violeta visible */
-  color: var(--accent);               /* texto violeta */
-  font-weight: 600;
-}
-
-/* ❌ INCORRECTO — usa --bg-surface que en light mode = blanco, indistinguible */
-.pill-tab.active {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-}
-```
-
-**Antes de usar cualquier variable CSS** → verificar que existe en `frontend/app/src/css/app.scss`. Si no existe, agrégala al archivo O usa una variable equivalente que sí esté definida.
 
 ---
 
