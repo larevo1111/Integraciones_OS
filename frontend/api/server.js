@@ -421,7 +421,7 @@ app.get('/api/ventas/consignacion', async (req, res) => {
              CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2)) AS total_neto_num,
              fecha_de_creacion, fecha_de_entrega, vigencia
       FROM zeffi_ordenes_venta_encabezados
-      WHERE ultimo_estado = 'Generada' AND estado_facturacion = 'Pendiente'
+      WHERE vigencia = 'Vigente'
       ORDER BY fecha_de_creacion ASC`)
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
