@@ -16,6 +16,7 @@ function getToken() {
 function handle401() {
   localStorage.removeItem('ia_jwt')
   localStorage.removeItem('ia_usuario')
+  localStorage.removeItem('ia_empresa')
   window.location.hash = '/login'
 }
 

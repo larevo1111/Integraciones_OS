@@ -3,6 +3,7 @@
  * Express API para el panel de administración del Servicio Central de IA
  * Puerto: 9200 — sirve la API y el frontend estático (dist/spa)
  * Auth: Google OAuth (id_token) → JWT propio
+ * Multi-empresa: JWT temporal → selección empresa → JWT final
  */
 
 const express = require('express')
@@ -92,20 +93,29 @@ function requireAuth(req, res, next) {
   const token  = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return res.status(401).json({ error: 'No autenticado' })
   try {
-    req.usuario = jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_SECRET)
+    req.usuario = decoded
+    req.empresa = decoded.empresa_activa || null
+
+    // Si es token temporal, rechazar salvo en /seleccionar_empresa
+    if (decoded.tipo === 'temporal' && !req.path.endsWith('/seleccionar_empresa')) {
+      return res.status(403).json({ error: 'Selección de empresa pendiente' })
+    }
+
     next()
   } catch (e) {
     res.status(401).json({ error: 'Token expirado o inválido' })
   }
 }
 
-// Middleware solo para admins
+// Middleware solo para admins (verifica rol_empresa en token final, o rol en token legacy)
 function requireAdmin(req, res, next) {
-  if (req.usuario?.rol !== 'admin') return res.status(403).json({ error: 'Se requiere rol admin' })
+  const rolEmpresa = req.usuario?.rol_empresa || req.usuario?.rol
+  if (rolEmpresa !== 'admin') return res.status(403).json({ error: 'Se requiere rol admin' })
   next()
 }
 
-// ─── AUTH — Google OAuth ──────────────────────────────────────────
+// ─── AUTH — Google OAuth (flujo multi-empresa) ────────────────────
 app.post('/api/ia/auth/google', async (req, res) => {
   const { id_token } = req.body
   if (!id_token) return res.status(400).json({ error: 'Falta id_token' })
@@ -114,7 +124,7 @@ app.post('/api/ia/auth/google', async (req, res) => {
     const payload = await validarTokenGoogle(id_token)
     const email   = payload.email
 
-    // Buscar o crear usuario
+    // Verificar usuario en ia_usuarios
     let [rows] = await db.query('SELECT * FROM ia_usuarios WHERE email = ?', [email])
     let usuario
 
@@ -122,22 +132,147 @@ app.post('/api/ia/auth/google', async (req, res) => {
       usuario = rows[0]
       if (!usuario.activo) return res.status(403).json({ error: 'Usuario inactivo. Contacta al administrador.' })
     } else {
-      // Email no registrado — rechazar
       return res.status(403).json({ error: 'No tienes acceso a este panel. Contacta al administrador.' })
     }
 
-    // Emitir JWT propio (7 días)
-    const jwtPayload = {
-      email:  usuario.email,
-      nombre: usuario.nombre,
-      rol:    usuario.rol,
-      foto:   payload.picture || ''
-    }
-    const token = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: '7d' })
+    // Obtener empresas del usuario
+    const [empresas] = await db.query(`
+      SELECT e.uid, e.nombre, e.siglas, ue.rol
+      FROM ia_usuarios_empresas ue
+      JOIN ia_empresas e ON e.uid = ue.empresa_uid
+      WHERE ue.usuario_email = ? AND ue.activo = 1 AND e.estado = 'activo'
+      ORDER BY e.nombre
+    `, [email])
 
-    res.json({ ok: true, token, usuario: jwtPayload })
+    if (empresas.length === 0) {
+      return res.status(403).json({ error: 'No tienes empresas asignadas. Contacta al administrador.' })
+    }
+
+    // Si tiene 1 empresa → JWT final directo (7 días)
+    if (empresas.length === 1) {
+      const emp = empresas[0]
+      const jwtPayload = {
+        tipo:            'final',
+        email:           usuario.email,
+        nombre:          usuario.nombre,
+        foto:            payload.picture || '',
+        empresa_activa:  emp.uid,
+        empresa_nombre:  emp.nombre,
+        empresa_siglas:  emp.siglas,
+        rol_empresa:     emp.rol
+      }
+      const token = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: '7d' })
+      return res.json({
+        ok: true,
+        token,
+        tipo: 'final',
+        usuario: { email: usuario.email, nombre: usuario.nombre, foto: payload.picture || '' },
+        empresa: { uid: emp.uid, nombre: emp.nombre, siglas: emp.siglas },
+        rol_empresa: emp.rol
+      })
+    }
+
+    // Si tiene múltiples → JWT temporal (30 min)
+    const jwtPayload = {
+      tipo:     'temporal',
+      email:    usuario.email,
+      nombre:   usuario.nombre,
+      foto:     payload.picture || '',
+      empresas: empresas.map(e => ({ uid: e.uid, nombre: e.nombre, siglas: e.siglas, rol: e.rol }))
+    }
+    const token = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: '30m' })
+    return res.json({
+      ok: true,
+      token,
+      tipo: 'temporal',
+      usuario: { email: usuario.email, nombre: usuario.nombre, foto: payload.picture || '' },
+      empresas: jwtPayload.empresas
+    })
+
   } catch (e) {
     res.status(401).json({ error: e.message })
+  }
+})
+
+// ─── SELECCIONAR EMPRESA (desde token temporal) ───────────────────
+app.post('/api/ia/auth/seleccionar_empresa', async (req, res) => {
+  const header = req.headers.authorization || ''
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : null
+  if (!token) return res.status(401).json({ error: 'No autenticado' })
+
+  let decoded
+  try {
+    decoded = jwt.verify(token, JWT_SECRET)
+  } catch (e) {
+    return res.status(401).json({ error: 'Token expirado o inválido' })
+  }
+
+  if (decoded.tipo !== 'temporal') {
+    return res.status(400).json({ error: 'Este endpoint solo acepta tokens temporales' })
+  }
+
+  const { empresa_uid } = req.body
+  if (!empresa_uid) return res.status(400).json({ error: 'Falta empresa_uid' })
+
+  try {
+    // Verificar acceso real en BD
+    const [rows] = await db.query(`
+      SELECT ue.rol, e.uid, e.nombre, e.siglas
+      FROM ia_usuarios_empresas ue
+      JOIN ia_empresas e ON e.uid = ue.empresa_uid
+      WHERE ue.usuario_email = ? AND ue.empresa_uid = ? AND ue.activo = 1 AND e.estado = 'activo'
+    `, [decoded.email, empresa_uid])
+
+    if (!rows.length) {
+      return res.status(403).json({ error: 'No tienes acceso a esa empresa' })
+    }
+
+    const emp = rows[0]
+    const jwtPayload = {
+      tipo:           'final',
+      email:          decoded.email,
+      nombre:         decoded.nombre,
+      foto:           decoded.foto || '',
+      empresa_activa: emp.uid,
+      empresa_nombre: emp.nombre,
+      empresa_siglas: emp.siglas,
+      rol_empresa:    emp.rol
+    }
+    const newToken = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: '7d' })
+    res.json({
+      ok: true,
+      token: newToken,
+      empresa: { uid: emp.uid, nombre: emp.nombre, siglas: emp.siglas },
+      rol_empresa: emp.rol
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ─── MIS EMPRESAS (token temporal o final) ────────────────────────
+app.get('/api/ia/mis-empresas', async (req, res) => {
+  const header = req.headers.authorization || ''
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : null
+  if (!token) return res.status(401).json({ error: 'No autenticado' })
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    if (decoded.tipo === 'temporal') {
+      return res.json({ ok: true, empresas: decoded.empresas || [] })
+    }
+    // Token final: retornar empresa activa como lista
+    return res.json({
+      ok: true,
+      empresas: [{
+        uid:    decoded.empresa_activa,
+        nombre: decoded.empresa_nombre,
+        siglas: decoded.empresa_siglas,
+        rol:    decoded.rol_empresa
+      }]
+    })
+  } catch (e) {
+    res.status(401).json({ error: 'Token expirado o inválido' })
   }
 })
 
@@ -166,10 +301,10 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/ia', requireAuth)
 
 // ─── helper proxy al ia-service ───────────────────────────────────
-function proxyIaService(path) {
+function proxyIaService(urlPath) {
   return new Promise((resolve, reject) => {
     const http = require('http')
-    http.get(`http://localhost:5100${path}`, r => {
+    http.get(`http://localhost:5100${urlPath}`, r => {
       let body = ''
       r.on('data', d => body += d)
       r.on('end', () => { try { resolve(JSON.parse(body)) } catch(e) { reject(e) } })
@@ -177,19 +312,27 @@ function proxyIaService(path) {
   })
 }
 
-// ─── /api/ia/consumo (proxy al ia-service) ────────────────────────
+// ─── /api/ia/consumo (proxy al ia-service, filtrado por empresa) ──
 app.get('/api/ia/consumo', async (req, res) => {
   try {
-    res.json(await proxyIaService('/ia/consumo'))
+    const empresa = req.empresa || 'ori_sil_2'
+    const params  = new URLSearchParams({ empresa })
+    if (req.query.periodo) params.set('periodo', req.query.periodo)
+    if (req.query.agente)  params.set('agente',  req.query.agente)
+    res.json(await proxyIaService(`/ia/consumo?${params}`))
   } catch (e) {
     res.status(502).json({ error: 'ia-service no disponible: ' + e.message })
   }
 })
 
-// ─── /api/ia/consumo/historico (proxy al ia-service) ──────────────
+// ─── /api/ia/consumo/historico (proxy al ia-service, filtrado por empresa) ──
 app.get('/api/ia/consumo/historico', async (req, res) => {
   try {
-    res.json(await proxyIaService('/ia/consumo/historico'))
+    const empresa = req.empresa || 'ori_sil_2'
+    const params  = new URLSearchParams({ empresa })
+    if (req.query.dias)   params.set('dias',   req.query.dias)
+    if (req.query.agente) params.set('agente', req.query.agente)
+    res.json(await proxyIaService(`/ia/consumo/historico?${params}`))
   } catch (e) {
     res.status(502).json({ error: 'ia-service no disponible: ' + e.message })
   }
@@ -200,7 +343,11 @@ app.get('/api/ia/logs', async (req, res) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit) || 50, 200)
     const offset = parseInt(req.query.offset) || 0
+    const empresa = req.empresa
     const conds = [], vals = []
+
+    // Filtro de empresa siempre presente
+    if (empresa) { conds.push('empresa = ?'); vals.push(empresa) }
 
     if (req.query.agente)      { conds.push('agente_slug = ?');       vals.push(req.query.agente) }
     if (req.query.tipo)        { conds.push('tipo_consulta = ?');      vals.push(req.query.tipo) }
@@ -224,7 +371,7 @@ app.get('/api/ia/logs', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ─── AGENTES ──────────────────────────────────────────────────────
+// ─── AGENTES (globales — sin filtro empresa) ──────────────────────
 app.get('/api/ia/agentes-admin', async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -420,9 +567,9 @@ app.post('/api/ia/consultar', async (req, res) => {
 
 // ─── RAG — TEMAS ─────────────────────────────────────────────────
 
-// GET /api/ia/rag/temas?empresa=ori_sil_2
+// GET /api/ia/rag/temas — filtrado por empresa del token
 app.get('/api/ia/rag/temas', requireAuth, async (req, res) => {
-  const empresa = req.query.empresa || 'ori_sil_2'
+  const empresa = req.empresa || req.query.empresa || 'ori_sil_2'
   try {
     const [rows] = await db.execute(`
       SELECT t.*,
@@ -439,9 +586,10 @@ app.get('/api/ia/rag/temas', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// POST /api/ia/rag/temas — crear tema
+// POST /api/ia/rag/temas — empresa viene de req.empresa (del JWT), nunca del body
 app.post('/api/ia/rag/temas', requireAdmin, async (req, res) => {
-  const { empresa = 'ori_sil_2', slug, nombre, descripcion = '', system_prompt = '', agente_preferido = null } = req.body
+  const empresa = req.empresa || 'ori_sil_2'
+  const { slug, nombre, descripcion = '', system_prompt = '', agente_preferido = null } = req.body
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ error: 'slug inválido (solo minúsculas, guiones y números)' })
   if (!nombre?.trim()) return res.status(400).json({ error: 'nombre es requerido' })
   try {
@@ -485,9 +633,15 @@ app.delete('/api/ia/rag/temas/:id', requireAdmin, async (req, res) => {
 
 // ─── RAG — DOCUMENTOS ─────────────────────────────────────────────
 
-// GET /api/ia/rag/temas/:id/documentos
+// GET /api/ia/rag/temas/:id/documentos — verificar empresa del tema
 app.get('/api/ia/rag/temas/:id/documentos', requireAuth, async (req, res) => {
   try {
+    const empresa = req.empresa
+    if (empresa) {
+      const [[tema]] = await db.execute('SELECT empresa FROM ia_temas WHERE id = ?', [req.params.id])
+      if (!tema) return res.status(404).json({ error: 'Tema no encontrado' })
+      if (tema.empresa !== empresa) return res.status(403).json({ error: 'No tienes acceso a este tema' })
+    }
     const [rows] = await db.execute(
       'SELECT id, nombre, tipo, tokens_estimados, fragmentos_total, activo, created_at FROM ia_rag_documentos WHERE tema_id = ? ORDER BY nombre',
       [req.params.id]
@@ -496,7 +650,7 @@ app.get('/api/ia/rag/temas/:id/documentos', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// POST /api/ia/rag/temas/:id/documentos — crear + indexar
+// POST /api/ia/rag/temas/:id/documentos — crear + indexar (empresa de req.empresa)
 app.post('/api/ia/rag/temas/:id/documentos', requireAdmin, async (req, res) => {
   const { nombre, tipo = 'texto', contenido } = req.body
   if (!nombre?.trim()) return res.status(400).json({ error: 'nombre es requerido' })
@@ -505,6 +659,12 @@ app.post('/api/ia/rag/temas/:id/documentos', requireAdmin, async (req, res) => {
   try {
     const [[tema]] = await db.execute('SELECT empresa FROM ia_temas WHERE id = ?', [temaId])
     if (!tema) return res.status(404).json({ error: 'Tema no encontrado' })
+
+    // Verificar que el tema pertenece a la empresa del token
+    const empresaToken = req.empresa
+    if (empresaToken && tema.empresa !== empresaToken) {
+      return res.status(403).json({ error: 'No tienes acceso a este tema' })
+    }
 
     const [result] = await db.execute(
       'INSERT INTO ia_rag_documentos (empresa, tema_id, nombre, tipo, contenido_original) VALUES (?, ?, ?, ?, ?)',
@@ -569,7 +729,8 @@ app.delete('/api/ia/rag/documentos/:id', requireAdmin, async (req, res) => {
 
 // POST /api/ia/rag/buscar
 app.post('/api/ia/rag/buscar', requireAuth, async (req, res) => {
-  const { pregunta, tema_id, empresa = 'ori_sil_2' } = req.body
+  const { pregunta, tema_id } = req.body
+  const empresa = req.empresa || req.body.empresa || 'ori_sil_2'
   if (!pregunta?.trim()) return res.status(400).json({ error: 'pregunta es requerida' })
   try {
     const tmpFile = `/tmp/rag_buscar_${Date.now()}.py`

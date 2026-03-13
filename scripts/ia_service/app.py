@@ -106,9 +106,11 @@ def endpoint_consumo():
     Query params:
       ?periodo=hoy|ayer|semana|mes|todo  (default: hoy)
       ?agente=gemini-pro                 (opcional, filtra por agente)
+      ?empresa=ori_sil_2                 (opcional, filtra por empresa)
     """
     periodo = request.args.get('periodo', 'hoy')
     agente_filtro = request.args.get('agente')
+    empresa_filtro = request.args.get('empresa')
 
     filtros_fecha = {
         'hoy':    "c.fecha = CURDATE()",
@@ -124,9 +126,13 @@ def endpoint_consumo():
         with conn.cursor() as cur:
             params = []
             cond_agente = ""
+            cond_empresa = ""
             if agente_filtro:
                 cond_agente = " AND c.agente_slug = %s"
                 params.append(agente_filtro)
+            if empresa_filtro:
+                cond_empresa = " AND c.empresa = %s"
+                params.append(empresa_filtro)
 
             cur.execute(f"""
                 SELECT
@@ -157,7 +163,7 @@ def endpoint_consumo():
                     END AS estado
                 FROM ia_consumo_diario c
                 JOIN ia_agentes a ON a.slug = c.agente_slug
-                WHERE {cond_fecha}{cond_agente}
+                WHERE {cond_fecha}{cond_agente}{cond_empresa}
                 GROUP BY c.agente_slug, a.nombre, a.modelo_id, a.tipo, a.rate_limit_rpd
                 ORDER BY llamadas DESC
             """, params)
@@ -197,20 +203,26 @@ def endpoint_consumo_historico():
     """
     Consumo histórico día a día.
     Query params:
-      ?dias=30   (default: 30, max: 365)
-      ?agente=gemini-pro  (opcional)
+      ?dias=30              (default: 30, max: 365)
+      ?agente=gemini-pro    (opcional)
+      ?empresa=ori_sil_2    (opcional, filtra por empresa)
     """
     dias = min(int(request.args.get('dias', 30)), 365)
     agente_filtro = request.args.get('agente')
+    empresa_filtro = request.args.get('empresa')
 
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             params = [dias]
             cond_agente = ""
+            cond_empresa = ""
             if agente_filtro:
                 cond_agente = " AND c.agente_slug = %s"
                 params.append(agente_filtro)
+            if empresa_filtro:
+                cond_empresa = " AND c.empresa = %s"
+                params.append(empresa_filtro)
 
             cur.execute(f"""
                 SELECT
@@ -227,7 +239,7 @@ def endpoint_consumo_historico():
                     c.latencia_prom_ms
                 FROM ia_consumo_diario c
                 JOIN ia_agentes a ON a.slug = c.agente_slug
-                WHERE c.fecha >= CURDATE() - INTERVAL %s DAY{cond_agente}
+                WHERE c.fecha >= CURDATE() - INTERVAL %s DAY{cond_agente}{cond_empresa}
                 ORDER BY c.fecha DESC, c.llamadas DESC
             """, params)
             filas = cur.fetchall()
