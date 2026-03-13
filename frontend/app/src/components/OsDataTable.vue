@@ -28,7 +28,6 @@
             <SlidersHorizontalIcon :size="14" />
             <span>Campos</span>
           </button>
-          <!-- Popup campos -->
           <div v-if="showFields" class="popup fields-popup" @click.stop>
             <div class="pp-section-label">Propiedades visibles</div>
             <div class="fields-pills">
@@ -54,7 +53,6 @@
             <DownloadIcon :size="14" />
             <span>Exportar</span>
           </button>
-          <!-- Popup export -->
           <div v-if="showExport" class="popup export-popup" @click.stop>
             <div class="pp-section-label">Exportar como</div>
             <div class="export-list">
@@ -89,7 +87,7 @@
               :key="col.key"
               class="th"
               :class="{
-                'th-filtered': !!columnFilters[col.key],
+                'th-filtered': hasFilter(col.key),
                 'th-sorted': sortKey === col.key,
                 'th-agg': !!columnAggregates[col.key],
                 'th-popup-open': colPopup === col.key
@@ -101,70 +99,7 @@
                 <span v-if="sortKey === col.key" class="sort-icon">
                   <component :is="sortDir === 'asc' ? ChevronUpIcon : ChevronDownIcon" :size="12" />
                 </span>
-                <span v-if="columnFilters[col.key]" class="th-filter-dot" />
-              </div>
-
-              <!-- Mini-popup por columna -->
-              <div v-if="colPopup === col.key" class="col-popup" @click.stop>
-                <!-- Filtro -->
-                <div class="cp-section">
-                  <label class="cp-label">Filtrar</label>
-                  <input
-                    ref="colFilterInput"
-                    class="cp-input"
-                    :placeholder="isNumeric(col.key) ? 'ej: >100, <50' : 'Buscar...'"
-                    :value="columnFilters[col.key] || ''"
-                    @input="setColumnFilter(col.key, $event.target.value)"
-                    @keyup.enter="colPopup = null"
-                    @keyup.escape="colPopup = null"
-                  />
-                </div>
-
-                <!-- Ordenar -->
-                <div class="cp-section">
-                  <label class="cp-label">Ordenar</label>
-                  <div class="cp-sort-btns">
-                    <button
-                      class="cp-sort-btn"
-                      :class="{ active: sortKey === col.key && sortDir === 'asc' }"
-                      @click="setSort(col.key, 'asc')"
-                    >
-                      <ChevronUpIcon :size="12" /> Ascendente
-                    </button>
-                    <button
-                      class="cp-sort-btn"
-                      :class="{ active: sortKey === col.key && sortDir === 'desc' }"
-                      @click="setSort(col.key, 'desc')"
-                    >
-                      <ChevronDownIcon :size="12" /> Descendente
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Subtotal (solo numéricas) -->
-                <template v-if="isNumeric(col.key)">
-                  <div class="cp-divider" />
-                  <div class="cp-section">
-                    <label class="cp-label">Subtotal</label>
-                    <div class="cp-agg-btns">
-                      <button
-                        v-for="agg in aggOptions"
-                        :key="agg.value"
-                        class="cp-agg-btn"
-                        :class="{ active: columnAggregates[col.key] === agg.value }"
-                        @click="toggleAggregate(col.key, agg.value)"
-                      >
-                        <span class="cp-agg-icon">{{ agg.icon }}</span>
-                        {{ agg.label }}
-                      </button>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- Limpiar -->
-                <div v-if="columnFilters[col.key] || columnAggregates[col.key] || (sortKey === col.key)" class="cp-footer">
-                  <button class="cp-clear-btn" @click="clearColumn(col.key)">Limpiar todo</button>
-                </div>
+                <span v-if="hasFilter(col.key)" class="th-filter-dot" />
               </div>
             </th>
           </tr>
@@ -219,6 +154,103 @@
       <span v-if="activeFilterCount > 0"> · {{ rows.length - sortedRows.length }} filtradas</span>
     </div>
 
+    <!-- ── POPUP DE COLUMNA (fuera de la tabla, al final del wrapper) ── -->
+    <Teleport to="body">
+      <div v-if="colPopup" class="col-popup-overlay" @click="colPopup = null">
+        <div
+          class="col-popup"
+          :style="colPopupStyle"
+          @click.stop
+        >
+          <!-- Filtro -->
+          <div class="cp-section">
+            <label class="cp-label">Filtrar</label>
+            <div class="cp-filter-row">
+              <select
+                class="cp-select"
+                :value="getFilterOp(colPopup)"
+                @change="setFilterOp(colPopup, $event.target.value)"
+              >
+                <option value="eq">Igual a</option>
+                <option value="contains">Contiene</option>
+                <option value="gt">Mayor que</option>
+                <option value="lt">Menor que</option>
+                <option value="gte">Mayor o igual</option>
+                <option value="lte">Menor o igual</option>
+                <option value="between">Entre</option>
+              </select>
+            </div>
+            <div class="cp-filter-inputs">
+              <input
+                ref="colFilterInput"
+                class="cp-input"
+                :placeholder="getFilterOp(colPopup) === 'between' ? 'Desde' : 'Valor'"
+                :value="getFilterVal(colPopup)"
+                @input="setFilterVal(colPopup, $event.target.value)"
+                @keyup.enter="colPopup = null"
+                @keyup.escape="colPopup = null"
+              />
+              <input
+                v-if="getFilterOp(colPopup) === 'between'"
+                class="cp-input"
+                placeholder="Hasta"
+                :value="getFilterVal2(colPopup)"
+                @input="setFilterVal2(colPopup, $event.target.value)"
+                @keyup.enter="colPopup = null"
+                @keyup.escape="colPopup = null"
+              />
+            </div>
+          </div>
+
+          <!-- Ordenar -->
+          <div class="cp-section">
+            <label class="cp-label">Ordenar</label>
+            <div class="cp-sort-btns">
+              <button
+                class="cp-sort-btn"
+                :class="{ active: sortKey === colPopup && sortDir === 'asc' }"
+                @click="setSort(colPopup, 'asc')"
+              >
+                <ChevronUpIcon :size="12" /> Ascendente
+              </button>
+              <button
+                class="cp-sort-btn"
+                :class="{ active: sortKey === colPopup && sortDir === 'desc' }"
+                @click="setSort(colPopup, 'desc')"
+              >
+                <ChevronDownIcon :size="12" /> Descendente
+              </button>
+            </div>
+          </div>
+
+          <!-- Subtotal (solo numéricas) -->
+          <template v-if="isNumeric(colPopup)">
+            <div class="cp-divider" />
+            <div class="cp-section">
+              <label class="cp-label">Subtotal</label>
+              <div class="cp-agg-btns">
+                <button
+                  v-for="agg in aggOptions"
+                  :key="agg.value"
+                  class="cp-agg-btn"
+                  :class="{ active: columnAggregates[colPopup] === agg.value }"
+                  @click="toggleAggregate(colPopup, agg.value)"
+                >
+                  <span class="cp-agg-icon">{{ agg.icon }}</span>
+                  {{ agg.label }}
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- Limpiar -->
+          <div v-if="hasFilter(colPopup) || columnAggregates[colPopup] || (sortKey === colPopup)" class="cp-footer">
+            <button class="cp-clear-btn" @click="clearColumn(colPopup)">Limpiar todo</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -253,36 +285,62 @@ const showFields    = ref(false)
 const showExport    = ref(false)
 
 // ── Popup de columna ────────────────────────────────
-const colPopup = ref(null)     // key de la columna con popup abierto
-const colFilterInput = ref(null)
+const colPopup = ref(null)
+const colPopupStyle = ref({})
 
 function openColPopup(key) {
   if (colPopup.value === key) {
     colPopup.value = null
     return
   }
+  // Calcular posición del th clickeado
+  const thEls = document.querySelectorAll('.os-table .th')
+  const colIdx = visibleColumns.value.findIndex(c => c.key === key)
+  const thEl = thEls[colIdx]
+  if (thEl) {
+    const rect = thEl.getBoundingClientRect()
+    colPopupStyle.value = {
+      top: (rect.bottom + 4) + 'px',
+      left: Math.max(4, rect.left) + 'px',
+    }
+  }
   colPopup.value = key
   nextTick(() => {
-    // Focalizar el input de filtro
-    const inputs = document.querySelectorAll('.cp-input')
-    if (inputs.length > 0) inputs[inputs.length - 1].focus()
+    const input = document.querySelector('.col-popup .cp-input')
+    if (input) input.focus()
   })
 }
 
 // ── Filtros por columna ─────────────────────────────
+// Cada filtro: { op: string, val: string, val2: string }
 const columnFilters = ref({})
 
-function setColumnFilter(key, value) {
-  if (value) {
-    columnFilters.value = { ...columnFilters.value, [key]: value }
-  } else {
-    const copy = { ...columnFilters.value }
-    delete copy[key]
-    columnFilters.value = copy
-  }
+function getFilterOp(key) { return columnFilters.value[key]?.op || 'eq' }
+function getFilterVal(key) { return columnFilters.value[key]?.val || '' }
+function getFilterVal2(key) { return columnFilters.value[key]?.val2 || '' }
+
+function setFilterOp(key, op) {
+  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '' }
+  columnFilters.value = { ...columnFilters.value, [key]: { ...curr, op } }
+}
+function setFilterVal(key, val) {
+  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '' }
+  columnFilters.value = { ...columnFilters.value, [key]: { ...curr, val } }
+}
+function setFilterVal2(key, val2) {
+  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '' }
+  columnFilters.value = { ...columnFilters.value, [key]: { ...curr, val2 } }
 }
 
-const activeFilterCount = computed(() => Object.keys(columnFilters.value).length)
+function hasFilter(key) {
+  const f = columnFilters.value[key]
+  if (!f) return false
+  return f.val.trim() !== ''
+}
+
+const activeFilterCount = computed(() => {
+  return Object.keys(columnFilters.value).filter(k => hasFilter(k)).length
+})
 
 function clearAllFilters() {
   columnFilters.value = {}
@@ -290,41 +348,42 @@ function clearAllFilters() {
 
 const filteredRows = computed(() => {
   let data = props.rows
-  const filters = columnFilters.value
-  const keys = Object.keys(filters)
+  const keys = Object.keys(columnFilters.value).filter(k => hasFilter(k))
   if (keys.length === 0) return data
 
   return data.filter(row => {
     return keys.every(key => {
-      const fv = filters[key].trim()
+      const f = columnFilters.value[key]
+      const fv = f.val.trim()
       if (!fv) return true
       const raw = row[key]
+      const rawNum = parseFloat(String(raw).replace(',', '.'))
+      const fNum = parseFloat(fv)
       const val = String(raw ?? '').toLowerCase()
 
-      // Operadores numéricos
-      if (fv.startsWith('>=')) {
-        const n = parseFloat(fv.slice(2))
-        return !isNaN(n) && parseFloat(raw) >= n
+      switch (f.op) {
+        case 'eq':
+          return val === fv.toLowerCase()
+        case 'contains':
+          return val.includes(fv.toLowerCase())
+        case 'gt':
+          return !isNaN(fNum) && !isNaN(rawNum) && rawNum > fNum
+        case 'lt':
+          return !isNaN(fNum) && !isNaN(rawNum) && rawNum < fNum
+        case 'gte':
+          return !isNaN(fNum) && !isNaN(rawNum) && rawNum >= fNum
+        case 'lte':
+          return !isNaN(fNum) && !isNaN(rawNum) && rawNum <= fNum
+        case 'between': {
+          const fv2 = f.val2?.trim()
+          const fNum2 = parseFloat(fv2)
+          if (isNaN(rawNum) || isNaN(fNum)) return false
+          if (!fv2 || isNaN(fNum2)) return rawNum >= fNum
+          return rawNum >= fNum && rawNum <= fNum2
+        }
+        default:
+          return val.includes(fv.toLowerCase())
       }
-      if (fv.startsWith('<=')) {
-        const n = parseFloat(fv.slice(2))
-        return !isNaN(n) && parseFloat(raw) <= n
-      }
-      if (fv.startsWith('>')) {
-        const n = parseFloat(fv.slice(1))
-        return !isNaN(n) && parseFloat(raw) > n
-      }
-      if (fv.startsWith('<')) {
-        const n = parseFloat(fv.slice(1))
-        return !isNaN(n) && parseFloat(raw) < n
-      }
-      if (fv.startsWith('=')) {
-        const target = fv.slice(1).trim().toLowerCase()
-        return val === target
-      }
-
-      // Contiene (default)
-      return val.includes(fv.toLowerCase())
     })
   })
 })
@@ -335,7 +394,6 @@ const sortDir = ref('asc')
 
 function setSort(key, dir) {
   if (sortKey.value === key && sortDir.value === dir) {
-    // Desactivar sort
     sortKey.value = ''
   } else {
     sortKey.value = key
@@ -395,7 +453,6 @@ function aggLabel(type) {
 
 // ── Detectar columna numérica ───────────────────────
 function isNumeric(key) {
-  // Por convención de nombre
   if (key.startsWith('fin_') || key.startsWith('cto_') || key.startsWith('vol_') ||
       key.startsWith('cli_') || key.startsWith('car_') || key.startsWith('cat_') ||
       key.startsWith('con_') || key.startsWith('pry_') || key.startsWith('ant_') ||
@@ -405,7 +462,6 @@ function isNumeric(key) {
       key === 'subtotal' || key === 'total_neto' || key === 'iva' || key === 'descuento') {
     return true
   }
-  // Por datos: revisar las primeras 5 filas
   const sample = props.rows.slice(0, 5)
   if (sample.length === 0) return false
   return sample.every(r => {
@@ -442,18 +498,49 @@ function doExport(format) {
   window.open(`/api/export/${props.recurso}?${params}`, '_blank')
 }
 
+// ── Formato numérico estándar ────────────────────────
+// Separador miles: punto. Decimal: coma. Máximo 3 decimales, automático.
+function fmtNum(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—'
+  // Determinar decimales: 0 si entero, sino hasta 3
+  let decimals = 0
+  const abs = Math.abs(n)
+  const remainder = abs - Math.floor(abs)
+  if (remainder > 0.0005) {
+    // Tiene decimales
+    const s = n.toFixed(3)
+    // Quitar ceros finales
+    const trimmed = s.replace(/0+$/, '').replace(/\.$/, '')
+    const parts = trimmed.split('.')
+    decimals = parts[1] ? parts[1].length : 0
+    if (decimals > 3) decimals = 3
+  }
+  return n.toLocaleString('de-DE', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+}
+
 // ── Formato de celda ─────────────────────────────────
 function formatCell(val, key) {
   if (val === null || val === undefined) return '—'
   // Porcentajes
   if (key.includes('_pct') || key.includes('_margen')) {
     const n = parseFloat(val)
-    return isNaN(n) ? val : (n * 100).toFixed(1) + '%'
+    if (isNaN(n)) return val
+    return fmtNum(n * 100) + '%'
   }
-  // Moneda
-  if (key.startsWith('fin_') || key.startsWith('cto_') || key.startsWith('car_') || key.includes('ventas') || key.includes('ticket') || key.includes('costo') || key.includes('utilidad')) {
+  // Moneda (con símbolo $)
+  if (key.startsWith('fin_') || key.startsWith('cto_') || key.startsWith('car_') ||
+      key.includes('ventas') || key.includes('ticket') || key.includes('costo') ||
+      key.includes('utilidad')) {
     const n = parseFloat(String(val).replace(',', '.'))
-    if (!isNaN(n)) return '$' + n.toLocaleString('es-CO', { maximumFractionDigits: 0 })
+    if (!isNaN(n)) return '$' + fmtNum(n)
+  }
+  // Numéricos genéricos (no moneda, no porcentaje)
+  if (isNumeric(key)) {
+    const n = parseFloat(String(val).replace(',', '.'))
+    if (!isNaN(n)) return fmtNum(n)
   }
   return val
 }
@@ -462,7 +549,6 @@ function formatCell(val, key) {
 function handleOutsideClick() {
   showFields.value = false
   showExport.value = false
-  colPopup.value = null
 }
 onMounted(() => document.addEventListener('click', handleOutsideClick))
 onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
@@ -474,7 +560,8 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   background: var(--bg-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 /* ── TOOLBAR ── */
@@ -486,6 +573,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   padding: 0 14px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-toolbar);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 .toolbar-left { display: flex; align-items: center; gap: 8px; }
 .table-title  { font-size: 13px; font-weight: 600; color: var(--text-primary); }
@@ -628,85 +716,12 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .th-sorted   { color: var(--text-primary); }
 .th-agg      { border-bottom-color: var(--color-success); }
 .th-popup-open { color: var(--accent); background: var(--accent-muted); }
-.th-inner { display: flex; align-items: center; gap: 4px; position: relative; }
+.th-inner { display: flex; align-items: center; gap: 4px; }
 .th-label { flex: 1; }
 .th-filter-dot {
   width: 5px; height: 5px; border-radius: 50%;
   background: var(--accent); flex-shrink: 0;
 }
-
-/* ── MINI-POPUP POR COLUMNA ── */
-.col-popup {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  min-width: 200px;
-  background: var(--bg-modal);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  z-index: 210;
-  animation: popup-in 120ms ease-out;
-  padding: 8px 0;
-}
-.cp-section { padding: 4px 12px; }
-.cp-label {
-  font-size: 10px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--text-tertiary);
-  display: block; margin-bottom: 4px;
-}
-.cp-input {
-  width: 100%; height: 28px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-default);
-  background: var(--bg-input);
-  font-size: 12px; color: var(--text-primary);
-  padding: 0 8px; outline: none;
-  font-family: var(--font-sans);
-  box-sizing: border-box;
-}
-.cp-input:focus { border-color: var(--accent); }
-
-.cp-sort-btns { display: flex; flex-direction: column; gap: 2px; }
-.cp-sort-btn {
-  display: flex; align-items: center; gap: 6px;
-  height: 28px; padding: 0 8px;
-  border-radius: var(--radius-sm);
-  border: none; background: transparent;
-  font-size: 12px; color: var(--text-secondary);
-  cursor: pointer; transition: all 60ms;
-  font-family: var(--font-sans); width: 100%; text-align: left;
-}
-.cp-sort-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.cp-sort-btn.active { background: var(--accent-muted); color: var(--accent); font-weight: 500; }
-
-.cp-divider { height: 1px; background: var(--border-subtle); margin: 6px 0; }
-
-.cp-agg-btns { display: flex; flex-direction: column; gap: 2px; }
-.cp-agg-btn {
-  display: flex; align-items: center; gap: 6px;
-  height: 28px; padding: 0 8px;
-  border-radius: var(--radius-sm);
-  border: none; background: transparent;
-  font-size: 12px; color: var(--text-secondary);
-  cursor: pointer; transition: all 60ms;
-  font-family: var(--font-sans); width: 100%; text-align: left;
-}
-.cp-agg-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.cp-agg-btn.active { background: rgba(16,185,129,0.1); color: var(--color-success); font-weight: 500; }
-.cp-agg-icon { font-weight: 700; min-width: 14px; text-align: center; }
-
-.cp-footer {
-  padding: 4px 8px 0; border-top: 1px solid var(--border-subtle); margin-top: 4px;
-}
-.cp-clear-btn {
-  width: 100%; height: 26px; border: none; background: transparent;
-  font-size: 11px; color: var(--text-tertiary); cursor: pointer;
-  border-radius: var(--radius-sm); transition: all 60ms;
-  font-family: var(--font-sans);
-}
-.cp-clear-btn:hover { background: var(--bg-card-hover); color: var(--color-error); }
 
 /* ── FILAS ── */
 .data-row { cursor: pointer; transition: background 60ms; }
@@ -747,4 +762,98 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 
 /* footer */
 .table-footer { padding: 8px 14px; font-size: 12px; color: var(--text-tertiary); border-top: 1px solid var(--border-subtle); }
+</style>
+
+<style>
+/* ── POPUP DE COLUMNA (Teleport a body — NO scoped) ── */
+.col-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+.col-popup {
+  position: fixed;
+  min-width: 210px;
+  max-width: 280px;
+  background: var(--bg-modal, #fff);
+  border: 1px solid var(--border-strong, #d0d0d0);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 10000;
+  animation: popup-in 120ms ease-out;
+  padding: 8px 0;
+}
+
+.cp-section { padding: 4px 12px; }
+.cp-label {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary, #888);
+  display: block; margin-bottom: 4px;
+}
+.cp-filter-row { margin-bottom: 6px; }
+.cp-select {
+  width: 100%; height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--border-default, #ddd);
+  background: var(--bg-input, #fff);
+  font-size: 12px; color: var(--text-primary, #1a1a1a);
+  padding: 0 7px; outline: none;
+  font-family: inherit; cursor: pointer;
+  appearance: auto;
+}
+.cp-select:focus { border-color: var(--accent, #5e6ad2); }
+
+.cp-filter-inputs { display: flex; flex-direction: column; gap: 4px; }
+.cp-input {
+  width: 100%; height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--border-default, #ddd);
+  background: var(--bg-input, #fff);
+  font-size: 12px; color: var(--text-primary, #1a1a1a);
+  padding: 0 8px; outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.cp-input:focus { border-color: var(--accent, #5e6ad2); }
+
+.cp-sort-btns { display: flex; flex-direction: column; gap: 2px; }
+.cp-sort-btn {
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 8px;
+  border-radius: 4px;
+  border: none; background: transparent;
+  font-size: 12px; color: var(--text-secondary, #666);
+  cursor: pointer; transition: all 60ms;
+  font-family: inherit; width: 100%; text-align: left;
+}
+.cp-sort-btn:hover { background: var(--bg-card-hover, #f5f5f5); color: var(--text-primary, #1a1a1a); }
+.cp-sort-btn.active { background: var(--accent-muted, rgba(94,106,210,0.08)); color: var(--accent, #5e6ad2); font-weight: 500; }
+
+.cp-divider { height: 1px; background: var(--border-subtle, #eee); margin: 6px 0; }
+
+.cp-agg-btns { display: flex; flex-direction: column; gap: 2px; }
+.cp-agg-btn {
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 8px;
+  border-radius: 4px;
+  border: none; background: transparent;
+  font-size: 12px; color: var(--text-secondary, #666);
+  cursor: pointer; transition: all 60ms;
+  font-family: inherit; width: 100%; text-align: left;
+}
+.cp-agg-btn:hover { background: var(--bg-card-hover, #f5f5f5); color: var(--text-primary, #1a1a1a); }
+.cp-agg-btn.active { background: rgba(16,185,129,0.1); color: var(--color-success, #10b981); font-weight: 500; }
+.cp-agg-icon { font-weight: 700; min-width: 14px; text-align: center; }
+
+.cp-footer {
+  padding: 4px 8px 0; border-top: 1px solid var(--border-subtle, #eee); margin-top: 4px;
+}
+.cp-clear-btn {
+  width: 100%; height: 26px; border: none; background: transparent;
+  font-size: 11px; color: var(--text-tertiary, #999); cursor: pointer;
+  border-radius: 4px; transition: all 60ms;
+  font-family: inherit;
+}
+.cp-clear-btn:hover { background: var(--bg-card-hover, #f5f5f5); color: var(--color-error, #ef4444); }
 </style>
