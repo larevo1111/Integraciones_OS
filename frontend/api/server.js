@@ -451,6 +451,25 @@ app.get('/api/ventas/consignacion-cliente/:id_cliente', async (req, res) => {
 })
 
 // ── CONSIGNACIÓN ORDEN: encabezado + ítems de una orden (Nivel 3) ─
+app.get('/api/ventas/consignacion-por-producto', async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT
+        d.cod_articulo,
+        COALESCE(NULLIF(TRIM(d.descripcion_en_factura),''), d.descripcion_original) AS descripcion_articulo,
+        COUNT(DISTINCT d.id_orden)                                                   AS num_ordenes,
+        COUNT(DISTINCT e.id_cliente)                                                 AS num_clientes,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4)))) AS cantidad_total,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.total_neto,'0'),',','.') AS DECIMAL(15,2)))) AS fin_total
+      FROM zeffi_ordenes_venta_encabezados e
+      JOIN zeffi_ordenes_venta_detalle d ON d.id_orden = e.id_orden
+      WHERE e.vigencia = 'Vigente'
+      GROUP BY d.cod_articulo, COALESCE(NULLIF(TRIM(d.descripcion_en_factura),''), d.descripcion_original)
+      ORDER BY fin_total DESC`)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 app.get('/api/ventas/consignacion-orden/:id_orden', async (req, res) => {
   try {
     const { id_orden } = req.params
@@ -547,6 +566,11 @@ const COLUMN_TOOLTIPS = {
 
   // Consignación
   con_consignacion_pp: 'Mercancía entregada en consignación (órdenes de venta)',
+  cod_articulo:        'Código interno del artículo en Effi',
+  descripcion_articulo:'Nombre o descripción del producto',
+  num_ordenes:         'Cantidad de órdenes de venta vigentes que incluyen este producto',
+  num_clientes:        'Cantidad de clientes distintos con este producto en consignación',
+  cantidad_total:      'Unidades totales del producto actualmente en consignación',
 
   // Proyección
   pry_dia_del_mes: 'Día del mes actual (para calcular proyección)',

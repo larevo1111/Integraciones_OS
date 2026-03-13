@@ -19,7 +19,7 @@
     <div class="page-content">
 
       <!-- KPIs -->
-      <div v-if="!loading && rows.length > 0" class="kpi-section">
+      <div v-if="!loadingClientes && rowsClientes.length > 0" class="kpi-section">
         <div class="kpi-card">
           <span class="kpi-label">Clientes con consignación</span>
           <span class="kpi-value">{{ kpis.numClientes }}</span>
@@ -34,14 +34,44 @@
         </div>
       </div>
 
-      <!-- Tabla resumen por cliente -->
+      <!-- Pill Tabs -->
+      <div class="pill-tabs">
+        <button
+          class="pill-tab"
+          :class="{ active: tabActivo === 'clientes' }"
+          @click="tabActivo = 'clientes'"
+        >
+          Por cliente
+          <span v-if="rowsClientes.length > 0" class="pill-tab-badge">{{ rowsClientes.length }}</span>
+        </button>
+        <button
+          class="pill-tab"
+          :class="{ active: tabActivo === 'productos' }"
+          @click="tabActivo = 'productos'"
+        >
+          Por producto
+          <span v-if="rowsProductos.length > 0" class="pill-tab-badge">{{ rowsProductos.length }}</span>
+        </button>
+      </div>
+
+      <!-- Tab: Por cliente -->
       <OsDataTable
+        v-if="tabActivo === 'clientes'"
         title="Consignación por cliente"
         recurso="consignacion"
-        :rows="rows"
-        :columns="cols"
-        :loading="loading"
-        @row-click="onRowClick"
+        :rows="rowsClientes"
+        :columns="colsClientes"
+        :loading="loadingClientes"
+        @row-click="onRowClickCliente"
+      />
+
+      <!-- Tab: Por producto -->
+      <OsDataTable
+        v-if="tabActivo === 'productos'"
+        title="Consignación por producto"
+        :rows="rowsProductos"
+        :columns="colsProductos"
+        :loading="loadingProductos"
       />
 
     </div>
@@ -57,17 +87,21 @@ import OsDataTable from 'src/components/OsDataTable.vue'
 
 const router  = useRouter()
 const API     = '/api'
-const rows    = ref([])
-const cols    = ref([])
-const loading = ref(true)
 
-const VISIBLE = [
+const tabActivo = ref('clientes')
+
+// ── Tab clientes ──────────────────────────────────────
+const rowsClientes    = ref([])
+const colsClientes    = ref([])
+const loadingClientes = ref(true)
+
+const VISIBLE_CLIENTES = [
   'nombre_cliente', 'ciudad', 'vendedor',
   'num_ordenes', 'fin_total_consignacion',
   'fecha_primera_orden', 'fecha_ultima_orden'
 ]
 
-const LABELS = {
+const LABELS_CLIENTES = {
   nombre_cliente:        'Cliente',
   ciudad:                'Ciudad',
   vendedor:              'Vendedor',
@@ -78,14 +112,34 @@ const LABELS = {
   id_cliente:            'ID Cliente',
 }
 
-function labelFromKey(key) {
-  return LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+// ── Tab productos ─────────────────────────────────────
+const rowsProductos    = ref([])
+const colsProductos    = ref([])
+const loadingProductos = ref(true)
+
+const VISIBLE_PRODUCTOS = [
+  'cod_articulo', 'descripcion_articulo',
+  'num_clientes', 'num_ordenes', 'cantidad_total', 'fin_total'
+]
+
+const LABELS_PRODUCTOS = {
+  cod_articulo:         'Cód.',
+  descripcion_articulo: 'Producto',
+  num_clientes:         'Clientes',
+  num_ordenes:          'Órdenes',
+  cantidad_total:       'Cantidad',
+  fin_total:            'Total',
+}
+
+// ── Helpers ───────────────────────────────────────────
+function labelFromKey(key, labels) {
+  return labels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
 const kpis = computed(() => ({
-  numClientes:       rows.value.length,
-  numOrdenes:        rows.value.reduce((s, r) => s + (parseInt(r.num_ordenes) || 0), 0),
-  totalConsignacion: rows.value.reduce((s, r) => s + (parseFloat(r.fin_total_consignacion) || 0), 0),
+  numClientes:       rowsClientes.value.length,
+  numOrdenes:        rowsClientes.value.reduce((s, r) => s + (parseInt(r.num_ordenes) || 0), 0),
+  totalConsignacion: rowsClientes.value.reduce((s, r) => s + (parseFloat(r.fin_total_consignacion) || 0), 0),
 }))
 
 function fmtMoney(n) {
@@ -93,20 +147,38 @@ function fmtMoney(n) {
   return '$' + Math.round(n).toLocaleString('de-DE')
 }
 
-function onRowClick(row) {
+function onRowClickCliente(row) {
   router.push(`/ventas/consignacion-cliente/${encodeURIComponent(row.id_cliente)}`)
 }
 
 onMounted(async () => {
-  try {
-    const { data } = await axios.get(`${API}/ventas/consignacion`)
-    rows.value = data
+  // Cargar ambas tabs en paralelo
+  const [resClientes, resProductos] = await Promise.allSettled([
+    axios.get(`${API}/ventas/consignacion`),
+    axios.get(`${API}/ventas/consignacion-por-producto`),
+  ])
+
+  if (resClientes.status === 'fulfilled') {
+    const data = resClientes.value.data
+    rowsClientes.value = data
     if (data.length > 0) {
-      cols.value = Object.keys(data[0]).map(key => ({
-        key, label: labelFromKey(key), visible: VISIBLE.includes(key)
+      colsClientes.value = Object.keys(data[0]).map(key => ({
+        key, label: labelFromKey(key, LABELS_CLIENTES), visible: VISIBLE_CLIENTES.includes(key)
       }))
     }
-  } finally { loading.value = false }
+  }
+  loadingClientes.value = false
+
+  if (resProductos.status === 'fulfilled') {
+    const data = resProductos.value.data
+    rowsProductos.value = data
+    if (data.length > 0) {
+      colsProductos.value = Object.keys(data[0]).map(key => ({
+        key, label: labelFromKey(key, LABELS_PRODUCTOS), visible: VISIBLE_PRODUCTOS.includes(key)
+      }))
+    }
+  }
+  loadingProductos.value = false
 })
 </script>
 
@@ -132,4 +204,46 @@ onMounted(async () => {
 }
 .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
 .kpi-value { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+
+/* Pill Tabs — Manual sección 26 */
+.pill-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: inherit;
+  transition: border-color 70ms, color 70ms, background 70ms;
+  white-space: nowrap;
+}
+.pill-tab:hover {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+.pill-tab.active {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.pill-tab-badge {
+  background: var(--color-accent);
+  color: white;
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+}
 </style>
