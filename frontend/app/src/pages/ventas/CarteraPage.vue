@@ -19,45 +19,36 @@
     <div class="page-content">
 
       <!-- KPIs -->
-      <div v-if="!loadingFacturas && resCartera.length > 0" class="kpi-section">
+      <div v-if="!loading && resCliente.length > 0" class="kpi-section">
         <div class="kpi-card">
           <span class="kpi-label">Total pendiente</span>
           <span class="kpi-value">{{ fmtMoney(kpis.totalPendiente) }}</span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Facturas pendientes</span>
-          <span class="kpi-value">{{ kpis.numFacturas }}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Clientes con saldo</span>
           <span class="kpi-value">{{ kpis.numClientes }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Total mora</span>
+          <span class="kpi-label">Facturas pendientes</span>
+          <span class="kpi-value">{{ kpis.numFacturas }}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Saldo en mora (+30 días)</span>
           <span class="kpi-value kpi-danger">{{ fmtMoney(kpis.totalMora) }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Mayor mora</span>
-          <span class="kpi-value kpi-danger">{{ kpis.maxDiasMora }} días</span>
+          <span class="kpi-label">Mayor antigüedad</span>
+          <span class="kpi-value kpi-danger">{{ kpis.antiguedadMax }} días</span>
         </div>
       </div>
 
-      <!-- Tabla facturas pendientes -->
-      <OsDataTable
-        title="Facturas con saldo pendiente"
-        recurso="cartera"
-        :rows="resCartera"
-        :columns="colsCartera"
-        :loading="loadingFacturas"
-        @row-click="onFacturaClick"
-      />
-
-      <!-- Tabla resumen por cliente -->
+      <!-- Tabla cartera por cliente -->
       <OsDataTable
         title="Cartera por cliente"
+        recurso="cartera-cliente"
         :rows="resCliente"
         :columns="colsCliente"
-        :loading="loadingCliente"
+        :loading="loading"
       />
     </div>
   </div>
@@ -65,52 +56,52 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ChevronRightIcon } from 'lucide-vue-next'
 import OsDataTable from 'src/components/OsDataTable.vue'
 
-const router = useRouter()
 const API = '/api'
+const resCliente = ref([])
+const loading    = ref(true)
+const colsCliente = ref([])
 
-const resCartera      = ref([])
-const loadingFacturas = ref(true)
-const colsCartera     = ref([])
+const VISIBLE = [
+  'cliente', 'ciudad', 'vendedor', 'plazo',
+  'num_facturas_pendientes', 'total_pendiente',
+  'saldo_1_30', 'saldo_31_60', 'saldo_61_90', 'saldo_mas_90',
+  'promedio_antiguedad', 'antiguedad_max'
+]
 
-const resCliente      = ref([])
-const loadingCliente  = ref(true)
-const colsCliente     = ref([])
-
-const VISIBLE_CARTERA = ['id_numeracion','fecha_de_creacion','cliente','ciudad','vendedor','total_neto','pdte_de_cobro','estado_cxc','dias_mora','valor_mora','formas_de_pago']
-const VISIBLE_CLIENTE = ['cliente','ciudad','vendedor','num_facturas_pendientes','total_pendiente','total_mora','max_dias_mora','factura_mas_antigua']
+const LABELS = {
+  cliente:                 'Cliente',
+  ciudad:                  'Ciudad',
+  vendedor:                'Vendedor',
+  plazo:                   'Plazo',
+  num_facturas_pendientes: 'Facturas pend.',
+  total_pendiente:         'Total pendiente',
+  saldo_1_30:              '1–30 días',
+  saldo_31_60:             '31–60 días',
+  saldo_61_90:             '61–90 días',
+  saldo_mas_90:            '+90 días',
+  promedio_antiguedad:     'Prom. antigüedad',
+  antiguedad_max:          'Antigüedad máx.',
+}
 
 function labelFromKey(key) {
-  const MAP = {
-    id_numeracion: 'N° Factura',
-    fecha_de_creacion: 'Fecha',
-    pdte_de_cobro: 'Saldo pendiente',
-    estado_cxc: 'Estado CxC',
-    dias_mora: 'Días mora',
-    valor_mora: 'Valor mora',
-    total_neto: 'Total factura',
-    formas_de_pago: 'Forma de pago',
-    num_facturas_pendientes: 'Facturas pend.',
-    total_pendiente: 'Total pendiente',
-    total_mora: 'Total mora',
-    max_dias_mora: 'Máx días mora',
-    factura_mas_antigua: 'Factura más antigua',
-  }
-  if (MAP[key]) return MAP[key]
-  return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim()
+  return LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
 const kpis = computed(() => {
-  const rows = resCartera.value
-  const totalPendiente = rows.reduce((s, r) => s + (parseFloat(r.pdte_de_cobro) || 0), 0)
-  const totalMora = rows.reduce((s, r) => s + (parseFloat(r.valor_mora) || 0), 0)
-  const maxDiasMora = rows.reduce((m, r) => Math.max(m, parseInt(r.dias_mora) || 0), 0)
-  const clientes = new Set(rows.map(r => r.id_cliente))
-  return { totalPendiente, totalMora, maxDiasMora, numFacturas: rows.length, numClientes: clientes.size }
+  const rows = resCliente.value
+  return {
+    totalPendiente: rows.reduce((s, r) => s + (parseFloat(r.total_pendiente) || 0), 0),
+    numClientes:    rows.length,
+    numFacturas:    rows.reduce((s, r) => s + (parseInt(r.num_facturas_pendientes) || 0), 0),
+    totalMora:      rows.reduce((s, r) => s + (parseFloat(r.saldo_31_60) || 0)
+                                           + (parseFloat(r.saldo_61_90) || 0)
+                                           + (parseFloat(r.saldo_mas_90) || 0), 0),
+    antiguedadMax:  rows.reduce((m, r) => Math.max(m, parseInt(r.antiguedad_max) || 0), 0),
+  }
 })
 
 function fmtMoney(n) {
@@ -118,41 +109,16 @@ function fmtMoney(n) {
   return '$' + Math.round(n).toLocaleString('de-DE')
 }
 
-async function loadCartera() {
-  loadingFacturas.value = true
-  try {
-    const { data } = await axios.get(`${API}/ventas/cartera`)
-    resCartera.value = data
-    if (data.length > 0) {
-      colsCartera.value = Object.keys(data[0]).map(key => ({
-        key, label: labelFromKey(key), visible: VISIBLE_CARTERA.includes(key)
-      }))
-    }
-  } finally { loadingFacturas.value = false }
-}
-
-async function loadCarteraCliente() {
-  loadingCliente.value = true
+onMounted(async () => {
   try {
     const { data } = await axios.get(`${API}/ventas/cartera-cliente`)
     resCliente.value = data
     if (data.length > 0) {
       colsCliente.value = Object.keys(data[0]).map(key => ({
-        key, label: labelFromKey(key), visible: VISIBLE_CLIENTE.includes(key)
+        key, label: labelFromKey(key), visible: VISIBLE.includes(key)
       }))
     }
-  } finally { loadingCliente.value = false }
-}
-
-function onFacturaClick(row) {
-  if (row.id_interno && row.id_numeracion) {
-    router.push(`/ventas/detalle-factura/${row.id_interno}/${row.id_numeracion}`)
-  }
-}
-
-onMounted(() => {
-  loadCartera()
-  loadCarteraCliente()
+  } finally { loading.value = false }
 })
 </script>
 
@@ -176,10 +142,7 @@ onMounted(() => {
 
 .page-content { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 
-/* KPIs */
-.kpi-section {
-  display: flex; gap: 12px; flex-wrap: wrap;
-}
+.kpi-section { display: flex; gap: 12px; flex-wrap: wrap; }
 .kpi-card {
   flex: 1; min-width: 160px;
   background: var(--bg-card);
