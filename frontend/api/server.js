@@ -393,6 +393,64 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ── CARTERA DETALLE: facturas pendientes de un cliente ────
+app.get('/api/ventas/cartera-cliente/:id_cliente', async (req, res) => {
+  try {
+    const id_cliente = decodeURIComponent(req.params.id_cliente)
+    const rows = await query(`
+      SELECT
+        id_interno, id_numeracion, fecha_de_creacion,
+        cliente, id_cliente, ciudad, vendedor, formas_de_pago, estado_cxc,
+        CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))    AS fin_total_neto,
+        CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS fin_pendiente,
+        DATEDIFF(CURDATE(), fecha_de_creacion)                               AS dias_antiguedad
+      FROM zeffi_facturas_venta_encabezados
+      WHERE id_cliente = ?
+        AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
+      ORDER BY fecha_de_creacion ASC`,
+      [id_cliente])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── CONSIGNACIÓN: órdenes activas (Generada + Pendiente) ─
+app.get('/api/ventas/consignacion', async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT id_orden, nombre_cliente, id_cliente, vendedor, ciudad,
+             CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2)) AS total_neto_num,
+             fecha_de_creacion, fecha_de_entrega, vigencia
+      FROM zeffi_ordenes_venta_encabezados
+      WHERE ultimo_estado = 'Generada' AND estado_facturacion = 'Pendiente'
+      ORDER BY fecha_de_creacion ASC`)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── CONSIGNACIÓN DETALLE: encabezado + ítems de una orden ─
+app.get('/api/ventas/consignacion/:id_orden', async (req, res) => {
+  try {
+    const { id_orden } = req.params
+    const [encabezado] = await query(
+      `SELECT * FROM zeffi_ordenes_venta_encabezados WHERE id_orden = ? LIMIT 1`,
+      [id_orden]
+    )
+    const items = await query(`
+      SELECT
+        cod_articulo,
+        COALESCE(NULLIF(TRIM(descripcion_en_factura),''), descripcion_original) AS descripcion_articulo,
+        CAST(REPLACE(COALESCE(cantidad,'0'),',','.') AS DECIMAL(15,4))         AS cantidad,
+        CAST(REPLACE(COALESCE(precio_unitario,'0'),',','.') AS DECIMAL(15,2))  AS precio_unitario,
+        CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))       AS total
+      FROM zeffi_ordenes_venta_detalle
+      WHERE id_orden = ?
+      ORDER BY _pk`,
+      [id_orden]
+    )
+    res.json({ encabezado: encabezado || null, items })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ── TOOLTIPS — diccionario de columnas ───────────────
 
 const COLUMN_TOOLTIPS = {
@@ -428,6 +486,21 @@ const COLUMN_TOOLTIPS = {
   cli_clientes_nuevos: 'Clientes cuya primera compra fue en este período',
   cli_vtas_por_cliente: 'Venta promedio por cliente activo',
   cli_es_nuevo: '1 si es la primera compra histórica del cliente',
+
+  // Consignación
+  id_orden:                'Número de orden de venta',
+  nombre_cliente:          'Nombre del cliente de la orden',
+  total_neto_num:          'Valor total neto de la orden',
+  fecha_de_entrega:        'Fecha comprometida de entrega al cliente',
+  dias_en_calle:           'Días transcurridos desde la fecha de creación de la orden',
+  descripcion_articulo:    'Descripción del artículo en la orden',
+  precio_unitario:         'Precio unitario del artículo',
+
+  // Cartera CxC — detalle factura
+  fin_total_neto:          'Valor total neto de la factura',
+  fin_pendiente:           'Saldo pendiente de cobro de esta factura',
+  dias_antiguedad:         'Días transcurridos desde la fecha de creación de la factura',
+  formas_de_pago:          'Forma de pago acordada en la factura',
 
   // Cartera CxC
   total_pendiente:         'Suma total de saldos pendientes del cliente',

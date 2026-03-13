@@ -49,6 +49,7 @@
         :rows="resCliente"
         :columns="colsCliente"
         :loading="loading"
+        @row-click="onRowClick"
       />
     </div>
   </div>
@@ -56,10 +57,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ChevronRightIcon } from 'lucide-vue-next'
 import OsDataTable from 'src/components/OsDataTable.vue'
 
+const router     = useRouter()
 const API = '/api'
 const resCliente = ref([])
 const loading    = ref(true)
@@ -120,6 +123,10 @@ onMounted(async () => {
     }
   } finally { loading.value = false }
 })
+
+function onRowClick(row) {
+  router.push(`/ventas/cartera/${encodeURIComponent(row.id_cliente)}`)
+}
 </script>
 
 <style scoped>
