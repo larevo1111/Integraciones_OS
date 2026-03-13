@@ -381,8 +381,11 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
         FROM zeffi_facturas_venta_encabezados
         WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
       ) sub
-      LEFT JOIN zeffi_clientes c
-             ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
+      LEFT JOIN (
+        SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago
+        FROM zeffi_clientes
+        GROUP BY numero_de_identificacion
+      ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
       GROUP BY sub.id_cliente
       ORDER BY total_pendiente DESC
       LIMIT 1000`)
