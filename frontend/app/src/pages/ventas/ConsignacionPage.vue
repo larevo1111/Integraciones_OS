@@ -232,10 +232,10 @@ onMounted(async () => {
   color: var(--text-secondary);
 }
 .pill-tab.active {
-  border-color: var(--border-default);
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-weight: 500;
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-weight: 600;
 }
 .pill-tab-badge {
   background: var(--color-accent);

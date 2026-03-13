@@ -11,6 +11,12 @@
 3. **Seguir el manual al pie de la letra**: colores, tipografía, espaciado, componentes — todo definido ahí.
 4. **Si el elemento NO está en el manual**: DETENERSE. Preguntar a Santi y definir juntos antes de implementar. Luego actualizar el manual.
 
+**⚠️ VERIFICACIÓN OBLIGATORIA ANTES DE MARCAR CUALQUIER TAREA FRONTEND COMO LISTA:**
+1. Verificar que TODAS las variables CSS usadas existen en `frontend/app/src/css/app.scss` — si no existen, agregarlas o usar variable equivalente
+2. Verificar que el endpoint API devuelve los datos correctos con `curl` o query directa
+3. Hacer el build y confirmar que compila sin errores
+4. NO declarar una tarea como completada sin haber verificado los puntos anteriores
+
 **⚠️ BUILD OBLIGATORIO:** Después de cualquier modificación Vue/Quasar, los fuentes NO se sirven directamente. El servidor sirve `dist/spa/` compilado. Sin rebuild = cambios invisibles en producción.
 
 ### Cómo hacer el build correctamente
