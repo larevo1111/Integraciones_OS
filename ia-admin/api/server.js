@@ -870,6 +870,158 @@ print(json.dumps({'fragmentos': fix(result)}))
   }
 })
 
+// ═══════════════════════════════════════════════════════════════════
+// MÓDULO CONEXIONES BD
+// ═══════════════════════════════════════════════════════════════════
+
+// GET /api/ia/conexiones
+app.get('/api/ia/conexiones', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, empresa, nombre, tipo, host, puerto, usuario, base_datos, activo, notas, ultima_sync, updated_at FROM ia_conexiones_bd WHERE empresa = ? ORDER BY nombre',
+      [req.empresa]
+    )
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/ia/conexiones
+app.post('/api/ia/conexiones', requireAdmin, async (req, res) => {
+  const { nombre, tipo = 'mariadb', host, puerto = 3306, usuario, password = '', base_datos, notas = '' } = req.body
+  if (!nombre || !host || !usuario || !base_datos)
+    return res.status(400).json({ error: 'nombre, host, usuario y base_datos son obligatorios' })
+  try {
+    const [r] = await db.execute(
+      'INSERT INTO ia_conexiones_bd (empresa, nombre, tipo, host, puerto, usuario, password, base_datos, notas, usuario_creacion) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [req.empresa, nombre, tipo, host, puerto, usuario, password, base_datos, notas, req.user]
+    )
+    res.json({ ok: true, id: r.insertId })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/ia/conexiones/:id
+app.put('/api/ia/conexiones/:id', requireAdmin, async (req, res) => {
+  const { nombre, tipo, host, puerto, usuario, password, base_datos, notas, activo } = req.body
+  try {
+    const [[conn]] = await db.execute('SELECT id FROM ia_conexiones_bd WHERE id = ? AND empresa = ?', [req.params.id, req.empresa])
+    if (!conn) return res.status(404).json({ error: 'Conexión no encontrada' })
+    const fields = [], params = []
+    if (nombre     !== undefined) { fields.push('nombre = ?');     params.push(nombre) }
+    if (tipo       !== undefined) { fields.push('tipo = ?');       params.push(tipo) }
+    if (host       !== undefined) { fields.push('host = ?');       params.push(host) }
+    if (puerto     !== undefined) { fields.push('puerto = ?');     params.push(puerto) }
+    if (usuario    !== undefined) { fields.push('usuario = ?');    params.push(usuario) }
+    if (password   !== undefined) { fields.push('password = ?');   params.push(password) }
+    if (base_datos !== undefined) { fields.push('base_datos = ?'); params.push(base_datos) }
+    if (notas      !== undefined) { fields.push('notas = ?');      params.push(notas) }
+    if (activo     !== undefined) { fields.push('activo = ?');     params.push(activo) }
+    fields.push('usuario_ult_mod = ?'); params.push(req.user)
+    params.push(req.params.id)
+    await db.execute(`UPDATE ia_conexiones_bd SET ${fields.join(', ')} WHERE id = ?`, params)
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// DELETE /api/ia/conexiones/:id
+app.delete('/api/ia/conexiones/:id', requireAdmin, async (req, res) => {
+  try {
+    const [[used]] = await db.execute('SELECT COUNT(*) AS total FROM ia_esquemas WHERE conexion_id = ?', [req.params.id])
+    if (used.total > 0)
+      return res.status(409).json({ error: `Conexión en uso por ${used.total} esquema(s). Primero desvincula los esquemas.` })
+    await db.execute('DELETE FROM ia_conexiones_bd WHERE id = ? AND empresa = ?', [req.params.id, req.empresa])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/ia/conexiones/:id/test — probar conexión via Flask
+app.post('/api/ia/conexiones/:id/test', requireAdmin, async (req, res) => {
+  const body = JSON.stringify({ conexion_id: parseInt(req.params.id) })
+  const options = { host: 'localhost', port: 5100, path: '/ia/conexion/test', method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }
+  const result = await new Promise((resolve) => {
+    const r = http.request(options, resp => {
+      let d = ''
+      resp.on('data', c => d += c)
+      resp.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve({ ok: false, mensaje: d }) } })
+    })
+    r.on('error', e => resolve({ ok: false, mensaje: e.message }))
+    r.write(body); r.end()
+  })
+  res.json(result)
+})
+
+// GET /api/ia/conexiones/:id/tablas — listar tablas disponibles
+app.get('/api/ia/conexiones/:id/tablas', requireAdmin, async (req, res) => {
+  const body = JSON.stringify({ conexion_id: parseInt(req.params.id) })
+  const options = { host: 'localhost', port: 5100, path: '/ia/conexion/test', method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }
+  const result = await new Promise((resolve) => {
+    const r = http.request(options, resp => {
+      let d = ''
+      resp.on('data', c => d += c)
+      resp.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve({ ok: false }) } })
+    })
+    r.on('error', e => resolve({ ok: false, mensaje: e.message }))
+    r.write(body); r.end()
+  })
+  if (!result.ok) return res.status(400).json({ error: result.mensaje })
+  res.json({ tablas: result.tablas_disponibles || [] })
+})
+
+// POST /api/ia/esquemas/:tema_id/sync — sincronizar schema via Flask
+app.post('/api/ia/esquemas/:tema_id/sync', requireAdmin, async (req, res) => {
+  const body = JSON.stringify({ tema_id: parseInt(req.params.tema_id), empresa: req.empresa })
+  const options = { host: 'localhost', port: 5100, path: '/ia/esquema/sync', method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }
+  const result = await new Promise((resolve) => {
+    const r = http.request(options, resp => {
+      let d = ''
+      resp.on('data', c => d += c)
+      resp.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve({ ok: false, mensaje: d }) } })
+    })
+    r.on('error', e => resolve({ ok: false, mensaje: e.message }))
+    r.write(body); r.end()
+  })
+  res.json(result)
+})
+
+// GET /api/ia/esquemas/:tema_id
+app.get('/api/ia/esquemas/:tema_id', requireAdmin, async (req, res) => {
+  try {
+    const [[row]] = await db.execute(
+      `SELECT e.*, c.nombre AS conexion_nombre, c.tipo AS conexion_tipo
+       FROM ia_esquemas e LEFT JOIN ia_conexiones_bd c ON c.id = e.conexion_id
+       WHERE e.tema_id = ? AND e.empresa = ?`,
+      [req.params.tema_id, req.empresa]
+    )
+    if (!row) return res.status(404).json({ error: 'Esquema no encontrado' })
+    if (row.tablas_incluidas) {
+      try { row.tablas_incluidas = JSON.parse(row.tablas_incluidas) } catch { row.tablas_incluidas = [] }
+    }
+    res.json(row)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/ia/esquemas/:tema_id
+app.put('/api/ia/esquemas/:tema_id', requireAdmin, async (req, res) => {
+  const { tablas_incluidas, notas_manuales, conexion_id } = req.body
+  try {
+    const [[row]] = await db.execute('SELECT id FROM ia_esquemas WHERE tema_id = ? AND empresa = ?', [req.params.tema_id, req.empresa])
+    if (!row) return res.status(404).json({ error: 'Esquema no encontrado' })
+    const fields = [], params = []
+    if (tablas_incluidas !== undefined) { fields.push('tablas_incluidas = ?'); params.push(JSON.stringify(tablas_incluidas)) }
+    if (notas_manuales  !== undefined) { fields.push('notas_manuales = ?');   params.push(notas_manuales) }
+    if (conexion_id     !== undefined) { fields.push('conexion_id = ?');      params.push(conexion_id) }
+    if (tablas_incluidas !== undefined || conexion_id !== undefined) {
+      fields.push('ddl_auto = NULL'); fields.push('ultima_sync = NULL')
+    }
+    fields.push('usuario_ult_mod = ?'); params.push(req.user)
+    params.push(row.id)
+    await db.execute(`UPDATE ia_esquemas SET ${fields.join(', ')} WHERE id = ?`, params)
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Frontend estático ────────────────────────────────────────────
 const distPath = path.join(__dirname, '../app/dist/spa')
 app.use(express.static(distPath))

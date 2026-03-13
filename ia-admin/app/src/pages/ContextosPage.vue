@@ -82,6 +82,61 @@
         </table>
       </div>
 
+      <!-- Sección Schema BD -->
+      <div class="tabla-wrap schema-section" v-if="temaActivo">
+        <div class="tabla-header">
+          <span class="tabla-titulo">Schema de BD
+            <span class="text-muted" style="font-weight:400;font-size:12px">
+              — se inyecta al LLM en consultas de datos
+            </span>
+          </span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span v-if="esquema?.ultima_sync" style="font-size:11px;color:var(--text-tertiary)">
+              Sync: {{ fmtFecha(esquema.ultima_sync) }}
+            </span>
+            <button class="btn btn-secondary" @click="syncSchema" :disabled="sincronizando">
+              {{ sincronizando ? 'Sincronizando...' : '↻ Sincronizar' }}
+            </button>
+            <button class="btn btn-secondary" @click="guardarSchema" :disabled="guardandoSchema">
+              {{ guardandoSchema ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="cargandoSchema" style="padding:16px;color:var(--text-tertiary);font-size:13px">Cargando schema...</div>
+        <div v-else class="schema-body">
+          <!-- Tablas seleccionadas -->
+          <div class="schema-field">
+            <label class="schema-label">Tablas incluidas</label>
+            <div class="tablas-chips" v-if="tablasDisponibles.length">
+              <label v-for="t in tablasDisponibles" :key="t" class="chip-toggle">
+                <input type="checkbox" :value="t" v-model="tablasSeleccionadas" />
+                <span>{{ t }}</span>
+              </label>
+            </div>
+            <div v-else style="font-size:12px;color:var(--text-tertiary)">
+              Prueba la conexión primero para ver las tablas disponibles.
+              <button class="btn-link" @click="cargarTablas">Cargar tablas</button>
+            </div>
+          </div>
+
+          <!-- Schema auto -->
+          <div class="schema-field" v-if="esquema?.ddl_auto">
+            <label class="schema-label">Schema generado automáticamente <span class="text-muted">(solo lectura)</span></label>
+            <pre class="schema-pre">{{ esquema.ddl_auto }}</pre>
+          </div>
+
+          <!-- Notas manuales -->
+          <div class="schema-field">
+            <label class="schema-label">Notas de negocio <span class="text-muted">(instrucciones adicionales para la IA)</span></label>
+            <textarea class="input-field schema-textarea" v-model="notasSchema" rows="5"
+              placeholder="ej: precio_neto_total INCLUYE IVA — usar precio_bruto_total - descuento_total&#10;id_cliente tiene prefijo tipo doc (CC 12345) — usar SUBSTRING_INDEX para JOIN"></textarea>
+          </div>
+
+          <div v-if="schemaMsg" class="schema-msg" :class="schemaMsgOk ? 'schema-ok' : 'schema-err'">{{ schemaMsg }}</div>
+        </div>
+      </div>
+
       <!-- Sección de búsqueda RAG -->
       <div class="tabla-wrap busqueda-section">
         <div class="tabla-header">
@@ -298,6 +353,17 @@ const buscando           = ref(false)
 const busquedaRealizada  = ref(false)
 const resultadosBusqueda = ref([])
 
+// ── Schema BD ─────────────────────────────────────────────────────
+const esquema            = ref(null)
+const cargandoSchema     = ref(false)
+const sincronizando      = ref(false)
+const guardandoSchema    = ref(false)
+const tablasDisponibles  = ref([])
+const tablasSeleccionadas = ref([])
+const notasSchema        = ref('')
+const schemaMsg          = ref('')
+const schemaMsgOk        = ref(true)
+
 // ── Computed ──────────────────────────────────────────────────────
 const tokensEstimados = computed(() => {
   const palabras = formDoc.value.contenido.split(/\s+/).filter(w => w).length
@@ -333,6 +399,69 @@ async function cargarTemas() {
 async function seleccionarTema(tema) {
   temaActivo.value = tema
   cargarDocumentos()
+  cargarSchema()
+}
+
+// ── Schema BD ─────────────────────────────────────────────────────
+async function cargarSchema() {
+  if (!temaActivo.value) return
+  cargandoSchema.value = true
+  schemaMsg.value = ''
+  try {
+    const data = await api(`/api/ia/esquemas/${temaActivo.value.id}`)
+    esquema.value = data
+    tablasSeleccionadas.value = Array.isArray(data.tablas_incluidas) ? data.tablas_incluidas : []
+    notasSchema.value = data.notas_manuales || ''
+    if (data.conexion_id) cargarTablas(data.conexion_id)
+  } catch (e) {
+    esquema.value = null
+  } finally {
+    cargandoSchema.value = false
+  }
+}
+
+async function cargarTablas(conexionId) {
+  const id = conexionId || esquema.value?.conexion_id
+  if (!id) return
+  try {
+    const data = await api(`/api/ia/conexiones/${id}/tablas`)
+    tablasDisponibles.value = data.tablas || []
+  } catch (e) { tablasDisponibles.value = [] }
+}
+
+async function syncSchema() {
+  if (!temaActivo.value) return
+  sincronizando.value = true
+  schemaMsg.value = ''
+  try {
+    const data = await api(`/api/ia/esquemas/${temaActivo.value.id}/sync`, { method: 'POST' })
+    schemaMsg.value = data.mensaje || 'Schema sincronizado'
+    schemaMsgOk.value = data.ok !== false
+    if (data.ok) { esquema.value = { ...esquema.value, ddl_auto: data.schema, ultima_sync: new Date().toISOString() } }
+  } catch (e) {
+    schemaMsg.value = e.message; schemaMsgOk.value = false
+  } finally { sincronizando.value = false }
+}
+
+async function guardarSchema() {
+  if (!temaActivo.value) return
+  guardandoSchema.value = true
+  schemaMsg.value = ''
+  try {
+    await api(`/api/ia/esquemas/${temaActivo.value.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ tablas_incluidas: tablasSeleccionadas.value, notas_manuales: notasSchema.value })
+    })
+    schemaMsg.value = 'Guardado correctamente'
+    schemaMsgOk.value = true
+  } catch (e) {
+    schemaMsg.value = e.message; schemaMsgOk.value = false
+  } finally { guardandoSchema.value = false }
+}
+
+function fmtFecha(ts) {
+  if (!ts) return '—'
+  return new Date(ts).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 // ── Documentos ────────────────────────────────────────────────────
@@ -815,4 +944,41 @@ onMounted(cargarTemas)
   background: none; border: none; cursor: pointer; padding: 0;
   text-decoration: underline; font-family: inherit;
 }
+
+/* ── Schema BD ─────────────────────────────────────────── */
+.schema-section { margin-top: 16px; }
+.schema-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.schema-field { display: flex; flex-direction: column; gap: 8px; }
+.schema-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.schema-textarea {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px; line-height: 1.6; resize: vertical;
+}
+.schema-pre {
+  background: var(--bg-surface); border: 1px solid var(--border-default);
+  border-radius: 6px; padding: 12px; font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; color: var(--text-secondary);
+  overflow-x: auto; max-height: 300px; overflow-y: auto;
+  white-space: pre; line-height: 1.5; margin: 0;
+}
+.schema-msg {
+  padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+}
+.schema-ok  { background: rgba(74,222,128,0.1); color: #4ade80; }
+.schema-err { background: rgba(248,113,113,0.1); color: #f87171; }
+
+/* Chips de selección de tablas */
+.tablas-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-toggle { display: flex; align-items: center; cursor: pointer; }
+.chip-toggle input { display: none; }
+.chip-toggle span {
+  padding: 3px 10px; border-radius: 20px; font-size: 12px;
+  border: 1px solid var(--border-default); color: var(--text-secondary);
+  background: var(--bg-surface); transition: all 120ms; font-family: monospace;
+}
+.chip-toggle input:checked + span {
+  background: rgba(94,106,210,0.15); border-color: #5e6ad2;
+  color: #5e6ad2; font-weight: 500;
+}
+.chip-toggle:hover span { border-color: var(--border-strong); }
 </style>

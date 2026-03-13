@@ -96,10 +96,10 @@
               <td>
                 <div style="display:flex;align-items:center;gap:8px">
                   <div class="progress-bar-wrap" style="width:80px">
-                    <div class="progress-bar-fill" :style="{ width: `${Math.min(ag.pct_limite_hoy||0,100)}%`, background: colorBarra(ag.estado) }" />
+                    <div class="progress-bar-fill" :style="{ width: `${Math.min(Number(ag.pct_limite_hoy)||0,100)}%`, background: colorBarra(ag.estado) }" />
                   </div>
                   <span :style="{ color: colorTexto(ag.estado), fontSize:'12px', fontWeight:500 }">
-                    {{ ag.pct_limite_hoy != null ? ag.pct_limite_hoy.toFixed(1)+'%' : '—' }}
+                    {{ ag.pct_limite_hoy != null ? Number(ag.pct_limite_hoy).toFixed(1)+'%' : '—' }}
                   </span>
                 </div>
               </td>

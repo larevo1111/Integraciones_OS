@@ -39,6 +39,10 @@
           <DatabaseIcon :size="15" class="nav-icon" />
           <span>Contextos</span>
         </router-link>
+        <router-link to="/conexiones" class="nav-item" active-class="active">
+          <LinkIcon :size="15" class="nav-icon" />
+          <span>Conexiones BD</span>
+        </router-link>
       </div>
 
       <div class="nav-divider" />
@@ -79,7 +83,7 @@
 import { computed } from 'vue'
 import {
   LayoutDashboardIcon, BotIcon, SettingsIcon, UsersIcon,
-  ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon
+  ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon, LinkIcon
 } from 'lucide-vue-next'
 
 const emit = defineEmits(["logout"])

@@ -249,6 +249,31 @@ def endpoint_consumo_historico():
         conn.close()
 
 
+@app.route('/ia/conexion/test', methods=['POST'])
+def endpoint_test_conexion():
+    """Prueba una conexión externa. Body: {conexion_id}"""
+    from ia_service.conector import test_conexion
+    data = request.get_json(silent=True) or {}
+    conexion_id = data.get('conexion_id')
+    if not conexion_id:
+        return jsonify({'ok': False, 'mensaje': 'conexion_id requerido'}), 400
+    resultado = test_conexion(int(conexion_id))
+    return jsonify(resultado)
+
+
+@app.route('/ia/esquema/sync', methods=['POST'])
+def endpoint_sync_esquema():
+    """Sincroniza el schema de un tema. Body: {tema_id, empresa}"""
+    from ia_service.conector import sincronizar_schema
+    data = request.get_json(silent=True) or {}
+    tema_id = data.get('tema_id')
+    empresa = data.get('empresa', 'ori_sil_2')
+    if not tema_id:
+        return jsonify({'ok': False, 'mensaje': 'tema_id requerido'}), 400
+    resultado = sincronizar_schema(int(tema_id), empresa)
+    return jsonify(resultado)
+
+
 if __name__ == '__main__':
     print("Iniciando IA Service OS en puerto 5100...")
     app.run(host='0.0.0.0', port=5100, debug=False)
