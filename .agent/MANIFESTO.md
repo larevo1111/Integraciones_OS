@@ -32,8 +32,8 @@ Es el cerebro técnico del proyecto. Diseña la estructura de módulos, planific
 **Codex** — Revisor + Ejecutor Puntual.
 Segunda opinión técnica. Revisa lo que implementó Claude, genera scripts específicos, implementa tareas puntuales cuando Claude está en rate limit. Sirve para contrastar enfoques. Recibe el **15% del trabajo**: revisiones, tareas aisladas y generación puntual de código.
 
-**Antigravity** — Entorno de Trabajo + Verificador Visual + Orquestador de Agentes.
-Es la mesa de trabajo donde viven Claude y Codex como add-ons contextualizados. Su valor único es el browser nativo para verificar UI y los agentes paralelos para tareas simultáneas. Coordina, verifica visualmente y mantiene el contexto del proyecto. Recibe el **15% restante**: orquestación, verificación visual y tareas paralelas. **NO es la indicada para conexiones de infraestructura (MySQL remoto, SSH, queries directas a DB)** — esas tareas van a Claude Code por terminal directo.
+**Antigravity / Subagentes Claude** — Verificador Visual + QA + Explorador + Ejecutor Paralelo.
+Subagentes lanzados por Claude Code con la herramienta `Agent`. Mismas capacidades que Claude Code (Bash, Playwright, Read, Write, DB) pero corren en paralelo sin consumir tokens del contexto principal. Recibe el **máximo posible de trabajo**: QA, testing, exploración de codebase, diagnósticos de BD, screenshots, verificación de endpoints, logs, documentación. **Regla: si una tarea no requiere razonamiento arquitectónico profundo → va al subagente.** NO es la indicada para decisiones de diseño ni implementación de features nuevas — esas van a Claude Code.
 
 ### 1.2 Asignación de tareas según tipo
 
@@ -250,3 +250,85 @@ Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando
 1. **Lectura:** Usen estas imágenes para entender el resultado final de la UI al hacer debug de componentes Vue (ej. alineación, tablas vacías, etc).
 2. **Ciclo de Vida:** Cuando la tarea o bug se dé por finalizado/resuelto, **tienen la obligación de borrar las capturas asociadas** de la carpeta temporal para no contaminar el repo.
 3. **Excepción:** Si una captura representa un patrón importante de diseño que debe recordarse a futuro, muévanla a `frontend/design-system/screenshots/` y actualicen su `INDEX.md`.
+
+---
+
+## 14. DELEGACIÓN A SUBAGENTES — POLÍTICA DE AHORRO DE TOKENS
+
+**Principio:** Claude Code es el arquitecto y constructor principal pero consume tokens costosos del contexto principal. Antigravity (subagente) tiene tokens propios — usarlos al máximo es **obligatorio**. Codex ya NO forma parte del proyecto.
+
+### 14.1 Quién es Antigravity
+
+Antigravity = subagente Claude lanzado por Claude Code con la herramienta `Agent`. Es una instancia independiente de Claude con acceso completo a todas las herramientas (Bash, Read, Write, Edit, Playwright, etc.). Corre en paralelo o segundo plano **sin consumir tokens del contexto principal**.
+
+**No confundir con Google Antigravity (Google Labs) — son cosas distintas. Aquí Antigravity = subagente propio.**
+
+### 14.2 Roles en el equipo
+
+| Rol | Quién | Responsabilidad |
+|---|---|---|
+| **Director** | Santi | Visión, decisiones de negocio, aprobación de planes |
+| **Arquitecta + Constructora principal** | Claude Code | Diseño técnico, decisiones arquitecturales, coordinación, features críticas |
+| **Constructor + QA secundario** | Antigravity (subagente) | Construcción de tareas secundarias, QA, exploración, diagnóstico, documentación |
+
+### 14.3 Regla de los planes — OBLIGATORIO
+
+**Con CADA PLAN que Claude Code presente a Santi, debe incluir una sección explícita:**
+
+```
+## Tareas para Antigravity
+- [ ] Tarea 1 — descripción
+- [ ] Tarea 2 — descripción
+```
+
+Si no hay tareas delegables, justificarlo. Santi necesita saber siempre qué puede hacer Antigravity.
+
+### 14.4 Qué puede hacer Antigravity
+
+**Construcción secundaria (Antigravity construye, Claude Code revisa):**
+- Páginas/vistas nuevas de estructura estándar (CRUD, listados, formularios)
+- Endpoints REST simples (GET/POST/PUT/DELETE de tablas)
+- Migraciones de BD simples (CREATE TABLE, ALTER TABLE)
+- Componentes Vue reutilizables siguiendo el design system
+- Scripts Python/Node de utilidad (exports, imports, sync)
+- Refactoring y limpieza de código
+
+**QA y verificación (Antigravity verifica de forma autónoma):**
+- Probar endpoints con curl, verificar respuestas
+- Verificar UI con Playwright: navegar, tomar screenshots, reportar bugs
+- Comparar schema real de BD vs código
+- Verificar integridad de datos tras cambios
+
+**Exploración y diagnóstico:**
+- Leer múltiples archivos, mapear estructura de código
+- Diagnosticar bugs: leer logs, trazar causa raíz
+- Investigar APIs externas (docs, ejemplos)
+- Validar configuraciones del sistema
+
+**Documentación:**
+- Actualizar archivos `.agent/`
+- Generar reportes de QA
+- Escribir comentarios en código
+
+### 14.5 Qué retiene Claude Code (nunca delegar)
+
+- Diseño arquitectural y decisiones técnicas críticas
+- Features con lógica de negocio compleja
+- Coordinación entre múltiples partes del sistema
+- Decisiones que necesitan aprobación de Santi
+- Tareas que requieren contexto acumulado de la conversación
+
+### 14.6 Protocolo de ejecución
+
+Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente:
+1. **¿Puedo delegarlo?** → Si toma >3 lecturas de archivo o >3 comandos bash → **delegarlo**.
+2. **Lanzar con prompt detallado** — incluir todo el contexto: rutas, schemas, objetivo, formato de resultado esperado.
+3. **En segundo plano si es posible** → `run_in_background: true` para no bloquear la conversación.
+4. **Informar a Santi** qué se delegó y en qué directorio quedará el resultado.
+
+### 14.7 Archivos de resultados de Antigravity
+
+- **QA/Testing:** `/home/osserver/playwright/exports/TEST_<proyecto>_<fecha>.md`
+- **Screenshots:** `/home/osserver/playwright/exports/<nombre>.png`
+- **Diagnósticos:** `/home/osserver/Proyectos_Antigravity/Integraciones_OS/.agent/docs/DIAG_<tema>_<fecha>.md`
+- **Exploraciones:** Reportar directamente en la conversación
