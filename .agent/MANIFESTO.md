@@ -328,7 +328,34 @@ Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente
 
 ### 14.7 Archivos de resultados de Antigravity
 
-- **QA/Testing:** `/home/osserver/playwright/exports/TEST_<proyecto>_<fecha>.md`
-- **Screenshots:** `/home/osserver/playwright/exports/<nombre>.png`
-- **Diagnósticos:** `/home/osserver/Proyectos_Antigravity/Integraciones_OS/.agent/docs/DIAG_<tema>_<fecha>.md`
+- **QA/Testing:** `.agent/QA_REGISTRO.md` — registro vivo de bugs y checklists
+- **Screenshots temporales:** `screenshots_temporales/<modulo>_<desc>_<timestamp>.png`
+- **Diagnósticos:** `.agent/docs/DIAG_<tema>_<fecha>.md`
 - **Exploraciones:** Reportar directamente en la conversación
+
+---
+
+## 15. PROTOCOLO DE QA Y TESTING
+
+### Archivos clave
+- `.agent/INSTRUCCIONES_TESTING.md` — **política y protocolo completo de QA** (leer antes de cualquier sesión de testing)
+- `.agent/QA_REGISTRO.md` — **registro vivo de bugs** — se actualiza en cada sesión de QA
+
+### Reglas fundamentales
+1. **Antigravity** es el responsable exclusivo de QA visual y funcional.
+2. Cada feature nueva terminada por Claude Code **debe pasar por QA de Antigravity** antes de considerarse cerrada.
+3. Los bugs se documentan en `QA_REGISTRO.md` con estado 🔴/🟡/🟢.
+4. Los screenshots de bugs abiertos viven en `screenshots_temporales/`. **Al cerrarse, se borran.**
+5. Claude Code no puede marcar una tarea como terminada si hay bugs 🔴 abiertos relacionados.
+6. Santi da el visto bueno final — Antigravity solo verifica, no aprueba.
+
+### Flujo mínimo de QA por feature
+```
+Claude Code implementa + build + restart
+  → Antigravity: curl endpoints → verificar datos
+  → Antigravity: Playwright → navegar UI → screenshots
+  → Antigravity: documenta en QA_REGISTRO.md
+  → Claude Code: corrige bugs reportados
+  → Antigravity: re-verifica → cierra bugs
+  → Screenshots de bugs resueltos → borrar
+```

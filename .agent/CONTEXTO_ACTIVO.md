@@ -28,7 +28,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 ### Pipeline completo (16 pasos via orquestador.py)
 - **Paso 1 — 26 scripts Playwright** exportan módulos de Effi a `/home/osserver/playwright/exports/`
 - **Paso 2 — import_all.js** importa **41 tablas** a MariaDB `effi_data` local (TRUNCATE + INSERT)
-- **Paso 3a — calcular_resumen_ventas.py** → `resumen_ventas_facturas_mes` (38 campos, PK: mes)
+- **Paso 3a — calcular_resumen_ventas.py** → `resumen_ventas_facturas_mes` (campos + **year_ant_* y mes_ant_* para 9 métricas**, PK: mes)
 - **Paso 3b — calcular_resumen_ventas_canal.py** → `resumen_ventas_facturas_canal_mes` (32 campos, PK: mes+canal, 251 filas)
 - **Paso 3c — calcular_resumen_ventas_cliente.py** → `resumen_ventas_facturas_cliente_mes` (34 campos, PK: mes+id_cliente, 600 filas)
 - **Paso 3d — calcular_resumen_ventas_producto.py** → `resumen_ventas_facturas_producto_mes` (30 campos, PK: mes+cod_articulo, 697 filas)
@@ -120,7 +120,7 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 - Flask server: `scripts/webhook_server.py`, systemd service `effi-webhook.service` (activo, auto-restart)
 - Archivos versionados en `espocrm-custom/` con instrucciones de deploy
 
-## Frontend — Estado actual (2026-03-12)
+## Frontend — Estado actual (2026-03-13)
 
 > **IMPORTANTE**: `menu.oscomunidad.com` NO es el ERP definitivo. Es una **app temporal de visualización de datos** mientras se construye el ERP real. La usan Santi y Jen para ver información de ventas.
 > El **ERP real** está en `u768061575_os_comunidad` (Hostinger) — **⚠️ NO TOCAR**.
@@ -140,7 +140,8 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 | **Detalle Canal** | `pages/ventas/DetalleCanalMesPage.vue` | ✅ /ventas/detalle-canal/:mes/:canal |
 | **Detalle Producto** | `pages/ventas/DetalleProductoMesPage.vue` | ✅ /ventas/detalle-producto/:mes/:cod_articulo |
 | **Detalle Factura** | `pages/ventas/DetalleFacturaPage.vue` | ✅ /ventas/detalle-factura/:id_interno/:id_numeracion |
-| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + mini-popup por columna + filtros con operador + subtotales + row-click |
+| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + mini-popup + filtros + subtotales + row-click + **tooltips por columna (prop `tooltips`)** |
+| **Cartera CxC** | `pages/ventas/CarteraPage.vue` | ✅ /ventas/cartera — KPIs + tabla facturas pendientes + tabla resumen por cliente |
 
 **⚠️ Antes de cualquier trabajo frontend: leer `frontend/design-system/MANUAL_ESTILOS.md`**
 **⚠️ Después de cualquier cambio Vue/JS: `cd frontend/app && npx quasar build`**
@@ -162,6 +163,9 @@ ResumenFacturacionPage (solo tabla de meses — sin acordeones)
 - `/api/ventas/canal-clientes|canal-productos|canal-facturas|canal-remisiones` — datos por canal (ad-hoc)
 - `/api/ventas/producto-canales|producto-clientes|producto-facturas` — datos por producto (ad-hoc)
 - `/api/ventas/factura/:id_interno/:id_numeracion` — encabezado + ítems de una factura
+- `/api/ventas/cartera` — facturas con `pdte_de_cobro > 0`, order by dias_mora DESC
+- `/api/ventas/cartera-cliente` — resumen CxC agrupado por id_cliente con total_pendiente, total_mora, max_dias_mora
+- `/api/tooltips` — diccionario estático de ~60 descripciones de columnas (year_ant, mes_ant, pry, cto, etc.)
 - `/api/columnas/:tabla` — columnas de cualquier tabla Hostinger
 - `/api/export/:recurso` — CSV / XLSX / PDF
 
@@ -246,7 +250,8 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **[ANTIGRAVITY]** Módulo Contextos en ia-admin — ver `.agent/tareas_antigravity_rag.md` (UI + endpoints RAG)
+1. **[ANTIGRAVITY — URGENTE]** QA de features 2026-03-13 — ver `.agent/QA_REGISTRO.md` (Cartera CxC, tooltips, year_ant/mes_ant)
+2. **[ANTIGRAVITY]** Módulo Contextos en ia-admin — ver `.agent/tareas_antigravity_rag.md` (UI + endpoints RAG)
 2. **DeepSeek** — Santi obtiene key en platform.deepseek.com → activar deepseek-chat + deepseek-reasoner
 3. **Claude Sonnet** — Santi recarga $5 en console.anthropic.com → activar claude-sonnet
 4. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
