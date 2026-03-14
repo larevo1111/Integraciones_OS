@@ -133,58 +133,85 @@ Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **compl
 | URL pública app temporal | menu.oscomunidad.com | ✅ Cloudflare tunnel activo |
 | **App IA Admin** | ia.oscomunidad.com | ✅ Activa — puerto 9200, systemd `os-ia-admin.service` |
 | Tabla sys_menu | Hostinger `u768061575_os_integracion` | ✅ 36 registros (7 módulos + 29 submenús) |
-| **API Express** | `frontend/api/` | ✅ Puerto 3002 (realmente sirve en puerto 9100 junto al frontend), systemd `os-erp-frontend` |
-| **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ /ventas/resumen-facturacion — solo tabla principal, click navega |
+| **API Express** | `frontend/api/` | ✅ Puerto 9100, systemd `os-erp-frontend` |
+| **Resumen Facturación** | `pages/ventas/ResumenFacturacionPage.vue` | ✅ 3 pestañas: Por mes / Por producto / Por grupo. Barra de filtros de fechas (años, trimestres, rango personalizado) en tabs producto/grupo |
 | **Detalle Mes** | `pages/ventas/DetalleFacturacionMesPage.vue` | ✅ /ventas/detalle-mes/:mes — KPIs + 6 tablas acordeón + click drill-down |
 | **Detalle Cliente** | `pages/ventas/DetalleClienteMesPage.vue` | ✅ /ventas/detalle-cliente/:mes/:id_cliente |
 | **Detalle Canal** | `pages/ventas/DetalleCanalMesPage.vue` | ✅ /ventas/detalle-canal/:mes/:canal |
 | **Detalle Producto** | `pages/ventas/DetalleProductoMesPage.vue` | ✅ /ventas/detalle-producto/:mes/:cod_articulo |
 | **Detalle Factura** | `pages/ventas/DetalleFacturaPage.vue` | ✅ /ventas/detalle-factura/:id_interno/:id_numeracion |
-| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable + mini-popup + filtros + subtotales + row-click + **tooltips por columna (prop `tooltips`)** |
+| **Facturas de producto/grupo** | `pages/ventas/DetalleFacturasProductoPage.vue` | ✅ Reutilizable: /ventas/facturas-producto/:cod y /ventas/facturas-grupo/:grupo — KPIs + tabla, click → DetalleFacturaPage |
+| **OsDataTable** | `components/OsDataTable.vue` | ✅ Tabla reutilizable. **Fila de subtotales al TOPE** (debajo del header, sticky) — ya NO al pie. Tooltips automáticos, mini-popup, filtros, subtotales, row-click |
 | **Cartera CxC** | `pages/ventas/CarteraPage.vue` | ✅ /ventas/cartera — KPIs + tabla resumen por cliente (click → detalle) |
 | **Detalle Cartera Cliente** | `pages/ventas/DetalleCarteraClientePage.vue` | ✅ /ventas/cartera/:id_cliente — KPIs + facturas pendientes del cliente |
-| **Consignación** | `pages/ventas/ConsignacionPage.vue` | ✅ /ventas/consignacion — 13 órdenes vigentes, KPIs + tabla (click → detalle). Filtro: `vigencia='Vigente'` |
-| **Detalle Consignación** | `pages/ventas/DetalleConsignacionPage.vue` | ✅ /ventas/consignacion/:id_orden — encabezado KPIs + ítems de la orden |
+| **Consignación** | `pages/ventas/ConsignacionPage.vue` | ✅ /ventas/consignacion — 2 tabs: Por cliente / Por producto. Filtro: `vigencia='Vigente'` |
+| **Detalle Consignación** | `pages/ventas/DetalleConsignacionPage.vue` | ✅ /ventas/consignacion-orden/:id_orden |
+| **Consignación por producto** | `pages/ventas/ConsignacionProductoPage.vue` | ✅ /ventas/consignacion-producto/:cod_articulo — órdenes activas con ese producto |
 
 **⚠️ Antes de cualquier trabajo frontend: leer `frontend/design-system/MANUAL_ESTILOS.md`**
 **⚠️ Después de cualquier cambio Vue/JS: `cd frontend/app && npx quasar build`**
 
 ### Jerarquía de navegación drill-down (módulo Ventas)
 ```
-ResumenFacturacionPage (solo tabla de meses — sin acordeones)
+ResumenFacturacionPage — tab Por mes
   └─ click fila → DetalleFacturacionMesPage (mes)
-       ├─ click canal → DetalleCanalMesPage (mes + canal)
-       ├─ click cliente → DetalleClienteMesPage (mes + cliente)
-       ├─ click producto → DetalleProductoMesPage (mes + producto)
-       └─ click factura → DetalleFacturaPage (encabezado + ítems)
+       ├─ click canal    → DetalleCanalMesPage
+       ├─ click cliente  → DetalleClienteMesPage
+       ├─ click producto → DetalleProductoMesPage
+       └─ click factura  → DetalleFacturaPage ⭐ (vista canónica)
+
+ResumenFacturacionPage — tab Por producto (con filtro fechas)
+  └─ click fila → DetalleFacturasProductoPage (/facturas-producto/:cod)
+       └─ click factura → DetalleFacturaPage ⭐
+
+ResumenFacturacionPage — tab Por grupo (con filtro fechas)
+  └─ click fila → DetalleFacturasProductoPage (/facturas-grupo/:grupo)
+       └─ click factura → DetalleFacturaPage ⭐
+
+ConsignacionPage — tab Por cliente
+  └─ click → ConsignacionClientePage → click orden → DetalleConsignacionPage
+
+ConsignacionPage — tab Por producto
+  └─ click → ConsignacionProductoPage → click orden → DetalleConsignacionPage
 ```
 
+### catalogo_articulos — tabla de grupos de producto
+- **BD**: `effi_data` local (y sincronizada a Hostinger via pipeline)
+- **Propósito**: mapear `cod_articulo` → `grupo_producto` (nombre sin gramaje/presentación)
+- **Campos**: `cod_articulo` (PK), `descripcion`, `grupo_producto`, `actualizado_en`, `grupo_revisado`
+- **500 registros**: 176 con `grupo_producto` asignado (solo productos vendidos alguna vez)
+- **Asignación**: regex determinístico (`scripts/asignar_grupo_producto.py`). Groq solo para nuevas referencias futuras.
+- **Pipeline paso 4e**: `sync_catalogo_articulos.py` detecta nuevos cod_articulo vendidos y les asigna grupo automáticamente
+- **Colación**: `utf8mb4_unicode_ci` (igual que zeffi_*)
+
 ### API Express — endpoints activos en server.js
-- `/api/ventas/resumen-mes|canal|cliente|producto` — tablas resumen Hostinger (con filtros)
+- `/api/ventas/resumen-mes|canal|cliente|producto` — tablas resumen Hostinger
 - `/api/ventas/facturas|cotizaciones|remisiones` — encabezados zeffi (con filtro mes)
-- `/api/ventas/cliente-productos` — productos comprados por un cliente (ad-hoc SQL)
-- `/api/ventas/canal-clientes|canal-productos|canal-facturas|canal-remisiones` — datos por canal (ad-hoc)
-- `/api/ventas/producto-canales|producto-clientes|producto-facturas` — datos por producto (ad-hoc)
+- `/api/ventas/resumen-por-producto` — toda la vida por cod_articulo, JOIN catalogo_articulos. Acepta `?desde=&hasta=`
+- `/api/ventas/resumen-por-grupo` — toda la vida por grupo_producto. Acepta `?desde=&hasta=`
+- `/api/ventas/anios-facturas` — años distintos disponibles en zeffi_facturas_venta_detalle
+- `/api/ventas/facturas-producto/:cod_articulo` — facturas donde aparece el producto
+- `/api/ventas/facturas-grupo/:grupo` — facturas donde aparece cualquier ref. del grupo
+- `/api/ventas/cliente-productos|canal-clientes|canal-productos|canal-facturas|canal-remisiones` — drill-down por canal
+- `/api/ventas/producto-canales|producto-clientes|producto-facturas` — drill-down por producto
 - `/api/ventas/factura/:id_interno/:id_numeracion` — encabezado + ítems de una factura
-- `/api/ventas/cartera` — facturas con `pdte_de_cobro > 0`, order by dias_mora DESC
-- `/api/ventas/cartera-cliente` — resumen CxC agrupado por id_cliente con total_pendiente, total_mora, max_dias_mora
-- `/api/ventas/cartera-cliente/:id_cliente` — facturas pendientes del cliente (CAST + dias_antiguedad en SQL)
-- `/api/ventas/consignacion` — OVs activas filtro: `vigencia='Vigente'` (13 órdenes, total bruto $7.380.375, total neto $7.763.832)
-- `/api/ventas/consignacion/:id_orden` — `{ encabezado, items }` con descripciones y montos casteados
-- `/api/tooltips` — diccionario estático de ~60 descripciones de columnas (year_ant, mes_ant, pry, cto, etc.)
+- `/api/ventas/cartera|cartera-cliente|cartera-cliente/:id` — módulo CxC
+- `/api/ventas/consignacion` — OVs activas (`vigencia='Vigente'`)
+- `/api/ventas/consignacion/:id_orden` — detalle de orden
+- `/api/ventas/consignacion-cliente/:id_cliente` — órdenes activas del cliente
+- `/api/ventas/consignacion-por-producto` — órdenes activas agrupadas por cod_articulo
+- `/api/ventas/consignacion-producto/:cod_articulo` — órdenes activas con ese producto
+- `/api/tooltips` — ~60 descripciones de columnas
 - `/api/columnas/:tabla` — columnas de cualquier tabla Hostinger
 - `/api/export/:recurso` — CSV / XLSX / PDF
 
 ### OsDataTable — componente reutilizable
-- Props: `rows`, `columns` (array {key,label,visible}), `loading`, `title`, `recurso`, `mes`
-- Emits: `row-click` (navegación / drill-down con single click)
-- **Mini-popup por columna**: click en header abre popup (Teleport al body, z-index 9999) con:
-  - Filtro con selector de operador: Igual (default), Contiene, >, <, >=, <=, Entre
-  - Ordenamiento: Ascendente / Descendente (toggle)
-  - Subtotal (solo numéricas): Suma Σ, Promedio x̄, Máximo ↑, Mínimo ↓
-- **Formato numérico estándar**: separador miles con punto, decimales con coma, automático (0–3 decimales)
-  - Moneda: `$1.234.567` | Porcentajes: `12,5%` | Enteros: `1.234` | Decimales: `1.234,56`
-- Features: selector de columnas, export CSV/XLSX/PDF, skeleton, fila de subtotales al pie
+- Props: `rows`, `columns ({key,label,visible})`, `loading`, `title`, `recurso`, `mes`, `tooltips`
+- Emits: `row-click`
+- **Fila de subtotales al TOPE** (justo debajo del `<thead>`, sticky top:36px) — **no al pie**
+- Mini-popup por columna: Filtro (6 operadores), Ordenamiento, Subtotal (Σ x̄ ↑ ↓)
+- Tooltips: carga `/api/tooltips` automáticamente (caché global, no necesita prop)
+- Formato: `fin_/cto_/car_` → `$COP`, `_pct/_margen` → `%` (×100), resto → número con `.` miles
 
 ## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-13)
 

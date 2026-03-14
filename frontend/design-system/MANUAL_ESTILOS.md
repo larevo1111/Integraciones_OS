@@ -2219,4 +2219,132 @@ Ayuda **inline y contextual** — sin modales, sin páginas separadas. Un `?` ci
 
 ---
 
+## 28. FILTER BAR — BARRA DE FILTRO DE FECHAS SOBRE TABLAS
+
+### 28.1 Concepto
+Barra de filtro horizontal que aparece **encima de una tabla** cuando se quiere filtrar por rango de fechas. Usada en las pestañas "Por producto" y "Por grupo" de Resumen Facturación.
+
+### 28.2 Estructura (dos filas)
+
+**Fila 1 — siempre visible:**
+```
+[ Todas ] | [ 2024 ] [ 2025 ] [ 2026 ] | [ Desde: ▤ ] [ Hasta: ▤ ] [ × ]
+```
+- `[Todas]` — pill activo por defecto; restablece el filtro
+- Pills de año — generados dinámicamente desde `/api/ventas/anios-facturas`
+- Separador vertical `|` (`.filter-sep`) entre grupos
+- Inputs de fecha nativa (`<input type="date">`) con icono de calendario del browser
+- Botón `×` — visible solo cuando hay filtro activo; limpia las fechas manuales
+
+**Fila 2 — solo cuando hay un año seleccionado:**
+```
+2026  ›  [ Q1 ] [ Q2 ] [ Q3 ] [ Q4 ]
+```
+- Label del año + `›` como contexto visual
+- Cuatro pills de trimestre (Q1–Q4), clickeables, toggle
+- Al hacer click en un trimestre: se aplica el rango de fechas del trimestre en el año activo
+
+### 28.3 Lógica de estado (Vue)
+
+```javascript
+const filtroAnio  = ref(null)   // null | '2025' | '2026'
+const filtroQ     = ref(null)   // null | 1 | 2 | 3 | 4
+const filtroDe    = ref('')     // 'YYYY-MM-DD'
+const filtroHasta = ref('')     // 'YYYY-MM-DD'
+
+const TRIMESTRES = {
+  1: { desde: '-01-01', hasta: '-03-31' },
+  2: { desde: '-04-01', hasta: '-06-30' },
+  3: { desde: '-07-01', hasta: '-09-30' },
+  4: { desde: '-10-01', hasta: '-12-31' },
+}
+
+function selAnio(a) {
+  filtroAnio.value = filtroAnio.value === a ? null : a
+  filtroQ.value = null; filtroDe.value = ''; filtroHasta.value = ''
+  // Si año activo, aplicar rango completo del año como desde/hasta
+  if (filtroAnio.value) {
+    filtroDe.value = `${filtroAnio.value}-01-01`
+    filtroHasta.value = `${filtroAnio.value}-12-31`
+  }
+  cargar()
+}
+
+function selQ(q) {
+  filtroQ.value = filtroQ.value === q ? null : q
+  if (filtroAnio.value && filtroQ.value) {
+    filtroDe.value = filtroAnio.value + TRIMESTRES[filtroQ.value].desde
+    filtroHasta.value = filtroAnio.value + TRIMESTRES[filtroQ.value].hasta
+  } else if (filtroAnio.value) {
+    filtroDe.value = `${filtroAnio.value}-01-01`
+    filtroHasta.value = `${filtroAnio.value}-12-31`
+  }
+  cargar()
+}
+
+function limpiarFechas() {
+  filtroAnio.value = null; filtroQ.value = null
+  filtroDe.value = ''; filtroHasta.value = ''
+  cargar()
+}
+```
+
+### 28.4 CSS
+
+```css
+.filter-bar {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+.filter-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.filter-sep { width: 1px; height: 16px; background: var(--border-subtle); margin: 0 2px; }
+
+/* Pills del filter bar — más pequeños que los pill tabs de §26 */
+.filter-pill {
+  font-size: 11px; font-weight: 500; padding: 3px 9px; height: 24px;
+  border-radius: 12px; border: 1px solid var(--border-default);
+  background: none; color: var(--text-secondary); cursor: pointer;
+  transition: all 100ms;
+}
+.filter-pill:hover  { background: var(--bg-surface); color: var(--text-primary); border-color: var(--border-strong); }
+.filter-pill.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); font-weight: 600; }
+
+/* Inputs de fecha */
+.filter-date-input {
+  font-size: 11px; height: 26px; padding: 0 8px;
+  border: 1px solid var(--border-default); border-radius: 6px;
+  background: var(--bg-app); color: var(--text-primary); width: 128px;
+}
+/* Icono de calendario en dark mode */
+.filter-date-input::-webkit-calendar-picker-indicator {
+  filter: var(--calendar-icon-filter, invert(1));
+  opacity: 0.5; cursor: pointer;
+}
+
+/* Fila de trimestres (row 2) */
+.filter-row-q { display: flex; align-items: center; gap: 6px; }
+.filter-q-label { font-size: 11px; color: var(--text-tertiary); margin-right: 2px; }
+
+/* Botón limpiar × */
+.filter-clear {
+  font-size: 12px; width: 20px; height: 20px; border-radius: 50%;
+  border: none; background: var(--bg-surface); color: var(--text-tertiary);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.filter-clear:hover { background: var(--color-error-subtle); color: var(--color-error); }
+```
+
+### 28.5 Reglas
+- Usar siempre filtro de fecha nativa (`<input type="date">`) — no flatpickr salvo que se pida explícitamente
+- Los pills de año deben cargarse dinámicamente desde el endpoint `/api/ventas/anios-facturas`
+- Q1–Q4 SOLO aparecen cuando hay un año seleccionado (segunda fila)
+- El año activo siempre se muestra como label antes de Q1–Q4
+- `filter-pill.active` usa `var(--color-accent)` (azul/violeta del sistema)
+- El filter bar va DENTRO de `.page-content`, justo encima de la `OsDataTable` correspondiente
+
+---
+
 > **Versión**: 2.0 — Actualizado con datos reales de 88 capturas de Linear.app

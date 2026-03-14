@@ -337,8 +337,10 @@ def main():
 
     # ── 4e. SYNC CATÁLOGO ARTÍCULOS (nuevos productos) ───────────
     log.info('▶ sync_catalogo_articulos.py ...')
+    t_cat = datetime.datetime.now()
     exit_cat, salida_cat = ejecutar(['python3', str(SYNC_CATALOGO_SCRIPT)], 60)
-    log.info(f'   {salida_cat.strip().splitlines()[-1] if salida_cat.strip() else "sin salida"}')
+    dur_cat = int((datetime.datetime.now() - t_cat).total_seconds())
+    log.info(f'   {salida_cat.strip().splitlines()[-1] if salida_cat.strip() else "sin salida"}  [{dur_cat}s]')
 
     # ── 5. SYNC HOSTINGER ────────────────────────────────────────
     log.info('▶ sync_hostinger.py ...')
@@ -409,11 +411,12 @@ def main():
     hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
                  or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or exit_rsm_rem != 0
                  or exit_rem_canal != 0 or exit_rem_cli != 0 or exit_rem_prod != 0
+                 or exit_cat != 0
                  or exit_sync != 0 or exit_espo != 0 or exit_espo_con != 0
                  or exit_espo_host != 0 or exit_gen != 0 or exit_imp_effi != 0
                  or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_gen + dur_imp_effi
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_cat + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_gen + dur_imp_effi
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 

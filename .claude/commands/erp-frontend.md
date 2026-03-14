@@ -55,6 +55,7 @@ User MySQL: u768061575_osserver / Epist2487.
 - 41 tablas `zeffi_*` (datos crudos de Effi)
 - 8 tablas `resumen_ventas_*` (analíticas calculadas)
 - `crm_contactos` (488 contactos del CRM)
+- `catalogo_articulos` (500 artículos, 176 con `grupo_producto` asignado) — se sincroniza automáticamente vía `sync_hostinger.py`
 
 **Gotcha importante — nombres de columnas en tablas de detalle:**
 - `fecha_de_creacion` → solo en **encabezados** (facturas/remisiones/cotizaciones)
@@ -79,6 +80,15 @@ User MySQL: u768061575_osserver / Epist2487.
 | `GET /api/ventas/facturas` | `zeffi_facturas_venta_encabezados` |
 | `GET /api/ventas/remisiones` | `zeffi_remisiones_venta_encabezados` |
 | `GET /api/ventas/cotizaciones` | `zeffi_cotizaciones_ventas_encabezados` |
+
+**Resumen por producto y grupo (con filtro fechas)**
+| Endpoint | Descripción | Parámetros |
+|---|---|---|
+| `GET /api/ventas/resumen-por-producto` | Totales históricos por artículo con costo, utilidad, margen, NC | `?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` |
+| `GET /api/ventas/resumen-por-grupo` | Totales históricos agrupados por `grupo_producto` (catalogo_articulos) | `?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` |
+| `GET /api/ventas/facturas-producto/:cod_articulo` | Lista de facturas donde aparece ese artículo | path param |
+| `GET /api/ventas/facturas-grupo/:grupo` | Lista de facturas con artículos de ese grupo | path param |
+| `GET /api/ventas/anios-facturas` | Array de años distintos en `zeffi_facturas_venta_detalle` | — |
 
 **Ad-hoc de drill-down (usados en páginas de detalle)**
 | Endpoint | Descripción | Parámetros |
@@ -260,21 +270,27 @@ Clases utilitarias clave:
 
 ```
 ResumenFacturacionPage  →  /ventas/resumen-facturacion
-  └─ dblclick fila mes  →  DetalleFacturacionMesPage  /ventas/detalle-mes/:mes
-       ├─ dblclick canal    →  DetalleCanalMesPage    /ventas/detalle-canal/:mes/:canal
-       ├─ dblclick cliente  →  DetalleClienteMesPage  /ventas/detalle-cliente/:mes/:id_cliente
-       ├─ dblclick producto →  DetalleProductoMesPage /ventas/detalle-producto/:mes/:cod_articulo
-       └─ dblclick factura  →  DetalleFacturaPage     /ventas/detalle-factura/:id_interno/:id_numeracion
+  ├─ tab Por mes: click fila mes   →  DetalleFacturacionMesPage  /ventas/detalle-mes/:mes
+  │    ├─ click canal    →  DetalleCanalMesPage    /ventas/detalle-canal/:mes/:canal
+  │    ├─ click cliente  →  DetalleClienteMesPage  /ventas/detalle-cliente/:mes/:id_cliente
+  │    ├─ click producto →  DetalleProductoMesPage /ventas/detalle-producto/:mes/:cod_articulo
+  │    └─ click factura  →  DetalleFacturaPage     /ventas/detalle-factura/:id_interno/:id_numeracion
+  ├─ tab Por producto: click artículo → DetalleFacturasProductoPage /ventas/facturas-producto/:cod_articulo
+  │    └─ click factura  →  DetalleFacturaPage
+  └─ tab Por grupo: click grupo → DetalleFacturasProductoPage /ventas/facturas-grupo/:grupo
+       └─ click factura  →  DetalleFacturaPage
 ```
 
 | Página | Ruta URL | Archivo |
 |---|---|---|
-| Resumen Facturación | `/ventas/resumen-facturacion` | `pages/ventas/ResumenFacturacionPage.vue` |
+| Resumen Facturación (3 tabs) | `/ventas/resumen-facturacion` | `pages/ventas/ResumenFacturacionPage.vue` |
 | Detalle Mes | `/ventas/detalle-mes/:mes` | `pages/ventas/DetalleFacturacionMesPage.vue` |
 | Detalle Canal | `/ventas/detalle-canal/:mes/:canal` | `pages/ventas/DetalleCanalMesPage.vue` |
 | Detalle Cliente | `/ventas/detalle-cliente/:mes/:id_cliente` | `pages/ventas/DetalleClienteMesPage.vue` |
-| Detalle Producto | `/ventas/detalle-producto/:mes/:cod_articulo` | `pages/ventas/DetalleProductoMesPage.vue` |
-| Detalle Factura | `/ventas/detalle-factura/:id_interno/:id_numeracion` | `pages/ventas/DetalleFacturaPage.vue` |
+| Detalle Producto (por mes) | `/ventas/detalle-producto/:mes/:cod_articulo` | `pages/ventas/DetalleProductoMesPage.vue` |
+| Detalle Factura ⭐ | `/ventas/detalle-factura/:id_interno/:id_numeracion` | `pages/ventas/DetalleFacturaPage.vue` |
+| Facturas de un producto | `/ventas/facturas-producto/:cod_articulo` | `pages/ventas/DetalleFacturasProductoPage.vue` |
+| Facturas de un grupo | `/ventas/facturas-grupo/:grupo` | `pages/ventas/DetalleFacturasProductoPage.vue` |
 
 ### Patrón de navegación drill-down con contexto
 

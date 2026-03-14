@@ -172,9 +172,11 @@ function isNumeric(key) {
 
 ### Fila de subtotales
 
-- Se renderiza al pie de la tabla si hay al menos 1 columna con aggregate activo
+- Se renderiza **al inicio de la tabla** (primera fila después del `<thead>`) si hay al menos 1 columna con aggregate activo
+- Es **sticky**: `position: sticky; top: 36px; z-index: 4` — queda pegada justo debajo del header al hacer scroll
 - Cada celda muestra el valor agregado formateado con `fmtNum()`
 - Label pequeño encima del valor: "Σ", "x̄", "↑", "↓" según tipo
+- CSS clave: `border-bottom: 2px solid rgba(16,185,129,0.25); background: rgba(16,185,129,0.06)`
 
 ### CSS del popup (NO scoped — va en `<style>` sin scoped porque usa Teleport)
 

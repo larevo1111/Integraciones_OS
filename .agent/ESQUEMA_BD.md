@@ -23,6 +23,7 @@ Todas las columnas son **TEXT** + `_pk` BIGINT AUTO_INCREMENT PK.
 | Módulo | Tablas |
 |---|---|
 | **Clientes / Terceros** | `zeffi_clientes`, `zeffi_proveedores` |
+| **Catálogo analítico** | `catalogo_articulos` |
 | **Inventario** | `zeffi_inventario`, `zeffi_bodegas`, `zeffi_categorias_articulos`, `zeffi_ajustes_inventario`, `zeffi_traslados_inventario`, `zeffi_trazabilidad` |
 | **Ventas** | `zeffi_facturas_venta_encabezados`, `zeffi_facturas_venta_detalle`, `zeffi_remisiones_venta_encabezados`, `zeffi_remisiones_venta_detalle`, `zeffi_ordenes_venta_encabezados`, `zeffi_ordenes_venta_detalle`, `zeffi_cotizaciones_ventas_encabezados`, `zeffi_cotizaciones_ventas_detalle`, `zeffi_notas_credito_venta_encabezados`, `zeffi_notas_credito_venta_detalle`, `zeffi_devoluciones_venta_encabezados`, `zeffi_devoluciones_venta_detalle` |
 | **Compras** | `zeffi_facturas_compra_encabezados`, `zeffi_facturas_compra_detalle`, `zeffi_remisiones_compra_encabezados`, `zeffi_remisiones_compra_detalle`, `zeffi_ordenes_compra_encabezados`, `zeffi_ordenes_compra_detalle` |
@@ -46,6 +47,20 @@ Todas las columnas son **TEXT** + `_pk` BIGINT AUTO_INCREMENT PK.
 ---
 
 ## Detalle por tabla
+
+### catalogo_articulos — ~500 filas
+Catálogo analítico de artículos. **NO tiene prefijo `zeffi_`**. Existe tanto en `effi_data` (local) como en Hostinger (`u768061575_os_integracion`). Se sincroniza automáticamente vía `sync_hostinger.py` junto con las demás tablas de `effi_data`.
+Collation: `utf8mb4_unicode_ci` (igual que las tablas `zeffi_*`).
+```
+cod_articulo  VARCHAR(50) PK
+descripcion   VARCHAR(500)
+grupo_producto VARCHAR(300)   -- nombre sin gramaje/tamaño; 176 artículos tienen valor
+actualizado_en DATETIME
+grupo_revisado TINYINT(1)
+```
+Uso: JOIN desde `zeffi_facturas_venta_detalle.cod_articulo` para obtener `grupo_producto`.
+
+---
 
 ### zeffi_clientes — ~462 filas
 Maestro de clientes.

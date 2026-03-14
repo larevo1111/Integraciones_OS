@@ -470,7 +470,9 @@ function isNumeric(key) {
   return sample.every(r => {
     const v = r[key]
     if (v === null || v === undefined || v === '') return true
-    return !isNaN(parseFloat(String(v).replace(',', '.')))
+    const s = String(v).trim()
+    // Usar Number() en lugar de parseFloat() — es estricto: Number("2026-01") = NaN, parseFloat("2026-01") = 2026
+    return s !== '' && !isNaN(Number(s))
   })
 }
 

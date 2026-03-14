@@ -18,9 +18,20 @@ Toda fila es clickeable. El Nivel 3 SIEMPRE reutiliza la vista canónica del tip
 
 ## Módulo Ventas — Facturación (resúmenes analíticos)
 
+`ResumenFacturacionPage.vue` tiene **3 pestañas (pill tabs)**:
+- **Por mes** — tabla histórica mensual (`resumen_ventas_facturas_mes`)
+- **Por producto** — totales por artículo con costo, utilidad, margen, notas crédito; filtro de fechas y drill-down
+- **Por grupo** — agrupado por `grupo_producto` (desde `catalogo_articulos`); mismas métricas; filtro de fechas y drill-down
+
+Las pestañas Por producto y Por grupo tienen **filter bar** con: botón Todas, pills de año (dinámicos desde BD), trimestres Q1–Q4 contextuales (segunda fila con año label), e inputs de fecha nativa desde/hasta.
+
 | Nivel | Ruta | Archivo Vue | Fuente de datos |
 |---|---|---|---|
-| 1 — Resumen por mes | `/ventas/resumen-facturacion` | `ResumenFacturacionPage.vue` | `resumen_ventas_facturas_mes` |
+| 1 — Resumen por mes | `/ventas/resumen-facturacion` (tab Por mes) | `ResumenFacturacionPage.vue` | `resumen_ventas_facturas_mes` |
+| 1 — Resumen por producto | `/ventas/resumen-facturacion` (tab Por producto) | `ResumenFacturacionPage.vue` | `/api/ventas/resumen-por-producto` |
+| 1 — Resumen por grupo | `/ventas/resumen-facturacion` (tab Por grupo) | `ResumenFacturacionPage.vue` | `/api/ventas/resumen-por-grupo` |
+| 2 — Facturas de un producto | `/ventas/facturas-producto/:cod_articulo` | `DetalleFacturasProductoPage.vue` | `/api/ventas/facturas-producto/:cod_articulo` |
+| 2 — Facturas de un grupo | `/ventas/facturas-grupo/:grupo` | `DetalleFacturasProductoPage.vue` | `/api/ventas/facturas-grupo/:grupo` |
 | 2 — Detalle de un mes | `/ventas/detalle-mes/:mes` | `DetalleFacturacionMesPage.vue` | `resumen_ventas_facturas_*` |
 | 2 — Detalle canal+mes | `/ventas/detalle-canal/:mes/:canal` | `DetalleCanalMesPage.vue` | `canal-clientes`, `canal-productos`, `canal-facturas` |
 | 2 — Detalle cliente+mes | `/ventas/detalle-cliente/:mes/:id_cliente` | `DetalleClienteMesPage.vue` | `resumen-cliente`, `cliente-productos`, `facturas` |
@@ -28,6 +39,8 @@ Toda fila es clickeable. El Nivel 3 SIEMPRE reutiliza la vista canónica del tip
 | **3 — Detalle factura** ⭐ | `/ventas/detalle-factura/:id_interno/:id_numeracion` | `DetalleFacturaPage.vue` | `factura/:id_interno/:id_numeracion` |
 
 > ⭐ Vista canónica de factura. Cualquier módulo que muestre una factura debe navegar aquí.
+
+**Nota:** `DetalleFacturasProductoPage.vue` es reutilizable para ambas rutas. Detecta el modo via `route.path.includes('/facturas-grupo/')` y ajusta columnas, KPIs y endpoint automáticamente.
 
 ---
 

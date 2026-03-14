@@ -45,7 +45,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
   ```
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
 - **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js y los 8 scripts calcular_resumen_*)
-- **Dependencias**: `export_all.sh`, `import_all.js`, todos los `calcular_resumen_ventas_*.py` (pasos 3a/3b/3c/3d/4a/4b/4c/4d), `sync_hostinger.py`, `sync_espocrm_marketing.py`, `sync_espocrm_contactos.py`, `sync_espocrm_to_hostinger.py`, `scripts/.env`
+- **Dependencias**: `export_all.sh`, `import_all.js`, todos los `calcular_resumen_ventas_*.py` (pasos 3a/3b/3c/3d/4a/4b/4c/4d), `sync_catalogo_articulos.py`, `sync_hostinger.py`, `sync_espocrm_marketing.py`, `sync_espocrm_contactos.py`, `sync_espocrm_to_hostinger.py`, `generar_plantilla_import_effi.py`, `import_clientes_effi.js`, `scripts/.env`
 - **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
 - **Systemd**:
   ```bash
@@ -259,6 +259,38 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Notas**:
   - Todo el financiero/costo desde detalle JOIN encabezados (encabezados aporta canal y fecha).
   - 1228 filas. diff vs fuente = 0.00.
+
+### sync_catalogo_articulos.py — Paso 4e
+- **Propósito**: Detecta artículos vendidos que no están en `catalogo_articulos`, los agrega y asigna `grupo_producto` automáticamente (regex determinístico primero; Groq llama-3.1-8b-instant si quedan sin resolver)
+- **Tipo**: import / analítica (paso 4e del pipeline — corre antes de sync_hostinger)
+- **Ejecución manual**:
+  ```bash
+  python3 scripts/sync_catalogo_articulos.py            # modo normal
+  python3 scripts/sync_catalogo_articulos.py --dry-run  # solo muestra novedades sin escribir
+  ```
+- **Salida**: stdout con número de artículos nuevos detectados y grupos asignados
+- **Tabla(s) MariaDB**: `effi_data.catalogo_articulos` (INSERT para nuevos, UPDATE para grupos pendientes)
+- **Dependencias**: `zeffi_facturas_venta_detalle` (para detectar cod_articulo vendidos), `scripts/.env` (GROQ_API_KEY — opcional, solo si hay sin resolver)
+- **Notas**: Solo actúa sobre artículos SIN `grupo_producto` asignado. El regex cubre los patrones actuales de nomenclatura de OS. Groq solo se llama si hay artículos que el regex no resolvió bien. La tabla `catalogo_articulos` se sincroniza a Hostinger en el paso 5 (sync_hostinger.py).
+
+---
+
+### asignar_grupo_producto.py — Herramienta manual
+- **Propósito**: Asigna `grupo_producto` en `catalogo_articulos` para artículos ya vendidos. Herramienta de limpieza/reasignación manual (no corre en el pipeline).
+- **Tipo**: utilidad (manual)
+- **Ejecución manual**:
+  ```bash
+  python3 scripts/asignar_grupo_producto.py            # solo los que faltan (sin grupo)
+  python3 scripts/asignar_grupo_producto.py --dry-run  # preview sin escribir
+  python3 scripts/asignar_grupo_producto.py --todos    # reasigna todos (útil si cambia el criterio)
+  python3 scripts/asignar_grupo_producto.py --groq     # usa Groq para los sin grupo
+  ```
+- **Salida**: stdout con artículos procesados y grupos asignados
+- **Tabla(s) MariaDB**: `effi_data.catalogo_articulos` (UPDATE grupo_producto)
+- **Dependencias**: `scripts/.env` (GROQ_API_KEY — opcional, solo con --groq)
+- **Notas**: NO está en el orquestador. Usar cuando se quiere revisar o corregir grupos en lote. La diferencia con `sync_catalogo_articulos.py`: este script es para mantenimiento manual; el otro es el que corre automáticamente en el pipeline.
+
+---
 
 ### calcular_resumen_ventas_remisiones_mes.py
 - **Propósito**: Calcula y actualiza `resumen_ventas_remisiones_mes` — resumen mensual de ventas por remisión (paralelo a facturas_mes)
