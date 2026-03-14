@@ -8,6 +8,96 @@ from .config import get_local_conn
 from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
 from .proveedores import openai_compat, google, anthropic_prov
 
+
+# ── Seguridad: verificación de límites antes de cada llamada ─────────────────
+
+def _get_config(conn, clave: str, default):
+    with conn.cursor() as cur:
+        cur.execute("SELECT valor FROM ia_config WHERE clave = %s", (clave,))
+        row = cur.fetchone()
+    return row['valor'] if row else default
+
+
+def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
+    """
+    Verifica 3 capas de protección antes de llamar a la API externa.
+    Devuelve None si todo OK, o dict {error: str} si hay que bloquear.
+    """
+    conn = get_local_conn()
+    try:
+        # — Config global —
+        limite_costo = float(_get_config(conn, 'limite_costo_dia_usd', '0'))
+        cb_errores   = int(_get_config(conn, 'circuit_breaker_errores', '5'))
+        cb_ventana   = int(_get_config(conn, 'circuit_breaker_ventana_min', '10'))
+
+        with conn.cursor() as cur:
+
+            # CAPA 1: Costo diario global (toda la empresa)
+            if limite_costo > 0:
+                cur.execute(
+                    "SELECT COALESCE(SUM(costo_usd), 0) AS total FROM ia_logs "
+                    "WHERE empresa = %s AND DATE(created_at) = CURDATE()",
+                    (empresa,)
+                )
+                costo_hoy = float(cur.fetchone()['total'])
+                if costo_hoy >= limite_costo:
+                    return {
+                        'error': (
+                            f"⛔ Límite de gasto diario alcanzado "
+                            f"(${costo_hoy:.4f} / ${limite_costo:.2f} USD). "
+                            f"Reinicia mañana o ajusta el límite en ia_config."
+                        )
+                    }
+
+            # CAPA 2: RPD por agente (rate_limit_rpd de ia_agentes)
+            cur.execute(
+                "SELECT rate_limit_rpd FROM ia_agentes WHERE slug = %s",
+                (agente_slug,)
+            )
+            agente_row = cur.fetchone()
+            rpd = agente_row['rate_limit_rpd'] if agente_row else None
+            if rpd:
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM ia_logs "
+                    "WHERE agente_slug = %s AND DATE(created_at) = CURDATE()",
+                    (agente_slug,)
+                )
+                llamadas_hoy = cur.fetchone()['n']
+                if llamadas_hoy >= rpd:
+                    return {
+                        'error': (
+                            f"⛔ Agente '{agente_slug}' alcanzó su límite diario "
+                            f"({llamadas_hoy}/{rpd} llamadas). "
+                            f"Usa otro agente o espera mañana."
+                        )
+                    }
+
+            # CAPA 3: Circuit breaker — errores recientes
+            cur.execute(
+                "SELECT COUNT(*) AS n FROM ia_logs "
+                "WHERE agente_slug = %s "
+                "  AND error IS NOT NULL "
+                "  AND created_at >= NOW() - INTERVAL %s MINUTE",
+                (agente_slug, cb_ventana)
+            )
+            errores_recientes = cur.fetchone()['n']
+            if errores_recientes >= cb_errores:
+                return {
+                    'error': (
+                        f"⛔ Agente '{agente_slug}' suspendido automáticamente "
+                        f"({errores_recientes} errores en los últimos {cb_ventana} min). "
+                        f"Revisa el agente o espera {cb_ventana} minutos."
+                    )
+                }
+
+        return None  # Todo OK
+
+    except Exception as e:
+        # Si la verificación falla, dejar pasar (no bloquear por error de seguridad)
+        return None
+    finally:
+        conn.close()
+
 # Prompt de resumen — se agrega al final de cada turno
 _PROMPT_RESUMEN = """
 
@@ -118,6 +208,18 @@ def consultar(
         finally:
             conn.close()
         agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash'
+
+    # ── 4b. Verificar límites de seguridad ────────────────────────────
+    bloqueo = verificar_limites(agente_slug, empresa)
+    if bloqueo:
+        return {
+            'ok': False, 'conversacion_id': conv_id,
+            'respuesta': bloqueo['error'],
+            'formato': 'texto', 'tabla': None, 'sql_generado': None,
+            'agente': agente_slug, 'tema': tema,
+            'tokens': {'in': 0, 'out': 0}, 'costo_usd': 0.0,
+            'pasos': [], 'log_id': None, 'error': bloqueo['error'],
+        }
 
     # ── 5. Construir contexto de sistema (6 capas) ───────────────────
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
