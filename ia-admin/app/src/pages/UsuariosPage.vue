@@ -20,7 +20,7 @@
             <tr>
               <th>Email</th>
               <th>Nombre</th>
-              <th>Rol</th>
+              <th>Nivel</th>
               <th>Activo</th>
               <th>Creado</th>
               <th></th>
@@ -31,7 +31,9 @@
               <td>{{ u.email }}</td>
               <td><strong>{{ u.nombre }}</strong></td>
               <td>
-                <span class="badge" :class="u.rol === 'admin' ? 'badge-info' : 'badge-neutral'">{{ u.rol }}</span>
+                <div class="nivel-pill" :class="`nivel-${u.nivel}`" :title="nivelLabel(u.nivel)">
+                  {{ u.nivel }} <span class="nivel-text">{{ nivelLabel(u.nivel) }}</span>
+                </div>
               </td>
               <td>
                 <label class="toggle" @click.stop>
@@ -89,11 +91,15 @@
             <input class="input-field" v-model="form.nombre" placeholder="Santiago" />
           </div>
           <div class="input-group">
-            <label class="input-label">Rol</label>
-            <select class="input-field" v-model="form.rol">
-              <option value="admin">admin — acceso completo</option>
-              <option value="viewer">viewer — solo lectura</option>
-            </select>
+            <label class="input-label">
+              Nivel de acceso
+              <span class="nivel-badge-form nivel-{{ form.nivel }}">{{ form.nivel }} — {{ nivelLabel(form.nivel) }}</span>
+            </label>
+            <input type="range" min="1" max="7" step="1" v-model.number="form.nivel" class="nivel-slider" />
+            <div class="nivel-ticks">
+              <span v-for="n in 7" :key="n" :class="{ active: n <= form.nivel }">{{ n }}</span>
+            </div>
+            <div class="nivel-desc">{{ nivelDesc(form.nivel) }}</div>
           </div>
           <div class="input-group" style="display:flex;align-items:center;gap:10px;margin-top:4px">
             <label class="toggle">
@@ -146,7 +152,19 @@ function seleccionar(u) {
 function abrirNuevo() {
   esNuevo.value = true
   seleccionado.value = { email: '' }
-  form.value = { email: '', nombre: '', rol: 'viewer', activo: true }
+  form.value = { email: '', nombre: '', rol: 'viewer', nivel: 1, activo: true }
+}
+
+function nivelLabel(n) {
+  const labels = { 1: 'Básico', 2: 'Básico+', 3: 'Estándar', 4: 'Estándar+', 5: 'Avanzado', 6: 'Avanzado+', 7: 'Admin' }
+  return labels[n] || n
+}
+
+function nivelDesc(n) {
+  if (n >= 7) return 'Acceso total — todas las páginas y agentes premium (Claude, DeepSeek R1)'
+  if (n >= 5) return 'Acceso a Contextos y agentes intermedios (Gemini Pro, DeepSeek Chat)'
+  if (n >= 3) return 'Acceso a Logs — agentes gratuitos únicamente'
+  return 'Acceso básico — Dashboard y Playground con agentes gratuitos'
 }
 
 function cerrar() { seleccionado.value = null; form.value = {} }
@@ -193,3 +211,63 @@ function fechaCorta(ts) {
 
 onMounted(cargar)
 </script>
+
+<style scoped>
+/* ── Nivel pill en tabla ── */
+.nivel-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.nivel-pill.nivel-7 { background: rgba(94,106,210,0.12); color: #5e6ad2; }
+.nivel-pill.nivel-5, .nivel-pill.nivel-6 { background: rgba(16,185,129,0.1); color: #059669; }
+.nivel-pill.nivel-3, .nivel-pill.nivel-4 { background: rgba(245,158,11,0.1); color: #d97706; }
+.nivel-text { font-weight: 400; }
+
+/* ── Slider de nivel en formulario ── */
+.nivel-slider {
+  width: 100%;
+  accent-color: #5e6ad2;
+  cursor: pointer;
+  margin: 6px 0 4px;
+}
+.nivel-ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-bottom: 6px;
+}
+.nivel-ticks span {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  width: 18px;
+  text-align: center;
+}
+.nivel-ticks span.active { color: #5e6ad2; font-weight: 700; }
+
+.nivel-badge-form {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(94,106,210,0.12);
+  color: #5e6ad2;
+}
+.nivel-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border-left: 3px solid #5e6ad2;
+}
+</style>
