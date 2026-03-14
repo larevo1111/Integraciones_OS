@@ -94,9 +94,42 @@ app.get('/api/ventas/resumen-mes', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Resumen por producto (toda la vida)
+// Años disponibles en facturas (para filtro de fechas)
+app.get('/api/ventas/anios-facturas', async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT DISTINCT LEFT(fecha_creacion_factura, 4) AS anio
+      FROM zeffi_facturas_venta_detalle
+      WHERE fecha_creacion_factura IS NOT NULL AND fecha_creacion_factura != ''
+        AND LEFT(fecha_creacion_factura, 4) REGEXP '^[0-9]{4}$'
+      ORDER BY anio DESC
+    `)
+    res.json(rows.map(r => r.anio))
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Helper: cláusula WHERE de fecha sobre zeffi_facturas_venta_detalle.fecha_creacion_factura
+function fechaWhereDetalle(desde, hasta) {
+  const parts = ["d.cod_articulo IS NOT NULL AND d.cod_articulo != ''"]
+  const params = []
+  if (desde) { parts.push("LEFT(d.fecha_creacion_factura, 10) >= ?"); params.push(desde) }
+  if (hasta) { parts.push("LEFT(d.fecha_creacion_factura, 10) <= ?"); params.push(hasta) }
+  return { where: parts.join(' AND '), params }
+}
+function fechaWhereNC(desde, hasta) {
+  const parts = ["nc2.cod_articulo IS NOT NULL AND nc2.cod_articulo != ''"]
+  const params = []
+  if (desde) { parts.push("LEFT(nc2.fecha_factura, 10) >= ?"); params.push(desde) }
+  if (hasta) { parts.push("LEFT(nc2.fecha_factura, 10) <= ?"); params.push(hasta) }
+  return { where: parts.join(' AND '), params }
+}
+
+// Resumen por producto — con filtro de fechas opcional (?desde=YYYY-MM-DD&hasta=YYYY-MM-DD)
 app.get('/api/ventas/resumen-por-producto', async (req, res) => {
   try {
+    const { desde, hasta } = req.query
+    const wD = fechaWhereDetalle(desde, hasta)
+    const wNC = fechaWhereNC(desde, hasta)
     const rows = await query(`
       SELECT
         d.cod_articulo,
@@ -134,25 +167,28 @@ app.get('/api/ventas/resumen-por-producto', async (req, res) => {
       LEFT JOIN catalogo_articulos ca ON ca.cod_articulo = d.cod_articulo
       LEFT JOIN (
         SELECT
-          cod_articulo,
-          ROUND(SUM(CAST(REPLACE(COALESCE(precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
-                    CAST(REPLACE(COALESCE(descuento_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_notas_credito,
-          ROUND(SUM(CAST(REPLACE(COALESCE(cantidad,'0'),',','.') AS DECIMAL(15,4))))        AS cantidad_nc
-        FROM zeffi_notas_credito_venta_detalle
-        WHERE cod_articulo IS NOT NULL AND cod_articulo != ''
-        GROUP BY cod_articulo
+          nc2.cod_articulo,
+          ROUND(SUM(CAST(REPLACE(COALESCE(nc2.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+                    CAST(REPLACE(COALESCE(nc2.descuento_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_notas_credito,
+          ROUND(SUM(CAST(REPLACE(COALESCE(nc2.cantidad,'0'),',','.') AS DECIMAL(15,4))))        AS cantidad_nc
+        FROM zeffi_notas_credito_venta_detalle nc2
+        WHERE ${wNC.where}
+        GROUP BY nc2.cod_articulo
       ) nc ON nc.cod_articulo = d.cod_articulo
-      WHERE d.cod_articulo IS NOT NULL AND d.cod_articulo != ''
+      WHERE ${wD.where}
       GROUP BY d.cod_articulo
       ORDER BY fin_ventas_netas DESC
-    `)
+    `, [...wD.params, ...wNC.params])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Resumen por grupo producto (toda la vida)
+// Resumen por grupo producto — con filtro de fechas opcional
 app.get('/api/ventas/resumen-por-grupo', async (req, res) => {
   try {
+    const { desde, hasta } = req.query
+    const wD = fechaWhereDetalle(desde, hasta)
+    const wNC = fechaWhereNC(desde, hasta)
     const rows = await query(`
       SELECT
         COALESCE(ca.grupo_producto, d.cod_articulo)                                           AS grupo_producto,
@@ -193,13 +229,13 @@ app.get('/api/ventas/resumen-por-grupo', async (req, res) => {
                     CAST(REPLACE(COALESCE(nc2.descuento_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_notas_credito
         FROM zeffi_notas_credito_venta_detalle nc2
         LEFT JOIN catalogo_articulos ca2 ON ca2.cod_articulo = nc2.cod_articulo
-        WHERE nc2.cod_articulo IS NOT NULL AND nc2.cod_articulo != ''
+        WHERE ${wNC.where}
         GROUP BY COALESCE(ca2.grupo_producto, nc2.cod_articulo)
       ) nc ON nc.grupo_producto = COALESCE(ca.grupo_producto, d.cod_articulo)
-      WHERE d.cod_articulo IS NOT NULL AND d.cod_articulo != ''
+      WHERE ${wD.where}
       GROUP BY COALESCE(ca.grupo_producto, d.cod_articulo)
       ORDER BY fin_ventas_netas DESC
-    `)
+    `, [...wD.params, ...wNC.params])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
