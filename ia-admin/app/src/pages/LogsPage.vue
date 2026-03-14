@@ -42,6 +42,7 @@
               <th>Agente</th>
               <th>Tipo</th>
               <th>Tokens</th>
+              <th>Costo</th>
               <th>ms</th>
               <th>Estado</th>
             </tr>
@@ -60,6 +61,7 @@
               <td>{{ log.agente_slug }}</td>
               <td>{{ log.tipo_consulta }}</td>
               <td>{{ log.tokens_total ?? '—' }}</td>
+              <td class="mono" style="font-size:12px">{{ log.costo_usd ? '$' + Number(log.costo_usd).toFixed(5) : '—' }}</td>
               <td>{{ log.latencia_ms ?? '—' }}</td>
               <td>
                 <span v-if="!log.error_mensaje" class="badge badge-success">OK</span>
@@ -67,7 +69,7 @@
               </td>
             </tr>
             <tr v-if="!logs.length">
-              <td colspan="9" style="text-align:center;color:var(--text-tertiary);padding:40px">Sin registros</td>
+              <td colspan="10" style="text-align:center;color:var(--text-tertiary);padding:40px">Sin registros</td>
             </tr>
           </tbody>
         </table>
