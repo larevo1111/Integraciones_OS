@@ -198,6 +198,70 @@ El resumen debe ser DETALLADO (máximo 1000 palabras). Incluye siempre:
 """
 
 
+def _extraer_palabras_clave(texto: str) -> str:
+    """Extrae palabras relevantes de una pregunta para indexar ejemplos SQL."""
+    import re
+    palabras_negocio = [
+        'ventas', 'venta', 'facturas', 'factura', 'remisiones', 'remision',
+        'clientes', 'cliente', 'productos', 'producto', 'mes', 'dia', 'hoy',
+        'ayer', 'semana', 'año', 'canal', 'margen', 'utilidad', 'costo',
+        'consignacion', 'pendiente', 'top', 'mejor', 'mayor', 'menor',
+        'comparar', 'comparame', 'vs', 'resumen', 'total', 'cuanto', 'cuantos'
+    ]
+    texto_lower = texto.lower()
+    encontradas = [p for p in palabras_negocio if p in texto_lower]
+    return ','.join(encontradas[:10])
+
+
+def _guardar_ejemplo_sql(empresa: str, pregunta: str, sql: str):
+    """Guarda un Q→SQL exitoso para auto-mejora progresiva del agente."""
+    try:
+        import re
+        tablas_raw = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', sql, re.IGNORECASE)
+        tablas = [t for par in tablas_raw for t in par if t]
+        tablas_str = ','.join(set(tablas))[:500]
+        palabras = _extraer_palabras_clave(pregunta)
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO ia_ejemplos_sql (empresa, pregunta, sql_generado, tablas_usadas, palabras_clave)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (empresa, pregunta[:500], sql[:2000], tablas_str, palabras))
+            conn.commit()
+        conn.close()
+    except Exception:
+        pass  # No fallar si no se puede guardar
+
+
+def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
+    """Recupera los N ejemplos Q→SQL más relevantes para la pregunta actual."""
+    try:
+        palabras = _extraer_palabras_clave(pregunta).split(',')
+        if not palabras:
+            return ''
+        condicion = ' OR '.join([f"palabras_clave LIKE %s" for _ in palabras])
+        params = [f'%{p}%' for p in palabras] + [empresa, n]
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT pregunta, sql_generado FROM ia_ejemplos_sql
+                WHERE ({condicion}) AND empresa = %s
+                ORDER BY veces_usado DESC, ultima_vez DESC
+                LIMIT %s
+            """, params)
+            filas = cur.fetchall()
+        conn.close()
+        if not filas:
+            return ''
+        ejemplos = '\n\n'.join([
+            f"Pregunta: {f['pregunta']}\nSQL:\n{f['sql_generado']}"
+            for f in filas
+        ])
+        return f"\n\nEJEMPLOS DE CONSULTAS ANTERIORES EXITOSAS (referencia):\n{ejemplos}"
+    except Exception:
+        return ''
+
+
 def _nivel_usuario(usuario_id: str, empresa: str) -> int:
     """Obtiene el nivel del usuario desde ia_usuarios. Default 1 si no existe."""
     try:
@@ -431,10 +495,17 @@ def consultar(
 
             if paso == 'generar_sql':
                 pasos_ejecutados.append('generar_sql')
+                # Recuperar ejemplos dinámicos de consultas exitosas anteriores
+                ejemplos_din = _obtener_ejemplos_dinamicos(empresa, pregunta)
                 prompt_sql = (
-                    f"Genera el SQL para responder esta pregunta:\n{pregunta}\n\n"
+                    f"Genera el SQL para responder esta pregunta:\n{pregunta}"
+                    f"{ejemplos_din}\n\n"
                     f"Responde SOLO con el SQL dentro de un bloque ```sql```. "
-                    f"Sin explicaciones adicionales."
+                    f"Sin explicaciones adicionales.\n"
+                    f"Antes de devolver el SQL, verifica internamente: "
+                    f"(1) todas las columnas usadas existen en el esquema, "
+                    f"(2) el campo 'mes' se trata como VARCHAR 'YYYY-MM', "
+                    f"(3) es compatible con MariaDB. Si algo falla, corrígelo."
                 )
                 msgs = mensajes_base + [{'role': 'user', 'content': prompt_sql}]
                 res = _llamar_agente(agente_cfg, msgs, temperatura=0.1)
@@ -482,6 +553,8 @@ def consultar(
 
                 datos_crudos = res_sql['filas']
                 tabla_resultado = formateador.filas_a_tabla(res_sql['filas'], res_sql['columnas'])
+                # Auto-mejora: guardar este Q→SQL exitoso para futuras consultas similares
+                _guardar_ejemplo_sql(empresa, pregunta, sql_generado)
 
             elif paso in ('redactar', 'resumir', 'generar_doc'):
                 pasos_ejecutados.append(paso)

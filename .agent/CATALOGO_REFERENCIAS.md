@@ -75,13 +75,23 @@ Registro de todas las fuentes externas, guías técnicas y documentación que in
 
 ### Self-Improving Text-to-SQL — DAIL-SQL Paper
 - **URL**: https://arxiv.org/abs/2308.15363
-- **Relevancia**: Sistema que selecciona dinámicamente los few-shot examples más relevantes para cada pregunta. Accuracy mejora 20%+ vs ejemplos fijos. Base para implementar RAG de ejemplos.
-- **Pendiente de implementar**: RAG sobre historial de Q→SQL exitosos — cuando el sistema resuelve bien una consulta, guardarla como ejemplo para consultas similares futuras
+- **Relevancia**: Selección dinámica de few-shot examples por similitud semántica. Accuracy mejora 20%+ vs ejemplos fijos.
+- **Aplicado en**: `ia_ejemplos_sql` table + `_obtener_ejemplos_dinamicos()` en `servicio.py` — recupera los 3 más relevantes por palabras clave antes de cada consulta
+
+### Defog SQL-Eval — Self-correction framework
+- **URL**: https://github.com/defog-ai/sql-eval
+- **Relevancia**: El 80% de errores SQL se corrigen en el primer reintento cuando el error se inyecta en el prompt. Max 3 intentos.
+- **Aplicado en**: Retry loop en `servicio.py` (implementado desde sesión anterior)
 
 ### Vanna.ai — Training Pipeline
 - **URL**: https://vanna.ai/docs/training
-- **Relevancia**: Flujo de auto-mejora: usuario valida respuesta → par Q→SQL se guarda → se usa en próximas consultas similares. El agente aprende del uso real.
-- **Pendiente de implementar**: Tabla `ia_ejemplos_sql` + endpoint de feedback + RAG sobre ejemplos validados
+- **Relevancia**: Flujo de auto-mejora: SQL exitoso se guarda → se usa en próximas consultas similares. El agente mejora progresivamente con el uso real.
+- **Aplicado en**: `_guardar_ejemplo_sql()` en `servicio.py` — logging automático después de cada ejecución SQL exitosa
+
+### Anthropic — Prompting Best Practices (oficial)
+- **URL**: https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices
+- **Relevancia**: (1) XML tags para estructurar system prompt — el modelo parsea mejor secciones nombradas. (2) Decir QUÉ HACER en lugar de qué no hacer. (3) Pregunta del usuario al final mejora hasta 30% en contexto largo.
+- **Pendiente**: Restructurar system_prompt de analisis_datos con XML tags (discutir con Santi)
 
 ---
 
