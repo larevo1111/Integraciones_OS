@@ -244,7 +244,7 @@ def endpoint_consumo_historico():
             """, params)
             filas = cur.fetchall()
 
-        return jsonify({'ok': True, 'dias': dias, 'registros': filas})
+        return jsonify({'ok': True, 'dias': dias, 'historico': filas, 'registros': filas})
     finally:
         conn.close()
 
