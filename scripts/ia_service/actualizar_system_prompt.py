@@ -39,48 +39,205 @@ Cuando haya múltiples cifras relacionadas: las pones en contexto entre sí para
 </precision>
 
 <tablas_disponibles>
-VENTAS FACTURADAS (históricas, confirmadas):
-  zeffi_facturas_venta_encabezados → encabezado de cada factura
-  zeffi_facturas_venta_detalle     → detalle por artículo de cada factura
+── VENTAS FACTURADAS ─────────────────────────────────────────────────────────
 
-REMISIONES (mercancía entregada pendiente de facturar / consignación):
-  zeffi_remisiones_venta_encabezados → encabezado de cada remisión
-  zeffi_remisiones_venta_detalle     → detalle por artículo de cada remisión
+zeffi_facturas_venta_encabezados
+  Cada fila es una factura de venta emitida. Tiene los totales: valor bruto, descuentos, IVA,
+  total neto, márgenes, estado de cobro y cartera.
+  Usar para: ventas del día/semana/mes, ingresos, comparar períodos, ventas por canal o cliente,
+  cartera pendiente, márgenes globales.
 
-RESÚMENES PRECALCULADOS (más rápido para análisis mensuales):
-  resumen_ventas_facturas_mes          → KPIs mensual de facturas
-  resumen_ventas_facturas_producto_mes → facturas por producto/mes
-  resumen_ventas_facturas_cliente_mes  → facturas por cliente/mes
-  resumen_ventas_facturas_canal_mes    → facturas por canal/mes
-  resumen_ventas_remisiones_mes        → KPIs mensual de remisiones
-  resumen_ventas_remisiones_producto_mes → remisiones por producto/mes
-  resumen_ventas_remisiones_cliente_mes  → remisiones por cliente/mes
-  resumen_ventas_remisiones_canal_mes    → remisiones por canal/mes
+zeffi_facturas_venta_detalle
+  Cada fila es un artículo dentro de una factura: cantidad, precio, descuento, costo y utilidad
+  por producto en cada venta.
+  Usar para: top productos vendidos, ventas por referencia/categoría/marca, unidades vendidas,
+  margen por producto, ventas de un artículo específico.
 
-CLIENTES Y PRODUCTOS:
-  zeffi_clientes     → maestro de clientes
-  catalogo_articulos → catálogo de artículos con grupo asignado
-  zeffi_inventario   → inventario: stock, precios, costos por artículo
+── REMISIONES (entregado, pendiente de facturar) ────────────────────────────
 
-DEVOLUCIONES Y NOTAS CRÉDITO:
-  zeffi_notas_credito_venta_encabezados → notas crédito (devoluciones)
-  zeffi_devoluciones_venta_encabezados  → devoluciones físicas
+zeffi_remisiones_venta_encabezados
+  Cada fila es una remisión (mercancía entregada que aún no se facturó). Incluye totales y estado
+  (Pendiente de facturar / Anulado).
+  Usar para: mercancía entregada sin cobrar, comparar volumen facturado vs remisionado,
+  cartera de remisiones, ventas por canal o vendedor.
 
-ÓRDENES DE VENTA (consignación activa):
-  zeffi_ordenes_venta_encabezados → órdenes/consignaciones
-  zeffi_ordenes_venta_detalle     → detalle de ítems de cada orden
+zeffi_remisiones_venta_detalle
+  Artículos dentro de cada remisión — misma estructura que detalle de facturas.
+  Usar para: qué productos se están remisionando, cantidades por referencia.
 
-OTRAS TABLAS DISPONIBLES (menos frecuentes):
-  zeffi_cotizaciones_ventas_encabezados / _detalle → cotizaciones
-  zeffi_cuentas_por_cobrar   → cartera pendiente de cobro
-  zeffi_cuentas_por_pagar    → pagos pendientes a proveedores
-  zeffi_facturas_compra_*    → compras a proveedores
-  zeffi_proveedores          → maestro de proveedores
-  zeffi_empleados            → maestro de empleados/vendedores
-  zeffi_bodegas              → bodegas disponibles
-  zeffi_categorias_articulos → categorías de artículos
-  zeffi_tipos_marketing      → canales de marketing
-  zeffi_tarifas_precios      → tarifas de precio
+── ÓRDENES DE VENTA / CONSIGNACIÓN ──────────────────────────────────────────
+
+zeffi_ordenes_venta_encabezados
+  Órdenes de Venta (OV) — usadas principalmente para consignación (mercancía en poder del cliente).
+  vigencia='Vigente' = consignación activa. vigencia='Anulada' = ya procesada (facturada, remisionada o cancelada).
+  Usar para: consignación activa y su valor total, órdenes por cliente o vendedor.
+
+zeffi_ordenes_venta_detalle
+  Artículos dentro de cada orden de venta/consignación.
+  Usar para: detalle de productos en consignación activa.
+
+── DEVOLUCIONES ──────────────────────────────────────────────────────────────
+
+zeffi_notas_credito_venta_encabezados
+  Notas crédito (devolución de dinero o crédito a favor del cliente sobre una factura). Indica qué
+  factura origina la devolución y el valor devuelto.
+  Usar para: devoluciones en valor ($), impacto en ingresos netos, notas crédito por período o cliente.
+
+zeffi_notas_credito_venta_detalle
+  Artículos devueltos dentro de cada nota crédito.
+  Usar para: qué productos se devuelven más, devoluciones por referencia.
+
+zeffi_devoluciones_venta_encabezados
+  Devoluciones físicas de mercancía (la mercancía vuelve al inventario). Complementa las notas crédito.
+  Usar para: devoluciones físicas por período, clientes que más devuelven.
+
+zeffi_devoluciones_venta_detalle
+  Artículos incluidos en cada devolución física.
+
+── COTIZACIONES ──────────────────────────────────────────────────────────────
+
+zeffi_cotizaciones_ventas_encabezados
+  Cotizaciones enviadas a clientes (propuestas de precio, no son ventas aún).
+  Usar para: pipeline comercial, cotizaciones por período o cliente, tasa de conversión.
+
+zeffi_cotizaciones_ventas_detalle
+  Artículos dentro de cada cotización.
+
+── RESÚMENES PRECALCULADOS (preferir para análisis mensual — más rápidos) ───
+
+resumen_ventas_facturas_mes
+  KPIs mensuales de ventas facturadas: ventas netas, devoluciones, ingresos, costos, margen,
+  unidades, clientes, ticket promedio, cartera, top cliente/producto/canal.
+  Incluye comparativos con mes anterior y mismo mes año anterior, proyección del mes corriente.
+  Usar para: resumen del mes, comparar meses, tendencias anuales, proyección. SIEMPRE preferir
+  esta tabla para consultas mensuales globales — es la más rápida.
+
+resumen_ventas_facturas_producto_mes
+  Ventas facturadas por producto y mes. Cada fila = un artículo en un mes específico.
+  Usar para: ranking de productos por mes, evolución de ventas de un artículo, top referencias.
+
+resumen_ventas_facturas_cliente_mes
+  Ventas facturadas por cliente y mes. Cada fila = un cliente en un mes.
+  Usar para: ranking de clientes por mes, historial de compras de un cliente,
+  clientes nuevos vs recurrentes.
+
+resumen_ventas_facturas_canal_mes
+  Ventas facturadas por canal de marketing y mes.
+  Usar para: participación de cada canal, evolución de canales, comparar Instagram vs WhatsApp.
+
+resumen_ventas_remisiones_mes
+  Igual que facturas_mes pero para remisiones. Incluye métricas de pendientes de facturar.
+  Usar para: resumen mensual de remisiones, remisiones pendientes, comparar facturado vs remisionado.
+
+resumen_ventas_remisiones_producto_mes
+  Remisiones por producto y mes.
+
+resumen_ventas_remisiones_cliente_mes
+  Remisiones por cliente y mes.
+
+resumen_ventas_remisiones_canal_mes
+  Remisiones por canal y mes.
+
+── CLIENTES Y PRODUCTOS ──────────────────────────────────────────────────────
+
+zeffi_clientes
+  Maestro de todos los clientes en Effi: datos de contacto, tipo de cliente, canal de marketing,
+  tarifa, forma de pago, vendedor asignado, fecha última compra.
+  Usar para: buscar datos de un cliente, segmentar por canal o tipo, clientes activos vs inactivos.
+  Nota: puede haber NITs duplicados — al hacer JOIN con facturas, deduplicar con GROUP BY.
+
+zeffi_inventario
+  Inventario actual: stock disponible, costos (manual y promedio), precios de venta, márgenes,
+  niveles mínimos y óptimos por artículo.
+  Usar para: stock disponible, valoración del inventario, artículos bajo stock mínimo,
+  precios y márgenes actuales.
+
+catalogo_articulos
+  Catálogo de artículos con su clasificación en grupos de producto (Aceites, Cremas, Jabones...).
+  Enriquece las ventas con el grupo cuando las tablas de detalle no lo traen directamente.
+  Usar para: cruzar ventas con grupo de producto.
+
+zeffi_categorias_articulos
+  Categorías maestras de artículos como están definidas en Effi.
+  Usar para: listar categorías disponibles.
+
+── COMPRAS ───────────────────────────────────────────────────────────────────
+
+zeffi_facturas_compra_encabezados
+  Facturas de compra a proveedores — cada fila es una compra registrada.
+  Usar para: compras del período, gasto en compras, compras por proveedor.
+
+zeffi_facturas_compra_detalle
+  Artículos dentro de cada factura de compra.
+  Usar para: artículos comprados, costo por unidad, volumen de compras por referencia.
+
+zeffi_ordenes_compra_encabezados
+  Órdenes de compra emitidas a proveedores (antes de recibir la mercancía).
+  Usar para: compras en tránsito, órdenes pendientes de recibir.
+
+zeffi_ordenes_compra_detalle
+  Artículos dentro de cada orden de compra.
+
+zeffi_remisiones_compra_encabezados
+  Recepciones de mercancía de proveedores (mercancía recibida antes o sin factura).
+  Usar para: ingresos de mercancía al inventario, recepciones por período.
+
+zeffi_remisiones_compra_detalle
+  Artículos recibidos en cada remisión de compra.
+
+zeffi_proveedores
+  Maestro de proveedores en Effi.
+  Usar para: datos de un proveedor, listar proveedores activos.
+
+── PRODUCCIÓN ────────────────────────────────────────────────────────────────
+
+zeffi_produccion_encabezados
+  Órdenes de producción — cada fila es una orden de fabricación con estado y valores.
+  Usar para: producción del período, órdenes en proceso, costo de producción.
+
+zeffi_articulos_producidos
+  Artículos terminados que resultaron de cada orden de producción.
+  Usar para: qué se fabricó, cantidades producidas por referencia.
+
+zeffi_costos_produccion
+  Costos asociados a cada orden (mano de obra, insumos indirectos, etc.).
+  Usar para: costo real de fabricación, análisis de costos.
+
+zeffi_materiales
+  Materias primas consumidas en cada orden de producción.
+  Usar para: consumo de materiales, relación materia prima → producto terminado.
+
+── FINANCIERO ────────────────────────────────────────────────────────────────
+
+zeffi_cuentas_por_cobrar
+  Cartera de clientes — facturas con saldo pendiente de cobro, días de mora, estado.
+  Usar para: cartera total, clientes en mora, antigüedad de cartera, facturas vencidas.
+
+zeffi_cuentas_por_pagar
+  Deudas con proveedores — facturas de compra con saldo pendiente de pago.
+  Usar para: saldo por pagar a proveedores, deudas vencidas.
+
+zeffi_comprobantes_ingreso_encabezados
+  Comprobantes de recaudo / pagos recibidos de clientes.
+  Usar para: pagos recibidos del período, ingresos de caja, abonos a cartera.
+
+── MAESTROS / CATÁLOGOS ──────────────────────────────────────────────────────
+
+zeffi_empleados
+  Maestro de empleados y vendedores en Effi.
+  Usar para: datos de vendedores, listar el equipo de ventas, cruzar ventas por vendedor.
+
+zeffi_tarifas_precios
+  Tarifas de precios definidas en Effi (lista pública, distribuidor, mayorista, etc.).
+  Usar para: listar tarifas, cruzar con clientes que tienen cada tarifa.
+
+zeffi_tipos_marketing
+  Canales de marketing definidos en Effi (Instagram, WhatsApp, Referido, etc.).
+  Usar para: listar canales disponibles, cruzar con clientes o ventas por canal.
+
+zeffi_bodegas
+  Maestro de bodegas/almacenes de la empresa.
+  Usar para: listar bodegas, cruzar con inventario por bodega.
 </tablas_disponibles>
 
 <diccionario_campos>

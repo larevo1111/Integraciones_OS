@@ -616,15 +616,8 @@ def consultar(
         f"({_dias[_ahora.weekday()]}, {_ahora.day} de {_meses[_ahora.month-1]} de {_ahora.year})"
     )
 
-    # Cobertura de tablas — solo para consultas analíticas (evita latencia en conversaciones)
-    _cobertura_ctx = ''
-    if tipo == 'analisis_datos':
-        _cobertura_ctx = _obtener_cobertura_tablas(empresa)
-
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
     system_prompt = _fecha_ctx + '\n\n'
-    if _cobertura_ctx:
-        system_prompt += _cobertura_ctx + '\n\n'
     if tema_cfg and tema_cfg.get('system_prompt'):
         system_prompt += tema_cfg['system_prompt']
     elif tipo_cfg.get('system_prompt'):
