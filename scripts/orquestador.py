@@ -37,6 +37,7 @@ RESUMEN_REM_CANAL_SCRIPT          = SCRIPTS_DIR / 'calcular_resumen_ventas_remis
 RESUMEN_REM_CLIENTE_SCRIPT        = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_cliente_mes.py'
 RESUMEN_REM_PRODUCTO_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_producto_mes.py'
 SYNC_CATALOGO_SCRIPT              = SCRIPTS_DIR / 'sync_catalogo_articulos.py'
+ASIGNAR_GRUPO_SCRIPT              = SCRIPTS_DIR / 'asignar_grupo_producto.py'
 SYNC_HOSTINGER_SCRIPT             = SCRIPTS_DIR / 'sync_hostinger.py'
 SYNC_ESPOCRM_MARKETING_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_marketing.py'
 SYNC_ESPOCRM_CONTACTOS_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_contactos.py'
@@ -342,6 +343,13 @@ def main():
     dur_cat = int((datetime.datetime.now() - t_cat).total_seconds())
     log.info(f'   {salida_cat.strip().splitlines()[-1] if salida_cat.strip() else "sin salida"}  [{dur_cat}s]')
 
+    # ── 4f. ASIGNAR GRUPO PRODUCTO (artículos sin grupo) ─────────
+    log.info('▶ asignar_grupo_producto.py ...')
+    t_grupo = datetime.datetime.now()
+    exit_grupo, salida_grupo = ejecutar(['python3', str(ASIGNAR_GRUPO_SCRIPT), '--groq'], 90)
+    dur_grupo = int((datetime.datetime.now() - t_grupo).total_seconds())
+    log.info(f'   {salida_grupo.strip().splitlines()[-1] if salida_grupo.strip() else "sin salida"}  [{dur_grupo}s]')
+
     # ── 5. SYNC HOSTINGER ────────────────────────────────────────
     log.info('▶ sync_hostinger.py ...')
     t7 = datetime.datetime.now()
@@ -411,12 +419,12 @@ def main():
     hay_error = (exit_exp != 0 or exit_imp != 0 or exit_rsm != 0 or exit_rsm_canal != 0
                  or exit_rsm_cliente != 0 or exit_rsm_producto != 0 or exit_rsm_rem != 0
                  or exit_rem_canal != 0 or exit_rem_cli != 0 or exit_rem_prod != 0
-                 or exit_cat != 0
+                 or exit_cat != 0 or exit_grupo != 0
                  or exit_sync != 0 or exit_espo != 0 or exit_espo_con != 0
                  or exit_espo_host != 0 or exit_gen != 0 or exit_imp_effi != 0
                  or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_cat + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_gen + dur_imp_effi
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_cat + dur_grupo + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_gen + dur_imp_effi
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 

@@ -275,9 +275,9 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 
 ---
 
-### asignar_grupo_producto.py — Herramienta manual
-- **Propósito**: Asigna `grupo_producto` en `catalogo_articulos` para artículos ya vendidos. Herramienta de limpieza/reasignación manual (no corre en el pipeline).
-- **Tipo**: utilidad (manual)
+### asignar_grupo_producto.py — Paso 4f + Herramienta manual
+- **Propósito**: Asigna `grupo_producto` en `catalogo_articulos` para artículos ya vendidos que aún no tienen grupo. Corre automáticamente en el pipeline (paso 4f) y también es útil como herramienta manual.
+- **Tipo**: import / analítica (paso 4f) + utilidad manual
 - **Ejecución manual**:
   ```bash
   python3 scripts/asignar_grupo_producto.py            # solo los que faltan (sin grupo)
@@ -288,7 +288,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Salida**: stdout con artículos procesados y grupos asignados
 - **Tabla(s) MariaDB**: `effi_data.catalogo_articulos` (UPDATE grupo_producto)
 - **Dependencias**: `scripts/.env` (GROQ_API_KEY — opcional, solo con --groq)
-- **Notas**: NO está en el orquestador. Usar cuando se quiere revisar o corregir grupos en lote. La diferencia con `sync_catalogo_articulos.py`: este script es para mantenimiento manual; el otro es el que corre automáticamente en el pipeline.
+- **Notas**: En el pipeline (paso 4f) se ejecuta con `--groq`. Si no hay artículos sin grupo, termina en milisegundos (no-op). Si la GROQ_API_KEY no está configurada, el paso de Groq se salta sin error. La diferencia con `sync_catalogo_articulos.py` (paso 4e): ese script detecta e inserta artículos NUEVOS; este script asigna grupo a artículos ya existentes en el catálogo que quedaron sin grupo (ej. si el regex no los resolvió en una corrida anterior).
 
 ---
 
