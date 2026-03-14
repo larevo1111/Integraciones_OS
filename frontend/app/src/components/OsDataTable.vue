@@ -116,6 +116,15 @@
           </template>
           <!-- Datos -->
           <template v-else>
+            <!-- Fila de subtotales — arriba, justo debajo del header -->
+            <tr v-if="hasAggregates && sortedRows.length > 0" class="agg-row">
+              <td v-for="col in visibleColumns" :key="col.key" class="td agg-td">
+                <template v-if="columnAggregates[col.key]">
+                  <span class="agg-label">{{ aggLabel(columnAggregates[col.key]) }}</span>
+                  <span class="agg-value">{{ formatCell(computeAggregate(col.key, columnAggregates[col.key]), col.key) }}</span>
+                </template>
+              </td>
+            </tr>
             <tr
               v-for="(row, idx) in sortedRows"
               :key="row._pk || row.mes || row._key || idx"
@@ -133,15 +142,6 @@
                   <InboxIcon :size="24" />
                   <span>Sin resultados</span>
                 </div>
-              </td>
-            </tr>
-            <!-- Fila de subtotales -->
-            <tr v-if="hasAggregates && sortedRows.length > 0" class="agg-row">
-              <td v-for="col in visibleColumns" :key="col.key" class="td agg-td">
-                <template v-if="columnAggregates[col.key]">
-                  <span class="agg-label">{{ aggLabel(columnAggregates[col.key]) }}</span>
-                  <span class="agg-value">{{ formatCell(computeAggregate(col.key, columnAggregates[col.key]), col.key) }}</span>
-                </template>
               </td>
             </tr>
           </template>
@@ -754,13 +754,17 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 }
 .cell-value { font-size: 13px; }
 
-/* Fila de subtotales */
+/* Fila de subtotales — encima de los datos */
 .agg-row { background: rgba(16,185,129,0.04); }
 .agg-td {
   font-weight: 600;
   color: var(--text-primary);
   border-bottom: 2px solid rgba(16,185,129,0.25);
   vertical-align: middle;
+  position: sticky;
+  top: 36px;   /* justo debajo del th (height: 36px) */
+  z-index: 4;
+  background: rgba(16,185,129,0.06);
 }
 .agg-label {
   font-size: 10px; color: var(--color-success);
