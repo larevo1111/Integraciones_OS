@@ -155,12 +155,11 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # Error del servicio
     if not resultado.get('ok'):
-        error = resultado.get('error', 'Error desconocido')
         retry = resultado.get('retry_after')
         if retry:
-            msg = f'⏳ {error}'
+            msg = f'⏳ Demasiadas consultas seguidas. Intenta en {retry} segundos.'
         else:
-            msg = f'❌ {error}'
+            msg = '😔 No pude obtener esa información. Intenta reformular la pregunta o pregúntame algo más.'
         await update.message.reply_text(msg, reply_markup=REPLY_KB)
         return
 

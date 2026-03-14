@@ -443,7 +443,30 @@ def consultar(
 
                 res_sql = ejecutor_sql.ejecutar(sql_generado)
                 if not res_sql['ok']:
-                    raise Exception(f"Error ejecutando SQL: {res_sql['error']}")
+                    # Reintento: devolver el error al LLM para que corrija el SQL
+                    error_sql = res_sql['error']
+                    prompt_retry = (
+                        f"El SQL que generaste falló con este error:\n{error_sql}\n\n"
+                        f"SQL fallido:\n{sql_generado}\n\n"
+                        "Genera un SQL corregido. Revisa los nombres de columnas en el esquema. "
+                        "Solo responde con el SQL corregido, sin explicaciones."
+                    )
+                    msgs_retry = mensajes_base + [{'role': 'user', 'content': prompt_retry}]
+                    res_retry = _llamar_agente(agente_cfg, msgs_retry, temperatura=0.1)
+                    tokens_in_total  += res_retry.get('tokens_in', 0)
+                    tokens_out_total += res_retry.get('tokens_out', 0)
+                    if res_retry['ok']:
+                        sql_retry = formateador.extraer_sql(res_retry['texto'])
+                        if sql_retry:
+                            res_sql = ejecutor_sql.ejecutar(sql_retry)
+                            if res_sql['ok']:
+                                sql_generado = sql_retry
+                            else:
+                                raise Exception(f"Error ejecutando SQL: {res_sql['error']}")
+                        else:
+                            raise Exception(f"Error ejecutando SQL: {error_sql}")
+                    else:
+                        raise Exception(f"Error ejecutando SQL: {error_sql}")
 
                 datos_crudos = res_sql['filas']
                 tabla_resultado = formateador.filas_a_tabla(res_sql['filas'], res_sql['columnas'])
