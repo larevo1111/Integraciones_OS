@@ -22,14 +22,23 @@ def _formatear_valor(v) -> str:
     return str(v)
 
 
+def _fila_valor(fila, idx: int, col: str):
+    """Extrae valor de una fila sea lista o dict."""
+    if isinstance(fila, dict):
+        return fila.get(col, '')
+    if isinstance(fila, list) and idx < len(fila):
+        return fila[idx]
+    return ''
+
+
 def _tabla_texto(columnas: list, filas: list, titulo: str = '') -> str:
-    """Genera tabla monoespaciada para Telegram (MarkdownV2 code block)."""
+    """Genera tabla monoespaciada para Telegram (code block)."""
     if not filas:
         return '_Sin datos_'
 
     # Calcular anchos de columna
-    anchos = [max(len(str(c)), max((len(_formatear_valor(f.get(c, ''))) for f in filas), default=0))
-              for c in columnas]
+    anchos = [max(len(str(c)), max((len(_formatear_valor(_fila_valor(f, i, c))) for f in filas), default=0))
+              for i, c in enumerate(columnas)]
     anchos = [min(a, 20) for a in anchos]  # máx 20 chars por col
 
     sep   = '┼'.join('─' * (a + 2) for a in anchos)
@@ -49,7 +58,7 @@ def _tabla_texto(columnas: list, filas: list, titulo: str = '') -> str:
 
     lines = [top, header, sep2]
     for f in filas:
-        vals = [_formatear_valor(f.get(c, '')) for c in columnas]
+        vals = [_formatear_valor(_fila_valor(f, i, c)) for i, c in enumerate(columnas)]
         lines.append(fila_txt(vals))
         lines.append(sep)
     lines[-1] = bot
@@ -59,38 +68,42 @@ def _tabla_texto(columnas: list, filas: list, titulo: str = '') -> str:
     return f'{encabezado}```\n{tabla_str}\n```'
 
 
+def _filas_validas(filas: list) -> list:
+    """Filtra filas vacías o nulas."""
+    result = []
+    for f in filas:
+        if isinstance(f, list):
+            if any(v not in (None, '', 0) for v in f):
+                result.append(f)
+        elif isinstance(f, dict):
+            if any(v not in (None, '', 0) for v in f.values()):
+                result.append(f)
+    return result
+
+
 def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -> dict:
     """
-    Analiza el resultado de ia_service y devuelve:
-    {
-      'texto': str,          — mensaje formateado para Telegram
-      'tiene_tabla': bool,
-      'token': str|None,     — token para Mini App si >5 filas
-      'n_filas': int,
-    }
+    Siempre usa resultado['respuesta'] como texto principal.
+    Si hay tabla con datos reales: genera token para Mini App o muestra inline.
+    Nunca reemplaza el texto de la IA con código de tabla.
     """
-    tabla  = resultado.get('tabla')
+    tabla   = resultado.get('tabla')
+    texto   = (resultado.get('respuesta') or '').strip()
     n_filas = 0
     token   = None
-    texto   = resultado.get('respuesta', '') or ''
 
     if tabla and isinstance(tabla, dict):
         columnas = tabla.get('columnas', [])
-        filas    = tabla.get('filas', [])
+        filas    = _filas_validas(tabla.get('filas', []))
         n_filas  = len(filas)
 
-        if 0 < n_filas <= MAX_FILAS_INLINE:
-            texto = _tabla_texto(columnas, filas)
-        elif n_filas > MAX_FILAS_INLINE:
-            # Mostrar preview de 3 filas + botón Mini App
-            texto_prev = _tabla_texto(columnas, filas[:3], titulo=f'Vista previa — {n_filas} filas')
+        if n_filas > MAX_FILAS_INLINE:
             token = str(uuid.uuid4())
             guardar_tabla_temp(token, pregunta, columnas, filas, empresa)
-            texto = texto_prev
 
     return {
-        'texto':      texto,
+        'texto':       texto,
         'tiene_tabla': n_filas > 0,
-        'token':      token,
-        'n_filas':    n_filas,
+        'token':       token,
+        'n_filas':     n_filas,
     }
