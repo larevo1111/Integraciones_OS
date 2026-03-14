@@ -417,9 +417,13 @@ def consultar(
     conv_id = conv['id']
     resumen_anterior = conv.get('resumen') or ''
 
-    # ── 2. Enrutar: detectar tipo Y tema si no vienen ─────────────────
+    # ── 2. Enrutar: detectar tipo, tema y si se necesita SQL nuevo ───────
+    requiere_sql = True  # default conservador
     if not tipo or not tema:
-        tipo_enrutado, tema_enrutado = _enrutar(pregunta, empresa)
+        # Pasar historial reciente para que el enrutador pueda decidir requiere_sql
+        # (distingue entre "dame ventas de ayer" vs "explícame ese margen")
+        historial_ctx = contexto.obtener_mensajes_recientes_formateados(conv)
+        tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, historial_ctx)
         if not tipo:
             tipo = tipo_enrutado
         if not tema:
@@ -434,6 +438,12 @@ def consultar(
     pasos_del_tipo = tipo_cfg.get('pasos') or ['redactar']
     if isinstance(pasos_del_tipo, str):
         pasos_del_tipo = json.loads(pasos_del_tipo)
+
+    # Si el enrutador determinó que no se necesita SQL nuevo, saltar generar_sql y ejecutar.
+    # La respuesta se construye con los datos ya presentes en el contexto conversacional.
+    if tipo == 'analisis_datos' and not requiere_sql:
+        pasos_del_tipo = ['redactar']
+        pasos_ejecutados.append('sin_sql')  # trazabilidad en logs
 
     temperatura = float(tipo_cfg.get('temperatura', 0.3))
 
@@ -766,13 +776,18 @@ def consultar(
 
 # ── Funciones internas ────────────────────────────────────────────────────────
 
-def _enrutar(pregunta: str, empresa: str = 'ori_sil_2') -> tuple:
+def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str = '') -> tuple:
     """
-    Detecta tipo de consulta Y tema en una sola llamada al enrutador.
+    Detecta tipo de consulta, tema Y si se necesita SQL nuevo en una sola llamada.
     Prefiere Groq (velocidad), fallback a Gemma, fallback a valores default.
 
     Returns:
-        (tipo: str, tema: str)  — ej: ('analisis_datos', 'comercial')
+        (tipo: str, tema: str, requiere_sql: bool)
+        — ej: ('analisis_datos', 'comercial', True)
+
+    requiere_sql=False cuando la pregunta puede responderse con datos ya presentes
+    en el historial de conversación (ej: "explícame ese margen", "cuál recomiendas").
+    En ese caso el orquestador omite generar_sql y ejecutar, ahorrando 2 llamadas al LLM.
     """
     agente_cfg = None
     for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
@@ -781,7 +796,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2') -> tuple:
             agente_cfg = cand
             break
     if not agente_cfg:
-        return ('analisis_datos', 'general')
+        return ('analisis_datos', 'general', True)
 
     tipo_enrut = _cargar_tipo('enrutamiento')
     system_base = tipo_enrut.get('system_prompt', '') if tipo_enrut else ''
@@ -789,24 +804,25 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2') -> tuple:
     # Ampliar system prompt con temas disponibles para esta empresa
     temas_disponibles = rag_module.listar_temas(empresa)
     temas_str = ', '.join([f"{t['slug']} ({t['nombre']})" for t in temas_disponibles]) if temas_disponibles else 'general'
-    system = system_base + f"""
+    system = system_base + f'\n\nTemas disponibles para clasificar: {temas_str}.'
 
-Adicionalmente, clasifica el TEMA de la pregunta. Temas disponibles: {temas_str}.
-Responde en formato JSON exacto: {{"tipo": "slug_tipo", "tema": "slug_tema"}}
-Ejemplo: {{"tipo": "analisis_datos", "tema": "comercial"}}"""
+    # Incluir historial reciente para que el enrutador pueda determinar requiere_sql
+    # Si ya hay datos en la conversación, preguntas de interpretación no necesitan SQL nuevo
+    user_content = pregunta
+    if historial_reciente:
+        user_content = f'Historial reciente:\n{historial_reciente}\n\nPregunta actual: {pregunta}'
 
     msgs = [
         {'role': 'system', 'content': system},
-        {'role': 'user',   'content': pregunta},
+        {'role': 'user',   'content': user_content},
     ]
-    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=50)
+    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=80)
 
     tipo_default = 'conversacion'
     tema_default = 'general'
 
     if res['ok']:
         texto = res['texto'].strip()
-        # Intentar parsear JSON {"tipo": "...", "tema": "..."}
         try:
             import re
             match = re.search(r'\{[^}]+\}', texto)
@@ -815,23 +831,26 @@ Ejemplo: {{"tipo": "analisis_datos", "tema": "comercial"}}"""
                 tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
                                  'generacion_documento', 'generacion_imagen', 'conversacion', 'enrutamiento'}
                 temas_validos  = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
-                tipo_ret = data.get('tipo', tipo_default)
-                tema_ret = data.get('tema', tema_default)
+                tipo_ret  = data.get('tipo', tipo_default)
+                tema_ret  = data.get('tema', tema_default)
+                # requiere_sql: default True para analisis_datos (conservador)
+                req_sql = bool(data.get('requiere_sql', True))
                 return (
                     tipo_ret if tipo_ret in tipos_validos else tipo_default,
                     tema_ret if tema_ret in temas_validos  else tema_default,
+                    req_sql,
                 )
         except Exception:
             pass
 
-        # Fallback: buscar tipo en texto plano
+        # Fallback: buscar tipo en texto plano — sin historial no podemos saber requiere_sql
         texto_lower = texto.lower()
         for slug in ('analisis_datos', 'redaccion', 'clasificacion', 'resumen',
                      'generacion_documento', 'generacion_imagen', 'conversacion'):
             if slug in texto_lower:
-                return (slug, tema_default)
+                return (slug, tema_default, True)
 
-    return (tipo_default, tema_default)
+    return (tipo_default, tema_default, True)
 
 
 def _cargar_agente(slug: str) -> dict | None:
