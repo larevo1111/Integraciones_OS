@@ -70,12 +70,28 @@ def _obtener_ddl_directo(tablas: list = None) -> str:
     from .config import get_hostinger_conn
 
     TABLAS_RELEVANTES = [
+        # Resúmenes precalculados
         'resumen_ventas_facturas_mes', 'resumen_ventas_facturas_canal_mes',
         'resumen_ventas_facturas_cliente_mes', 'resumen_ventas_facturas_producto_mes',
         'resumen_ventas_remisiones_mes', 'resumen_ventas_remisiones_canal_mes',
         'resumen_ventas_remisiones_cliente_mes', 'resumen_ventas_remisiones_producto_mes',
-        'zeffi_clientes', 'zeffi_facturas_venta_encabezados',
-        'zeffi_facturas_venta_detalle', 'zeffi_remisiones_venta_encabezados', 'crm_contactos',
+        # Ventas
+        'zeffi_facturas_venta_encabezados', 'zeffi_facturas_venta_detalle',
+        'zeffi_remisiones_venta_encabezados', 'zeffi_remisiones_venta_detalle',
+        'zeffi_ordenes_venta_encabezados', 'zeffi_ordenes_venta_detalle',
+        'zeffi_notas_credito_venta_encabezados', 'zeffi_devoluciones_venta_encabezados',
+        'zeffi_cotizaciones_ventas_encabezados',
+        # Clientes y productos
+        'zeffi_clientes', 'zeffi_inventario', 'catalogo_articulos',
+        # Compras
+        'zeffi_facturas_compra_encabezados', 'zeffi_facturas_compra_detalle',
+        'zeffi_ordenes_compra_encabezados', 'zeffi_proveedores',
+        # Producción
+        'zeffi_produccion_encabezados', 'zeffi_articulos_producidos',
+        # Financiero
+        'zeffi_cuentas_por_cobrar', 'zeffi_cuentas_por_pagar',
+        # Maestros
+        'zeffi_empleados', 'zeffi_tipos_marketing',
     ]
     tablas_a_usar = tablas or TABLAS_RELEVANTES
     conn = None

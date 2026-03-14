@@ -86,7 +86,55 @@ Instancias de Claude lanzadas por Claude Code con la herramienta `Agent`. Mismas
 
 ---
 
-## 2. ARCHIVOS DE CONTEXTO Y CONFIGURACIÓN
+## 2. FILOSOFÍA DEL SISTEMA IA — PRINCIPIO FUNDAMENTAL
+
+> **Aplicable a ia_service_os, al bot de Telegram y a cualquier componente de IA del proyecto.**
+
+### Enseñar a razonar, no a memorizar
+
+**El objetivo es construir una IA que encuentre las respuestas de forma autónoma.**
+
+Esto significa que NO hay que llenar el sistema de reglas específicas para cada pregunta posible. Si la IA falla en una consulta concreta y se le inyecta la respuesta correcta directamente en el prompt, la próxima vez la responderá bien — pero eso no es inteligencia: es memorización. El próximo usuario que haga la misma pregunta de otra forma volverá a fallar.
+
+**No nos ganamos nada afinando el prompt para responder una pregunta específica que falló.** Lo que nos ganamos es mejorar el contexto general para que la IA razone mejor en todos los casos similares.
+
+### Cuándo sí agregar reglas
+
+Solo cuando representan información que el modelo NO puede inferir con el contexto disponible:
+- Gotchas técnicos de la BD (ej: `id_cliente` en facturas tiene prefijo `'CC '`)
+- Semántica no obvia de campos (ej: `precio_neto_total` INCLUYE IVA)
+- Comportamientos contraintuitivos del negocio (ej: `vigencia='Vigente'` para consignación activa)
+
+Estas cosas el modelo no puede deducirlas. Pero cómo calcular "ventas del lunes" sí puede razonarlo desde los patrones de fecha que ya tiene en el prompt.
+
+### Cómo refinar correctamente
+
+Cuando la IA falla en una consulta:
+1. **Diagnosticar**: ¿Le falta contexto general? ¿O es un gotcha técnico que no puede inferir?
+2. **Falta contexto general** → mejorar el system prompt con el principio, no el caso puntual
+3. **Gotcha técnico** → sí agregar la regla, es legítimo
+4. **Error de razonamiento** → agregar un ejemplo representativo en `ia_ejemplos_sql` que demuestre el patrón (no hardcodear la respuesta, sino el razonamiento)
+
+### En la práctica
+
+```
+❌ MAL: La IA falló con "ventas del miércoles" → agregar en el prompt:
+   "Si el usuario pregunta por el miércoles, usa DATE_SUB(CURDATE(), INTERVAL (WEEKDAY(CURDATE())-2) DAY)"
+
+✅ BIEN: La IA falló con "ventas del miércoles" → revisar si los patrones de WEEKDAY
+   ya están en <reglas_sql>. Si no están → agregar la REGLA GENERAL de días de la semana.
+   No el caso del miércoles. Todos los días.
+
+❌ MAL: La IA no supo qué tabla usar para consignación → agregar:
+   "Cuando pregunten por consignación, usar zeffi_ordenes_venta_encabezados"
+
+✅ BIEN: → verificar que la descripción de esa tabla en <tablas_disponibles> dice
+   claramente "Usar para: consignación activa (filtrar vigencia='Vigente')". Si no lo dice → corregirlo.
+```
+
+---
+
+## 4. ARCHIVOS DE CONTEXTO Y CONFIGURACIÓN
 
 **Leer SIEMPRE al iniciar sesión, en este orden:**
 1. `.agent/MANIFESTO.md` — Estado actual, decisiones tomadas, arquitectura vigente. Fuente de verdad #1.
@@ -102,7 +150,7 @@ Las instrucciones de conexión están documentadas como skills. Si no existe la 
 
 ---
 
-## 3. TONO Y COMUNICACIÓN
+## 5. TONO Y COMUNICACIÓN
 
 - **Claridad Quirúrgica**: Profesional, directa y empática.
 - **NUNCA suponer, SIEMPRE preguntar.** Admitir ignorancia es una virtud; suponer es un error crítico.

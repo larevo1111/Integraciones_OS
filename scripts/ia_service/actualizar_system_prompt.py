@@ -495,6 +495,38 @@ rem_facturadas    → remisiones ya convertidas a factura
 rem_pct_facturadas → % de remisiones que se convirtieron en factura
 top_canal, top_cliente, top_producto_* → tops del mes
 ant_ventas_netas, ant_var_ventas_pct → comparación mes anterior (prefijo "ant_")
+
+── zeffi_produccion_encabezados ──────────────────────────────────
+id_orden              → número de la orden de producción
+nombre_encargado      → nombre del encargado/responsable de la producción
+nombre_tercero        → tercero asociado (proveedor de servicio, si aplica)
+activo_productivo     → activo o máquina usada en la producción
+fecha_inicial         → fecha de inicio de la orden (TEXT "YYYY-MM-DD HH:MM:SS")
+fecha_final           → fecha de finalización de la orden (TEXT "YYYY-MM-DD HH:MM:SS")
+fecha_de_creacion     → fecha de creación del registro (TEXT "YYYY-MM-DD HH:MM:SS")
+total_precios_de_venta → valor de venta de lo producido (TEXT numérico)
+costo_de_materiales   → costo de materiales consumidos (TEXT numérico) — USAR para costo de materiales
+otros_costos_de_produccion → otros costos indirectos (TEXT numérico)
+beneficio_neto        → beneficio_neto = total_precios_de_venta - costo_de_materiales - otros_costos_de_produccion
+estado                → estado de la orden: "Generada" (en proceso) o "Procesada" (terminada)
+vigencia              → "Vigente" o "Anulada"
+fecha_de_anulacion    → NULL si vigente
+
+NOTA: No existe columna costo_total ni costo_promedio en produccion.
+Para costo total: CAST(costo_de_materiales AS DECIMAL) + CAST(otros_costos_de_produccion AS DECIMAL)
+
+── zeffi_cuentas_por_cobrar ──────────────────────────────────────
+id_cxc                → identificador de la cuenta por cobrar
+tercero               → nombre del cliente/deudor (equivale a "cliente")
+id_tercero            → ID del cliente
+vendedor              → vendedor asignado
+estado_cxc            → "Pendiente de cobro al día" o "Pendiente de cobro en mora"
+valor_inicial         → valor original de la deuda (TEXT numérico)
+saldo_total           → saldo pendiente total por cobrar (TEXT numérico) — USAR para cartera
+dias_mora             → días de mora (TEXT numérico, 0 si al día)
+saldo_en_mora         → valor en mora (TEXT numérico)
+primer_vencimiento    → fecha del primer vencimiento (TEXT)
+fecha_creacion        → fecha de creación del registro (TEXT)
 </diccionario_campos>
 
 <reglas_sql>
