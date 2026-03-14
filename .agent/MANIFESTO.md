@@ -150,6 +150,7 @@ Antes de dar una tarea por terminada, responder estas preguntas:
 3. ¿Creé o modifiqué un script? → **CATALOGO_SCRIPTS**
 4. ¿Aprendí algo sobre Effi, la BD o el frontend que no estaba documentado? → **Skill del dominio correspondiente**
 5. ¿Definí un patrón nuevo reutilizable? → **Crear/actualizar skill + entrada en catálogo**
+6. ¿Adopté una técnica de una fuente externa (paper, guía, librería)? → **CATALOGO_REFERENCIAS** con URL, relevancia y dónde se aplicó
 
 **Regla absoluta: ningún problema resuelto queda sin registrar. Si se descubrió en esta sesión, se documenta en esta sesión.**
 
@@ -315,6 +316,7 @@ Para que la IA no invente respuestas o datos financieros, el flujo técnico obli
 - `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
 - `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts ejecutables (Python/JS). **Actualizar obligatoriamente al crear o modificar cualquier script.**
 - `.agent/catalogo-skills.md` — Catálogo de conocimientos fundacionales. Índice de cómo se hacen las cosas.
+- `.agent/CATALOGO_REFERENCIAS.md` — **Fuentes externas e internas que informan decisiones técnicas y de IA.** Incluye: guías de Anthropic/Google, papers de text-to-SQL, referencias de Antigravity, patrones de prompting, pendientes de investigar. **Actualizar al adoptar cualquier técnica externa o al encontrar una referencia relevante.**
 - `.agent/skills/` — Skills individuales con conocimiento especializado (Ej. `.agent/skills/manejo_ia.md`).
 - `.agent/planes/` — Especificaciones de construcción técnica para las features (Ej. `.agent/planes/bot_telegram.md`).
 - `.agent/docs/` — Informes y documentación externa.

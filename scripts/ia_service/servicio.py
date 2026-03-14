@@ -359,12 +359,24 @@ def consultar(
         }
 
     # ── 5. Construir contexto de sistema (6 capas) ───────────────────
+    # CAPA 0: Fecha y hora actual — siempre inyectada para que cualquier modelo
+    # pueda interpretar correctamente referencias temporales (hoy, ayer, esta semana, etc.)
+    from datetime import datetime
+    _ahora = datetime.now()
+    _dias   = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo']
+    _meses  = ['enero','febrero','marzo','abril','mayo','junio',
+               'julio','agosto','septiembre','octubre','noviembre','diciembre']
+    _fecha_ctx = (
+        f"Fecha y hora actuales: {_ahora.strftime('%Y-%m-%d %H:%M')} "
+        f"({_dias[_ahora.weekday()]}, {_ahora.day} de {_meses[_ahora.month-1]} de {_ahora.year})"
+    )
+
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
-    system_prompt = ''
+    system_prompt = _fecha_ctx + '\n\n'
     if tema_cfg and tema_cfg.get('system_prompt'):
-        system_prompt = tema_cfg['system_prompt']
+        system_prompt += tema_cfg['system_prompt']
     elif tipo_cfg.get('system_prompt'):
-        system_prompt = tipo_cfg['system_prompt']
+        system_prompt += tipo_cfg['system_prompt']
 
     # CAPA 2: RAG — fragmentos relevantes filtrados por empresa y tema
     tema_id_rag = tema_cfg['id'] if tema_cfg else None
