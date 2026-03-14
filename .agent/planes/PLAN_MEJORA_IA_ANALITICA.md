@@ -9,11 +9,11 @@
 
 | # | Mejora | Impacto | Velocidad | Complejidad | Estado |
 |---|---|---|---|---|---|
-| 1 | XML en system prompt | Alto — mejor parsing del modelo | Neutral | Baja | ⬜ Pendiente |
-| 2 | Embeddings en ia_ejemplos_sql | Alto — búsqueda semántica real | -100ms | Media | ⬜ Pendiente |
-| 3 | Validación resultado vacío + retry | Alto — elimina "no hay datos" falsos | +1-2s peor caso | Media | ⬜ Pendiente |
-| 4 | Arquitectura dos capas (mecánica gratis / analítica = elección usuario) | Alto — 55% más rápido, más barato, DeepSeek como default | -2.5s | Media | ⬜ Pendiente |
-| 5 | Restructurar prompt: QUÉ HACER vs QUÉ NO HACER | Medio — el modelo entiende mejor el "por qué" | Neutral | Baja | ⬜ Pendiente |
+| 1 | XML en system prompt | Alto — mejor parsing del modelo | Neutral | Baja | ✅ Completado 2026-03-14 |
+| 2 | Embeddings en ia_ejemplos_sql | Alto — búsqueda semántica real | -100ms | Media | ✅ Completado 2026-03-14 |
+| 3 | Validación resultado vacío + retry | Alto — elimina "no hay datos" falsos | +1-2s peor caso | Media | ✅ Completado 2026-03-14 |
+| 4 | Arquitectura dos capas (mecánica gratis / analítica = elección usuario) | Alto — 55% más rápido, más barato, DeepSeek como default | -2.5s | Media | ✅ Completado 2026-03-14 |
+| 5 | Restructurar prompt: QUÉ HACER vs QUÉ NO HACER | Medio — el modelo entiende mejor el "por qué" | Neutral | Baja | ✅ Completado 2026-03-14 |
 
 ---
 

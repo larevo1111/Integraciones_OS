@@ -279,8 +279,8 @@ CAPA 6 — Pregunta actual del usuario        → input directo
 | `gemini-flash-lite` | gemini-3.1-flash-lite | ✅ Activo — alto volumen |
 | `gemma-router` | gemma-3-27b-it | ✅ Activo — enrutador fallback |
 | `groq-llama` | llama-3.3-70b-versatile | ✅ Activo — enrutador principal (key configurada 2026-03-13) |
-| `deepseek-chat` | deepseek-chat | 🔲 Pendiente key: platform.deepseek.com |
-| `deepseek-reasoner` | deepseek-reasoner | 🔲 Pendiente (misma key que deepseek-chat) |
+| `deepseek-chat` | deepseek-chat | ✅ Activo — recomendado para bot (nivel_minimo=1) |
+| `deepseek-reasoner` | deepseek-reasoner | ✅ Activo (nivel_minimo=7 — solo admin) |
 | `claude-sonnet` | claude-sonnet-4-6 | 🔲 Pendiente key: console.anthropic.com |
 
 **Estado del servicio (2026-03-13):** ✅ Activo — RAG + temas + empresa + enrutador dual (tipo+tema)
@@ -306,13 +306,19 @@ resultado = consultar(
 ```
 
 ## Próximos Pasos
-1. **QA completo del módulo IA** — testeo con Antigravity: chat, enrutador, RAG upload, schema sync
-2. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
-3. **Bot Telegram** — construir sobre ia_service_os. Spec: `.agent/planes/bot_telegram.md`
-2. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
-3. **DeepSeek** — Santi obtiene key en platform.deepseek.com → activar deepseek-chat + deepseek-reasoner
-4. **Claude Sonnet** — Santi recarga $5 en console.anthropic.com → activar claude-sonnet
-5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual (Pedro Ruiz, Farmacia Salud Natural, Ana Lucía Montoya)
+1. **QA bot IA** — probar en Telegram: preguntas de días de semana, consultas vacías, /agente con DeepSeek
+2. **Migrar embeddings históricos** — `python3 -m scripts.ia_service.actualizar_system_prompt` (ya corrido) + `migrar_embeddings_faltantes()` cuando haya ejemplos acumulados
+3. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
+4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
+5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
+
+## Completado 2026-03-14 — 5 mejoras IA analítica
+- ✅ **XML en system prompt** — `<rol>`, `<precision>`, `<tablas_disponibles>`, `<diccionario_campos>`, `<reglas_sql>`, `<ejemplos>` (25,835 chars)
+- ✅ **Embeddings semánticos** — `scripts/ia_service/embeddings.py`: Google text-embedding-004 + cosine similarity. Fallback a keywords LIKE. Generación en background al guardar ejemplos.
+- ✅ **Retry resultado vacío** — 0 filas → `_obtener_fecha_maxima()` + reenvío al LLM con contexto, máx 2 reintentos
+- ✅ **Arquitectura dos capas** — `agente_sql` (Gemini Flash, gratis) para SQL; agente del usuario para análisis/respuesta
+- ✅ **Reglas positivas** — QUÉ HACER en vez de QUÉ NO HACER en todo el system prompt
+- ✅ **DeepSeek accesible** — nivel_minimo=1, primero en menú /agente, recomendado para uso diario
 
 ## Completado 2026-03-13
 - ✅ ia-service: arquitectura RAG multitema+empresa — ia_temas, ia_rag_documentos, ia_rag_fragmentos
