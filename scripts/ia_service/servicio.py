@@ -287,6 +287,107 @@ def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
         return ''
 
 
+_CACHE_COBERTURA: dict = {}   # {empresa: (timestamp, texto)}
+_CACHE_COBERTURA_TTL = 3600  # 1 hora
+
+
+def _obtener_cobertura_tablas(empresa: str = 'ori_sil_2') -> str:
+    """
+    Calcula y devuelve un bloque de texto con la cobertura real de datos
+    de las tablas principales: rango de fechas, total de registros,
+    días distintos con ventas, y última actualización.
+
+    Se cachea 1 hora para no hacer queries en cada llamada.
+    Se inyecta en el system prompt (Capa 0) para que el modelo sepa
+    con qué datos cuenta antes de razonar — evita "no hay datos" falsos
+    cuando en realidad el rango correcto sí tiene información.
+    """
+    import time
+    ahora = time.time()
+    if empresa in _CACHE_COBERTURA:
+        ts, texto = _CACHE_COBERTURA[empresa]
+        if ahora - ts < _CACHE_COBERTURA_TTL:
+            return texto
+
+    tablas_config = [
+        {
+            'tabla': 'zeffi_facturas_venta_encabezados',
+            'col_fecha': 'fecha_de_creacion',
+            'filtro': "fecha_de_anulacion IS NULL",
+            'etiqueta': 'Facturas de venta',
+        },
+        {
+            'tabla': 'zeffi_remisiones_venta_encabezados',
+            'col_fecha': 'fecha_de_creacion',
+            'filtro': "fecha_de_anulacion IS NULL",
+            'etiqueta': 'Remisiones de venta',
+        },
+        {
+            'tabla': 'zeffi_ordenes_venta_encabezados',
+            'col_fecha': 'fecha_de_creacion',
+            'filtro': "vigencia = 'Vigente'",
+            'etiqueta': 'Órdenes activas (consignación)',
+        },
+    ]
+
+    lineas = ['Cobertura de datos disponibles en la base de datos:']
+    try:
+        from .config import get_hostinger_conn
+        conn = get_hostinger_conn()
+        with conn.cursor() as cur:
+            for t in tablas_config:
+                try:
+                    where = f"WHERE {t['filtro']}" if t['filtro'] else ''
+                    cur.execute(f"""
+                        SELECT
+                            MIN(DATE({t['col_fecha']}))                     AS fecha_min,
+                            MAX(DATE({t['col_fecha']}))                     AS fecha_max,
+                            COUNT(*)                                        AS total_registros,
+                            COUNT(DISTINCT DATE({t['col_fecha']}))          AS dias_con_datos
+                        FROM {t['tabla']}
+                        {where}
+                    """)
+                    row = cur.fetchone()
+                    if row and row.get('fecha_max'):
+                        lineas.append(
+                            f"  {t['etiqueta']}: {row['fecha_min']} → {row['fecha_max']} "
+                            f"({row['total_registros']:,} registros en {row['dias_con_datos']:,} días distintos)"
+                        )
+                except Exception:
+                    pass
+
+            # Meses disponibles en resúmenes
+            try:
+                cur.execute(
+                    "SELECT MIN(mes) AS desde, MAX(mes) AS hasta, COUNT(*) AS n "
+                    "FROM resumen_ventas_facturas_mes"
+                )
+                row = cur.fetchone()
+                if row and row.get('hasta'):
+                    lineas.append(
+                        f"  Resúmenes mensuales: {row['desde']} → {row['hasta']} ({row['n']} meses)"
+                    )
+            except Exception:
+                pass
+
+        conn.close()
+    except Exception:
+        return ''
+
+    if len(lineas) <= 1:
+        return ''
+
+    lineas.append(
+        'Nota: la ausencia de datos en un día específico puede significar que ese día '
+        'no hubo ventas (fin de semana, feriado, o simplemente sin actividad). '
+        'En ese caso, considera consultar la semana completa o el acumulado del período.'
+    )
+
+    texto = '\n'.join(lineas)
+    _CACHE_COBERTURA[empresa] = (ahora, texto)
+    return texto
+
+
 def _obtener_fecha_maxima(sql: str) -> str:
     """
     Dado un SQL, detecta las tablas consultadas y obtiene la fecha máxima
@@ -503,8 +604,8 @@ def consultar(
         }
 
     # ── 5. Construir contexto de sistema (6 capas) ───────────────────
-    # CAPA 0: Fecha y hora actual — siempre inyectada para que cualquier modelo
-    # pueda interpretar correctamente referencias temporales (hoy, ayer, esta semana, etc.)
+    # CAPA 0: Fecha actual + cobertura de datos — siempre inyectada.
+    # El modelo sabe qué día es y con qué rango de datos cuenta antes de razonar.
     from datetime import datetime
     _ahora = datetime.now()
     _dias   = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo']
@@ -515,8 +616,15 @@ def consultar(
         f"({_dias[_ahora.weekday()]}, {_ahora.day} de {_meses[_ahora.month-1]} de {_ahora.year})"
     )
 
+    # Cobertura de tablas — solo para consultas analíticas (evita latencia en conversaciones)
+    _cobertura_ctx = ''
+    if tipo == 'analisis_datos':
+        _cobertura_ctx = _obtener_cobertura_tablas(empresa)
+
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
     system_prompt = _fecha_ctx + '\n\n'
+    if _cobertura_ctx:
+        system_prompt += _cobertura_ctx + '\n\n'
     if tema_cfg and tema_cfg.get('system_prompt'):
         system_prompt += tema_cfg['system_prompt']
     elif tipo_cfg.get('system_prompt'):
