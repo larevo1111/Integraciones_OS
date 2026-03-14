@@ -1041,6 +1041,29 @@ app.put('/api/ia/esquemas/:tema_id', requireAdmin, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Config global (ia_config) ────────────────────────────────────
+// GET /api/ia/config
+app.get('/api/ia/config', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT clave, valor, descripcion, updated_at FROM ia_config ORDER BY clave')
+    res.json({ ok: true, config: rows })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
+// PUT /api/ia/config/:clave
+app.put('/api/ia/config/:clave', requireAdmin, async (req, res) => {
+  const { valor } = req.body
+  if (valor === undefined || valor === null) return res.status(400).json({ ok: false, error: 'valor requerido' })
+  try {
+    await db.execute('UPDATE ia_config SET valor = ? WHERE clave = ?', [String(valor), req.params.clave])
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message })
+  }
+})
+
 // ─── Frontend estático ────────────────────────────────────────────
 const distPath = path.join(__dirname, '../app/dist/spa')
 app.use(express.static(distPath))
