@@ -11,7 +11,9 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     estaAutenticado: s => !!s.token,
     esAdmin:         s => (s.empresa_activa?.rol_empresa || s.usuario?.rol) === 'admin',
-    rolActual:       s => s.empresa_activa?.rol_empresa || s.usuario?.rol || 'viewer'
+    rolActual:       s => s.empresa_activa?.rol_empresa || s.usuario?.rol || 'viewer',
+    nivel:           s => s.usuario?.nivel || 1,
+    puedeVer:        s => (nivelMin) => (s.usuario?.nivel || 1) >= nivelMin
   },
 
   actions: {

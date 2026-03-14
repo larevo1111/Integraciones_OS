@@ -146,9 +146,15 @@
               <input class="input-field" type="number" step="0.0001" v-model.number="form.costo_output_1k" placeholder="0.005" />
             </div>
           </div>
-          <div class="input-group">
-            <label class="input-label">Orden de fallback</label>
-            <input class="input-field" type="number" v-model.number="form.orden" placeholder="1" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="input-group">
+              <label class="input-label">Orden de fallback</label>
+              <input class="input-field" type="number" v-model.number="form.orden" placeholder="1" />
+            </div>
+            <div class="input-group">
+              <label class="input-label">Nivel mínimo de usuario <span style="font-weight:400;color:var(--text-tertiary)">(1–7)</span></label>
+              <input class="input-field" type="number" min="1" max="7" v-model.number="form.nivel_minimo" placeholder="1" />
+            </div>
           </div>
           <div class="input-group">
             <label class="input-label">Capacidades (JSON array)</label>
@@ -213,6 +219,7 @@ function seleccionar(ag) {
     costo_output_1k: ag.costo_output_1k,
     capacidades: ag.capacidades,
     orden: ag.orden,
+    nivel_minimo: ag.nivel_minimo || 1,
     activo: !!ag.activo
   }
 }

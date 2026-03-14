@@ -198,6 +198,37 @@ El resumen debe ser DETALLADO (máximo 1000 palabras). Incluye siempre:
 """
 
 
+def _nivel_usuario(usuario_id: str, empresa: str) -> int:
+    """Obtiene el nivel del usuario desde ia_usuarios. Default 1 si no existe."""
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT nivel FROM ia_usuarios WHERE email = %s", (usuario_id,))
+            row = cur.fetchone()
+        conn.close()
+        return int(row['nivel']) if row else 1
+    except Exception:
+        return 1
+
+
+def _mejor_agente_para_nivel(nivel: int) -> str:
+    """Devuelve el slug del mejor agente disponible para el nivel dado."""
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT slug FROM ia_agentes "
+                "WHERE activo=1 AND api_key != '' AND nivel_minimo <= %s "
+                "ORDER BY nivel_minimo DESC, orden ASC LIMIT 1",
+                (nivel,)
+            )
+            row = cur.fetchone()
+        conn.close()
+        return row['slug'] if row else 'gemini-flash'
+    except Exception:
+        return 'gemini-flash'
+
+
 def consultar(
     pregunta:        str,
     tipo:            str  = None,
@@ -307,7 +338,15 @@ def consultar(
             conn.close()
         agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash'
 
-    # ── 4b. Verificar límites de seguridad ────────────────────────────
+    # ── 4b. Verificar nivel de usuario vs agente ─────────────────────
+    nivel_usr = _nivel_usuario(usuario_id, empresa)
+    agente_nivel_min = (agente_cfg or {}).get('nivel_minimo', 1) or 1
+    if nivel_usr < agente_nivel_min:
+        # Redirigir silenciosamente al mejor agente disponible para su nivel
+        agente_slug = _mejor_agente_para_nivel(nivel_usr)
+        agente_cfg  = _cargar_agente(agente_slug)
+
+    # ── 4c. Verificar límites de seguridad ────────────────────────────
     bloqueo = verificar_limites(agente_slug, empresa)
     if bloqueo:
         return {

@@ -70,6 +70,27 @@
         </div>
       </div>
 
+      <!-- Sección Acceso a páginas por nivel -->
+      <div class="config-section">
+        <div class="section-header">
+          <LockIcon :size="14" class="section-icon" />
+          <span class="section-title">Acceso a páginas</span>
+          <span class="section-desc">Nivel mínimo requerido para ver cada sección (1=básico · 7=admin total)</span>
+        </div>
+        <div class="config-table">
+          <ConfigRow
+            v-for="clave in ORDEN_ACCESO"
+            :key="clave"
+            :row="byKey[clave]"
+            :editando="editando === clave"
+            :guardando="guardando === clave"
+            @edit="iniciarEdicion(clave)"
+            @save="guardar(clave, $event)"
+            @cancel="editando = null"
+          />
+        </div>
+      </div>
+
     </div>
 
     <!-- Toast -->
@@ -79,7 +100,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ShieldIcon, ZapIcon, AlertTriangleIcon } from 'lucide-vue-next'
+import { ShieldIcon, ZapIcon, AlertTriangleIcon, LockIcon } from 'lucide-vue-next'
 import ConfigRow from 'components/ConfigRow.vue'
 import { useAuthStore } from 'stores/authStore'
 
@@ -88,14 +109,28 @@ const auth = useAuthStore()
 const ORDEN_SEGURIDAD = ['limite_costo_dia_usd']
 const ORDEN_RATE      = ['rate_usuario_rps', 'rate_usuario_rp10s', 'rate_usuario_rpm']
 const ORDEN_CIRCUIT   = ['circuit_breaker_errores', 'circuit_breaker_ventana_min']
+const ORDEN_ACCESO    = [
+  'acceso_dashboard','acceso_playground','acceso_logs',
+  'acceso_contextos','acceso_agentes','acceso_tipos',
+  'acceso_conexiones','acceso_usuarios','acceso_config'
+]
 
 const LABELS = {
-  limite_costo_dia_usd:       { label: 'Límite de costo diario',         unidad: 'USD',      info: 'Si el gasto total del día supera este valor, todas las llamadas a agentes de pago se bloquean. Reinicia a medianoche. Pon 0 para desactivar.' },
-  rate_usuario_rps:           { label: 'Máx. solicitudes por segundo',   unidad: 'req/s',    info: 'Máximo de solicitudes que un mismo usuario puede enviar por segundo desde cualquier canal (Telegram, ERP, API).' },
-  rate_usuario_rp10s:         { label: 'Máx. solicitudes en 10 segundos',unidad: 'req/10s',  info: 'Máximo acumulado en una ventana deslizante de 10 segundos por usuario.' },
-  rate_usuario_rpm:           { label: 'Máx. solicitudes por minuto',    unidad: 'req/min',  info: 'Máximo acumulado en una ventana deslizante de 60 segundos por usuario.' },
-  circuit_breaker_errores:    { label: 'Errores para activar el corte',  unidad: 'errores',  info: 'Si un agente acumula este número de errores dentro de la ventana de tiempo, se suspende automáticamente.' },
-  circuit_breaker_ventana_min:{ label: 'Ventana del circuit breaker',    unidad: 'minutos',  info: 'Ventana de tiempo en la que se cuentan los errores para activar el circuit breaker.' },
+  limite_costo_dia_usd:       { label: 'Límite de costo diario',            unidad: 'USD',     info: 'Si el gasto total del día supera este valor, todas las llamadas a agentes de pago se bloquean. Reinicia a medianoche. Pon 0 para desactivar.' },
+  rate_usuario_rps:           { label: 'Máx. solicitudes por segundo',      unidad: 'req/s',   info: 'Máximo de solicitudes que un mismo usuario puede enviar por segundo desde cualquier canal (Telegram, ERP, API).' },
+  rate_usuario_rp10s:         { label: 'Máx. solicitudes en 10 segundos',   unidad: 'req/10s', info: 'Máximo acumulado en una ventana deslizante de 10 segundos por usuario.' },
+  rate_usuario_rpm:           { label: 'Máx. solicitudes por minuto',       unidad: 'req/min', info: 'Máximo acumulado en una ventana deslizante de 60 segundos por usuario.' },
+  circuit_breaker_errores:    { label: 'Errores para activar el corte',     unidad: 'errores', info: 'Si un agente acumula este número de errores dentro de la ventana de tiempo, se suspende automáticamente.' },
+  circuit_breaker_ventana_min:{ label: 'Ventana del circuit breaker',       unidad: 'minutos', info: 'Ventana de tiempo en la que se cuentan los errores para activar el circuit breaker.' },
+  acceso_dashboard:           { label: 'Dashboard',                         unidad: 'nivel',   info: 'Nivel mínimo para ver el Dashboard.' },
+  acceso_playground:          { label: 'Playground',                        unidad: 'nivel',   info: 'Nivel mínimo para usar el Playground.' },
+  acceso_logs:                { label: 'Logs',                              unidad: 'nivel',   info: 'Nivel mínimo para ver los Logs.' },
+  acceso_contextos:           { label: 'Contextos',                         unidad: 'nivel',   info: 'Nivel mínimo para gestionar Contextos y RAG.' },
+  acceso_agentes:             { label: 'Agentes',                           unidad: 'nivel',   info: 'Nivel mínimo para ver y editar Agentes.' },
+  acceso_tipos:               { label: 'Tipos de consulta',                 unidad: 'nivel',   info: 'Nivel mínimo para ver y editar Tipos de consulta.' },
+  acceso_conexiones:          { label: 'Conexiones BD',                     unidad: 'nivel',   info: 'Nivel mínimo para gestionar Conexiones a bases de datos.' },
+  acceso_usuarios:            { label: 'Usuarios',                          unidad: 'nivel',   info: 'Nivel mínimo para gestionar Usuarios.' },
+  acceso_config:              { label: 'Configuración',                     unidad: 'nivel',   info: 'Nivel mínimo para ver y editar esta página de Configuración.' },
 }
 
 const config   = ref([])

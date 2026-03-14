@@ -23,27 +23,27 @@
       <div class="nav-group-label">Configuración</div>
 
       <div class="nav-section">
-        <router-link to="/agentes" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 7" to="/agentes" class="nav-item" active-class="active">
           <BotIcon :size="15" class="nav-icon" />
           <span>Agentes</span>
         </router-link>
-        <router-link to="/tipos" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 7" to="/tipos" class="nav-item" active-class="active">
           <SettingsIcon :size="15" class="nav-icon" />
           <span>Tipos de consulta</span>
         </router-link>
-        <router-link to="/usuarios" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 7" to="/usuarios" class="nav-item" active-class="active">
           <UsersIcon :size="15" class="nav-icon" />
           <span>Usuarios</span>
         </router-link>
-        <router-link to="/contextos" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 5" to="/contextos" class="nav-item" active-class="active">
           <DatabaseIcon :size="15" class="nav-icon" />
           <span>Contextos</span>
         </router-link>
-        <router-link to="/conexiones" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 7" to="/conexiones" class="nav-item" active-class="active">
           <LinkIcon :size="15" class="nav-icon" />
           <span>Conexiones BD</span>
         </router-link>
-        <router-link to="/config" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 7" to="/config" class="nav-item" active-class="active">
           <SlidersHorizontalIcon :size="15" class="nav-icon" />
           <span>Configuración</span>
         </router-link>
@@ -54,7 +54,7 @@
       <div class="nav-group-label">Monitoreo</div>
 
       <div class="nav-section">
-        <router-link to="/logs" class="nav-item" active-class="active">
+        <router-link v-if="nivel >= 3" to="/logs" class="nav-item" active-class="active">
           <ScrollIcon :size="15" class="nav-icon" />
           <span>Logs</span>
         </router-link>
@@ -90,10 +90,14 @@ import {
   ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon, LinkIcon,
   SlidersHorizontalIcon
 } from 'lucide-vue-next'
+import { useAuthStore } from 'stores/authStore'
 
 const emit = defineEmits(["logout"])
 const props = defineProps({ usuario: { type: Object, default: () => ({ nombre: 'Admin', rol: 'admin' }) } })
 const inicial = computed(() => props.usuario.nombre?.charAt(0).toUpperCase() || 'A')
+
+const auth  = useAuthStore()
+const nivel = computed(() => auth.nivel)
 </script>
 
 <style scoped>

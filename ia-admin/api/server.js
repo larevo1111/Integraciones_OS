@@ -204,6 +204,7 @@ app.post('/api/ia/auth/google', async (req, res) => {
         email:           usuario.email,
         nombre:          usuario.nombre,
         foto:            payload.picture || '',
+        nivel:           usuario.nivel || 1,
         empresa_activa:  emp.uid,
         empresa_nombre:  emp.nombre,
         empresa_siglas:  emp.siglas,
@@ -214,7 +215,7 @@ app.post('/api/ia/auth/google', async (req, res) => {
         ok: true,
         token,
         tipo: 'final',
-        usuario: { email: usuario.email, nombre: usuario.nombre, foto: payload.picture || '' },
+        usuario: { email: usuario.email, nombre: usuario.nombre, foto: payload.picture || '', nivel: usuario.nivel || 1 },
         empresa: { uid: emp.uid, nombre: emp.nombre, siglas: emp.siglas },
         rol_empresa: emp.rol
       })
@@ -226,6 +227,7 @@ app.post('/api/ia/auth/google', async (req, res) => {
       email:    usuario.email,
       nombre:   usuario.nombre,
       foto:     payload.picture || '',
+      nivel:    usuario.nivel || 1,
       empresas: empresas.map(e => ({ uid: e.uid, nombre: e.nombre, siglas: e.siglas, rol: e.rol }))
     }
     const token = jwt.sign(jwtPayload, JWT_SECRET, { expiresIn: '30m' })
@@ -276,11 +278,14 @@ app.post('/api/ia/auth/seleccionar_empresa', async (req, res) => {
     }
 
     const emp = rows[0]
+    // Leer nivel actualizado desde BD (puede haber cambiado desde el token temporal)
+    const [[usuarioRow]] = await db.execute('SELECT nivel FROM ia_usuarios WHERE email = ?', [decoded.email])
     const jwtPayload = {
       tipo:           'final',
       email:          decoded.email,
       nombre:         decoded.nombre,
       foto:           decoded.foto || '',
+      nivel:          usuarioRow?.nivel || decoded.nivel || 1,
       empresa_activa: emp.uid,
       empresa_nombre: emp.nombre,
       empresa_siglas: emp.siglas,
@@ -550,26 +555,26 @@ app.delete('/api/ia/tipos-admin/:tipo', requireAdmin, async (req, res) => {
 // ─── USUARIOS ─────────────────────────────────────────────────────
 app.get('/api/ia/usuarios', requireAdmin, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT email, nombre, rol, activo, created_at FROM ia_usuarios ORDER BY nombre')
+    const [rows] = await db.query('SELECT email, nombre, rol, nivel, activo, created_at FROM ia_usuarios ORDER BY nivel DESC, nombre')
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 app.post('/api/ia/usuarios', requireAdmin, async (req, res) => {
-  const { email, nombre, rol, activo } = req.body
+  const { email, nombre, rol, nivel, activo } = req.body
   if (!email || !nombre) return res.status(400).send('email y nombre son requeridos')
   try {
-    await db.query('INSERT INTO ia_usuarios (email, nombre, rol, activo) VALUES (?, ?, ?, ?)',
-      [email, nombre, rol || 'viewer', activo ? 1 : 0])
+    await db.query('INSERT INTO ia_usuarios (email, nombre, rol, nivel, activo) VALUES (?, ?, ?, ?, ?)',
+      [email, nombre, rol || 'viewer', nivel || 1, activo ? 1 : 0])
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
 })
 
 app.put('/api/ia/usuarios/:email', requireAdmin, async (req, res) => {
-  const { nombre, rol, activo } = req.body
+  const { nombre, rol, nivel, activo } = req.body
   try {
-    await db.query('UPDATE ia_usuarios SET nombre=?, rol=?, activo=? WHERE email=?',
-      [nombre, rol || 'viewer', activo ? 1 : 0, req.params.email])
+    await db.query('UPDATE ia_usuarios SET nombre=?, rol=?, nivel=?, activo=? WHERE email=?',
+      [nombre, rol || 'viewer', nivel || 1, activo ? 1 : 0, req.params.email])
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
 })
