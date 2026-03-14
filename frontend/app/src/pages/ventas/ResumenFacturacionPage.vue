@@ -17,7 +17,28 @@
 
     <!-- ── CONTENT ── -->
     <div class="page-content">
+
+      <!-- Pill Tabs -->
+      <div class="pill-tabs">
+        <button
+          class="pill-tab"
+          :class="{ active: tabActivo === 'mes' }"
+          @click="tabActivo = 'mes'"
+        >
+          Por mes
+        </button>
+        <button
+          class="pill-tab"
+          :class="{ active: tabActivo === 'producto' }"
+          @click="onTabProducto"
+        >
+          Por producto
+        </button>
+      </div>
+
+      <!-- Tab: Por mes -->
       <OsDataTable
+        v-if="tabActivo === 'mes'"
         title="Resumen por mes"
         recurso="resumen-mes"
         :rows="resMes"
@@ -25,6 +46,16 @@
         :loading="loadingMes"
         @row-click="onMesClick"
       />
+
+      <!-- Tab: Por producto -->
+      <OsDataTable
+        v-if="tabActivo === 'producto'"
+        title="Resumen por producto"
+        :rows="resProducto"
+        :columns="colsProducto"
+        :loading="loadingProducto"
+      />
+
     </div>
   </div>
 </template>
@@ -39,12 +70,35 @@ import OsDataTable from 'src/components/OsDataTable.vue'
 const router = useRouter()
 const API = '/api'
 
+const tabActivo = ref('mes')
+
+// ── Tab por mes ────────────────────────────────────────
 const resMes     = ref([])
 const loadingMes = ref(true)
 const colsMes    = ref([])
 
-const DEFAULT_VISIBLE = ['mes','fin_ventas_netas_sin_iva','fin_ingresos_netos','fin_devoluciones','vol_num_facturas','vol_ticket_promedio','cli_clientes_activos','cli_clientes_nuevos','top_canal','top_cliente','con_consignacion_pp']
+const DEFAULT_VISIBLE_MES = ['mes','fin_ventas_netas_sin_iva','fin_ingresos_netos','fin_devoluciones','vol_num_facturas','vol_ticket_promedio','cli_clientes_activos','cli_clientes_nuevos','top_canal','top_cliente','con_consignacion_pp']
 
+// ── Tab por producto ───────────────────────────────────
+const resProducto     = ref([])
+const loadingProducto = ref(false)
+const colsProducto    = ref([])
+let productosCargados = false
+
+const VISIBLE_PRODUCTO = ['cod_articulo','grupo_producto','descripcion','cantidad_total','fin_ventas_brutas','fin_descuentos','fin_ventas_netas','num_facturas','num_clientes']
+const LABELS_PRODUCTO  = {
+  cod_articulo:    'Cód.',
+  grupo_producto:  'Grupo producto',
+  descripcion:     'Descripción',
+  cantidad_total:  'Cantidad',
+  fin_ventas_brutas: 'Ventas brutas',
+  fin_descuentos:  'Descuentos',
+  fin_ventas_netas: 'Ventas netas',
+  num_facturas:    'Facturas',
+  num_clientes:    'Clientes',
+}
+
+// ── Helpers ────────────────────────────────────────────
 function labelFromKey(key) {
   return key
     .replace(/^_pk$/, 'N°')
@@ -67,7 +121,7 @@ async function loadColumns() {
     colsMes.value = cols.map(key => ({
       key,
       label: labelFromKey(key),
-      visible: DEFAULT_VISIBLE.includes(key)
+      visible: DEFAULT_VISIBLE_MES.includes(key)
     }))
   } catch(e) { console.error('Error cargando columnas', e) }
 }
@@ -78,6 +132,28 @@ async function loadMes() {
     const { data } = await axios.get(`${API}/ventas/resumen-mes`)
     resMes.value = data
   } finally { loadingMes.value = false }
+}
+
+async function loadProducto() {
+  if (productosCargados) return
+  loadingProducto.value = true
+  try {
+    const { data } = await axios.get(`${API}/ventas/resumen-por-producto`)
+    resProducto.value = data
+    if (data.length > 0) {
+      colsProducto.value = Object.keys(data[0]).map(key => ({
+        key,
+        label: LABELS_PRODUCTO[key] || labelFromKey(key),
+        visible: VISIBLE_PRODUCTO.includes(key)
+      }))
+    }
+    productosCargados = true
+  } finally { loadingProducto.value = false }
+}
+
+function onTabProducto() {
+  tabActivo.value = 'producto'
+  loadProducto()
 }
 
 function onMesClick(row) {
@@ -109,4 +185,37 @@ onMounted(async () => {
 .page-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
 
 .page-content { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Pill Tabs — Manual §26 */
+.pill-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  font-family: inherit;
+  transition: border-color 70ms, color 70ms, background 70ms;
+  white-space: nowrap;
+}
+.pill-tab:hover {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+.pill-tab.active {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 500;
+}
 </style>

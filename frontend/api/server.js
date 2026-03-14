@@ -94,6 +94,33 @@ app.get('/api/ventas/resumen-mes', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Resumen por producto (toda la vida)
+app.get('/api/ventas/resumen-por-producto', async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT
+        d.cod_articulo,
+        COALESCE(ca.grupo_producto, MIN(d.descripcion_articulo)) AS grupo_producto,
+        MIN(d.descripcion_articulo)                              AS descripcion,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4))))        AS cantidad_total,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_ventas_brutas,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))))   AS fin_descuentos,
+        ROUND(SUM(
+          CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+          CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))
+        ))                                                       AS fin_ventas_netas,
+        COUNT(DISTINCT d.id_interno)                             AS num_facturas,
+        COUNT(DISTINCT d.id_cliente)                             AS num_clientes
+      FROM zeffi_facturas_venta_detalle d
+      LEFT JOIN catalogo_articulos ca ON ca.cod_articulo = d.cod_articulo
+      WHERE d.cod_articulo IS NOT NULL AND d.cod_articulo != ''
+      GROUP BY d.cod_articulo
+      ORDER BY fin_ventas_netas DESC
+    `)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Resumen por canal+mes
 app.get('/api/ventas/resumen-canal', async (req, res) => {
   try {
