@@ -12,7 +12,7 @@
 | 1 | XML en system prompt | Alto — mejor parsing del modelo | Neutral | Baja | ⬜ Pendiente |
 | 2 | Embeddings en ia_ejemplos_sql | Alto — búsqueda semántica real | -100ms | Media | ⬜ Pendiente |
 | 3 | Validación resultado vacío + retry | Alto — elimina "no hay datos" falsos | +1-2s peor caso | Media | ⬜ Pendiente |
-| 4 | Modelo diferente por paso (Flash SQL / Pro respuesta) | Medio-alto — más rápido Y más barato | -1.5s | Media | ⬜ Pendiente |
+| 4 | Arquitectura dos capas (mecánica gratis / analítica = elección usuario) | Alto — 55% más rápido, más barato, DeepSeek como default | -2.5s | Media | ⬜ Pendiente |
 | 5 | Restructurar prompt: QUÉ HACER vs QUÉ NO HACER | Medio — el modelo entiende mejor el "por qué" | Neutral | Baja | ⬜ Pendiente |
 
 ---
@@ -109,35 +109,53 @@ SQL ejecuta → 0 filas
 
 ---
 
-### 4. Modelo diferente por paso (Flash para SQL, Pro para respuesta)
+### 4. Arquitectura de dos capas — Agentes mecánicos vs Agente analítico
 
-**Qué es**: Usar Gemini Flash para generar el SQL (tarea de patrón) y Gemini Pro para interpretar los datos y redactar la respuesta (tarea de razonamiento y tono).
+**Qué es**: Clasificar los agentes en dos roles fijos e independientes.
 
-**Por qué**:
-- SQL generation es pattern matching sobre un esquema conocido — Flash lo hace igual de bien que Pro
-- Interpretar datos, dar contexto, detectar anomalías — ahí sí importa la inteligencia de Pro
-- Resultado: 30-40% más rápido y más barato, sin perder calidad en la parte que importa
+**CAPA MECÁNICA** — siempre automática, el usuario nunca la configura:
+- Enrutamiento (¿datos o conversación?) → Groq Llama (gratis, ~100ms)
+- Generación SQL → Gemini Flash (gratis, ~300ms) — patrón sobre esquema conocido
+- Retry/corrección SQL → Gemini Flash (gratis)
 
-**Referencia**: Amazon Nova architecture (INVESTIGACION_IA_ANALITICA_2026-03-14.md)
+**CAPA ANALÍTICA** — el agente que el usuario elige en el bot:
+- Interpretación de datos + respuesta conversacional
+- Opciones disponibles:
 
-**Comparación**:
+| Agente | Costo (por 1M tokens) | Perfil |
+|---|---|---|
+| Gemini Flash | Gratis | Opción económica/rápida |
+| **DeepSeek Chat V3** | **$0.14 entrada / $0.28 salida** | Mejor balance costo/calidad para uso diario |
+| Gemini Pro | $1.25 / $10 | Contexto masivo, razonamiento profundo |
+| Claude Sonnet | $3 / $15 | Mejor tono conversacional, mayor calidad |
+| GPT-4o | $2.5 / $10 | Versatilidad general |
+
+**Por qué DeepSeek es relevante**: muy bueno para análisis de datos y SQL complejo, precio 10x menor que Gemini Pro. Debe ser el default para usuarios no premium del bot.
+
+**Comparación de velocidad**:
 ```
-HOY:
-  generar_sql  → Gemini Pro  → ~1.5s
-  redactar     → Gemini Pro  → ~2.5s
-  Total: ~4s
+HOY (todo con Gemini Pro):
+  enrutamiento → Gemini Flash  ~0.5s
+  generar_sql  → Gemini Pro    ~1.5s
+  redactar     → Gemini Pro    ~2.5s
+  Total: ~4.5s
 
-CON ESTE CAMBIO:
-  generar_sql  → Gemini Flash → ~0.3s
-  redactar     → Gemini Pro   → ~2.5s
-  Total: ~2.8s  (30% más rápido)
+CON ARQUITECTURA DOS CAPAS:
+  enrutamiento → Groq Llama    ~0.1s  (gratis)
+  generar_sql  → Gemini Flash  ~0.3s  (gratis)
+  redactar     → DeepSeek/Pro  ~1.5s  (según usuario)
+  Total: ~2s  (55% más rápido, significativamente más barato)
 ```
 
-**Cómo**: Campo nuevo `agente_sql` en `ia_tipos_consulta` — agente específico para el paso `generar_sql`, distinto del agente principal que hace `redactar`. Si es NULL, usa el mismo para todo (comportamiento actual).
+**Cómo implementar**:
+- Campo `agente_sql` en `ia_tipos_consulta` — el agente fijo de la capa mecánica
+- El agente de la capa analítica sigue siendo el que selecciona el usuario (`agente_preferido`)
+- Si el usuario no ha seleccionado uno → default = DeepSeek Chat (mejor ROI)
 
 **Archivos**:
 - BD: `ALTER TABLE ia_tipos_consulta ADD COLUMN agente_sql VARCHAR(50) NULL`
-- `scripts/ia_service/servicio.py` — en el paso `generar_sql`, usar `agente_sql` si está configurado
+- `scripts/ia_service/servicio.py` — paso `generar_sql` usa `agente_sql`, paso `redactar` usa el del usuario
+- Bot: actualizar menú /agente para mostrar DeepSeek como opción destacada
 
 ---
 
