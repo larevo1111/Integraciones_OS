@@ -9,6 +9,7 @@ import time
 from collections import defaultdict, deque
 from .config import get_local_conn
 from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
+from . import embeddings as embeddings_module
 from .proveedores import openai_compat, google, anthropic_prov
 
 
@@ -227,14 +228,38 @@ def _guardar_ejemplo_sql(empresa: str, pregunta: str, sql: str):
                 INSERT INTO ia_ejemplos_sql (empresa, pregunta, sql_generado, tablas_usadas, palabras_clave)
                 VALUES (%s, %s, %s, %s, %s)
             """, (empresa, pregunta[:500], sql[:2000], tablas_str, palabras))
+            ejemplo_id = cur.lastrowid
             conn.commit()
         conn.close()
+        # Generar y guardar embedding en background (no bloquea la respuesta)
+        import threading
+        threading.Thread(
+            target=embeddings_module.guardar_embedding,
+            args=(ejemplo_id, pregunta),
+            daemon=True
+        ).start()
     except Exception:
         pass  # No fallar si no se puede guardar
 
 
 def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
-    """Recupera los N ejemplos Q→SQL más relevantes para la pregunta actual."""
+    """
+    Recupera los N ejemplos Q→SQL más relevantes para la pregunta actual.
+    Estrategia: embeddings semánticos (principal) → keywords LIKE (fallback).
+    """
+    # Intento 1: búsqueda semántica por embeddings
+    try:
+        filas = embeddings_module.buscar_ejemplos_semanticos(empresa, pregunta, n)
+        if filas:
+            ejemplos = '\n\n'.join([
+                f"Pregunta: {f['pregunta']}\nSQL:\n{f['sql_generado']}"
+                for f in filas
+            ])
+            return f"\n\nEJEMPLOS DE CONSULTAS ANTERIORES EXITOSAS (referencia):\n{ejemplos}"
+    except Exception:
+        pass
+
+    # Fallback: búsqueda por palabras clave (LIKE) — funciona aunque no haya embeddings
     try:
         palabras = _extraer_palabras_clave(pregunta).split(',')
         if not palabras:
@@ -258,6 +283,40 @@ def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
             for f in filas
         ])
         return f"\n\nEJEMPLOS DE CONSULTAS ANTERIORES EXITOSAS (referencia):\n{ejemplos}"
+    except Exception:
+        return ''
+
+
+def _obtener_fecha_maxima(sql: str) -> str:
+    """
+    Dado un SQL, detecta las tablas consultadas y obtiene la fecha máxima
+    real disponible. Se usa para informar al LLM cuándo hay 0 filas.
+    """
+    try:
+        import re
+        tablas_raw = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', sql, re.IGNORECASE)
+        tablas = [t for par in tablas_raw for t in par if t]
+        if not tablas:
+            return ''
+        # Columnas de fecha comunes en las tablas de Effi
+        cols_fecha = ['fecha_de_creacion', 'fecha', 'fecha_factura', 'fecha_remision']
+        resultados = []
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            for tabla in set(tablas):
+                for col in cols_fecha:
+                    try:
+                        cur.execute(f"SELECT MAX({col}) AS max_fecha FROM {tabla}")
+                        row = cur.fetchone()
+                        if row and row.get('max_fecha'):
+                            resultados.append(f"{tabla}.{col}: {row['max_fecha']}")
+                            break  # Con una columna de fecha por tabla es suficiente
+                    except Exception:
+                        continue
+        conn.close()
+        if resultados:
+            return f"Fechas más recientes en las tablas consultadas:\n" + '\n'.join(resultados) + '\n\n'
+        return ''
     except Exception:
         return ''
 
@@ -410,6 +469,17 @@ def consultar(
         agente_slug = _mejor_agente_para_nivel(nivel_usr)
         agente_cfg  = _cargar_agente(agente_slug)
 
+    # ── 4d. Agente capa mecánica (generación SQL) ─────────────────────
+    # El agente analítico (agente_cfg) interpreta y redacta la respuesta final.
+    # El agente mecánico (agente_cfg_sql) genera y corrige SQL — más rápido y barato.
+    agente_sql_slug = tipo_cfg.get('agente_sql')
+    if agente_sql_slug and agente_sql_slug != agente_slug:
+        agente_cfg_sql = _cargar_agente(agente_sql_slug)
+        if not agente_cfg_sql or not agente_cfg_sql.get('activo') or not agente_cfg_sql.get('api_key'):
+            agente_cfg_sql = agente_cfg  # fallback al agente analítico
+    else:
+        agente_cfg_sql = agente_cfg
+
     # ── 4c. Verificar límites de seguridad ────────────────────────────
     bloqueo = verificar_limites(agente_slug, empresa)
     if bloqueo:
@@ -508,7 +578,7 @@ def consultar(
                     f"(3) es compatible con MariaDB. Si algo falla, corrígelo."
                 )
                 msgs = mensajes_base + [{'role': 'user', 'content': prompt_sql}]
-                res = _llamar_agente(agente_cfg, msgs, temperatura=0.1)
+                res = _llamar_agente(agente_cfg_sql, msgs, temperatura=0.1)
                 tokens_in_total  += res.get('tokens_in', 0)
                 tokens_out_total += res.get('tokens_out', 0)
 
@@ -535,7 +605,7 @@ def consultar(
                         "Solo responde con el SQL corregido, sin explicaciones."
                     )
                     msgs_retry = mensajes_base + [{'role': 'user', 'content': prompt_retry}]
-                    res_retry = _llamar_agente(agente_cfg, msgs_retry, temperatura=0.1)
+                    res_retry = _llamar_agente(agente_cfg_sql, msgs_retry, temperatura=0.1)
                     tokens_in_total  += res_retry.get('tokens_in', 0)
                     tokens_out_total += res_retry.get('tokens_out', 0)
                     if res_retry['ok']:
@@ -553,6 +623,37 @@ def consultar(
 
                 datos_crudos = res_sql['filas']
                 tabla_resultado = formateador.filas_a_tabla(res_sql['filas'], res_sql['columnas'])
+
+                # Retry inteligente: si 0 filas, reenviar al LLM con contexto de fecha máxima
+                # (máx 2 reintentos). Corrige filtros demasiado estrictos, fechas erróneas, etc.
+                if len(datos_crudos) == 0:
+                    for _ in range(2):
+                        fecha_max_ctx = _obtener_fecha_maxima(sql_generado)
+                        prompt_vacio = (
+                            f"El SQL ejecutó sin errores pero devolvió 0 filas.\n"
+                            f"SQL ejecutado:\n```sql\n{sql_generado}\n```\n\n"
+                            f"{fecha_max_ctx}"
+                            f"Revisa si el filtro de fecha es demasiado estricto, si el estado "
+                            f"está mal escrito, o si hay una fecha futura por error. "
+                            f"Genera un SQL corregido. Responde SOLO con el SQL en un bloque ```sql```."
+                        )
+                        msgs_vacio = mensajes_base + [{'role': 'user', 'content': prompt_vacio}]
+                        res_vacio = _llamar_agente(agente_cfg_sql, msgs_vacio, temperatura=0.1)
+                        tokens_in_total  += res_vacio.get('tokens_in', 0)
+                        tokens_out_total += res_vacio.get('tokens_out', 0)
+                        if res_vacio['ok']:
+                            sql_vacio = formateador.extraer_sql(res_vacio['texto'])
+                            if sql_vacio:
+                                res_sql_v = ejecutor_sql.ejecutar(sql_vacio)
+                                if res_sql_v['ok'] and len(res_sql_v['filas']) > 0:
+                                    sql_generado    = sql_vacio
+                                    datos_crudos    = res_sql_v['filas']
+                                    tabla_resultado = formateador.filas_a_tabla(
+                                        res_sql_v['filas'], res_sql_v['columnas']
+                                    )
+                                    break  # Encontró datos — salir del loop
+                        # Si sigue vacío, continuar el siguiente intento (o dejarlo vacío)
+
                 # Auto-mejora: guardar este Q→SQL exitoso para futuras consultas similares
                 _guardar_ejemplo_sql(empresa, pregunta, sql_generado)
 

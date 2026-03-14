@@ -128,7 +128,10 @@ async def cmd_agente(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     agente = sesion.get('agente_preferido')
     await update.message.reply_text(
         '🤖 *Selecciona el agente de IA*\n\n'
-        'Cada agente tiene fortalezas distintas:',
+        '💡 *DeepSeek Chat* — recomendado para uso diario. Excelente para análisis de datos, muy económico.\n'
+        '🧠 *Gemini Pro* — análisis profundo, contexto masivo.\n'
+        '⚡ *Gemini Flash* — respuestas rápidas.\n'
+        '🤖 *Claude Sonnet* — mejor tono conversacional.',
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=inline_ajustes(agente)
     )

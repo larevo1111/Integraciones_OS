@@ -36,10 +36,10 @@ MAX_INLINE = 5
 
 def inline_ajustes(agente_actual: str = None) -> InlineKeyboardMarkup:
     agentes = [
+        ('💡 DeepSeek Chat ★ recomendado', 'agente:deepseek-chat'),
+        ('🧠 Gemini Pro (análisis profundo)', 'agente:gemini-pro'),
         ('⚡ Gemini Flash (rápido)', 'agente:gemini-flash'),
-        ('🧠 Gemini Pro (análisis)', 'agente:gemini-pro'),
         ('🤖 Claude Sonnet (premium)', 'agente:claude-sonnet'),
-        ('💡 DeepSeek Chat (económico)', 'agente:deepseek-chat'),
     ]
     filas = []
     for label, data in agentes:
