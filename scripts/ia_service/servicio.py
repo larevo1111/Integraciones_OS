@@ -3,13 +3,98 @@ Orquestador principal del servicio de IA.
 Expone la función consultar() que es el punto de entrada único.
 """
 import json
+import math
+import threading
 import time
+from collections import defaultdict, deque
 from .config import get_local_conn
 from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
 from .proveedores import openai_compat, google, anthropic_prov
 
 
-# ── Seguridad: verificación de límites antes de cada llamada ─────────────────
+# ── Rate limiter por usuario — sliding window in-memory ──────────────────────
+# Clave: "{empresa}:{usuario_id}" → ventanas de timestamps por intervalo
+
+_rl_lock    = threading.Lock()
+_rl_windows = defaultdict(lambda: {'1s': deque(), '10s': deque(), '60s': deque()})
+
+def _limpiar_ventana(dq: deque, ventana_seg: float, ahora: float):
+    while dq and (ahora - dq[0]) > ventana_seg:
+        dq.popleft()
+
+def verificar_rate_usuario(usuario_id: str, empresa: str) -> dict | None:
+    """
+    Sliding window rate limit por usuario.
+    Límites leídos de ia_config: rate_usuario_rps / rp10s / rpm.
+    Devuelve None si OK, o dict {error, retry_after} si debe bloquearse.
+    No falla aunque la BD no responda.
+    """
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT clave, valor FROM ia_config "
+                "WHERE clave IN ('rate_usuario_rps','rate_usuario_rp10s','rate_usuario_rpm')"
+            )
+            cfg = {r['clave']: int(r['valor']) for r in cur.fetchall()}
+        conn.close()
+    except Exception:
+        return None  # Si no puede leer config, deja pasar
+
+    lim_1s  = cfg.get('rate_usuario_rps',   1)
+    lim_10s = cfg.get('rate_usuario_rp10s', 3)
+    lim_60s = cfg.get('rate_usuario_rpm',  15)
+
+    clave = f"{empresa}:{usuario_id}"
+    ahora = time.monotonic()
+
+    with _rl_lock:
+        w = _rl_windows[clave]
+
+        _limpiar_ventana(w['1s'],  1.0,  ahora)
+        _limpiar_ventana(w['10s'], 10.0, ahora)
+        _limpiar_ventana(w['60s'], 60.0, ahora)
+
+        # Verificar ANTES de registrar — más restrictivo primero (1s → 10s → 60s)
+        if len(w['1s']) >= lim_1s:
+            retry = math.ceil(1.0 - (ahora - w['1s'][0])) + 1
+            return {
+                'error': (
+                    f"Solicitud rechazada: límite de {lim_1s} por segundo alcanzado. "
+                    f"Intente en {retry} segundo{'s' if retry != 1 else ''}."
+                ),
+                'retry_after': retry,
+            }
+
+        if len(w['10s']) >= lim_10s:
+            retry = math.ceil(10.0 - (ahora - w['10s'][0])) + 1
+            return {
+                'error': (
+                    f"Solicitud rechazada: límite de {lim_10s} en 10 segundos alcanzado. "
+                    f"Intente en {retry} segundos."
+                ),
+                'retry_after': retry,
+            }
+
+        if len(w['60s']) >= lim_60s:
+            retry = math.ceil(60.0 - (ahora - w['60s'][0])) + 1
+            return {
+                'error': (
+                    f"Solicitud rechazada: límite de {lim_60s} por minuto alcanzado. "
+                    f"Intente en {retry} segundos."
+                ),
+                'retry_after': retry,
+            }
+
+        # Registrar el request en las 3 ventanas
+        w['1s'].append(ahora)
+        w['10s'].append(ahora)
+        w['60s'].append(ahora)
+
+    return None  # OK
+
+
+# ── Seguridad: verificación de límites de costo y circuit breaker ─────────────
 
 def _get_config(conn, clave: str, default):
     with conn.cursor() as cur:
@@ -159,6 +244,19 @@ def consultar(
     """
     t_inicio = time.time()
     pasos_ejecutados = []
+
+    # ── 0. Rate limit por usuario (sliding window in-memory) ─────────
+    rl = verificar_rate_usuario(usuario_id, empresa)
+    if rl:
+        return {
+            'ok': False, 'conversacion_id': None,
+            'respuesta': rl['error'],
+            'formato': 'texto', 'tabla': None, 'sql_generado': None,
+            'agente': None, 'tema': tema,
+            'tokens': {'in': 0, 'out': 0}, 'costo_usd': 0.0,
+            'pasos': [], 'log_id': None,
+            'error': rl['error'], 'retry_after': rl['retry_after'],
+        }
 
     # ── 1. Obtener conversación ───────────────────────────────────────
     conv = contexto.obtener_o_crear(usuario_id, canal, conversacion_id, nombre_usuario)

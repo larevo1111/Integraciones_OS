@@ -62,6 +62,12 @@ def endpoint_consultar():
         nombre_usuario  = data.get('nombre_usuario'),
         contexto_extra  = data.get('contexto_extra', ''),
     )
+    # Si fue bloqueado por rate limit, devolver 429 con Retry-After header
+    if not resultado.get('ok') and resultado.get('retry_after'):
+        resp = jsonify(resultado)
+        resp.status_code = 429
+        resp.headers['Retry-After'] = str(resultado['retry_after'])
+        return resp
     return jsonify(resultado)
 
 
