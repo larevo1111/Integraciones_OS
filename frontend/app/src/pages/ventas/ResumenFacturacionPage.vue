@@ -85,17 +85,22 @@ const loadingProducto = ref(false)
 const colsProducto    = ref([])
 let productosCargados = false
 
-const VISIBLE_PRODUCTO = ['cod_articulo','grupo_producto','descripcion','cantidad_total','fin_ventas_brutas','fin_descuentos','fin_ventas_netas','num_facturas','num_clientes']
+const VISIBLE_PRODUCTO = ['cod_articulo','grupo_producto','cantidad_total','fin_ventas_netas','fin_costo_total','fin_utilidad_bruta','margen_pct','fin_notas_credito','num_facturas','num_clientes']
 const LABELS_PRODUCTO  = {
-  cod_articulo:    'Cód.',
-  grupo_producto:  'Grupo producto',
-  descripcion:     'Descripción',
-  cantidad_total:  'Cantidad',
+  cod_articulo:      'Cód.',
+  grupo_producto:    'Grupo producto',
+  descripcion:       'Descripción',
+  cantidad_total:    'Cantidad',
   fin_ventas_brutas: 'Ventas brutas',
-  fin_descuentos:  'Descuentos',
-  fin_ventas_netas: 'Ventas netas',
-  num_facturas:    'Facturas',
-  num_clientes:    'Clientes',
+  fin_descuentos:    'Descuentos',
+  fin_ventas_netas:  'Ventas netas',
+  fin_costo_total:   'Costo total',
+  fin_utilidad_bruta:'Utilidad bruta',
+  margen_pct:        'Margen %',
+  fin_notas_credito: 'Notas crédito',
+  cantidad_nc:       'Cant. NC',
+  num_facturas:      'Facturas',
+  num_clientes:      'Clientes',
 }
 
 // ── Helpers ────────────────────────────────────────────
