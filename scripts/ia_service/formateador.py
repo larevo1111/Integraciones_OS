@@ -49,17 +49,22 @@ def _limpiar_sql(sql: str) -> str:
 
 def extraer_sql(texto: str) -> str | None:
     """Extrae SQL de un bloque ```sql ... ``` o de texto plano si parece SQL."""
-    # Bloque markdown
-    match = re.search(r'```(?:sql)?\s*(SELECT\s.*?)```', texto, re.DOTALL | re.IGNORECASE)
+    # Bloque markdown — acepta (SELECT... (con paréntesis, para UNION parenthesizado)
+    match = re.search(r'```(?:sql)?\s*([\s\S]*?SELECT[\s\S]*?)```', texto, re.DOTALL | re.IGNORECASE)
     if match:
-        return _limpiar_sql(match.group(1))
+        candidato = _limpiar_sql(match.group(1))
+        # Verificar que realmente contiene SELECT
+        if re.search(r'\bSELECT\b', candidato, re.IGNORECASE):
+            return candidato
 
-    # SQL sin markdown (línea que empieza con SELECT)
-    match = re.search(r'(SELECT\s.+)', texto, re.DOTALL | re.IGNORECASE)
+    # SQL sin markdown (línea que empieza con SELECT o con paréntesis + SELECT)
+    match = re.search(r'(\(?\s*SELECT\s.+)', texto, re.DOTALL | re.IGNORECASE)
     if match:
         candidate = _limpiar_sql(match.group(1).strip())
         # Limitar a la primera sentencia
         candidate = candidate.split(';')[0].strip()
+        # Eliminar backticks residuales al final (si el LLM no cerró el bloque)
+        candidate = re.sub(r'`+\s*$', '', candidate).strip()
         if len(candidate) > 10:
             return candidate
 

@@ -67,6 +67,55 @@ def _validar_sql_ast(sql: str) -> str | None:
     return None
 
 
+def _normalizar_sql(sql: str) -> str:
+    """
+    Corrige patrones de UNION que MariaDB rechaza:
+    Si el LLM genera   SELECT ... ORDER BY ... LIMIT N UNION ALL SELECT ... ORDER BY ... LIMIT N
+    sqlglot parsea el segundo ORDER BY/LIMIT como del UNION completo, y la rama
+    izquierda queda con su propio ORDER BY/LIMIT → MariaDB lo rechaza sin paréntesis.
+
+    Corrección: detectar ese patrón y envolver cada rama en paréntesis.
+    Si no aplica o falla, devuelve el SQL original sin modificar.
+    """
+    try:
+        stmts = sqlglot.parse(sql, dialect='mysql')
+        if not stmts:
+            return sql
+        stmt = stmts[0]
+
+        if not isinstance(stmt, (exp.Union, exp.Intersect, exp.Except)):
+            return sql
+
+        left = stmt.left
+        # ¿La rama izquierda tiene ORDER BY o LIMIT propios?
+        left_has_order = any(isinstance(n, (exp.Order, exp.Limit)) for n in left.walk())
+        # ¿El UNION tiene ORDER BY/LIMIT propios (absorbidos del segundo SELECT)?
+        union_order = stmt.args.get('order')
+        union_limit = stmt.args.get('limit')
+
+        if not left_has_order:
+            return sql  # Patrón normal — sin corrección necesaria
+
+        # Construir el SQL de la rama derecha con ORDER BY y LIMIT del UNION
+        right = stmt.right
+        sql_right = right.sql(dialect='mysql')
+        if union_order:
+            sql_right += ' ' + union_order.sql(dialect='mysql')
+        if union_limit:
+            sql_right += ' ' + union_limit.sql(dialect='mysql')
+
+        sql_left = left.sql(dialect='mysql')
+
+        # Determinar el operador
+        distinct = stmt.args.get('distinct', True)
+        op = 'UNION' if distinct else 'UNION ALL'
+
+        return f'({sql_left}) {op} ({sql_right})'
+    except Exception:
+        pass
+    return sql
+
+
 def ejecutar(sql: str, conexion_id: int = None) -> dict:
     """
     Ejecuta un SELECT contra la BD configurada.
@@ -79,6 +128,7 @@ def ejecutar(sql: str, conexion_id: int = None) -> dict:
         {ok, filas, columnas, total, truncado, error}
     """
     sql = _limpiar_sql(sql)
+    sql = _normalizar_sql(sql)
 
     # ── Capa 1: validación AST ────────────────────────────────────────
     error = _validar_sql_ast(sql)
