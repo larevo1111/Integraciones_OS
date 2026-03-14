@@ -36,6 +36,7 @@ RESUMEN_REMISIONES_SCRIPT         = SCRIPTS_DIR / 'calcular_resumen_ventas_remis
 RESUMEN_REM_CANAL_SCRIPT          = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_canal_mes.py'
 RESUMEN_REM_CLIENTE_SCRIPT        = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_cliente_mes.py'
 RESUMEN_REM_PRODUCTO_SCRIPT       = SCRIPTS_DIR / 'calcular_resumen_ventas_remisiones_producto_mes.py'
+SYNC_CATALOGO_SCRIPT              = SCRIPTS_DIR / 'sync_catalogo_articulos.py'
 SYNC_HOSTINGER_SCRIPT             = SCRIPTS_DIR / 'sync_hostinger.py'
 SYNC_ESPOCRM_MARKETING_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_marketing.py'
 SYNC_ESPOCRM_CONTACTOS_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_contactos.py'
@@ -333,6 +334,11 @@ def main():
     exit_rem_prod, salida_rem_prod = ejecutar(['python3', str(RESUMEN_REM_PRODUCTO_SCRIPT)], RESUMEN_TIMEOUT)
     dur_rem_prod = int((datetime.datetime.now() - t_rem_prod).total_seconds())
     log.info(f'   {salida_rem_prod.strip().splitlines()[-1] if salida_rem_prod.strip() else "sin salida"}  [{dur_rem_prod}s]')
+
+    # ── 4e. SYNC CATÁLOGO ARTÍCULOS (nuevos productos) ───────────
+    log.info('▶ sync_catalogo_articulos.py ...')
+    exit_cat, salida_cat = ejecutar(['python3', str(SYNC_CATALOGO_SCRIPT)], 60)
+    log.info(f'   {salida_cat.strip().splitlines()[-1] if salida_cat.strip() else "sin salida"}')
 
     # ── 5. SYNC HOSTINGER ────────────────────────────────────────
     log.info('▶ sync_hostinger.py ...')
