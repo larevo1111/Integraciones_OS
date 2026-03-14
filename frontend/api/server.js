@@ -237,6 +237,59 @@ app.get('/api/ventas/resumen-producto', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Facturas por producto (cod_articulo)
+app.get('/api/ventas/facturas-producto/:cod_articulo', async (req, res) => {
+  try {
+    const cod = decodeURIComponent(req.params.cod_articulo)
+    const rows = await query(`
+      SELECT
+        e.id_interno, e.id_numeracion, e.fecha_de_creacion,
+        e.cliente, e.id_cliente, e.ciudad, e.vendedor,
+        CAST(REPLACE(COALESCE(e.subtotal,'0'),',','.') AS DECIMAL(15,2))    AS fin_subtotal,
+        CAST(REPLACE(COALESCE(e.total_neto,'0'),',','.') AS DECIMAL(15,2))  AS fin_total_neto,
+        e.estado_cxc,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4))))         AS cantidad_producto,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+                  CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))))  AS fin_venta_producto
+      FROM zeffi_facturas_venta_encabezados e
+      JOIN zeffi_facturas_venta_detalle d ON d.id_interno = e.id_interno
+      WHERE d.cod_articulo = ?
+      GROUP BY e.id_interno, e.id_numeracion, e.fecha_de_creacion,
+               e.cliente, e.id_cliente, e.ciudad, e.vendedor,
+               e.subtotal, e.total_neto, e.estado_cxc
+      ORDER BY e.fecha_de_creacion DESC
+    `, [cod])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// Facturas por grupo producto
+app.get('/api/ventas/facturas-grupo/:grupo', async (req, res) => {
+  try {
+    const grupo = decodeURIComponent(req.params.grupo)
+    const rows = await query(`
+      SELECT
+        e.id_interno, e.id_numeracion, e.fecha_de_creacion,
+        e.cliente, e.id_cliente, e.ciudad, e.vendedor,
+        CAST(REPLACE(COALESCE(e.subtotal,'0'),',','.') AS DECIMAL(15,2))    AS fin_subtotal,
+        CAST(REPLACE(COALESCE(e.total_neto,'0'),',','.') AS DECIMAL(15,2))  AS fin_total_neto,
+        e.estado_cxc,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4))))         AS cantidad_grupo,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+                  CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))))  AS fin_venta_grupo
+      FROM zeffi_facturas_venta_encabezados e
+      JOIN zeffi_facturas_venta_detalle d ON d.id_interno = e.id_interno
+      JOIN catalogo_articulos ca ON ca.cod_articulo = d.cod_articulo
+      WHERE ca.grupo_producto = ?
+      GROUP BY e.id_interno, e.id_numeracion, e.fecha_de_creacion,
+               e.cliente, e.id_cliente, e.ciudad, e.vendedor,
+               e.subtotal, e.total_neto, e.estado_cxc
+      ORDER BY e.fecha_de_creacion DESC
+    `, [grupo])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Facturas encabezados por mes
 // Nota: fecha_de_creacion es TEXT con formato 'YYYY-MM-DD HH:MM:SS'
 // El filtro por mes usa LEFT(fecha_de_creacion, 7)

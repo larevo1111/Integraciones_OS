@@ -61,6 +61,7 @@
         :rows="resProducto"
         :columns="colsProducto"
         :loading="loadingProducto"
+        @row-click="row => router.push(`/ventas/facturas-producto/${encodeURIComponent(row.cod_articulo)}`)"
       />
 
       <!-- Tab: Por grupo -->
@@ -70,6 +71,7 @@
         :rows="resGrupo"
         :columns="colsGrupo"
         :loading="loadingGrupo"
+        @row-click="row => router.push(`/ventas/facturas-grupo/${encodeURIComponent(row.grupo_producto)}`)"
       />
 
     </div>
