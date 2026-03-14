@@ -150,6 +150,60 @@ app.get('/api/ventas/resumen-por-producto', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Resumen por grupo producto (toda la vida)
+app.get('/api/ventas/resumen-por-grupo', async (req, res) => {
+  try {
+    const rows = await query(`
+      SELECT
+        COALESCE(ca.grupo_producto, d.cod_articulo)                                           AS grupo_producto,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4))))          AS cantidad_total,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_ventas_brutas,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))))   AS fin_descuentos,
+        ROUND(SUM(
+          CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+          CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))
+        ))                                                                                     AS fin_ventas_netas,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.costo_promedio_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_costo_total,
+        ROUND(SUM(
+          CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+          CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2)) -
+          CAST(REPLACE(COALESCE(d.costo_promedio_total,'0'),',','.') AS DECIMAL(15,2))
+        ))                                                                                     AS fin_utilidad_bruta,
+        COALESCE(ROUND(
+          SUM(
+            CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+            CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2)) -
+            CAST(REPLACE(COALESCE(d.costo_promedio_total,'0'),',','.') AS DECIMAL(15,2))
+          ) /
+          NULLIF(SUM(
+            CAST(REPLACE(COALESCE(d.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+            CAST(REPLACE(COALESCE(d.descuento_total,'0'),',','.') AS DECIMAL(15,2))
+          ), 0) * 100, 1
+        ), 0)                                                                                  AS margen_pct,
+        COALESCE(nc.fin_notas_credito, 0)                                                     AS fin_notas_credito,
+        COUNT(DISTINCT d.id_interno)                                                          AS num_facturas,
+        COUNT(DISTINCT d.id_cliente)                                                          AS num_clientes,
+        COUNT(DISTINCT d.cod_articulo)                                                        AS num_referencias
+      FROM zeffi_facturas_venta_detalle d
+      LEFT JOIN catalogo_articulos ca ON ca.cod_articulo = d.cod_articulo
+      LEFT JOIN (
+        SELECT
+          COALESCE(ca2.grupo_producto, nc2.cod_articulo) AS grupo_producto,
+          ROUND(SUM(CAST(REPLACE(COALESCE(nc2.precio_bruto_total,'0'),',','.') AS DECIMAL(15,2)) -
+                    CAST(REPLACE(COALESCE(nc2.descuento_total,'0'),',','.') AS DECIMAL(15,2)))) AS fin_notas_credito
+        FROM zeffi_notas_credito_venta_detalle nc2
+        LEFT JOIN catalogo_articulos ca2 ON ca2.cod_articulo = nc2.cod_articulo
+        WHERE nc2.cod_articulo IS NOT NULL AND nc2.cod_articulo != ''
+        GROUP BY COALESCE(ca2.grupo_producto, nc2.cod_articulo)
+      ) nc ON nc.grupo_producto = COALESCE(ca.grupo_producto, d.cod_articulo)
+      WHERE d.cod_articulo IS NOT NULL AND d.cod_articulo != ''
+      GROUP BY COALESCE(ca.grupo_producto, d.cod_articulo)
+      ORDER BY fin_ventas_netas DESC
+    `)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Resumen por canal+mes
 app.get('/api/ventas/resumen-canal', async (req, res) => {
   try {

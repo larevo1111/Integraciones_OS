@@ -34,6 +34,13 @@
         >
           Por producto
         </button>
+        <button
+          class="pill-tab"
+          :class="{ active: tabActivo === 'grupo' }"
+          @click="onTabGrupo"
+        >
+          Por grupo
+        </button>
       </div>
 
       <!-- Tab: Por mes -->
@@ -54,6 +61,15 @@
         :rows="resProducto"
         :columns="colsProducto"
         :loading="loadingProducto"
+      />
+
+      <!-- Tab: Por grupo -->
+      <OsDataTable
+        v-if="tabActivo === 'grupo'"
+        title="Resumen por grupo"
+        :rows="resGrupo"
+        :columns="colsGrupo"
+        :loading="loadingGrupo"
       />
 
     </div>
@@ -85,6 +101,12 @@ const loadingProducto = ref(false)
 const colsProducto    = ref([])
 let productosCargados = false
 
+// ── Tab por grupo ──────────────────────────────────────
+const resGrupo     = ref([])
+const loadingGrupo = ref(false)
+const colsGrupo    = ref([])
+let grupoCargado   = false
+
 const VISIBLE_PRODUCTO = ['cod_articulo','grupo_producto','cantidad_total','fin_ventas_netas','fin_costo_total','fin_utilidad_bruta','margen_pct','fin_notas_credito','num_facturas','num_clientes']
 const LABELS_PRODUCTO  = {
   cod_articulo:      'Cód.',
@@ -101,6 +123,22 @@ const LABELS_PRODUCTO  = {
   cantidad_nc:       'Cant. NC',
   num_facturas:      'Facturas',
   num_clientes:      'Clientes',
+}
+
+const VISIBLE_GRUPO = ['grupo_producto','cantidad_total','fin_ventas_netas','fin_costo_total','fin_utilidad_bruta','margen_pct','fin_notas_credito','num_facturas','num_clientes','num_referencias']
+const LABELS_GRUPO  = {
+  grupo_producto:    'Grupo producto',
+  cantidad_total:    'Cantidad',
+  fin_ventas_brutas: 'Ventas brutas',
+  fin_descuentos:    'Descuentos',
+  fin_ventas_netas:  'Ventas netas',
+  fin_costo_total:   'Costo total',
+  fin_utilidad_bruta:'Utilidad bruta',
+  margen_pct:        'Margen %',
+  fin_notas_credito: 'Notas crédito',
+  num_facturas:      'Facturas',
+  num_clientes:      'Clientes',
+  num_referencias:   'Referencias',
 }
 
 // ── Helpers ────────────────────────────────────────────
@@ -159,6 +197,28 @@ async function loadProducto() {
 function onTabProducto() {
   tabActivo.value = 'producto'
   loadProducto()
+}
+
+async function loadGrupo() {
+  if (grupoCargado) return
+  loadingGrupo.value = true
+  try {
+    const { data } = await axios.get(`${API}/ventas/resumen-por-grupo`)
+    resGrupo.value = data
+    if (data.length > 0) {
+      colsGrupo.value = Object.keys(data[0]).map(key => ({
+        key,
+        label: LABELS_GRUPO[key] || labelFromKey(key),
+        visible: VISIBLE_GRUPO.includes(key)
+      }))
+    }
+    grupoCargado = true
+  } finally { loadingGrupo.value = false }
+}
+
+function onTabGrupo() {
+  tabActivo.value = 'grupo'
+  loadGrupo()
 }
 
 function onMesClick(row) {
