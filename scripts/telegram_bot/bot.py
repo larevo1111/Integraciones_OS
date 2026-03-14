@@ -87,17 +87,70 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_ayuda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         '📖 *Cómo usar el bot*\n\n'
-        '• Escribe cualquier pregunta en lenguaje natural\n'
-        '• `📊 Ventas hoy` — ventas del día actual\n'
-        '• `📈 Este mes` — resumen del mes en curso\n'
-        '• `⚙️ Ajustes` — cambiar agente IA o limpiar historial\n\n'
-        '*Ejemplos:*\n'
+        'Escribe cualquier pregunta en lenguaje natural. Ejemplos:\n'
         '  _¿Cuánto vendimos en febrero?_\n'
         '  _Top 5 productos del mes pasado_\n'
-        '  _¿Cuáles clientes compraron más este año?_',
+        '  _¿Qué clientes compraron más este año?_\n\n'
+        '*Comandos disponibles:*\n'
+        '/ventas — Ventas del día de hoy\n'
+        '/mes — Resumen del mes en curso\n'
+        '/estado — Ver agente activo\n'
+        '/agente — Cambiar modelo de IA\n'
+        '/limpiar — Limpiar historial\n'
+        '/ayuda — Ver esta ayuda',
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=REPLY_KB
     )
+
+
+async def cmd_estado(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    sesion = db.obtener_sesion(update.effective_user.id)
+    agente = sesion.get('agente_preferido') or 'automático'
+    nombres = {
+        'gemini-flash':   'Gemini Flash ⚡ (rápido, gratis)',
+        'gemini-pro':     'Gemini Pro 🧠 (análisis)',
+        'claude-sonnet':  'Claude Sonnet 🤖 (premium)',
+        'deepseek-chat':  'DeepSeek Chat 💡 (económico)',
+        'automático':     'Automático 🔀 (el sistema elige según la pregunta)',
+    }
+    await update.message.reply_text(
+        '📊 *Estado actual*\n\n'
+        f'🤖 Agente: {nombres.get(agente, agente)}\n'
+        f'🏢 Empresa: Origen Silvestre\n\n'
+        'Usa /agente para cambiar el modelo.',
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=REPLY_KB
+    )
+
+
+async def cmd_agente(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    sesion = db.obtener_sesion(update.effective_user.id)
+    agente = sesion.get('agente_preferido')
+    await update.message.reply_text(
+        '🤖 *Selecciona el agente de IA*\n\n'
+        'Cada agente tiene fortalezas distintas:',
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=inline_ajustes(agente)
+    )
+
+
+async def cmd_limpiar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    db.guardar_sesion(user.id, user.username or '', _nombre(user), conversacion_id=0)
+    await update.message.reply_text(
+        '🗑️ Historial limpiado. La próxima pregunta empieza desde cero.',
+        reply_markup=REPLY_KB
+    )
+
+
+async def cmd_ventas(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    update.message.text = '¿Cuánto hemos vendido hoy?'
+    await handle_mensaje(update, ctx)
+
+
+async def cmd_mes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    update.message.text = '¿Cuánto llevamos vendido este mes y cómo vamos vs el mes anterior?'
+    await handle_mensaje(update, ctx)
 
 
 # ─── Handler principal de mensajes ───────────────────────────────────────────
@@ -169,10 +222,21 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     else:
         kb = _inline_solo_nuevo()
 
+    # Pie sutil con el agente usado
+    agente_usado = resultado.get('agente', '')
+    iconos = {
+        'gemini-pro':    '🧠', 'gemini-flash': '⚡',
+        'gemini-flash-lite': '⚡', 'claude-sonnet': '🤖',
+        'deepseek-chat': '💡', 'deepseek-reasoner': '💡',
+        'groq-llama': '🔥', 'gemma-router': '🔀',
+    }
+    icono = iconos.get(agente_usado, '🤖')
+    pie   = f'\n\n_{icono} {agente_usado}_' if agente_usado else ''
+
     # Enviar respuesta — intentar Markdown, caer a texto plano si falla
     try:
         await update.message.reply_text(
-            texto_resp,
+            texto_resp + pie,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=kb
         )
@@ -234,9 +298,14 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler('start', cmd_start))
-    app.add_handler(CommandHandler('ayuda', cmd_ayuda))
-    app.add_handler(CommandHandler('help',  cmd_ayuda))
+    app.add_handler(CommandHandler('start',   cmd_start))
+    app.add_handler(CommandHandler('ayuda',   cmd_ayuda))
+    app.add_handler(CommandHandler('help',    cmd_ayuda))
+    app.add_handler(CommandHandler('estado',  cmd_estado))
+    app.add_handler(CommandHandler('agente',  cmd_agente))
+    app.add_handler(CommandHandler('limpiar', cmd_limpiar))
+    app.add_handler(CommandHandler('ventas',  cmd_ventas))
+    app.add_handler(CommandHandler('mes',     cmd_mes))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mensaje))
 
