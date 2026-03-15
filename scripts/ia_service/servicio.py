@@ -557,7 +557,7 @@ def consultar(
         or conv.get('agente_activo')
         or (tema_cfg.get('agente_preferido') if tema_cfg else None)
         or tipo_cfg.get('agente_preferido')
-        or 'groq-llama'
+        or 'gemini-flash-lite'
     )
     agente_cfg = _cargar_agente(agente_slug)
     # Si el agente no existe, no está activo o no tiene API key: buscar el primero disponible
