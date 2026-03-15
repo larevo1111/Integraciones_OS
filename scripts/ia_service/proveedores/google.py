@@ -58,7 +58,12 @@ def llamar(agente: dict, mensajes: list, temperatura: float = 0.3, max_tokens: i
         payload['generationConfig']['responseModalities'] = ['IMAGE', 'TEXT']
 
     if system_instruction:
-        payload['systemInstruction'] = {'parts': [{'text': system_instruction}]}
+        if 'gemma' in modelo.lower():
+            # Gemma no soporta systemInstruction — inyectar al inicio del primer user message
+            if contents and contents[0].get('role') == 'user':
+                contents[0]['parts'][0]['text'] = system_instruction + '\n\n' + contents[0]['parts'][0]['text']
+        else:
+            payload['systemInstruction'] = {'parts': [{'text': system_instruction}]}
 
     t0 = time.time()
     try:

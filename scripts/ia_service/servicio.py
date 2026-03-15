@@ -643,10 +643,12 @@ def consultar(
         system_prompt += tipo_cfg['system_prompt']
 
     # CAPA 2: RAG — fragmentos relevantes filtrados por empresa y tema
+    # No aplica para imagen (confundiría al modelo visual con texto de negocio)
     tema_id_rag = tema_cfg['id'] if tema_cfg else None
-    rag_ctx = rag_module.obtener_contexto_rag(pregunta, empresa, tema_id_rag)
-    if rag_ctx:
-        system_prompt += f'\n\n{rag_ctx}'
+    if tipo_cfg.get('slug') != 'generacion_imagen':
+        rag_ctx = rag_module.obtener_contexto_rag(pregunta, empresa, tema_id_rag)
+        if rag_ctx:
+            system_prompt += f'\n\n{rag_ctx}'
 
     # CAPA 3: Schema BD — tablas del tema si lo tiene, sino schema completo
     if tipo_cfg.get('requiere_estructura'):
