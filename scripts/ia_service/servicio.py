@@ -464,6 +464,7 @@ def consultar(
     conversacion_id: int  = None,
     nombre_usuario:  str  = None,
     contexto_extra:  str  = '',
+    cliente:         dict = None,
 ) -> dict:
     """
     Punto de entrada único del servicio de IA.
@@ -604,8 +605,7 @@ def consultar(
         }
 
     # ── 5. Construir contexto de sistema (6 capas) ───────────────────
-    # CAPA 0: Fecha actual + cobertura de datos — siempre inyectada.
-    # El modelo sabe qué día es y con qué rango de datos cuenta antes de razonar.
+    # CAPA 0: Fecha actual — siempre inyectada.
     from datetime import datetime
     _ahora = datetime.now()
     _dias   = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo']
@@ -616,8 +616,27 @@ def consultar(
         f"({_dias[_ahora.weekday()]}, {_ahora.day} de {_meses[_ahora.month-1]} de {_ahora.year})"
     )
 
+    # CAPA 0b: Contexto del cliente (si viene en la llamada)
+    # Permite que la IA sepa con quién habla y filtre datos por ese cliente.
+    _cliente_ctx = ''
+    if cliente and isinstance(cliente, dict):
+        partes = []
+        if cliente.get('nombre'):
+            partes.append(f"Nombre: {cliente['nombre']}")
+        if cliente.get('identificacion'):
+            tipo_id = cliente.get('tipo_id', 'ID')
+            partes.append(f"{tipo_id}: {cliente['identificacion']}")
+        if cliente.get('telefono'):
+            partes.append(f"Teléfono: {cliente['telefono']}")
+        if cliente.get('email'):
+            partes.append(f"Email: {cliente['email']}")
+        if partes:
+            _cliente_ctx = 'Cliente que consulta:\n' + '\n'.join(f'  {p}' for p in partes)
+
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
     system_prompt = _fecha_ctx + '\n\n'
+    if _cliente_ctx:
+        system_prompt += _cliente_ctx + '\n\n'
     if tema_cfg and tema_cfg.get('system_prompt'):
         system_prompt += tema_cfg['system_prompt']
     elif tipo_cfg.get('system_prompt'):

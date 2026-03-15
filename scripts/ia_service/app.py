@@ -42,6 +42,13 @@ def endpoint_consultar():
         "conversacion_id": 42,                          -- opcional
         "nombre_usuario":  "Santiago",                  -- opcional
         "contexto_extra":  "Vista: Resumen Ventas..."   -- opcional (contexto de pantalla del ERP)
+        "cliente": {                                    -- opcional (para atención al cliente)
+            "nombre":         "Juan Pérez",             -- nombre del cliente
+            "identificacion": "12345678",               -- cédula o NIT
+            "tipo_id":        "CC",                     -- CC, NIT, CE... (default: "ID")
+            "telefono":       "3001234567",             -- opcional
+            "email":          "juan@email.com"          -- opcional
+        }
     }
     """
     data = request.get_json(silent=True) or {}
@@ -61,6 +68,7 @@ def endpoint_consultar():
         conversacion_id = data.get('conversacion_id'),
         nombre_usuario  = data.get('nombre_usuario'),
         contexto_extra  = data.get('contexto_extra', ''),
+        cliente         = data.get('cliente'),
     )
     # Si fue bloqueado por rate limit, devolver 429 con Retry-After header
     if not resultado.get('ok') and resultado.get('retry_after'):
