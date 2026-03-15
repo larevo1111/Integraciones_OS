@@ -115,9 +115,10 @@ curl -s -X POST http://localhost:5100/ia/consultar \
 | gemini-flash-lite | ✅ | 150,000 | Alto volumen |
 | gemma-router | ✅ | 14,400 | Enrutador |
 | gemini-image | ✅ | 70 | Imágenes |
-| groq-llama | ❌ pendiente | 14,400 | Enrutador alternativo |
-| deepseek-chat | ❌ pendiente | — | Análisis económico |
-| claude-sonnet | ❌ pendiente | — | Documentos premium |
+| groq-llama | ✅ | 14,400 | Enrutador principal (llama-3.3-70b-versatile) |
+| deepseek-chat | ✅ | — | Análisis — recomendado para uso diario |
+| deepseek-reasoner | ✅ | — | Razonamiento complejo (nivel_minimo=7 — solo admin) |
+| claude-sonnet | ✅ | — | Documentos premium (claude-sonnet-4-6) |
 
 ## Reset de contexto de conversación
 

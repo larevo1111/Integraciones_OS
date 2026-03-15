@@ -2,7 +2,7 @@
 
 **Versión**: 2.0 — 2026-03-14
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
-**Admin panel**: app separada `ia.oscomunidad.com` — por construir (Vue + Quasar).
+**Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT 2 pasos.
 
 > **REGLA DE SEGURIDAD ABSOLUTA**: Las API keys van SOLO en la BD (`ia_agentes.api_key`) y en `scripts/.env`. NUNCA en archivos .md, código commiteado, comentarios ni mensajes de commit.
 
@@ -12,7 +12,7 @@
 
 1. [Filosofía del sistema — por qué importa](#filosofia)
 2. [Arquitectura completa](#arquitectura)
-3. [Base de datos — 7 tablas](#bd)
+3. [Base de datos — 8 tablas](#bd)
 4. [System prompt — 6 capas](#system-prompt)
 5. [Tipos de consulta](#tipos)
 6. [Agentes disponibles](#agentes)
@@ -107,13 +107,13 @@ POST /ia/consultar (Flask :5100)
   retorna: {ok, respuesta, tabla, sql, agente, tokens, costo, conversacion_id}
 ```
 
-**BD local**: `ia_service_os` — 7 tablas (ver sección 3)
+**BD local**: `ia_service_os` — 8 tablas (ver sección 3)
 **Puerto**: 5100 (systemd `ia-service.service`)
 **Código**: `scripts/ia_service/`
 
 ---
 
-## 3. Base de datos — 7 tablas {#bd}
+## 3. Base de datos — 8 tablas {#bd}
 
 BD: `ia_service_os` en MariaDB local (servidor OS, acceso solo local).
 
@@ -349,10 +349,11 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 | `gemini-flash` | gemini-2.5-flash | ✅ | 10,000 | 1 | Redacción, resumen |
 | `gemini-flash-lite` | gemini-3.1-flash-lite | ✅ | 150,000 | 1 | Alto volumen |
 | `gemma-router` | gemma-3-27b-it | ✅ | 14,400 | 1 | Enrutador fallback |
-| `gemini-image` | imagen-4.0-fast-generate-preview | ✅ | 70 | 1 | Imágenes |
-| `groq-llama` | llama-3.1-8b-instant | ❌ pendiente | 14,400 | 1 | Enrutador principal |
-| `deepseek-chat` | deepseek-chat | ❌ pendiente | — | 1 | Análisis económico |
-| `claude-sonnet` | claude-sonnet-4-6 | ❌ pendiente | — | 1 | Documentos premium |
+| `gemini-image` | gemini-2.5-flash-image | ✅ | 70 | 1 | Imágenes |
+| `groq-llama` | llama-3.3-70b-versatile | ✅ | 14,400 | 1 | Enrutador principal |
+| `deepseek-chat` | deepseek-chat | ✅ | — | 1 | Análisis — recomendado uso diario |
+| `deepseek-reasoner` | deepseek-reasoner | ✅ | — | 7 | Razonamiento complejo (solo admin) |
+| `claude-sonnet` | claude-sonnet-4-6 | ✅ | — | 1 | Documentos premium |
 
 ### Cómo obtener cada API key
 

@@ -573,6 +573,35 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 
 ---
 
+## 1c. Scripts del Servicio IA (`scripts/ia_service/`)
+
+> Módulo Python que corre como Flask API en puerto 5100. Ver manual completo: `.agent/manuales/ia_service_manual.md`.
+
+### actualizar_system_prompt.py
+- **Propósito**: Regenera y sube el system prompt XML completo del tipo `analisis_datos` a `ia_tipos_consulta` en BD
+- **Tipo**: utilidad de mantenimiento
+- **Ejecución manual**:
+  ```bash
+  python3 scripts/ia_service/actualizar_system_prompt.py
+  ```
+- **Salida**: stdout con confirmación + longitud del prompt generado (actualmente ~34,667 chars)
+- **Tabla(s) MariaDB**: `ia_service_os.ia_tipos_consulta` (UPDATE system_prompt WHERE slug='analisis_datos')
+- **Cuándo correr**: Siempre que se modifique el catálogo de tablas, el diccionario de campos, las reglas SQL o los ejemplos hardcodeados en el script. El servicio toma el nuevo prompt en la siguiente llamada (sin reiniciar).
+- **Notas**: El prompt incluye 6 secciones XML: `<rol>`, `<precision>`, `<tablas_disponibles>`, `<diccionario_campos>`, `<reglas_sql>`, `<ejemplos>`. Las 10 preguntas de ejemplo están hardcodeadas en el script; los ejemplos dinámicos vienen de `ia_ejemplos_sql` vía embeddings.
+
+### embeddings.py
+- **Propósito**: Genera y gestiona embeddings semánticos para `ia_ejemplos_sql` (búsqueda semántica de ejemplos SQL similares)
+- **Tipo**: módulo Python (no se ejecuta directamente — importado por `servicio.py`)
+- **Funciones principales**:
+  - `generar_embedding(texto)` — Llama API Google text-embedding-004, devuelve vector 768 dims
+  - `buscar_ejemplos_semanticos(empresa, pregunta, n=3)` — cosine similarity sobre ia_ejemplos_sql
+  - `guardar_embedding(ejemplo_id, texto)` — guarda vector en ia_ejemplos_sql.embedding
+  - `migrar_embeddings_faltantes(empresa)` — retroalimentar ejemplos sin embedding
+- **Dependencias**: Google text-embedding-004 (API key de Gemini), `ia_ejemplos_sql` table
+- **Notas**: Si la API de embeddings falla, cae back a búsqueda LIKE (keywords). El modelo text-embedding-004 es gratis e ilimitado en el plan de pago de Google.
+
+---
+
 ## 4. Skills / Comandos Claude (`.claude/commands/`)
 
 Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en la conversación.

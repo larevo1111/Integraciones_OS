@@ -281,7 +281,7 @@ CAPA 6 — Pregunta actual del usuario        → input directo
 | `groq-llama` | llama-3.3-70b-versatile | ✅ Activo — enrutador principal (key configurada 2026-03-13) |
 | `deepseek-chat` | deepseek-chat | ✅ Activo — recomendado para bot (nivel_minimo=1) |
 | `deepseek-reasoner` | deepseek-reasoner | ✅ Activo (nivel_minimo=7 — solo admin) |
-| `claude-sonnet` | claude-sonnet-4-6 | 🔲 Pendiente key: console.anthropic.com |
+| `claude-sonnet` | claude-sonnet-4-6 | ✅ Activo — documentos premium |
 
 **Estado del servicio (2026-03-13):** ✅ Activo — RAG + temas + empresa + enrutador dual (tipo+tema)
 **Módulo RAG:** `scripts/ia_service/rag.py` — fragmentación + búsqueda FULLTEXT por empresa+tema
@@ -296,11 +296,13 @@ resultado = consultar(
     agente=None,         # None = usar preferido del tipo
     usuario_id="santi",
     canal="telegram",
-    empresa="ori_sil_2", # ← NUEVO: multi-empresa
-    tema=None,           # ← NUEVO: None = enrutador detecta automáticamente
+    empresa="ori_sil_2", # ← multi-empresa
+    tema=None,           # ← None = enrutador detecta automáticamente
     conversacion_id=None,
     nombre_usuario=None,
     contexto_extra="",   # ← para ERP: contexto de pantalla activa
+    cliente=None,        # ← dict {nombre, identificacion, tipo_id, telefono, email}
+                         #    para agentes de atención al cliente (CRM)
 )
 # Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id, tema, empresa
 ```
@@ -312,13 +314,19 @@ resultado = consultar(
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
 
-## Completado 2026-03-14 — 5 mejoras IA analítica
-- ✅ **XML en system prompt** — `<rol>`, `<precision>`, `<tablas_disponibles>`, `<diccionario_campos>`, `<reglas_sql>`, `<ejemplos>` (25,835 chars)
+## Completado 2026-03-14 — Mejoras IA analítica + documentación completa
+- ✅ **XML en system prompt** — `<rol>`, `<precision>`, `<tablas_disponibles>`, `<diccionario_campos>`, `<reglas_sql>`, `<ejemplos>` (34,667 chars)
 - ✅ **Embeddings semánticos** — `scripts/ia_service/embeddings.py`: Google text-embedding-004 + cosine similarity. Fallback a keywords LIKE. Generación en background al guardar ejemplos.
 - ✅ **Retry resultado vacío** — 0 filas → `_obtener_fecha_maxima()` + reenvío al LLM con contexto, máx 2 reintentos
 - ✅ **Arquitectura dos capas** — `agente_sql` (Gemini Flash, gratis) para SQL; agente del usuario para análisis/respuesta
 - ✅ **Reglas positivas** — QUÉ HACER en vez de QUÉ NO HACER en todo el system prompt
 - ✅ **DeepSeek accesible** — nivel_minimo=1, primero en menú /agente, recomendado para uso diario
+- ✅ **Campo `cliente` en API** — `POST /ia/consultar` acepta `cliente: {nombre, identificacion, tipo_id, telefono, email}` → inyectado en Capa 0b del system prompt. Permite agentes de atención al cliente que saben con quién hablan.
+- ✅ **DDL fallback expandido** — `esquema.py`: TABLAS_RELEVANTES de 13 → 30 tablas (producción, compras, inventario, CxC, proveedores, etc.)
+- ✅ **Catálogo de tablas** — `.agent/CATALOGO_TABLAS.md`: 47 tablas con descripciones de negocio (cuándo usar cada una). Referencia para el equipo humano.
+- ✅ **Manual ia_service reescrito** — `.agent/manuales/ia_service_manual.md` v2.0: 20 secciones completas.
+- ✅ **Principio filosófico en MANIFESTO** — "enseñar a razonar, no memorizar": cuándo agregar reglas vs cuándo mejorar el contexto general.
+- ✅ **Todos los agentes activos** — groq-llama (llama-3.3-70b-versatile), deepseek-chat, deepseek-reasoner, claude-sonnet (4-6): todos con key + activo=1 en BD.
 
 ## Completado 2026-03-13
 - ✅ ia-service: arquitectura RAG multitema+empresa — ia_temas, ia_rag_documentos, ia_rag_fragmentos
