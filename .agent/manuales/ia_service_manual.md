@@ -1,6 +1,6 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.0 — 2026-03-14
+**Versión**: 2.1 — 2026-03-15
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
 **Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT 2 pasos.
 
@@ -12,24 +12,26 @@
 
 1. [Filosofía del sistema — por qué importa](#filosofia)
 2. [Arquitectura completa](#arquitectura)
-3. [Base de datos — 8 tablas](#bd)
+3. [Base de datos — tablas completas](#bd)
 4. [System prompt — 6 capas](#system-prompt)
 5. [Tipos de consulta](#tipos)
 6. [Agentes disponibles](#agentes)
 7. [Arquitectura de dos capas — mecánica vs analítica](#dos-capas)
-8. [Sistema RAG — documentos de negocio](#rag)
-9. [Embeddings — búsqueda semántica de ejemplos SQL](#embeddings)
-10. [Retry inteligente — resultado vacío](#retry)
-11. [Enrutador y requiere_sql](#enrutador)
-12. [Catálogo de tablas](#catalogo)
-13. [Conversaciones — contexto vivo](#conversaciones)
-14. [Bot de Telegram](#telegram)
-15. [Sistema de usuarios y niveles de acceso](#usuarios)
-16. [Cómo agregar / configurar un agente](#agregar-agente)
-17. [Monitoreo del consumo](#monitoreo)
-18. [Operación diaria — comandos útiles](#operacion)
-19. [Troubleshooting](#troubleshooting)
-20. [Referencia: modelos y costos](#referencia)
+8. [Temas — routing por área de negocio](#temas)
+9. [Sistema RAG — documentos de negocio](#rag)
+10. [Embeddings — búsqueda semántica de ejemplos SQL](#embeddings)
+11. [Retry inteligente — resultado vacío](#retry)
+12. [Enrutador y requiere_sql](#enrutador)
+13. [Catálogo de tablas](#catalogo)
+14. [Conversaciones — contexto vivo](#conversaciones)
+15. [Bot de Telegram](#telegram)
+16. [Sistema de usuarios, niveles y configuración](#usuarios)
+17. [Multi-empresa](#multiempresa)
+18. [Cómo agregar / configurar un agente](#agregar-agente)
+19. [Monitoreo del consumo](#monitoreo)
+20. [Operación diaria — comandos útiles](#operacion)
+21. [Troubleshooting](#troubleshooting)
+22. [Referencia: modelos y costos](#referencia)
 
 ---
 
@@ -113,20 +115,68 @@ POST /ia/consultar (Flask :5100)
   retorna: {ok, respuesta, tabla, sql, agente, tokens, costo, conversacion_id}
 ```
 
-**BD local**: `ia_service_os` — 8 tablas (ver sección 3)
+**BD local**: `ia_service_os` — 17 tablas + 1 vista (ver sección 3)
 **Puerto**: 5100 (systemd `ia-service.service`)
 **Código**: `scripts/ia_service/`
 
+**Módulos Python del servicio:**
+
+| Archivo | Propósito |
+|---|---|
+| `app.py` | Flask API — define endpoints, middleware auth JWT, CORS |
+| `servicio.py` | Orquestador principal — función `consultar()` con todos los pasos |
+| `contexto.py` | Manejo de conversaciones y resumen vivo por usuario+canal |
+| `ejecutor_sql.py` | Ejecución segura de SQL SELECT en Hostinger via SSH tunnel |
+| `esquema.py` | DDL de tablas analíticas desde Hostinger (caché 1h) |
+| `formateador.py` | Parseo de SQL de respuestas LLM + formato de filas a tabla |
+| `rag.py` | Fragmentación de documentos + búsqueda FULLTEXT por empresa+tema |
+| `embeddings.py` | Google text-embedding-004 + cosine similarity para ejemplos SQL |
+| `conector.py` | Multi-BD: ejecuta queries en ia_conexiones_bd configuradas |
+| `config.py` | Carga ia_config desde BD — parámetros globales |
+| `extractor.py` | Extrae texto de PDF/DOCX/PPTX para cargar documentos RAG |
+| `actualizar_system_prompt.py` | Regenera XML del system prompt de analisis_datos (ejecutar manualmente) |
+| `proveedores/google.py` | Llamadas a API Google: Gemini, Gemma, imagen |
+| `proveedores/openai_compat.py` | Llamadas a Groq y DeepSeek (API compatible OpenAI) |
+| `proveedores/anthropic_prov.py` | Llamadas a Anthropic Claude |
+
+**Bot de Telegram:** `scripts/telegram_bot/` — `bot.py`, `api_ia.py`, `db.py`, `tabla.py`, `teclado.py`
+
 ---
 
-## 3. Base de datos — 8 tablas {#bd}
+## 3. Base de datos — tablas completas {#bd}
 
 BD: `ia_service_os` en MariaDB local (servidor OS, acceso solo local).
 
 ```bash
 # Conectar
 mysql -u osadmin -pEpist2487. ia_service_os 2>/dev/null
+
+# Ver todas las tablas
+mysql -u osadmin -pEpist2487. ia_service_os -e "SHOW TABLES;" 2>/dev/null
 ```
+
+**Tablas actuales (17 tablas + 1 vista):**
+
+| Tabla | Propósito |
+|---|---|
+| `ia_agentes` | Modelos IA configurados con API key y capacidades |
+| `ia_tipos_consulta` | Flujos por tipo (SQL, RAG, imagen, etc.) + system prompts |
+| `ia_temas` | Áreas de negocio por empresa (7 temas para ori_sil_2) — routing por tema |
+| `ia_conversaciones` | Contexto vivo por usuario+canal (resumen + mensajes recientes) |
+| `ia_logs` | Auditoría completa: SQL, tokens, costo, latencia, error |
+| `ia_consumo_diario` | Agregado diario por agente |
+| `ia_ejemplos_sql` | Pares pregunta→SQL aprendidos (few-shot learning) |
+| `ia_rag_documentos` | Documentos de negocio para RAG |
+| `ia_rag_fragmentos` | Chunks ~500 palabras con FULLTEXT index |
+| `ia_usuarios` | Usuarios del servicio con nivel de acceso (1–7) |
+| `ia_empresas` | Empresas registradas (multi-tenant) — PK: uid |
+| `ia_usuarios_empresas` | Relación usuario↔empresa con rol (admin/viewer) |
+| `ia_config` | Parámetros globales del sistema (circuit breaker, rate limits, costo max) |
+| `ia_conexiones_bd` | Conexiones a BDs externas por empresa (para conector.py) |
+| `ia_esquemas` | DDL de tablas por tema+conexión (para inyectar en system prompt) |
+| `bot_sesiones` | Sesiones del bot de Telegram (agente preferido por usuario) |
+| `bot_tablas_temp` | Tablas de datos temporales para la mini app web del bot |
+| `v_consumo_hoy` | Vista — consumo del día actual aggregado (atajos de monitoreo) |
 
 ### ia_agentes
 
@@ -193,7 +243,7 @@ Auditoría completa — una fila por llamada a la IA.
 
 ```sql
 SELECT created_at, agente_slug, tipo_consulta, ok, tokens_in, tokens_out,
-       costo_usd, latencia_ms, error_msg
+       costo_usd, latencia_ms, error
 FROM ia_logs ORDER BY created_at DESC LIMIT 20;
 ```
 
@@ -263,6 +313,81 @@ FROM ia_ejemplos_sql ORDER BY creado_en DESC LIMIT 20;
 | `embedding` | LONGTEXT — vector 768 dims (JSON) para búsqueda semántica |
 | `calidad` | `buena`, `mala` — para filtrar ejemplos de baja calidad |
 
+### ia_temas
+
+Áreas de negocio por empresa. Define el `agente_preferido` para cada tema (sobreescribe el default del tipo).
+
+```sql
+SELECT slug, nombre, agente_preferido, activo FROM ia_temas ORDER BY id;
+```
+
+| Columna | Descripción |
+|---|---|
+| `slug` | Identificador: `comercial`, `finanzas`, `produccion`, `administracion`, `marketing`, `estrategia`, `general` |
+| `agente_preferido` | Slug del agente para respuestas en este tema |
+| `schema_tablas` | JSON — lista de tablas relevantes para el tema |
+| `system_prompt` | Prompt específico del tema (override al del tipo) |
+
+**Estado actual (2026-03-15):**
+
+| Tema | agente_preferido | Latencia esperada |
+|---|---|---|
+| finanzas | gemini-pro | ~20s |
+| comercial | gemini-pro | ~20s |
+| estrategia | gemini-pro | ~20s |
+| produccion | gemini-flash-lite | ~2.5s |
+| administracion | gemini-flash-lite | ~2.5s |
+| marketing | gemini-flash-lite | ~2.5s |
+| general | gemini-flash-lite | ~2.5s |
+
+### ia_usuarios
+
+Usuarios del servicio con nivel de acceso.
+
+```sql
+SELECT usuario_id, nombre, nivel, canal, empresa, activo FROM ia_usuarios;
+```
+
+### ia_config
+
+Parámetros globales del sistema. Se leen en cada arranque del servicio.
+
+```sql
+SELECT clave, valor, descripcion FROM ia_config ORDER BY clave;
+```
+
+**Configuración actual (2026-03-15):**
+
+| clave | valor | Descripción |
+|---|---|---|
+| `rate_usuario_rps` | 1 | Max solicitudes/segundo por usuario |
+| `rate_usuario_rpm` | 15 | Max solicitudes/minuto por usuario |
+| `rate_usuario_rp10s` | 3 | Max solicitudes en 10 segundos por usuario |
+| `limite_costo_dia_usd` | 5.00 | Gasto máximo diario USD (0 = sin límite) |
+| `circuit_breaker_errores` | 5 | Errores en ventana para suspender agente |
+| `circuit_breaker_ventana_min` | 10 | Ventana de tiempo del circuit breaker |
+| `acceso_dashboard` | 1 | Nivel mínimo para ver Dashboard |
+| `acceso_playground` | 1 | Nivel mínimo para usar Playground |
+| `acceso_logs` | 3 | Nivel mínimo para ver Logs |
+| `acceso_contextos` | 5 | Nivel mínimo para ver Contextos RAG |
+| `acceso_agentes` | 7 | Nivel mínimo para ver Agentes |
+| `acceso_tipos` | 7 | Nivel mínimo para ver Tipos de consulta |
+| `acceso_usuarios` | 7 | Nivel mínimo para ver Usuarios |
+| `acceso_config` | 7 | Nivel mínimo para ver Configuración |
+| `acceso_conexiones` | 7 | Nivel mínimo para ver Conexiones BD |
+
+### ia_empresas / ia_usuarios_empresas
+
+Multi-tenant. Ver sección [17. Multi-empresa](#multiempresa).
+
+### ia_conexiones_bd / ia_esquemas
+
+Conexiones a BDs externas por empresa (gestionado desde ia-admin → Conexiones BD, nivel 7 mínimo). `ia_esquemas` almacena DDL personalizado por tema+conexión.
+
+### bot_sesiones / bot_tablas_temp
+
+Para el bot de Telegram. `bot_sesiones` guarda el agente preferido por `telegram_user_id`. `bot_tablas_temp` almacena datasets temporales para la mini app web (tablas con muchas filas).
+
 ---
 
 ## 4. System prompt — 6 capas {#system-prompt}
@@ -314,12 +439,14 @@ Cada consulta se clasifica en un tipo por el enrutador. El tipo define:
 
 | slug | Descripción | Pasos | agente_sql | agente_preferido |
 |---|---|---|---|---|
-| `analisis_datos` | Preguntas sobre datos históricos de ventas, compras, inventario, etc. | enrutar → generar_sql → ejecutar → redactar | gemini-flash | Elección del usuario |
-| `conversacion` | Preguntas de estrategia, planes, metas — respuesta con RAG | enrutar → redactar (RAG) | — | gemini-flash |
+| `analisis_datos` | Preguntas sobre datos históricos de ventas, compras, inventario, etc. | enrutar → generar_sql → ejecutar → redactar | gemini-flash | gemini-pro (override por tema) |
+| `conversacion` | Preguntas de estrategia, planes, metas — respuesta con RAG o contexto | enrutar → redactar | — | gemini-flash-lite |
 | `enrutamiento` | Solo para el enrutador (no tiene steps de respuesta) | — | — | groq-llama |
-| `redaccion` | Redactar texto, email, documento | redactar | — | gemini-flash-lite |
+| `redaccion` | Redactar texto, email, documento | redactar | — | gemini-flash |
 | `clasificacion` | Clasificar o etiquetar información | clasificar | — | groq-llama |
 | `generacion_imagen` | Crear imagen con IA | generar_imagen | — | gemini-image |
+| `resumen` | Resumir un texto o conjunto de datos | resumir | — | gemini-flash |
+| `generacion_documento` | Generar documentos completos (informes, reportes) | generar_doc | — | claude-sonnet |
 
 ### Cómo actualizar el system prompt de un tipo
 
@@ -351,15 +478,15 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 | slug | modelo_id | tiene_key | RPD | nivel_min | Rol principal |
 |---|---|---|---|---|---|
-| `gemini-pro` | gemini-2.5-pro | ✅ | 1,000 | 1 | SQL complejo + análisis |
-| `gemini-flash` | gemini-2.5-flash | ✅ | 10,000 | 1 | Redacción, resumen |
-| `gemini-flash-lite` | gemini-3.1-flash-lite | ✅ | 150,000 | 1 | Alto volumen |
-| `gemma-router` | gemma-3-27b-it | ✅ | 14,400 | 1 | Enrutador fallback |
-| `gemini-image` | gemini-2.5-flash-image | ✅ | 70 | 1 | Imágenes |
-| `groq-llama` | llama-3.3-70b-versatile | ✅ | 14,400 | 1 | Enrutador principal |
-| `deepseek-chat` | deepseek-chat | ✅ | — | 1 | Análisis — recomendado uso diario |
-| `deepseek-reasoner` | deepseek-reasoner | ✅ | — | 7 | Razonamiento complejo (solo admin) |
-| `claude-sonnet` | claude-sonnet-4-6 | ✅ | — | 1 | Documentos premium |
+| `gemini-pro` | `gemini-2.5-pro` | ✅ | 1,000 | 1 | SQL complejo + análisis finanzas/comercial/estrategia |
+| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | Redacción, resumen, agente_sql fallback |
+| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | Alto volumen, conversación, temas generales |
+| `gemma-router` | `gemma-3-27b-it` | ✅ | 14,400 | 1 | Enrutador fallback (si groq falla) |
+| `gemini-image` | `gemini-2.5-flash-image` | ✅ | 70 | 1 | Generación de imágenes |
+| `groq-llama` | `llama-3.3-70b-versatile` | ✅ | 14,400 | 1 | **Enrutador principal** (NUNCA agente final) |
+| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Análisis — disponible para usuarios |
+| `deepseek-reasoner` | `deepseek-reasoner` | ✅ | — | 7 | Razonamiento complejo (solo admin) |
+| `claude-sonnet` | `claude-sonnet-4-6` | ✅ | — | 1 | Documentos premium, generacion_documento |
 
 ### Cómo obtener cada API key
 
@@ -429,10 +556,12 @@ Los agentes se dividen en dos roles con propósitos distintos:
 - Retry SQL: si SQL falla, corrige → Gemini Flash (gratis)
 - Retry vacío: si resultado = 0 filas, pide fecha máxima y reformula → Gemini Flash
 
-**CAPA ANALÍTICA** (el agente que el usuario elige):
-- Interpreta los datos y redacta la respuesta
-- Por defecto: DeepSeek Chat (mejor costo/calidad para uso diario)
-- El usuario puede cambiar a: Gemini Pro, Gemini Flash, Claude Sonnet
+**CAPA ANALÍTICA** (el agente que el usuario elige / que define el tema):
+- Interpreta los datos y redacta la respuesta final
+- El agente usado depende de la cadena de prioridad: `param_agente → conv.agente_activo → tema.agente_preferido → tipo.agente_preferido → gemini-flash-lite`
+- Para temas finanzas/comercial/estrategia → `gemini-pro` (por tema)
+- Para temas general/marketing/administracion/produccion → `gemini-flash-lite` (por tema)
+- Usuario puede forzar un agente específico desde el bot con `/agente`
 
 ### Configuración en BD
 
@@ -442,19 +571,30 @@ SELECT slug, agente_preferido, agente_sql
 FROM ia_tipos_consulta WHERE slug = 'analisis_datos';
 
 -- agente_sql = capa mecánica (genera SQL)
--- agente_preferido = capa analítica (redacta respuesta)
--- El campo 'agente_preferido' se sobreescribe con la elección del usuario
+-- agente_preferido = capa analítica (redacta respuesta) — PUEDE ser sobreescrito por ia_temas
+
+-- Ver agente por tema
+SELECT slug, agente_preferido FROM ia_temas ORDER BY id;
 ```
 
-### Comparativa de velocidad
+### Latencias reales medidas (2026-03-15)
 
 ```
-HOY (capa mecánica con Gemini Flash + analítica con DeepSeek):
-  enrutamiento → Groq Llama    ~0.1s  (gratis)
-  generar_sql  → Gemini Flash  ~0.3s  (gratis)
-  redactar     → DeepSeek      ~1.5s  ($0.07/M tokens)
-  Total: ~2s  (vs ~4.5s con todo en Gemini Pro)
+FLUJO SIN SQL:
+  enrutar       → Groq Llama       ~100–300ms  (gratis)
+  redactar      → gemini-flash-lite   ~2–3s    (gratis)
+  redactar      → gemini-pro          ~20–26s  (latencia base del modelo)
+  redactar      → deepseek-chat       ~18s
+
+FLUJO CON SQL:
+  enrutar       → Groq Llama       ~100–300ms
+  generar_sql   → gemini-flash      ~3–5s      (con 27K tokens DDL)
+  ejecutar BD   → Hostinger SSH     ~200ms
+  redactar      → gemini-pro        ~15s
+  Total con pro: ~20–23s  |  Total con flash-lite: ~8–12s (estimado)
 ```
+
+**⚠️ Nota crítica**: gemini-pro tiene ~20s de latencia independientemente del tamaño del prompt. 228 tokens y 27,625 tokens tardan lo mismo (~20s). Es la latencia base del modelo, no del volumen.
 
 ### Cambiar el agente SQL (capa mecánica)
 
@@ -467,7 +607,51 @@ WHERE slug = 'analisis_datos';
 
 ---
 
-## 8. Sistema RAG — documentos de negocio {#rag}
+## 8. Temas — routing por área de negocio {#temas}
+
+### Qué son los temas
+
+Los temas definen el **área de negocio** de la pregunta. El enrutador (Groq) detecta el tema automáticamente. El tema tiene dos efectos:
+
+1. **Selecciona el agente analítico** (`agente_preferido` del tema sobreescribe al del tipo)
+2. **Filtra el RAG** (solo se buscan fragmentos del mismo tema)
+
+### 7 temas actuales para ori_sil_2
+
+```sql
+SELECT slug, nombre, agente_preferido FROM ia_temas ORDER BY id;
+```
+
+| Tema | Agente preferido | Cuándo se activa |
+|---|---|---|
+| `comercial` | gemini-pro | Ventas, clientes, canales, facturas, remisiones |
+| `finanzas` | gemini-pro | Costos, utilidades, márgenes, flujo de caja, cartera |
+| `produccion` | gemini-flash-lite | Inventario, insumos, procesos productivos |
+| `administracion` | gemini-flash-lite | Gastos, RRHH, operaciones internas |
+| `marketing` | gemini-flash-lite | Campañas, análisis de mercado, tipoDeMarketing |
+| `estrategia` | gemini-pro | Metas, planes, KPIs estratégicos |
+| `general` | gemini-flash-lite | Preguntas generales, sin tema específico |
+
+### Cadena de prioridad del agente
+
+```
+1. agente especificado en la llamada (param)
+2. agente_activo de la conversación (usuario eligió con /agente)
+3. ia_temas.agente_preferido (si el tema tiene uno)
+4. ia_tipos_consulta.agente_preferido (fallback del tipo)
+5. 'gemini-flash-lite' (hardcoded fallback)
+```
+
+### Gestión de temas desde ia-admin
+
+Los temas se gestionan en `ia.oscomunidad.com` → Contextos → Temas (nivel mínimo 5). Desde ahí se puede:
+- Cargar documentos RAG por tema
+- Editar el system prompt específico del tema
+- Vincular una conexión BD y schema de tablas para el tema
+
+---
+
+## 9. Sistema RAG — documentos de negocio {#rag}
 
 ### Qué es el RAG aquí
 
@@ -527,7 +711,7 @@ Este tema se usa para filtrar el RAG por categoría de documento.
 
 ---
 
-## 9. Embeddings — búsqueda semántica de ejemplos SQL {#embeddings}
+## 10. Embeddings — búsqueda semántica de ejemplos SQL {#embeddings}
 
 ### El problema que resuelve
 
@@ -574,7 +758,7 @@ ALTER TABLE ia_ejemplos_sql ADD COLUMN embedding LONGTEXT NULL;
 
 ---
 
-## 10. Retry inteligente — resultado vacío {#retry}
+## 11. Retry inteligente — resultado vacío {#retry}
 
 ### El problema
 
@@ -603,7 +787,7 @@ SQL ejecuta → 0 filas
 
 ---
 
-## 11. Enrutador y requiere_sql {#enrutador}
+## 12. Enrutador y requiere_sql {#enrutador}
 
 ### Qué hace el enrutador
 
@@ -699,7 +883,7 @@ Si el enrutador confunde los dos → o se hace una consulta SQL innecesaria, o s
 
 ---
 
-## 12. Catálogo de tablas {#catalogo}
+## 13. Catálogo de tablas {#catalogo}
 
 El catálogo completo de tablas está en `.agent/CATALOGO_TABLAS.md`.
 
@@ -733,7 +917,7 @@ Dentro del system prompt de `analisis_datos`, la sección `<tablas_disponibles>`
 
 ---
 
-## 13. Conversaciones — contexto vivo {#conversaciones}
+## 14. Conversaciones — contexto vivo {#conversaciones}
 
 ### Cómo funciona el contexto
 
@@ -769,7 +953,7 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 ---
 
-## 14. Bot de Telegram {#telegram}
+## 15. Bot de Telegram {#telegram}
 
 ### Archivos
 
@@ -827,27 +1011,45 @@ Este endpoint carga la tabla completa en la app web.
 
 ---
 
-## 15. Sistema de usuarios y niveles de acceso {#usuarios}
+## 16. Sistema de usuarios, niveles y configuración {#usuarios}
 
-### Niveles (1–7)
+### Niveles de acceso (1–7)
 
-| Nivel | Descripción |
-|---|---|
-| 1–2 | Usuario básico (acceso solo a agentes económicos) |
-| 3–4 | Usuario estándar |
-| 5–6 | Usuario avanzado |
-| 7 | Admin — acceso a todos los agentes |
+El nivel controla qué agentes puede usar el usuario y qué secciones del ia-admin puede ver.
 
-### Tabla ia_usuarios (en BD local)
+| Nivel | Acceso ia-admin | Agentes disponibles |
+|---|---|---|
+| 1 | Dashboard, Playground | Todos excepto deepseek-reasoner |
+| 3 | + Logs | Todos excepto deepseek-reasoner |
+| 5 | + Contextos RAG | Todos excepto deepseek-reasoner |
+| 7 | Todo — Agentes, Tipos, Usuarios, Config, Conexiones | Todos incluyendo deepseek-reasoner |
+
+(Umbrales configurables en `ia_config.acceso_*`)
+
+### Tabla ia_usuarios
 
 ```sql
 SELECT usuario_id, nombre, nivel, canal, empresa, activo
 FROM ia_usuarios ORDER BY nivel DESC;
 ```
 
-### Rate limiting
+### Rate limiting (sliding window in-memory)
 
-El sistema tiene sliding window in-memory por usuario. Si un usuario hace demasiadas consultas seguidas, recibe error con `retry_after` (segundos a esperar).
+Configurado en `ia_config`. Si el usuario supera el límite recibe error con `retry_after`:
+
+```
+rate_usuario_rps   = 1   (max 1 request/segundo)
+rate_usuario_rpm   = 15  (max 15 requests/minuto)
+rate_usuario_rp10s = 3   (max 3 requests en 10 segundos)
+```
+
+### Circuit breaker por agente
+
+Si un agente acumula `circuit_breaker_errores` (5) errores en `circuit_breaker_ventana_min` (10 min), se suspende temporalmente y se usa el fallback del tipo.
+
+### Límite de costo diario
+
+`limite_costo_dia_usd = 5.00` — si el gasto total del día supera $5 USD en todos los agentes, las consultas se rechazan. Configurar a 0 para desactivar el límite.
 
 ### Asignar nivel a un usuario
 
@@ -857,9 +1059,62 @@ VALUES ('TELEGRAM_ID', 'Santi', 7, 'telegram', 'ori_sil_2', 1)
 ON DUPLICATE KEY UPDATE nivel=7;
 ```
 
+### Actualizar parámetros de configuración
+
+```sql
+UPDATE ia_config SET valor = '10.00' WHERE clave = 'limite_costo_dia_usd';
+```
+Los cambios se aplican en la siguiente llamada (no requiere reinicio).
+
 ---
 
-## 16. Cómo agregar / configurar un agente {#agregar-agente}
+## 17. Multi-empresa {#multiempresa}
+
+### Arquitectura multi-tenant
+
+El servicio soporta múltiples empresas desde el mismo servidor. Cada empresa tiene su propio conjunto de:
+- Agentes de conversación (contextos separados)
+- Temas y documentos RAG
+- Conexiones BD
+- Configuración de acceso (la `ia_config` es global, pero los permisos por usuario son por empresa)
+
+### Tablas involucradas
+
+```sql
+-- Empresas registradas
+SELECT uid, nombre, siglas, estado FROM ia_empresas;
+-- uid = 'ori_sil_2', nombre = 'Origen Silvestre', siglas = 'OS'
+
+-- Usuarios por empresa
+SELECT usuario_id, empresa_uid, rol FROM ia_usuarios_empresas;
+-- rol: 'admin' o 'viewer'
+```
+
+### Flujo de autenticación (ia-admin)
+
+1. Usuario abre `ia.oscomunidad.com` → redirige a Google OAuth
+2. Google devuelve email → el backend verifica en `ia_usuarios_empresas`
+3. Si tiene 1 empresa → JWT final directo con `empresa_activa`
+4. Si tiene varias → pantalla de selección → JWT final con `empresa_activa`
+
+**`empresa` NUNCA viene del cliente** — siempre inyectada desde JWT en middleware `requireAuth`. Imposible que un usuario acceda a datos de otra empresa.
+
+### Campo empresa en todas las tablas
+
+Todas las tablas de datos tienen campo `empresa` (excepto `ia_agentes` — configuración global compartida). Las queries siempre filtran por empresa.
+
+```python
+# En servicio.py — empresa viene del JWT o del param de la llamada
+resultado = consultar(pregunta="...", empresa="ori_sil_2", ...)
+```
+
+### Empresa activa OS
+
+`uid = 'ori_sil_2'` — Origen Silvestre. Santiago = admin (nivel 7). Jennifer = viewer.
+
+---
+
+## 18. Cómo agregar / configurar un agente {#agregar-agente}
 
 ### Paso 1 — Insertar key en BD
 
@@ -908,7 +1163,7 @@ La URL base del endpoint se configura en `proveedores/openai_compat.py` según e
 
 ---
 
-## 17. Monitoreo del consumo {#monitoreo}
+## 19. Monitoreo del consumo {#monitoreo}
 
 ### Endpoints del servicio
 
@@ -938,7 +1193,7 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 # Errores recientes
 mysql -u osadmin -pEpist2487. ia_service_os -e \
-  "SELECT created_at, agente_slug, tipo_consulta, error_msg
+  "SELECT created_at, agente_slug, tipo_consulta, error
    FROM ia_logs WHERE ok=0 ORDER BY created_at DESC LIMIT 10;" 2>/dev/null
 ```
 
@@ -950,7 +1205,7 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 ---
 
-## 18. Operación diaria — comandos útiles {#operacion}
+## 20. Operación diaria — comandos útiles {#operacion}
 
 ```bash
 # Estado del servicio
@@ -999,7 +1254,7 @@ migrar_embeddings_faltantes('ori_sil_2')
 
 ---
 
-## 19. Troubleshooting {#troubleshooting}
+## 21. Troubleshooting {#troubleshooting}
 
 ### Resultado vacío / "no hay datos" incorrecto
 
@@ -1050,44 +1305,51 @@ UPDATE ia_tipos_consulta SET agente_sql='gemini-flash-lite' WHERE slug='analisis
 
 ---
 
-## 20. Referencia: modelos y costos {#referencia}
+## 22. Referencia: modelos y costos {#referencia}
 
-### Google Gemini (Nivel de pago 1 — estado OS 2026-03-14)
+### Google Gemini (Nivel de pago 1 — estado OS 2026-03-15)
 
-| Modelo | modelo_id | RPD | Uso en OS |
+| Nombre | modelo_id en BD | RPD | Uso en OS |
 |---|---|---|---|
-| Gemini 2.5 Pro | `gemini-2.5-pro` | 1,000 | SQL complejo |
-| Gemini 2.5 Flash | `gemini-2.5-flash` | 10,000 | Redacción |
-| Gemini 2.0 Flash | `gemini-2.0-flash` | Ilimitado | Disponible |
-| Gemini 3.1 Flash Lite | `gemini-3.1-flash-lite` | 150,000 | Alto volumen |
-| Gemma 3 27B | `gemma-3-27b-it` | 14,400 | Enrutador fallback |
-| Imagen 4 Fast | `imagen-4.0-fast-generate-preview` | 70 | Imágenes |
-| text-embedding-004 | `text-embedding-004` | Ilimitado | Embeddings |
+| Gemini 2.5 Pro | `gemini-2.5-pro` | 1,000 | SQL complejo, análisis finanzas/comercial |
+| Gemini 2.5 Flash | `gemini-2.5-flash` | 10,000 | agente_sql (genera SQL), redacción |
+| Gemini 2.5 Flash Lite | `gemini-2.5-flash-lite` | 150,000 | Conversación general, alto volumen |
+| Gemma 3 27B | `gemma-3-27b-it` | 14,400 | Enrutador fallback (si groq falla) |
+| Gemini 2.5 Flash Image | `gemini-2.5-flash-image` | 70 | Generación de imágenes |
+| text-embedding-004 | `text-embedding-004` | Ilimitado | Embeddings semánticos (gratis) |
 
 **Reset cuotas**: 3:00 AM Colombia (medianoche Pacific Time)
+**Gemma gotcha**: no soporta `systemInstruction` — el sistema inyecta el prompt en el primer mensaje de usuario automáticamente (`proveedores/google.py`).
 
 ### Groq (gratis)
 
-| Modelo | modelo_id | RPD |
-|---|---|---|
-| Llama 3.1 8B | `llama-3.1-8b-instant` | 14,400 |
-| Llama 3.3 70B | `llama-3.3-70b-versatile` | 1,000 |
+| Modelo | modelo_id en BD | RPD | Uso en OS |
+|---|---|---|---|
+| Llama 3.3 70B | `llama-3.3-70b-versatile` | 1,000 | **Enrutador principal** (NUNCA agente final) |
 
 ### DeepSeek
 
-| Modelo | Input | Output |
-|---|---|---|
-| deepseek-chat | $0.07/M | $1.10/M |
-| deepseek-reasoner | $0.55/M | $2.19/M |
+| Modelo | modelo_id en BD | Input | Output |
+|---|---|---|---|
+| DeepSeek Chat V3 | `deepseek-chat` | $0.07/M | $1.10/M |
+| DeepSeek R1 Reasoner | `deepseek-reasoner` | $0.55/M | $2.19/M (solo nivel 7) |
 
 ### Anthropic Claude
 
-| Modelo | Input | Output |
+| Modelo | modelo_id en BD | Input | Output |
+|---|---|---|---|
+| Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | $0.80/M | $4.00/M |
+| Claude Sonnet 4.6 | `claude-sonnet-4-6` | $3.00/M | $15.00/M |
+| Claude Opus 4.6 | `claude-opus-4-6` | $15.00/M | $75.00/M |
+
+### Módulos de código por proveedor
+
+| Proveedor | Módulo | Nota |
 |---|---|---|
-| claude-haiku-4-5 | $0.80/M | $4.00/M |
-| claude-sonnet-4-6 | $3.00/M | $15.00/M |
-| claude-opus-4-6 | $15.00/M | $75.00/M |
+| Google | `proveedores/google.py` | Gemini + Gemma + imagen (autodetecta por modelo_id) |
+| Groq / DeepSeek | `proveedores/openai_compat.py` | API compatible OpenAI |
+| Anthropic | `proveedores/anthropic_prov.py` | Header `anthropic-version: 2023-06-01` requerido |
 
 ---
 
-*Última actualización: 2026-03-14*
+*Última actualización: 2026-03-15*

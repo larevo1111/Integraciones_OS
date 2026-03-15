@@ -145,6 +145,10 @@ Cuando la IA falla en una consulta:
 **Para tareas frontend además:**
 - `frontend/design-system/MANUAL_ESTILOS.md`
 
+**Para tareas del Servicio IA (`scripts/ia_service/` o `scripts/telegram_bot/`):**
+- Cargar skill `/ia-service` — contexto completo con BD, agentes, flujos, latencias, troubleshooting
+- Manual detallado: `.agent/manuales/ia_service_manual.md` (22 secciones)
+
 **Regla de conexiones a BD:**
 Las instrucciones de conexión están documentadas como skills. Si no existe la skill, Claude Code puede explorar — pero tiene la **obligación de documentar lo aprendido como skill nueva** antes de dar la tarea por terminada. El conocimiento no queda en el chat: se institucionaliza.
 

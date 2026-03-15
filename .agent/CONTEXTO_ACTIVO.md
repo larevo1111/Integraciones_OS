@@ -258,25 +258,16 @@ CAPA 5 — Últimos 5 mensajes verbatim        → ia_conversaciones.mensajes_re
 CAPA 6 — Pregunta actual del usuario        → input directo
 ```
 
-### 8 tablas en `ia_service_os`
-| Tabla | Para qué |
-|---|---|
-| `ia_agentes` | Catálogo de modelos con API key, endpoint, capacidades, costos |
-| `ia_tipos_consulta` | Tipos con reglas, pasos, system_prompt y agente preferido |
-| `ia_conversaciones` | Contexto vivo: resumen + agente activo + mensajes_recientes (JSON) |
-| `ia_logs` | Auditoría completa: SQL generado, tokens, costo, latencia, errores |
-| `ia_consumo_diario` | Agregado diario por agente |
-| `ia_usuarios` | Usuarios del admin (Santiago admin, Jennifer viewer) |
-| `ia_temas` | Temas/espacios de conocimiento por empresa+slug (7 temas para ori_sil_2) |
-| `ia_rag_documentos` | Documentos subidos por tema (campo tema_id, empresa) |
-| `ia_rag_fragmentos` | Chunks ~500 palabras con FULLTEXT index (campo tema_id, empresa) |
+### 17 tablas + 1 vista en `ia_service_os`
+Ver manual completo: `.agent/manuales/ia_service_manual.md`
+Tablas clave: `ia_agentes`, `ia_tipos_consulta`, `ia_temas`, `ia_conversaciones`, `ia_logs`, `ia_consumo_diario`, `ia_ejemplos_sql`, `ia_rag_documentos`, `ia_rag_fragmentos`, `ia_usuarios`, `ia_empresas`, `ia_usuarios_empresas`, `ia_config`, `ia_conexiones_bd`, `ia_esquemas`, `bot_sesiones`, `bot_tablas_temp`, `v_consumo_hoy`
 
 ### Agentes configurados
 | slug | modelo | Estado |
 |---|---|---|
 | `gemini-pro` | gemini-2.5-pro | ✅ Activo — SQL complejo |
 | `gemini-flash` | gemini-2.5-flash | ✅ Activo — redacción |
-| `gemini-flash-lite` | gemini-3.1-flash-lite | ✅ Activo — alto volumen |
+| `gemini-flash-lite` | gemini-2.5-flash-lite | ✅ Activo — alto volumen |
 | `gemma-router` | gemma-3-27b-it | ✅ Activo — enrutador fallback |
 | `groq-llama` | llama-3.3-70b-versatile | ✅ Activo — enrutador principal (key configurada 2026-03-13) |
 | `deepseek-chat` | deepseek-chat | ✅ Activo — recomendado para bot (nivel_minimo=1) |

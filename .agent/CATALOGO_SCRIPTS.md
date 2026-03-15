@@ -600,6 +600,46 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Dependencias**: Google text-embedding-004 (API key de Gemini), `ia_ejemplos_sql` table
 - **Notas**: Si la API de embeddings falla, cae back a búsqueda LIKE (keywords). El modelo text-embedding-004 es gratis e ilimitado en el plan de pago de Google.
 
+### rag.py
+- **Propósito**: Sistema RAG — fragmentación de documentos y búsqueda FULLTEXT por empresa+tema
+- **Tipo**: módulo Python (importado por `servicio.py`)
+- **Funciones principales**:
+  - `obtener_contexto_rag(pregunta, empresa, tema_id)` — busca fragmentos relevantes (top 3)
+  - `obtener_tema_por_slug(slug, empresa)` — carga un tema de ia_temas
+  - `fragmentar_documento(texto, chunk_size=500)` — divide texto en chunks con solapamiento
+- **Notas**: Usa FULLTEXT MATCH...AGAINST en BOOLEAN MODE. No aplica para `generacion_imagen` (se salta en servicio.py).
+
+### conector.py
+- **Propósito**: Multi-BD — ejecuta queries en conexiones configuradas en `ia_conexiones_bd`
+- **Tipo**: módulo Python (importado por servicio)
+- **Notas**: Permite al servicio IA consultar BDs distintas a Hostinger (futuro). Actualmente solo Hostinger está configurada.
+
+### config.py
+- **Propósito**: Carga parámetros de `ia_config` desde BD al arrancar el servicio
+- **Tipo**: módulo Python (importado por app.py y servicio.py)
+- **Notas**: Los valores se refrescan por llamada (no requieren reinicio del servicio).
+
+### extractor.py
+- **Propósito**: Extrae texto de archivos PDF, DOCX y PPTX para cargarlos como documentos RAG
+- **Tipo**: utilidad (importado por el endpoint de carga de documentos en app.py)
+- **Notas**: Usado desde ia-admin cuando se sube un documento al sistema RAG.
+
+### Bot de Telegram (`scripts/telegram_bot/`)
+
+| Archivo | Propósito |
+|---|---|
+| `bot.py` | Handler principal — comandos /start /ayuda /agente /ventas /mes /limpiar |
+| `api_ia.py` | Cliente HTTP del ia_service (POST /ia/consultar) |
+| `db.py` | Sesiones Telegram en `bot_sesiones` (MariaDB local) |
+| `tabla.py` | Formatea datasets grandes → enlace a mini app web |
+| `teclado.py` | Construcción de teclados reply e inline |
+
+```bash
+# Arrancar el bot
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/telegram_bot
+python3 bot.py
+```
+
 ---
 
 ## 4. Skills / Comandos Claude (`.claude/commands/`)
@@ -634,6 +674,7 @@ Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en l
 
 | Skill | Cuándo usarlo |
 |---|---|
+| `/ia-service` | Contexto completo del servicio IA: BD, endpoints, agentes, flujos, tiempos, troubleshooting. Cargar SIEMPRE antes de modificar `scripts/ia_service/`. |
 | `.agent/skills/manejo_ia.md` | Regla de los 3 Pasos (anti-alucinación) para cualquier bot IA que consulte la BD. Arquitectura obligatoria para el bot Telegram. |
 
 > **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla. Archivo en `.claude/commands/nombre.md`.

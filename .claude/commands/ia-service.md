@@ -32,14 +32,27 @@ Carga el contexto completo del Servicio Central de IA de Origen Silvestre.
 | GET | `/ia/consumo` | Consumo hoy/semana/mes con % límite |
 | GET | `/ia/consumo/historico` | Histórico día a día |
 
-## BD — 5 tablas
+## BD — 17 tablas + 1 vista
 
 ```sql
-ia_agentes          -- modelos configurados con API key
-ia_tipos_consulta   -- reglas por tipo (SQL, redaccion, imagen, etc.)
-ia_conversaciones   -- resumen vivo por usuario+canal (≤1000 palabras)
-ia_logs             -- auditoría completa por llamada
-ia_consumo_diario   -- agregado diario: llamadas, tokens, costo, % límite
+ia_agentes           -- modelos IA configurados con API key
+ia_tipos_consulta    -- flujos por tipo (SQL, RAG, imagen, etc.)
+ia_temas             -- áreas de negocio con agente_preferido por tema
+ia_conversaciones    -- contexto vivo por usuario+canal (resumen + mensajes)
+ia_logs              -- auditoría completa por llamada
+ia_consumo_diario    -- agregado diario: llamadas, tokens, costo
+ia_ejemplos_sql      -- pares pregunta→SQL (few-shot learning + embeddings)
+ia_rag_documentos    -- documentos de negocio para RAG
+ia_rag_fragmentos    -- chunks ~500 palabras con FULLTEXT index
+ia_usuarios          -- usuarios del servicio con nivel 1–7
+ia_empresas          -- empresas registradas (multi-tenant)
+ia_usuarios_empresas -- relación usuario↔empresa con rol
+ia_config            -- parámetros globales (rate limits, circuit breaker, costo max)
+ia_conexiones_bd     -- conexiones a BDs externas por empresa
+ia_esquemas          -- DDL personalizado por tema+conexión
+bot_sesiones         -- agente preferido por telegram_user_id
+bot_tablas_temp      -- datasets temporales para mini app web del bot
+v_consumo_hoy        -- vista: consumo del día actual
 ```
 
 ## Comandos de operación
@@ -48,8 +61,8 @@ ia_consumo_diario   -- agregado diario: llamadas, tokens, costo, % límite
 # Estado del servicio
 sudo systemctl status ia-service.service
 
-# Reiniciar
-sudo systemctl restart ia-service.service
+# Reiniciar (usar kill+start — restart a veces se cuelga)
+sudo kill $(sudo systemctl show -p MainPID ia-service.service | cut -d= -f2) && sudo systemctl start ia-service.service
 
 # Logs en tiempo real
 journalctl -u ia-service.service -f
