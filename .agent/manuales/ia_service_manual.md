@@ -78,26 +78,32 @@ POST /ia/consultar (Flask :5100)
         ↓
   CAPA 0: fecha + contexto dinámico
         ↓
-  _enrutar() → Groq Llama (~100ms, gratis)
+  _enrutar() → Groq Llama (~100–300ms, gratis)
     devuelve: tipo, tema, requiere_sql
         ↓
-  ┌─────────────────────────────────────────────────┐
-  │ tipo = analisis_datos && requiere_sql = True     │
-  │                                                  │
-  │  agente_sql (Gemini Flash, gratis, ~300ms)       │
-  │    → genera SQL con schema DDL + ejemplos        │
-  │    → (retry si SQL tiene error)                  │
-  │    → (retry si resultado vacío → fecha máxima)   │
-  │                                                  │
-  │  ejecutor_sql.py → SELECT en Hostinger           │
-  │                                                  │
-  │  agente analítico (elección usuario)             │
-  │    → redacta respuesta con los datos             │
-  └─────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────────────┐
+  │ FLUJO SQL — tipo=analisis_datos && requiere_sql=True     │
+  │                                                          │
+  │  agente_sql (Gemini Flash, gratis)                       │
+  │    → genera SQL con schema DDL (~27K tokens) + ejemplos  │
+  │    → verificación 1: ejecuta SQL en Hostinger            │
+  │    → si falla: agente corrige → verificación 2           │
+  │    → si vacío: agente corrige → verificación 2 y 3       │
+  │                                                          │
+  │  agente analítico (elección usuario)                     │
+  │    → redacta respuesta con los datos                     │
+  │                                                          │
+  │  TOTAL: ~20–23s con gemini-pro | ~8–12s con flash-lite   │
+  └─────────────────────────────────────────────────────────┘
         ↓
-  tipo = conversacion (requiere_sql = False)
-    → RAG search en ia_rag_fragmentos
-    → agente analítico redacta con contexto RAG
+  ┌────────────────────────────────────────────────────────┐
+  │ FLUJO SIN SQL — requiere_sql=False o tipo=conversacion  │
+  │                                                         │
+  │  agente analítico (elección usuario)                    │
+  │    → redacta con RAG + contexto conversacional          │
+  │                                                         │
+  │  TOTAL: ~2.5s con gemini-flash-lite | ~20s con pro      │
+  └────────────────────────────────────────────────────────┘
         ↓
   contexto.py → guarda resumen vivo (ia_conversaciones)
         ↓
@@ -601,7 +607,7 @@ SQL ejecuta → 0 filas
 
 ### Qué hace el enrutador
 
-El enrutador es la PRIMERA llamada en cada consulta. Usa Groq Llama (ultra rápido, gratis) para clasificar la pregunta en ~100ms, antes de hacer ninguna otra llamada.
+El enrutador es la PRIMERA llamada en cada consulta. Usa Groq Llama (gratis) para clasificar la pregunta en ~100–300ms, antes de hacer ninguna otra llamada.
 
 El enrutador devuelve un JSON:
 ```json
@@ -616,8 +622,8 @@ El enrutador devuelve un JSON:
 
 Este campo es la optimización más importante del enrutador:
 
-- `requiere_sql: true` → la pregunta necesita consultar la BD → flujo completo (3 llamadas LLM)
-- `requiere_sql: false` → la pregunta se puede responder desde el contexto de la conversación o desde RAG → solo 1 llamada LLM
+- `requiere_sql: true` → flujo SQL completo (hasta 4 llamadas LLM)
+- `requiere_sql: false` → directo al agente analítico (1 llamada LLM)
 
 **Ejemplos de requiere_sql: false:**
 - "¿Cuál es la meta de ventas anual?" (estrategia — responde con RAG)
@@ -628,6 +634,41 @@ Este campo es la optimización más importante del enrutador:
 - "¿Cuánto vendimos ayer?" (necesita datos reales de la BD)
 - "Top 5 productos del mes" (necesita consultar facturas)
 
+### Flujo completo con tiempos medidos
+
+**CON SQL** (`requiere_sql: true`) — medición real 2026-03-15:
+
+```
+enrutar     Groq Llama        ~100–300ms   clasifica tipo/tema/requiere_sql
+generar_sql Gemini Flash       ~3–5s       genera SQL con 27K tokens (DDL completo)
+ejecutar    BD Hostinger       ~200ms      [verificación 1] corre SELECT
+             ↳ si error SQL   +3–5s       agente corrige → [verificación 2]
+             ↳ si vacío       +3–5s c/u   agente reformula → [verificación 2 y 3]
+redactar    agente analítico   ~15–20s     interpreta datos y redacta
+
+TOTAL (sin reintentos, gemini-pro):  ~20–23s
+TOTAL (sin reintentos, flash-lite):  ~8–12s  (estimado)
+```
+
+**SIN SQL** (`requiere_sql: false`) — medición real 2026-03-15:
+
+```
+enrutar     Groq Llama        ~100–300ms   clasifica tipo/tema
+redactar    agente analítico   varía       responde con RAG + contexto
+
+TOTAL con gemini-flash-lite:  ~2.2–3.1s   (medido: log 232=2.5s, 228=2.2s, 227=3.1s)
+TOTAL con gemini-pro:         ~20–26s     (medido: log 234=21s, 231=26s — mismo tiempo que con SQL)
+TOTAL con deepseek-chat:      ~18s        (medido: log 229=18s)
+```
+
+### Observación crítica de latencia: gemini-pro
+
+**gemini-pro tiene ~20s de latencia base independientemente del tamaño del prompt.**
+
+Medición: 228 tokens entrada → 21s | 27,625 tokens entrada → 20s. El tamaño no es el factor dominante — es la latencia inherente del modelo (tiempo de "pensamiento" + red).
+
+Implicación práctica: para preguntas conversacionales (no-SQL) en temas analíticos como `finanzas`, `comercial` o `estrategia` donde el tema tiene `agente_preferido = gemini-pro`, la latencia es ~20s aunque la pregunta sea simple ("explícame un margen bruto"). El sistema usa gemini-pro porque el tema lo indica, pero no agrega valor analítico sobre flash-lite para preguntas conceptuales.
+
 ### Configuración del enrutador en BD
 
 ```sql
@@ -636,8 +677,17 @@ SELECT system_prompt FROM ia_tipos_consulta WHERE slug = 'enrutamiento';
 
 -- Ver agente del enrutador
 SELECT agente_preferido FROM ia_tipos_consulta WHERE slug = 'enrutamiento';
--- Debe apuntar a groq-llama (cuando tenga key) o gemma-router (fallback)
+-- groq-llama (enrutador — NUNCA responde como agente final)
 ```
+
+### Regla arquitectural: groq-llama es SOLO enrutador
+
+`groq-llama` clasifica la pregunta. **Nunca** aparece como agente final (`redactar`). El agente final siempre es el agente analítico seleccionado por el usuario (o el preferido del tema/tipo).
+
+Estado en BD (2026-03-15):
+- `ia_temas.agente_preferido` para `finanzas`, `comercial`, `estrategia` → `gemini-pro`
+- `ia_temas.agente_preferido` para `general`, `marketing`, `administracion`, `produccion` → `gemini-flash-lite`
+- `ia_tipos_consulta.agente_preferido` para `conversacion` → `gemini-flash-lite`
 
 ### Distinción crítica: analisis_datos vs conversacion
 

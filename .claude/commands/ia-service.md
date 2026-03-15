@@ -128,9 +128,27 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
   "UPDATE ia_conversaciones SET resumen=NULL, updated_at=NOW() WHERE usuario_id='santi' AND canal='telegram';" 2>/dev/null
 ```
 
+## Latencias reales (medido 2026-03-15)
+
+| Flujo | Agente | Tiempo | Tokens entrada |
+|---|---|---|---|
+| SIN SQL (conversacion) | gemini-flash-lite | **~2.2–3.1s** | ~230 |
+| SIN SQL (conversacion) | gemini-pro | ~20–26s | ~230–550 |
+| SIN SQL (conversacion) | deepseek-chat | ~18s | ~450 |
+| CON SQL (analisis_datos) | gemini-pro | **~20–23s** | ~27,600 (DDL) |
+
+**Reglas del flujo** (arquitectura vigente 2026-03-15):
+- **SIN SQL**: `enrutar (groq ~300ms)` → `redactar (agente analítico)` — 1 llamada LLM
+- **CON SQL**: `enrutar` → `generar_sql (gemini-flash)` → `ejecutar BD` → `redactar (agente analítico)` — hasta 4 llamadas
+  - Hasta 3 verificaciones SQL: 1 inicial + retry por error + retry por vacío
+  - Agente final siempre es el analítico seleccionado (NUNCA groq-llama)
+- **groq-llama**: enrutador exclusivo — NO responde como agente final
+- **gemini-pro latencia base**: ~20s independientemente del tamaño del prompt (característica del modelo)
+
 ## Gotchas críticos
 
 - **API keys**: SOLO en BD + scripts/.env. NUNCA en código o documentos del repo.
 - **Gemini 2.5 Pro**: 1,000 RPD — reservar para análisis reales, no para enrutador
 - **Reset cuota Gemini**: 3:00 AM Colombia (medianoche Pacific Time)
 - **Nivel de pago 1 activo**: billing vinculado en Google Cloud — los límites son 500x superiores al free tier
+- **gemini-pro tarda ~20s siempre** — con 228 o con 27,625 tokens, misma latencia. Para respuestas conversacionales simples es overkill.
