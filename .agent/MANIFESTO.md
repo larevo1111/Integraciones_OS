@@ -383,6 +383,32 @@ El servicio consulta esto para elegir el agente correcto por capacidad, sin hard
 
 ---
 
+### 9.4 ESTRUCTURA DEL REPO — REGLA DE MÓDULOS
+
+Cada módulo o herramienta independiente **debe tener su propio directorio en la raíz del repo**.
+
+**Estructura actual (referencia):**
+```
+Integraciones_OS/
+├── scripts/          ← pipeline Effi (exports, imports, sync, orquestador, ia_service, telegram_bot)
+├── frontend/         ← ERP web (menu.oscomunidad.com) — Quasar + Node API
+├── ia-admin/         ← Panel admin del servicio IA (ia.oscomunidad.com) — Quasar + Node API
+├── espocrm-custom/   ← Customizaciones EspoCRM (PHP + JS)
+├── docs/             ← Documentos de negocio (PDFs, DOCX, PPTX, XLSXs)
+├── logs/             ← Logs de todos los servicios
+├── systemd/          ← Unit files de systemd
+└── .agent/           ← Contexto y documentación interna para Claude
+```
+
+**Regla para módulos nuevos:**
+- Cualquier módulo nuevo (gestión de tareas, CRM propio, reportes, etc.) → **directorio propio en raíz**, NO dentro de `scripts/`
+- `scripts/` es exclusivo del pipeline Effi y sus servicios asociados (ia_service, telegram_bot)
+- Cada módulo debe tener su propio `README.md` o entrada en `.agent/`
+
+**Nota:** `ia_service/` y `telegram_bot/` viven dentro de `scripts/` por razones históricas. En el futuro, si crecen mucho, se pueden migrar a raíz — no es urgente.
+
+---
+
 ## 10. ESTRUCTURA DE MEMORIA
 
 - `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
