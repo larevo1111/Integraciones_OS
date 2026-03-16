@@ -1,6 +1,6 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.3 — 2026-03-15
+**Versión**: 2.5 — 2026-03-16
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
 **Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT 2 pasos.
 
@@ -476,17 +476,19 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
    FROM ia_agentes ORDER BY orden;" 2>/dev/null
 ```
 
-| slug | modelo_id | tiene_key | RPD | nivel_min | Rol principal |
-|---|---|---|---|---|---|
-| `gemini-pro` | `gemini-2.5-pro` | ✅ | 1,000 | 1 | SQL complejo + análisis finanzas/comercial/estrategia |
-| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | Redacción, resumen, agente_sql fallback |
-| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | Alto volumen, conversación, temas generales |
-| `gemma-router` | `gemma-3-27b-it` | ✅ | 14,400 | 1 | Enrutador fallback (si groq falla) |
-| `gemini-image` | `gemini-2.5-flash-image` | ✅ | 70 | 1 | Generación de imágenes |
-| `groq-llama` | `llama-3.3-70b-versatile` | ✅ | 14,400 | 1 | **Enrutador principal** (NUNCA agente final) |
-| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Análisis — disponible para usuarios |
-| `deepseek-reasoner` | `deepseek-reasoner` | ✅ | — | 7 | Razonamiento complejo (solo admin) |
-| `claude-sonnet` | `claude-sonnet-4-6` | ✅ | — | 1 | Documentos premium, generacion_documento |
+| slug | modelo_id | tiene_key | RPD | nivel_min | Rol principal | Capacidades |
+|---|---|---|---|---|---|---|
+| `gemini-pro` | `gemini-2.5-pro` | ✅ | 1,000 | 1 | SQL complejo + análisis | vision, sql, codigo, razonamiento, documentos |
+| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | **Default** — analítico + visión | vision, sql, codigo, documentos |
+| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | Alto volumen, conversación | vision, enrutamiento |
+| `gemma-router` | `gemma-3-27b-it` | ✅ | 14,400 | 1 | Enrutador fallback | enrutamiento |
+| `gemini-image` | `gemini-2.5-flash-image` | ✅ | 70 | 1 | Generación de imágenes | imagen_generacion |
+| `groq-llama` | `llama-3.3-70b-versatile` | ✅ | 14,400 | 1 | **Enrutador principal** (NUNCA agente final) | enrutamiento |
+| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Análisis económico | sql, codigo, razonamiento |
+| `deepseek-reasoner` | `deepseek-reasoner` | ✅ | — | 7 | Razonamiento complejo (solo admin) | sql, codigo, razonamiento |
+| `claude-sonnet` | `claude-sonnet-4-6` | ✅ | — | 1 | Documentos premium | vision, sql, codigo, razonamiento, documentos |
+
+Las capacidades están en `ia_agentes.capacidades` (JSON). El servicio las consulta dinámicamente para elegir el agente correcto según la tarea — no hay hardcoding de slugs para capacidades específicas.
 
 ### Cómo obtener cada API key
 
@@ -1111,16 +1113,44 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 ## 15. Bot de Telegram {#telegram}
 
-### Archivos
+### Dos bots — propósitos distintos
+
+| Bot | Username | Uso | Token en .env |
+|---|---|---|---|
+| **OS IA Bot** | `@os_integraciones_bot` | Asistente conversacional IA — preguntas, análisis, fotos | `TELEGRAM_BOT_TOKEN` |
+| **OS Notificaciones** | `@os_notificaciones_sys_bot` | Alertas automáticas del pipeline (errores, resúmenes) | `TELEGRAM_NOTIF_BOT_TOKEN` |
+
+El orquestador (`orquestador.py`) usa `TELEGRAM_NOTIF_BOT_TOKEN` para notificaciones. El bot de IA usa `TELEGRAM_BOT_TOKEN`.
+
+### Archivos del bot de IA
 
 ```
 scripts/telegram_bot/
-  bot.py      — handlers principales, arranca con python3 bot.py
+  bot.py      — handlers principales (texto + fotos)
   api_ia.py   — cliente del ia_service (POST /ia/consultar)
-  db.py       — sesiones en MariaDB local (tabla ia_bot_sesiones o similar)
+  db.py       — sesiones en MariaDB local
   tabla.py    — procesar tablas de datos para el bot
   teclado.py  — construcción de teclados reply e inline
 ```
+
+### Capacidad de visión — fotos y documentos
+
+El bot acepta fotos directamente. Flujo completo:
+
+```
+Usuario manda foto (con o sin caption)
+        ↓
+[Visión — Gemini Flash] extrae texto estructurado de la imagen
+        ↓
+[Enrutador — Groq] decide si requiere SQL u otra acción
+        ↓
+[Flujo normal] genera SQL si aplica → ejecuta → redacta respuesta
+```
+
+- **Solo foto (sin caption)**: describe lo que vio y pregunta qué quiere hacer
+- **Foto + caption**: extrae info y ejecuta la instrucción directamente
+- **Imagen en blanco**: avisa sin intentar SQL
+- Funciona con: capturas de Effi, remisiones en papel, conteos escritos, facturas, etiquetas
 
 ### Comandos del bot
 
@@ -1134,29 +1164,14 @@ scripts/telegram_bot/
 | `/mes` | Shortcut: "¿Cuánto llevamos vendido este mes vs el mes anterior?" |
 | `/limpiar` | Limpia historial de conversación |
 
-### Agentes disponibles en el menú /agente
-
-| Display | slug interno |
-|---|---|
-| 🧠 Gemini Pro ★ recomendado | `gemini-pro` |
-| ⚡ Gemini Flash (rápido) | `gemini-flash` |
-| 💡 DeepSeek Chat (económico, puede ser lento) | `deepseek-chat` |
-| 🤖 Claude Sonnet (premium) | `claude-sonnet` |
-
-**Nota sobre DeepSeek**: DeepSeek genera a ~18–22 tokens/segundo. Con la arquitectura de Groq para el resumen, la latencia bajó de 80+ segundos a ~20–30 segundos para consultas con SQL. Sigue siendo más lento que Gemini — se ofrece como opción económica.
-
 ### Variables de entorno necesarias
 
 En `scripts/.env`:
 ```
-TELEGRAM_BOT_TOKEN=...
-```
-
-### Cómo arranca el bot
-
-```bash
-cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/telegram_bot
-python3 bot.py
+TELEGRAM_BOT_TOKEN=...          # Bot de IA conversacional
+TELEGRAM_CHAT_ID=...            # Chat ID de Santi
+TELEGRAM_NOTIF_BOT_TOKEN=...    # Bot de notificaciones del pipeline
+TELEGRAM_NOTIF_CHAT_ID=...      # Chat ID destino de alertas
 ```
 
 ### Tabla con datos grandes → mini app web
@@ -1165,7 +1180,6 @@ Si la respuesta tiene una tabla con muchas filas, el bot muestra un botón inlin
 ```
 https://menu.oscomunidad.com/bot/tabla?token=TOKEN_TEMPORAL
 ```
-Este endpoint carga la tabla completa en la app web.
 
 ---
 

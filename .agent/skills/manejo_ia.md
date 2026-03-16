@@ -4,7 +4,7 @@ description: Arquitectura del Servicio Central de IA — ia_service_os (multi-pr
 
 # Skill: Servicio Central de IA — ia_service_os
 
-> **ACTUALIZADO 2026-03-15 (v2)**: Cambios críticos en enrutador, generación de resumen y catálogo de tablas.
+> **ACTUALIZADO 2026-03-16 (v3)**: Visión multimodal, capacidades por agente, bot de notificaciones separado.
 
 ## ¿Qué es ia_service_os?
 
@@ -27,15 +27,68 @@ resultado = consultar(
     usuario_id   = "santi",
     canal        = "telegram",     # telegram | erp | api | script
     conversacion_id = None,        # None = busca por usuario+canal
+    imagen_b64   = None,           # base64 de imagen opcional (activa flujo de visión)
+    imagen_mime  = "image/jpeg",   # mime de la imagen
 )
 # resultado = {ok, conversacion_id, respuesta, formato, tabla, sql, imagen_b64, agente, tokens, costo_usd}
 ```
 
-O vía HTTP desde cualquier proyecto:
+O vía HTTP:
 ```bash
+# Solo texto
 POST http://localhost:5100/ia/consultar
 {"pregunta": "¿Cuánto vendimos?", "usuario_id": "santi", "canal": "telegram"}
+
+# Con imagen (base64)
+POST http://localhost:5100/ia/consultar
+{"pregunta": "confirmame esta remisión", "usuario_id": "santi", "canal": "telegram",
+ "imagen_base64": "..base64..", "imagen_mime": "image/jpeg"}
+
+# Solo imagen sin texto — el agente describe y pregunta qué hacer
+POST http://localhost:5100/ia/consultar
+{"pregunta": "", "usuario_id": "santi", "canal": "telegram", "imagen_base64": "..base64.."}
 ```
+
+## Flujo con imagen (visión multimodal)
+
+```
+Foto + texto opcional
+      ↓
+[Visión — agente con capacidad 'vision'] → extrae texto estructurado
+      ↓                                    (usa google.agente_con_capacidad('vision'))
+¿Imagen en blanco?
+  SÍ → responde directo sin SQL
+  NO → inyecta texto extraído como contexto en la pregunta
+      ↓
+[Enrutador — Groq] → ¿requiere SQL?
+      ↓
+[Flujo normal] → SQL → ejecutar → redactar
+```
+
+**Telegram**: el bot acepta fotos directamente (caption opcional). `handle_foto()` en `bot.py` descarga la foto, convierte a base64, llama a `consultar()` con `imagen_b64`.
+
+## Capacidades por agente (ia_agentes.capacidades JSON)
+
+| slug | vision | sql | razonamiento | imagen_gen | enrutamiento |
+|---|---|---|---|---|---|
+| gemini-flash | ✅ | ✅ | — | — | — |
+| gemini-pro | ✅ | ✅ | ✅ | — | — |
+| claude-sonnet | ✅ | ✅ | ✅ | — | — |
+| gemini-flash-lite | ✅ | — | — | — | ✅ |
+| deepseek-chat | — | ✅ | ✅ | — | — |
+| groq-llama | — | — | — | — | ✅ |
+| gemini-image | — | — | — | ✅ | — |
+
+El servicio usa `google.agente_con_capacidad('vision')` para elegir dinámicamente — sin hardcoding. Agregar capacidad a un agente = solo update en BD.
+
+## Bots de Telegram — dos bots separados
+
+| Bot | Token .env | Uso |
+|---|---|---|
+| `@os_integraciones_bot` | `TELEGRAM_BOT_TOKEN` | Asistente IA conversacional |
+| `@os_notificaciones_sys_bot` | `TELEGRAM_NOTIF_BOT_TOKEN` | Alertas del pipeline (solo notificaciones) |
+
+El orquestador usa `TELEGRAM_NOTIF_BOT_TOKEN` (fallback a `TELEGRAM_BOT_TOKEN` si no existe).
 
 ## Regla de los 3 Pasos (Anti-Alucinaciones) — sigue vigente
 

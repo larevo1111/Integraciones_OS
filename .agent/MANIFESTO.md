@@ -287,7 +287,7 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 ### Orquestador Python (effi-pipeline)
 - **Script**: `scripts/orquestador.py` — corre export + import cada 2h (Lun–Sab, 06:00–20:00).
 - **Credenciales**: `scripts/.env` — **NUNCA subir a Git.**
-- **Notificaciones**: email siempre + Telegram solo en error.
+- **Notificaciones**: email siempre + Telegram solo en error → usa `@os_notificaciones_sys_bot` (`TELEGRAM_NOTIF_BOT_TOKEN`). Bot de IA (`TELEGRAM_BOT_TOKEN`) es solo para conversaciones.
 - **Systemd**: `systemd/effi-pipeline.service` + `.timer`
   - Test manual: `python3 scripts/orquestador.py --forzar`
   - Log: `journalctl -u effi-pipeline -f` o `logs/pipeline.log`
@@ -359,6 +359,27 @@ Para que la IA no invente respuestas o datos financieros, el flujo técnico obli
 1. **Generar código:** El Agente lee la pregunta + esquema y devuelve SÓLO una consulta SQL válida (o script equivalente).
 2. **Ejecutar código:** El sistema/orquestador ejecuta el query ciegamente contra la BD MariaDB real y captura las filas retornadas.
 3. **Responder usando ese resultado:** El sistema entrega los datos crudos de vuelta al Agente IA, quien redacta la respuesta usando única y exclusivamente la información del paso 2.
+
+### 9.2 FLUJO CON IMÁGENES (Visión Multimodal)
+Cuando el usuario envía una foto (desde Telegram u otro canal), el flujo tiene un paso previo:
+```
+Foto + texto (opcional)
+      ↓
+[Visión — agente con capacidad 'vision'] extrae texto estructurado de la imagen
+      ↓
+Texto extraído se inyecta como contexto en la pregunta
+      ↓
+[Flujo normal: Enrutador → SQL → Ejecutar → Redactar]
+```
+- El agente de visión se selecciona dinámicamente desde `ia_agentes.capacidades` (JSON `{"vision": true}`)
+- Hoy es `gemini-flash` — puede cambiar sin tocar código, solo actualizar BD
+- Si la imagen está en blanco o sin contenido, responde directo sin pasar por el enrutador
+- Funciona con: capturas de pantalla, remisiones en papel, facturas físicas, etiquetas, conteos escritos
+
+### 9.3 CAPACIDADES POR AGENTE
+Cada agente declara sus capacidades en `ia_agentes.capacidades` (JSON). Capacidades definidas:
+`vision` | `sql` | `codigo` | `razonamiento` | `documentos` | `contexto_largo` | `enrutamiento` | `imagen_generacion`
+El servicio consulta esto para elegir el agente correcto por capacidad, sin hardcoding.
 
 ---
 

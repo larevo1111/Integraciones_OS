@@ -218,8 +218,9 @@ def enviar_email(env, asunto, cuerpo):
 
 
 def enviar_telegram(env, mensaje):
-    token   = env.get('TELEGRAM_BOT_TOKEN', '')
-    chat_id = env.get('TELEGRAM_CHAT_ID', '')
+    # Usar bot de notificaciones si está configurado, sino caer al bot de IA (legacy)
+    token   = env.get('TELEGRAM_NOTIF_BOT_TOKEN') or env.get('TELEGRAM_BOT_TOKEN', '')
+    chat_id = env.get('TELEGRAM_NOTIF_CHAT_ID')   or env.get('TELEGRAM_CHAT_ID', '')
 
     if not token or not chat_id:
         log.warning('📱 Telegram no configurado en .env — omitiendo.')
