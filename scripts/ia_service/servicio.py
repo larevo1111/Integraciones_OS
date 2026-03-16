@@ -934,25 +934,14 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     en el historial de conversación (ej: "explícame ese margen", "cuál recomiendas").
     En ese caso el orquestador omite generar_sql y ejecutar, ahorrando 2 llamadas al LLM.
     """
-    agente_cfg = None
-    for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
-        cand = _cargar_agente(slug)
-        if cand and cand.get('api_key'):
-            agente_cfg = cand
-            break
-    if not agente_cfg:
-        return ('analisis_datos', 'general', True)
-
+    # Construir mensajes una sola vez (igual para todos los agentes candidatos)
     tipo_enrut = _cargar_tipo('enrutamiento')
     system_base = tipo_enrut.get('system_prompt', '') if tipo_enrut else ''
 
-    # Ampliar system prompt con temas disponibles para esta empresa
     temas_disponibles = rag_module.listar_temas(empresa)
     temas_str = ', '.join([f"{t['slug']} ({t['nombre']})" for t in temas_disponibles]) if temas_disponibles else 'general'
     system = system_base + f'\n\nTemas disponibles para clasificar: {temas_str}.'
 
-    # Incluir historial reciente para que el enrutador pueda determinar requiere_sql
-    # Si ya hay datos en la conversación, preguntas de interpretación no necesitan SQL nuevo
     user_content = pregunta
     if historial_reciente:
         user_content = f'Historial reciente:\n{historial_reciente}\n\nPregunta actual: {pregunta}'
@@ -961,25 +950,32 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
         {'role': 'system', 'content': system},
         {'role': 'user',   'content': user_content},
     ]
-    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=80)
 
     tipo_default = 'conversacion'
     tema_default = 'general'
+    tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
+                     'generacion_documento', 'generacion_imagen', 'conversacion', 'enrutamiento'}
+    temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
-    if res['ok']:
+    # Intentar cada agente candidato hasta obtener respuesta válida
+    for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
+        cand = _cargar_agente(slug)
+        if not (cand and cand.get('api_key')):
+            continue
+
+        res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=80)
+        if not res['ok']:
+            continue  # Fallo (rate limit, timeout, etc.) → intentar siguiente agente
+
         texto = res['texto'].strip()
         try:
             import re
             match = re.search(r'\{[^}]+\}', texto)
             if match:
                 data = json.loads(match.group())
-                tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                                 'generacion_documento', 'generacion_imagen', 'conversacion', 'enrutamiento'}
-                temas_validos  = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
-                tipo_ret  = data.get('tipo', tipo_default)
-                tema_ret  = data.get('tema', tema_default)
-                # requiere_sql: default True para analisis_datos (conservador)
-                req_sql = bool(data.get('requiere_sql', True))
+                tipo_ret = data.get('tipo', tipo_default)
+                tema_ret = data.get('tema', tema_default)
+                req_sql  = bool(data.get('requiere_sql', True))
                 return (
                     tipo_ret if tipo_ret in tipos_validos else tipo_default,
                     tema_ret if tema_ret in temas_validos  else tema_default,
@@ -988,14 +984,14 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
         except Exception:
             pass
 
-        # Fallback: buscar tipo en texto plano — sin historial no podemos saber requiere_sql
+        # Fallback: buscar tipo en texto plano
         texto_lower = texto.lower()
-        for slug in ('analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                     'generacion_documento', 'generacion_imagen', 'conversacion'):
-            if slug in texto_lower:
-                return (slug, tema_default, True)
+        for slug_t in ('analisis_datos', 'redaccion', 'clasificacion', 'resumen',
+                       'generacion_documento', 'generacion_imagen', 'conversacion'):
+            if slug_t in texto_lower:
+                return (slug_t, tema_default, True)
 
-    return (tipo_default, tema_default, True)
+    return ('analisis_datos', 'general', True)  # default conservador: si todo falla, intentar SQL
 
 
 def _cargar_agente(slug: str) -> dict | None:

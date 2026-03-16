@@ -4,8 +4,7 @@ description: Arquitectura del Servicio Central de IA — ia_service_os (multi-pr
 
 # Skill: Servicio Central de IA — ia_service_os
 
-> **ACTUALIZADO 2026-03-12**: Este documento reemplaza la versión anterior (Regla de los 3 Pasos simple).
-> El servicio está implementado y operativo. Ver implementación en `scripts/ia_service/`.
+> **ACTUALIZADO 2026-03-15 (v2)**: Cambios críticos en enrutador, generación de resumen y catálogo de tablas.
 
 ## ¿Qué es ia_service_os?
 
@@ -14,7 +13,7 @@ Es el **servicio de IA centralizado de Origen Silvestre** — corre en el servid
 - **Puerto**: 5100 (systemd `ia-service.service`)
 - **BD**: `ia_service_os` en MariaDB local
 - **Código**: `scripts/ia_service/` en este repo
-- **Admin panel (pendiente)**: app separada en `ia.oscomunidad.com`
+- **Admin panel**: `ia.oscomunidad.com` (activo, puerto 9200)
 
 ## Punto de entrada único
 
@@ -48,54 +47,90 @@ El servicio implementa esto internamente para `analisis_datos`:
 
 **NUNCA la IA responde con cifras de negocio inventadas.** Solo con datos reales de la BD.
 
-## Arquitectura de 4 tablas (BD ia_service_os)
+## Arquitectura de BD (ia_service_os) — tablas principales
 
 | Tabla | Propósito |
 |---|---|
 | `ia_agentes` | Catálogo de modelos con API key, endpoint, límites RPD/RPM, costos |
-| `ia_tipos_consulta` | Reglas por tipo: pasos, system_prompt, agente_preferido, temperatura |
-| `ia_conversaciones` | Contexto vivo: resumen ≤1000 palabras + agente activo por usuario/canal |
+| `ia_tipos_consulta` | Flujos por tipo: pasos, system_prompt, agente_preferido, agente_sql |
+| `ia_temas` | Áreas de negocio (7 temas): agente_preferido + schema_tablas por tema |
+| `ia_conversaciones` | Contexto vivo: resumen ≤600 palabras + mensajes_recientes por usuario/canal |
 | `ia_logs` | Auditoría completa por llamada: SQL, tokens, costo, latencia, error |
 | `ia_consumo_diario` | Agregado diario: llamadas, tokens, costo, % del límite RPD |
+| `ia_ejemplos_sql` | Pares pregunta→SQL (few-shot learning + embeddings semánticos) |
+| `ia_rag_fragmentos` | Chunks de documentos de negocio con FULLTEXT index |
+| `ia_usuarios` | Usuarios con nivel de acceso (1–7) |
 
-## Resumen Vivo (reemplaza historial de mensajes)
+## Resumen Vivo — CÓMO funciona (cambio 2026-03-15)
 
-En lugar de guardar todos los mensajes, cada conversación tiene un **resumen vivo de ≤1000 palabras** que se actualiza en cada turno. El LLM extrae el resumen entre tags `[RESUMEN_CONTEXTO]...[/RESUMEN_CONTEXTO]`.
+El contexto de conversación tiene:
+- `resumen` ≤600 palabras — historia comprimida de la conversación
+- `mensajes_recientes` — últimos 10 mensajes literales
 
-Ventaja: contexto compacto, sin límites de tokens acumulados.
+**⚠️ Cambio importante**: el resumen ya NO lo genera el agente principal (gemini-pro, etc.). Lo genera **Groq Llama** en llamada separada DESPUÉS de responder al usuario:
+```
+respuesta entregada → _generar_resumen_groq() → Groq genera resumen 600 palabras → guarda en BD
+```
+Esto elimina la penalización de latencia que tenía DeepSeek (era de 80+ segundos por generar 1,000 palabras de resumen).
 
-## Agentes activos (marzo 2026 — Nivel Pago 1 Gemini)
+## Enrutador — cambios críticos (2026-03-15)
 
-| slug | modelo | RPD | Uso |
+### Qué devuelve
+```json
+{"tipo": "analisis_datos", "tema": "comercial", "requiere_sql": true}
+```
+
+### Usa contexto COMPLETO de la conversación
+El enrutador recibe `resumen_anterior + historial_reciente` — NO solo la pregunta actual. Esto permite que "¿Y el mes pasado?" sea correctamente interpretado como consulta de ventas (porque el historial dice que hablaban de ventas).
+
+### System prompt reescrito (2026-03-15)
+Cubre todos los módulos del negocio:
+- **analisis_datos**: ventas, compras, producción, inventario, remisiones, cotizaciones, consignación, cartera, devoluciones, rankings, comparaciones
+- **conversacion**: estrategia, planes, preguntas sin datos de BD
+- **Regla**: en caso de duda → `analisis_datos` (mejor SQL innecesario que ignorar dato real)
+
+### schema_tablas por tema — crítico
+El campo `ia_temas.schema_tablas` controla el DDL que recibe el agente SQL. **Si la tabla no está aquí, el modelo no puede consultarla.**
+
+| Tema | Tablas incluidas |
+|---|---|
+| `comercial` | Todos los ventas, remisiones, cotizaciones, ordenes_venta, notas_credito, clientes, inventario |
+| `finanzas` | Compras (facturas, ordenes, remisiones), proveedores, cuentas por cobrar/pagar, cartera |
+| `produccion` | zeffi_produccion_encabezados, zeffi_articulos_producidos, zeffi_materiales, zeffi_costos_produccion |
+| `estrategia` | resumen_ventas_facturas_mes, resumen_ventas_remisiones_mes |
+| `general` | Principales: facturas_venta_enc, resumen_ventas_mes, clientes, inventario, crm_contactos |
+
+**Error corregido**: `produccion` tenía `zeffi_articulos` (inexistente). Ahora tiene las tablas de producción reales.
+
+## Agentes activos (2026-03-15)
+
+| slug | modelo | RPD | Rol |
 |---|---|---|---|
-| `gemini-pro` | gemini-2.5-pro | 1,000 | **analisis_datos** — SQL complejo |
-| `gemini-flash` | gemini-2.5-flash | 10,000 | redaccion, resumen |
-| `gemini-flash-lite` | gemini-3.1-flash-lite | 150,000 | alto volumen, bot |
-| `gemma-router` | gemma-3-27b-it | 14,400 | **enrutador** — clasificar intención |
-| `gemini-image` | imagen-4.0-fast-generate-preview | 70 | generacion_imagen |
-| `groq-llama` | llama-3.1-8b-instant | 14,400 | enrutador alternativo (pendiente key) |
-| `claude-sonnet` | claude-sonnet-4-6 | — | documentos (pendiente key) |
+| `gemini-pro` | gemini-2.5-pro | 1,000 | Análisis finanzas/comercial/estrategia — SQL complejo |
+| `gemini-flash` | gemini-2.5-flash | 10,000 | agente_sql principal para generar SQL |
+| `gemini-flash-lite` | gemini-2.5-flash-lite | 150,000 | Producción, marketing, conversación, alto volumen |
+| `gemma-router` | gemma-3-27b-it | 14,400 | Enrutador fallback (si groq falla) |
+| `groq-llama` | llama-3.3-70b-versatile | 14,400 | **Enrutador principal** + generador de resúmenes |
+| `deepseek-chat` | deepseek-chat | — | Opción económica para usuarios (18–30s con SQL) |
+| `claude-sonnet` | claude-sonnet-4-6 | — | Documentos premium |
+
+## Catálogo de tablas — dónde vive y cómo actualizar
+
+El LLM solo conoce lo que está en el `system_prompt` de `analisis_datos` (ia_tipos_consulta):
+- `<tablas_disponibles>` — catálogo con descripciones de negocio
+- `<diccionario_campos>` — campos clave con semántica
+- `<reglas_sql>` — gotchas técnicos de la BD
+- `<ejemplos>` — few-shot SQL
+
+Para actualizar cuando se agrega una tabla nueva:
+1. Actualizar `.agent/CATALOGO_TABLAS.md`
+2. Editar `ia_tipos_consulta.system_prompt` donde slug='analisis_datos'
+3. Reiniciar servicio: `sudo systemctl restart ia-service.service`
 
 ## Enrutamiento automático
 
-El servicio detecta el tipo de consulta automáticamente sin que el caller lo especifique.
-Flujo del enrutador: `groq-llama` → `gemma-router` → `gemini-flash-lite` → `gemini-flash` (primero con key activa).
-**Gemini Pro NO se usa para enrutar** — se reservan sus 1,000 RPD para análisis reales.
-
-## Selección de modelo — cómo funciona
-
-```
-Cada modelo = una fila en ia_agentes
-                    ↓
-ia_tipos_consulta.agente_preferido define qué modelo usa cada tipo
-  analisis_datos → gemini-pro
-  redaccion      → gemini-flash
-  enrutamiento   → groq-llama / gemma-router
-                    ↓
-Si ese agente no tiene key → fallback al primero activo con key (ORDER BY orden)
-                    ↓
-El caller puede forzar: agente='gemini-pro' en la llamada
-```
+Flujo del enrutador: `groq-llama` → `gemma-router` → `gemini-flash-lite` (primero disponible con key).
+**Groq y Gemma NUNCA son agentes finales** — solo enrutan y generan resúmenes.
 
 ## Monitoreo de consumo
 
@@ -107,7 +142,13 @@ curl http://localhost:5100/ia/consumo
 curl http://localhost:5100/ia/consumo/historico
 
 # SQL directo
-mysql ia_service_os -e "SELECT agente_slug, llamadas, costo_usd FROM ia_consumo_diario WHERE fecha=CURDATE();"
+python3 -c "
+import pymysql
+conn = pymysql.connect(host='localhost', user='osadmin', password='Epist2487.', db='ia_service_os')
+cur = conn.cursor()
+cur.execute('SELECT agente_slug, llamadas, tokens_total, costo_usd FROM ia_consumo_diario WHERE fecha=CURDATE()')
+for row in cur.fetchall(): print(row)
+"
 ```
 
 ## Dónde van las API keys
@@ -115,18 +156,6 @@ mysql ia_service_os -e "SELECT agente_slug, llamadas, costo_usd FROM ia_consumo_
 **SOLO** en la BD (`ia_agentes.api_key`) y en `scripts/.env`.
 NUNCA en código, manuales, comentarios o commits.
 
-Para agregar una key:
-```bash
-mysql -u osadmin -pEpist2487. ia_service_os -e \
-  "UPDATE ia_agentes SET api_key='TU_KEY', activo=1 WHERE slug='groq-llama';" 2>/dev/null
-```
-
 ## Manual completo
 
 Ver `.agent/manuales/ia_service_manual.md` — límites por modelo, endpoints, costos, troubleshooting.
-
-## Panel de administración (pendiente — próxima prioridad)
-
-App separada en `ia.oscomunidad.com` (Vue + Quasar, mismo design system).
-Vistas planeadas: Dashboard consumo, Agentes, Tipos de consulta, Logs, Playground.
-Razón app separada: ia_service_os sirve a múltiples proyectos OS — no es parte de ningún proyecto específico.

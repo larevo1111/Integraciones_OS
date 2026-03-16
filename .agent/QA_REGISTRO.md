@@ -5,6 +5,51 @@
 
 ---
 
+## Sesión QA — 2026-03-15/16 — ia_service_os (Bot Telegram IA)
+
+**Feature testeada:** Suite completa de consultas IA — enrutador, SQL, datos reales
+**Testeado por:** Claude Code
+**Servicio:** ia_service_os puerto 5100
+
+### Score final: 12/12 consultas clasificadas correctamente
+
+| # | Pregunta | Resultado | Tema | Tiempo | Datos reales |
+|---|---|---|---|---|---|
+| 1 | ¿Cuánto hemos vendido hoy? | ✅ analisis_datos + SQL | comercial | ~18s | $1,110,251 ✅ |
+| 2 | ¿Cuánto vendimos este mes? | ✅ analisis_datos + SQL | comercial | ~25s | $5,949,982 ✅ |
+| 3 | ¿Cuáles son los 5 productos más vendidos? | ✅ analisis_datos + SQL | comercial | ~19s | Miel 640g→$1,111,790 ✅ |
+| 4 | ¿Cuántos pedidos pendientes tenemos? | ✅ analisis_datos + SQL | comercial | ~17s | 7 cot.→$4,159,930 ✅ |
+| 5 | ¿Cuántas remisiones pendientes de facturar? | ✅ analisis_datos + SQL | comercial | ~20s | datos reales |
+| 6 | ¿Cuánto hemos comprado este mes? | ✅ analisis_datos + SQL | finanzas | ~20s | datos reales |
+| 7 | ¿Qué produjimos esta semana? | ✅ analisis_datos + SQL | produccion | ~27s | 11 ud chocolate ✅ |
+| 8 | ¿Qué materiales gastó la producción? | ✅ analisis_datos + SQL | produccion | ~31s | 0 rows (real) ✅ |
+| 9 | Compara ventas enero vs febrero 2026 | ✅ analisis_datos + SQL | comercial | ~20s | datos reales |
+| 10 | ¿Cuál es el tiempo promedio de producción? | ✅ analisis_datos + SQL | produccion | ~30s | datos reales |
+| 11 | Hola, ¿cómo estás? | ✅ conversacion, sin SQL | general | ~3.6s | N/A ✅ |
+| 12 | ¿Cuáles son las consignaciones activas? | ✅ analisis_datos + SQL | comercial | ~23s | 13 vigentes ✅ |
+
+### Bugs encontrados y corregidos
+
+**Bug 1**: Enrutador sin fallback cuando Groq está en rate limit
+- Síntoma: preguntas de ranking/productos clasificadas como `conversacion`
+- Fix: `_enrutar()` ahora itera por todos los agentes hasta obtener respuesta válida
+- Default final cambiado a `analisis_datos` (más conservador)
+
+**Bug 2**: Cotizaciones pendientes devolvía 0 (estado='Vigente' incorrecto)
+- Fix: system_prompt actualizado con estados correctos de `zeffi_cotizaciones_ventas_encabezados`
+- Estado correcto: `'Pendiente de venta'` (no 'Vigente' — ese aplica solo a ordenes_venta)
+- `ia_ejemplos_sql` IDs 55, 67, 76, 85 corregidos
+
+### Cambios aplicados en esta sesión (ver manual v2.2 para detalles)
+1. `servicio.py` — enrutador con fallback multi-agente
+2. `ia_tipos_consulta.system_prompt` — cotizaciones estados, campos producción/compras
+3. `ia_temas.schema_tablas` — produccion/finanzas/comercial corregidos
+4. `ia_ejemplos_sql` — SQL corregidos para cotizaciones
+5. `servicio.py` — resumen delegado a Groq (_generar_resumen_groq)
+6. `servicio.py` — enrutador con contexto completo de conversación
+
+---
+
 ## Sesión QA — 2026-03-13
 **Feature testeada:** Cartera CxC + Tooltips + Comparativos year_ant/mes_ant
 **Testeado por:** Pendiente (Antigravity — ver prompt en conversación)

@@ -1,6 +1,6 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.1 — 2026-03-15
+**Versión**: 2.2 — 2026-03-15
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
 **Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT 2 pasos.
 
@@ -624,13 +624,44 @@ SELECT slug, nombre, agente_preferido FROM ia_temas ORDER BY id;
 
 | Tema | Agente preferido | Cuándo se activa |
 |---|---|---|
-| `comercial` | gemini-pro | Ventas, clientes, canales, facturas, remisiones |
-| `finanzas` | gemini-pro | Costos, utilidades, márgenes, flujo de caja, cartera |
-| `produccion` | gemini-flash-lite | Inventario, insumos, procesos productivos |
+| `comercial` | gemini-pro | Ventas, clientes, canales, facturas, remisiones, cotizaciones, consignación, devoluciones |
+| `finanzas` | gemini-pro | Compras, costos, utilidades, márgenes, flujo de caja, cartera, cuentas por cobrar/pagar |
+| `produccion` | gemini-flash-lite | Producción, materiales, costos de producción, artículos producidos |
 | `administracion` | gemini-flash-lite | Gastos, RRHH, operaciones internas |
-| `marketing` | gemini-flash-lite | Campañas, análisis de mercado, tipoDeMarketing |
+| `marketing` | gemini-flash-lite | Campañas, análisis de mercado, tipoDeMarketing, contactos CRM |
 | `estrategia` | gemini-pro | Metas, planes, KPIs estratégicos |
 | `general` | gemini-flash-lite | Preguntas generales, sin tema específico |
+
+### schema_tablas por tema — tablas que recibe el agente SQL (DDL)
+
+El campo `schema_tablas` en `ia_temas` controla qué tablas se le pasan al agente SQL (DDL de Hostinger). Es crítico que esté correcto — si falta una tabla, el modelo no puede consultarla.
+
+**Estado actual (2026-03-15) — actualizado y corregido:**
+
+| Tema | Tablas (schema_tablas) |
+|---|---|
+| `comercial` | resumen_ventas_facturas_*, resumen_ventas_remisiones_*, zeffi_facturas_venta_*, zeffi_remisiones_venta_*, zeffi_ordenes_venta_*, zeffi_cotizaciones_ventas_*, zeffi_notas_credito_venta_*, zeffi_devoluciones_venta_*, zeffi_clientes, zeffi_inventario, catalogo_articulos, crm_contactos |
+| `finanzas` | zeffi_facturas_venta_*, zeffi_facturas_compra_*, zeffi_ordenes_compra_*, zeffi_remisiones_compra_*, zeffi_proveedores, zeffi_cuentas_por_cobrar, zeffi_cuentas_por_pagar, zeffi_comprobantes_ingreso_*, zeffi_notas_credito_venta_*, resumen_ventas_facturas_mes |
+| `produccion` | zeffi_produccion_encabezados, zeffi_articulos_producidos, zeffi_materiales, zeffi_costos_produccion, zeffi_otros_costos, zeffi_inventario, catalogo_articulos |
+| `estrategia` | resumen_ventas_facturas_mes, resumen_ventas_remisiones_mes |
+| `general` | resumen_ventas_facturas_mes, resumen_ventas_remisiones_mes, zeffi_facturas_venta_encabezados, zeffi_clientes, zeffi_inventario, crm_contactos |
+| `marketing` | crm_contactos, zeffi_clientes |
+| `administracion` | [] (sin tablas — usa RAG) |
+
+**⚠️ Error histórico corregido (2026-03-15):** `produccion` tenía `zeffi_articulos` (tabla inexistente) en lugar de las tablas de producción reales. Esto causaba que el DDL inyectado estuviera vacío y el modelo no pudiera generar SQL de producción.
+
+**Cómo actualizar schema_tablas:**
+```python
+import pymysql, json
+conn = pymysql.connect(host='localhost', user='osadmin', password='Epist2487.', db='ia_service_os')
+cur = conn.cursor()
+tablas = ["tabla1", "tabla2", "tabla3"]
+cur.execute("UPDATE ia_temas SET schema_tablas=%s WHERE slug='produccion'", [json.dumps(tablas)])
+conn.commit()
+conn.close()
+# Reiniciar el servicio para que el caché de DDL (1h) se invalide
+# sudo systemctl restart ia-service.service
+```
 
 ### Cadena de prioridad del agente
 
@@ -853,6 +884,23 @@ Medición: 228 tokens entrada → 21s | 27,625 tokens entrada → 20s. El tamañ
 
 Implicación práctica: para preguntas conversacionales (no-SQL) en temas analíticos como `finanzas`, `comercial` o `estrategia` donde el tema tiene `agente_preferido = gemini-pro`, la latencia es ~20s aunque la pregunta sea simple ("explícame un margen bruto"). El sistema usa gemini-pro porque el tema lo indica, pero no agrega valor analítico sobre flash-lite para preguntas conceptuales.
 
+### El enrutador usa contexto completo de la conversación (2026-03-15)
+
+**Cambio crítico**: el enrutador NO analiza solo la pregunta actual. Recibe el historial completo:
+
+```python
+# En servicio.py — _enrutar()
+historial_ctx = contexto.obtener_mensajes_recientes_formateados(conv)
+contexto_enrutador = (f'Resumen de la conversación:\n{resumen_anterior}\n\n{historial_ctx}'
+                      if resumen_anterior else historial_ctx)
+tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
+```
+
+Esto permite que:
+- "¿Y el mes pasado?" → entiende que habla de ventas (porque el resumen dice que se habló de ventas)
+- "¿Cuánto compramos?" → asigna tema `finanzas` aunque el historial sea de ventas
+- "Detalla eso por canal" → sabe a qué se refiere "eso" gracias al contexto
+
 ### Configuración del enrutador en BD
 
 ```sql
@@ -863,6 +911,22 @@ SELECT system_prompt FROM ia_tipos_consulta WHERE slug = 'enrutamiento';
 SELECT agente_preferido FROM ia_tipos_consulta WHERE slug = 'enrutamiento';
 -- groq-llama (enrutador — NUNCA responde como agente final)
 ```
+
+**System prompt del enrutador** (2026-03-15) — completamente reescrito para cubrir TODOS los módulos:
+- ventas: facturas, remisiones, top productos, canales
+- compras: órdenes de compra, facturas de compra, proveedores
+- producción: lotes producidos, materiales gastados, tiempo de producción
+- inventario: stock, costos actuales, catalogo_articulos
+- remisiones: mercancía entregada sin facturar (≠ ventas definitivas)
+- cotizaciones / pedidos pendientes
+- consignación: órdenes de venta vigentes
+- cartera: cuentas por cobrar, cuentas por pagar
+- devoluciones/notas crédito
+- comparaciones entre períodos
+- clientes/productos (análisis de comportamiento)
+- estrategia/planes (conversacion, no SQL)
+
+**Regla del enrutador**: "En caso de duda → `analisis_datos`" — mejor hacer un SQL innecesario que ignorar un dato real.
 
 ### Regla arquitectural: groq-llama es SOLO enrutador
 
@@ -885,9 +949,55 @@ Si el enrutador confunde los dos → o se hace una consulta SQL innecesaria, o s
 
 ## 13. Catálogo de tablas {#catalogo}
 
-El catálogo completo de tablas está en `.agent/CATALOGO_TABLAS.md`.
+### Dónde vive el catálogo
 
-Dentro del system prompt de `analisis_datos`, la sección `<tablas_disponibles>` tiene las mismas descripciones en formato compacto para que el modelo las use directamente.
+El catálogo de tablas tiene **dos representaciones**:
+
+1. **`.agent/CATALOGO_TABLAS.md`** — fuente de verdad legible por humanos. Describe cada tabla con su propósito de negocio, campos clave y gotchas.
+
+2. **`ia_tipos_consulta.system_prompt` (slug=`analisis_datos`)** — versión XML inyectada al LLM:
+   - `<tablas_disponibles>` — catálogo compacto: nombre tabla + descripción de negocio
+   - `<diccionario_campos>` — campos clave de las tablas principales con su semántica
+
+El LLM SOLO puede usar lo que está en el system_prompt. Si una tabla no está documentada ahí, el modelo no sabrá qué significa ni cuándo usarla.
+
+### Cómo actualizar el catálogo (flujo periódico)
+
+Cuando se agregan tablas nuevas a Effi o cambian los campos:
+
+1. **Actualizar CATALOGO_TABLAS.md** con la descripción de negocio de la nueva tabla
+2. **Actualizar el system_prompt de analisis_datos**:
+   ```bash
+   # Opción A: via script (si existe actualizar_system_prompt.py)
+   python3 scripts/ia_service/actualizar_system_prompt.py
+
+   # Opción B: directo en BD (si el script no cubre el cambio)
+   python3 -c "
+   import pymysql
+   conn = pymysql.connect(host='localhost', user='osadmin', password='Epist2487.', db='ia_service_os')
+   cur = conn.cursor()
+   cur.execute(\"SELECT system_prompt FROM ia_tipos_consulta WHERE slug='analisis_datos'\")
+   prompt = cur.fetchone()[0]
+   # Editar prompt (agregar tabla/campo al XML)
+   new_prompt = prompt.replace('...', '...')
+   cur.execute(\"UPDATE ia_tipos_consulta SET system_prompt=%s WHERE slug='analisis_datos'\", [new_prompt])
+   conn.commit()
+   conn.close()
+   "
+   ```
+3. **Reiniciar el servicio** para que aplique el nuevo prompt:
+   ```bash
+   sudo systemctl restart ia-service.service
+   ```
+
+### Tablas documentadas en el system_prompt (estado 2026-03-15)
+
+Tablas de ventas: zeffi_facturas_venta_*, resumen_ventas_facturas_*
+Tablas de remisiones: zeffi_remisiones_venta_*, resumen_ventas_remisiones_*
+Tablas comerciales: zeffi_cotizaciones_ventas_*, zeffi_ordenes_venta_*, zeffi_notas_credito_venta_*
+Tablas de producción: zeffi_produccion_encabezados, zeffi_articulos_producidos, zeffi_materiales, zeffi_costos_produccion
+Tablas de compras: zeffi_facturas_compra_*, zeffi_ordenes_compra_*, zeffi_remisiones_compra_*, zeffi_proveedores
+Tablas maestras: zeffi_clientes, zeffi_inventario, catalogo_articulos, crm_contactos
 
 ### Tablas más usadas — resumen rápido
 
@@ -936,10 +1046,35 @@ Mensaje 2: "¿Y el día anterior?"
 
 | Campo | Descripción |
 |---|---|
-| `resumen` | Resumen comprimido de toda la conversación (máx ~1,000 palabras) |
+| `resumen` | Resumen comprimido de toda la conversación (máx 600 palabras) |
 | `mensajes_recientes` | JSON — últimos 10 mensajes literales (pregunta + respuesta) |
 
-El resumen se actualiza automáticamente cuando los mensajes recientes superan cierto tamaño.
+El resumen se actualiza automáticamente después de cada respuesta.
+
+### Quién genera el resumen — arquitectura (2026-03-15)
+
+**Cambio crítico**: el resumen ya NO lo genera el agente principal (Gemini Pro, Claude, etc.). Lo genera **Groq Llama** en una llamada separada asíncrona después de entregar la respuesta al usuario.
+
+```
+Respuesta entregada → _generar_resumen_groq() [llamada separada, no bloquea]
+  → Groq Llama (gratis, rápido) genera resumen ≤600 palabras
+  → se guarda en ia_conversaciones.resumen
+```
+
+**Por qué importa**: antes, el agente principal recibía `_PROMPT_RESUMEN` — una instrucción de generar hasta 1,000 palabras de resumen DENTRO de su respuesta. Esto causaba:
+- DeepSeek: +1,783 tokens de resumen en cada respuesta → latencia de 80+ segundos
+- Gemini Pro: +1,000 palabras de overhead por consulta
+
+Ahora el agente principal solo redacta la respuesta al usuario. Groq genera el resumen en background.
+
+**Código relevante en servicio.py:**
+```python
+def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) -> str | None:
+    # Usa groq-llama, gemma-router o gemini-flash-lite (lo que esté disponible)
+    # Genera resumen máx 600 palabras con: datos numéricos, períodos, conclusiones
+    # Retorna None si ningún agente rápido está disponible
+    ...
+```
 
 ### Limpiar contexto de un usuario
 
@@ -982,10 +1117,12 @@ scripts/telegram_bot/
 
 | Display | slug interno |
 |---|---|
-| 💡 DeepSeek Chat ★ recomendado | `deepseek-chat` |
-| 🧠 Gemini Pro (análisis profundo) | `gemini-pro` |
+| 🧠 Gemini Pro ★ recomendado | `gemini-pro` |
 | ⚡ Gemini Flash (rápido) | `gemini-flash` |
+| 💡 DeepSeek Chat (económico, puede ser lento) | `deepseek-chat` |
 | 🤖 Claude Sonnet (premium) | `claude-sonnet` |
+
+**Nota sobre DeepSeek**: DeepSeek genera a ~18–22 tokens/segundo. Con la arquitectura de Groq para el resumen, la latencia bajó de 80+ segundos a ~20–30 segundos para consultas con SQL. Sigue siendo más lento que Gemini — se ofrece como opción económica.
 
 ### Variables de entorno necesarias
 

@@ -305,6 +305,30 @@ resultado = consultar(
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
 
+## Completado 2026-03-15/16 — QA completo ia_service + fixes críticos
+
+**Score QA: 12/12 preguntas correctas** — ver `.agent/QA_REGISTRO.md` para detalles
+
+### Fixes aplicados
+- ✅ **Enrutador con fallback multi-agente** — cuando Groq está en rate limit, prueba gemma-router, luego gemini-flash-lite. Default final cambiado a `analisis_datos` (no conversacion). `scripts/ia_service/servicio.py`
+- ✅ **Enrutador con contexto completo** — recibe `resumen_anterior + historial` para clasificar preguntas de seguimiento correctamente
+- ✅ **Resumen delegado a Groq** — `_generar_resumen_groq()`: resumen máx 600 palabras, llamada separada posterior, no bloquea la respuesta. DeepSeek bajó de 80+ seg a ~20-30s.
+- ✅ **schema_tablas corregido** — produccion tenía `zeffi_articulos` (inexistente). Corregido con las 7 tablas de producción reales. finanzas y comercial ampliados.
+- ✅ **Cotizaciones estados corregidos** — estado correcto es `'Pendiente de venta'` (no 'Vigente'). System_prompt + 4 ejemplos SQL corregidos (IDs 55,67,76,85).
+- ✅ **System prompt enrutador reescrito** — cubre todos los módulos: compras, producción, cotizaciones, consignación, cartera, devoluciones, rankings.
+- ✅ **System prompt analisis_datos ampliado** — tablas de producción + compras en `<diccionario_campos>` + 7 nuevos ejemplos SQL.
+
+### Datos verificados contra Hostinger
+- Ventas hoy: $1,110,251 ✅ exacto
+- Top 1 producto mes: Miel Os Vidrio 640g → $1,111,790 ✅ exacto
+- Cotizaciones pendientes: 7 → $4,159,930 ✅ exacto
+- Consignaciones activas: 13 vigentes ✅ exacto
+
+### Próximo paso pendiente
+1. Bot Telegram: probar en real con Santi
+
+---
+
 ## Completado 2026-03-14 — Mejoras IA analítica + documentación completa
 - ✅ **XML en system prompt** — `<rol>`, `<precision>`, `<tablas_disponibles>`, `<diccionario_campos>`, `<reglas_sql>`, `<ejemplos>` (34,667 chars)
 - ✅ **Embeddings semánticos** — `scripts/ia_service/embeddings.py`: Google text-embedding-004 + cosine similarity. Fallback a keywords LIKE. Generación en background al guardar ejemplos.
