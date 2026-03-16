@@ -184,19 +184,40 @@ def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
     finally:
         conn.close()
 
-# Prompt de resumen — se agrega al final de cada turno
-_PROMPT_RESUMEN = """
+def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) -> str | None:
+    """
+    Genera el resumen actualizado de conversación usando Groq (rápido, gratis).
+    El agente principal ya no necesita incluir el resumen en su respuesta.
+    Retorna el nuevo resumen como texto plano, o None si falla.
+    """
+    agente_cfg = None
+    for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite'):
+        cand = _cargar_agente(slug)
+        if cand and cand.get('api_key'):
+            agente_cfg = cand
+            break
+    if not agente_cfg:
+        return None
 
----
-Al final de tu respuesta incluye un resumen actualizado de esta conversación \
-entre las etiquetas [RESUMEN_CONTEXTO] y [/RESUMEN_CONTEXTO].
-El resumen debe ser DETALLADO (máximo 1000 palabras). Incluye siempre:
-- Nombres de personas, clientes, productos mencionados
-- Datos numéricos relevantes (ventas, fechas, cantidades, porcentajes)
-- Decisiones tomadas o conclusiones a las que se llegó
-- Preguntas ya respondidas (para no repetirlas)
-- Contexto del negocio que emerge de la conversación
-"""
+    contexto_previo = f'Resumen previo:\n{resumen_anterior}\n\n' if resumen_anterior else ''
+    prompt = (
+        f'{contexto_previo}'
+        f'Nuevo intercambio:\n'
+        f'Usuario: {pregunta}\n'
+        f'Asistente: {respuesta}\n\n'
+        f'Actualiza el resumen de la conversación en máximo 600 palabras. '
+        f'Incluye: datos numéricos mencionados, preguntas ya respondidas, '
+        f'nombres de clientes/productos/períodos, decisiones o conclusiones. '
+        f'Solo el resumen, sin etiquetas ni explicaciones.'
+    )
+    msgs = [
+        {'role': 'system', 'content': 'Eres un asistente que genera resúmenes concisos de conversaciones.'},
+        {'role': 'user',   'content': prompt},
+    ]
+    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
+    if res['ok'] and res.get('texto'):
+        return res['texto'].strip()
+    return None
 
 
 def _extraer_palabras_clave(texto: str) -> str:
@@ -522,10 +543,12 @@ def consultar(
     # ── 2. Enrutar: detectar tipo, tema y si se necesita SQL nuevo ───────
     requiere_sql = True  # default conservador
     if not tipo or not tema:
-        # Pasar historial reciente para que el enrutador pueda decidir requiere_sql
-        # (distingue entre "dame ventas de ayer" vs "explícame ese margen")
+        # Pasar resumen + historial reciente para que el enrutador asigne el tema
+        # correctamente basándose en el contexto completo de la conversación
         historial_ctx = contexto.obtener_mensajes_recientes_formateados(conv)
-        tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, historial_ctx)
+        contexto_enrutador = (f'Resumen de la conversación:\n{resumen_anterior}\n\n{historial_ctx}'
+                              if resumen_anterior else historial_ctx)
+        tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
         if not tipo:
             tipo = tipo_enrutado
         if not tema:
@@ -793,7 +816,7 @@ def consultar(
                 pasos_ejecutados.append(paso)
                 prompt_resp = _construir_prompt_respuesta(
                     pregunta, paso, datos_crudos, tabla_resultado, sql_generado
-                ) + _PROMPT_RESUMEN
+                )
                 msgs = mensajes_base + [{'role': 'user', 'content': prompt_resp}]
                 res = _llamar_agente(agente_cfg, msgs, temperatura=temperatura)
                 tokens_in_total  += res.get('tokens_in', 0)
@@ -804,13 +827,13 @@ def consultar(
 
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
-                resumen_nuevo   = parsed.get('resumen_nuevo')
+                # Resumen generado por Groq en lugar del agente principal
+                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
 
             elif paso == 'analizar':
                 pasos_ejecutados.append('analizar')
                 # Para clasificación: un solo turno
-                prompt_clas = pregunta + _PROMPT_RESUMEN
-                msgs = mensajes_base + [{'role': 'user', 'content': prompt_clas}]
+                msgs = mensajes_base + [{'role': 'user', 'content': pregunta}]
                 res = _llamar_agente(agente_cfg, msgs, temperatura=temperatura)
                 tokens_in_total  += res.get('tokens_in', 0)
                 tokens_out_total += res.get('tokens_out', 0)
@@ -820,7 +843,7 @@ def consultar(
 
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
-                resumen_nuevo   = parsed.get('resumen_nuevo')
+                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
 
             elif paso == 'generar_imagen':
                 pasos_ejecutados.append('generar_imagen')
