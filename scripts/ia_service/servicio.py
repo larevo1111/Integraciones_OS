@@ -784,6 +784,19 @@ def consultar(
                 tokens_in_total  += res.get('tokens_in', 0)
                 tokens_out_total += res.get('tokens_out', 0)
 
+                # Fallback a deepseek-chat si hay 429 (cuota agotada) en el agente SQL
+                # (groq-llama tiene límite de 6K TPM — insuficiente para el DDL de 27K tokens)
+                if not res['ok'] and '429' in str(res.get('error', '')):
+                    for slug_fb in ('deepseek-chat', 'gemini-pro', 'gemini-flash-lite'):
+                        agente_fallback = _cargar_agente(slug_fb)
+                        if agente_fallback:
+                            res_fb = _llamar_agente(agente_fallback, msgs, temperatura=0.1)
+                            tokens_in_total  += res_fb.get('tokens_in', 0)
+                            tokens_out_total += res_fb.get('tokens_out', 0)
+                            if res_fb['ok']:
+                                res = res_fb
+                                break
+
                 if not res['ok']:
                     raise Exception(f"Error generando SQL: {res['error']}")
 
@@ -868,6 +881,18 @@ def consultar(
                 res = _llamar_agente(agente_cfg, msgs, temperatura=temperatura)
                 tokens_in_total  += res.get('tokens_in', 0)
                 tokens_out_total += res.get('tokens_out', 0)
+
+                # Fallback si el agente principal da 429 (cuota agotada)
+                if not res['ok'] and '429' in str(res.get('error', '')):
+                    for slug_fb in ('deepseek-chat', 'gemini-flash-lite', 'groq-llama'):
+                        agente_fallback = _cargar_agente(slug_fb)
+                        if agente_fallback:
+                            res_fb = _llamar_agente(agente_fallback, msgs, temperatura=temperatura)
+                            tokens_in_total  += res_fb.get('tokens_in', 0)
+                            tokens_out_total += res_fb.get('tokens_out', 0)
+                            if res_fb['ok']:
+                                res = res_fb
+                                break
 
                 if not res['ok']:
                     raise Exception(f"Error generando respuesta: {res['error']}")
