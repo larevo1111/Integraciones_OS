@@ -5,6 +5,94 @@
 
 ---
 
+## Sesión QA — 2026-03-15 — ia_service_os: Catálogo completo + QA exhaustivo (53 tablas)
+
+**Feature testeada:** Catálogo completo 53 tablas + QA multi-tema ~60 consultas
+**Testeado por:** Claude Code
+**Servicio:** ia_service_os puerto 5100
+**Método:** `curl POST /ia/consultar` con `usuario_id` único por pregunta (evitar contaminación)
+
+### Score final: ~55/60 consultas correctas (92%) — 4 bugs críticos encontrados y corregidos
+
+### Bugs críticos encontrados y corregidos
+
+**BUG-2026-03-15-A — Vigencia en tablas de detalle de producción**
+- **Tabla afectada:** `zeffi_articulos_producidos`, `zeffi_materiales`, `zeffi_otros_costos`
+- **Síntoma:** "¿Cuál es el producto que más producimos?" → "no tengo datos de producción"
+- **Causa:** System prompt documentaba `vigencia='Vigente'` pero valores reales son `'Orden vigente'` / `'Orden anulada'`
+- **Verificación directa Hostinger:** `SELECT COUNT(*) FROM zeffi_articulos_producidos WHERE vigencia='Vigente'` → 0 filas; con `'Orden vigente'` → miles de filas
+- **Fix:** Actualizado `<diccionario_campos>` para ambas tablas. Añadido gotcha en `<reglas_sql>`. SQL examples corregidos a filtrar por `pe.vigencia='Vigente'` (encabezado) no por `ap.vigencia`
+- **Estado:** 🟢 Resuelto — post-fix: NIBS DE CACAO 77,478 ud ✅
+
+**BUG-2026-03-15-B — `zeffi_trazabilidad.tipo_de_movimiento` valores incorrectos**
+- **Síntoma:** "movimientos de ventas semana pasada" → 0 filas con `tipo_de_movimiento='Venta'`
+- **Causa:** Campo documentado con valores 'Venta', 'Compra', 'Producción' — valores reales son SOLO `'Creación de transacción'` / `'Anulación de transacción'`
+- **Fix real:** Para filtrar por tipo de operación usar campo `transaccion` con LIKE: `LIKE 'FACTURA DE VENTA%'`, `LIKE 'REMISIÓN DE VENTA%'`, etc.
+- **Fix:** Reescrito entry en `<diccionario_campos>`. Añadido gotcha completo en `<reglas_sql>`
+- **Estado:** 🟢 Resuelto — post-fix: 71 movimientos de ventas semana pasada ✅
+
+**BUG-2026-03-15-C — `zeffi_trazabilidad.vigencia_de_transaccion` valores incorrectos**
+- **Síntoma:** Queries con `vigencia_de_transaccion='Vigente'` → 0 resultados
+- **Causa:** Valores reales son `'Transacción vigente'` / `'Transacción anulada'`
+- **Fix:** Documentado correctamente en `<diccionario_campos>` y `<reglas_sql>`
+- **Estado:** 🟢 Resuelto
+
+**BUG-2026-03-15-D — `zeffi_ordenes_compra_encabezados.estado` valor incorrecto**
+- **Síntoma:** "órdenes de compra pendientes de recibir" → 0 filas con `estado='Vigente'`
+- **Causa:** Valor real es `'Pendiente de recibir'` (no 'Vigente')
+- **Verificación Hostinger:** 3 órdenes activas → $1,342,755 total
+- **Fix:** Corregido en `<diccionario_campos>`
+- **Estado:** 🟢 Resuelto — post-fix: 3 órdenes pendientes $1,342,755 ✅
+
+**BUG-2026-03-15-E — Tiempos de producción negativos**
+- **Síntoma:** Tiempo promedio de producción devolvía -25.1 horas
+- **Causa:** Algunos registros en Effi tienen `fecha_final < fecha_inicial` (error de captura)
+- **Fix:** Añadido filtro `AND TIMESTAMPDIFF(HOUR, fecha_inicial, fecha_final) >= 0` en `<reglas_sql>`
+- **Estado:** 🟢 Resuelto — post-fix: 30.1 horas promedio real ✅
+
+### Tablas y datos verificados contra Hostinger
+
+| Consulta | Dato verificado | SQL directo | Coincide |
+|---|---|---|---|
+| Producto más producido | NIBS DE CACAO 77,478 ud | ✅ verificado | ✅ |
+| Top materia prima | NIBS DE CACAO ~$11M | ✅ verificado | ✅ |
+| Órdenes compra pendientes | 3 → $1,342,755 | ✅ verificado | ✅ |
+| Movimientos ventas semana | 71 movimientos | ✅ verificado | ✅ |
+| Cotizaciones pendientes | 8 → $4.2M | ✅ verificado | ✅ |
+| Consignaciones activas | 13 vigentes → $7.76M | ✅ verificado | ✅ |
+| Cartera CxC | $17.2M pendiente | ✅ verificado | ✅ |
+| Cartera CxP | $75.7M con proveedores | ✅ verificado | ✅ |
+| Empleados/vendedores | 11 empleados | ✅ verificado | ✅ |
+| Stock miel bodega principal | 923.01 ud | ✅ verificado | ✅ |
+| Traslados últimos 30 días | 3 traslados | ✅ verificado | ✅ |
+| Ticket promedio histórico | $201,218 | ✅ verificado | ✅ |
+| Enero vs Febrero 2026 | Jan $12.9M / Feb $12.4M | ✅ verificado | ✅ |
+| Contactos CRM | 362 CD + 106 NA + 13 Int | ✅ verificado | ✅ |
+
+### Cambios aplicados en esta sesión
+
+1. `ia_tipos_consulta.system_prompt` — de TEXT a MEDIUMTEXT (ALTER TABLE), tamaño final 67,454 chars
+2. `ia_tipos_consulta.system_prompt` — `<tablas_disponibles>`: 42 → 53 tablas documentadas
+3. `ia_tipos_consulta.system_prompt` — `<diccionario_campos>`: 19 → 53+ tablas con campos completos
+4. `ia_tipos_consulta.system_prompt` — `<reglas_sql>`: 5 gotchas nuevos (vigencia detalles, trazabilidad, tiempos negativos)
+5. `ia_temas` — nuevo tema `operaciones` (id=9): trazabilidad, guías, ajustes, traslados, inventario, catálogo
+6. `ia_temas` — `produccion`: añadido `zeffi_cambios_estado`
+7. `ia_temas` — `finanzas`: añadido `zeffi_comprobantes_ingreso_detalle` + `zeffi_tipos_egresos`
+8. `ia_temas` — `administracion`: añadidas todas las tablas de catálogos/maestros
+9. `.agent/CATALOGO_TABLAS.md` — corregidas descripciones `zeffi_guias_transporte` y `zeffi_cambios_estado`
+
+### Errores no-bug (Gemini 503)
+Varias consultas retornaron 503 del API de Gemini (capacidad externa). NO son bugs del sistema.
+- Afectadas: CxP total, bodegas list, tarifas, producción vs ventas
+- Acción: Retry exitoso en todos los casos
+
+### Nota metodológica
+- SIEMPRE usar `usuario_id` único por pregunta para evitar contaminación de contexto
+- Gemini 503 = problema externo temporal, no bug interno
+- "requiere_sql=False" es comportamiento correcto cuando el dato ya está en el contexto de la conversación
+
+---
+
 ## Sesión QA — 2026-03-15/16 — ia_service_os (Bot Telegram IA)
 
 **Feature testeada:** Suite completa de consultas IA — enrutador, SQL, datos reales

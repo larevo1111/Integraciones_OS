@@ -305,6 +305,28 @@ resultado = consultar(
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
 
+## Completado 2026-03-15 — QA exhaustivo ia_service + 5 bugs críticos corregidos
+
+**Score QA: ~55/60 consultas correctas (92%)** — ver `.agent/QA_REGISTRO.md` para detalles
+
+### Bugs corregidos
+- ✅ **BUG-A — vigencia detalles producción**: `'Orden vigente'` no `'Vigente'` en `zeffi_articulos_producidos`/`zeffi_materiales`
+- ✅ **BUG-B — `zeffi_trazabilidad.tipo_de_movimiento`**: valores reales son `'Creación de transacción'`/`'Anulación de transacción'`. Para filtrar por tipo usar campo `transaccion LIKE 'FACTURA DE VENTA%'`
+- ✅ **BUG-C — `zeffi_trazabilidad.vigencia_de_transaccion`**: valores reales `'Transacción vigente'`/`'Transacción anulada'`
+- ✅ **BUG-D — `zeffi_ordenes_compra_encabezados.estado`**: valor real `'Pendiente de recibir'` (no `'Vigente'`)
+- ✅ **BUG-E — Tiempos producción negativos**: añadido filtro `TIMESTAMPDIFF >= 0` en `<reglas_sql>`
+
+### `ia_tipos_consulta.system_prompt` estado final
+- Columna: MEDIUMTEXT (ampliada de TEXT — 65K limitado)
+- Tamaño: **67,454 chars / ~74KB** en BD
+- Tablas documentadas: **53 tablas** (todas Hostinger)
+- `<reglas_sql>`: 8+ gotchas incluyendo los 5 nuevos de esta sesión
+
+### Datos verificados vs Hostinger
+Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7M | Stock miel: 923 ud | Ticket promedio: $201,218 | Producción top: NIBS DE CACAO 77,478 ud
+
+---
+
 ## Completado 2026-03-15 — Catálogo completo de tablas y campos (53 tablas)
 
 **Objetivo:** Ninguna tabla ni campo debe faltar en el catálogo del sistema de IA.
