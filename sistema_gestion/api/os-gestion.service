@@ -1,0 +1,17 @@
+[Unit]
+Description=OS Gestión App — API Express puerto 9300
+After=network.target
+
+[Service]
+Type=simple
+User=osserver
+WorkingDirectory=/home/osserver/Proyectos_Antigravity/Integraciones_OS/sistema_gestion/api
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
