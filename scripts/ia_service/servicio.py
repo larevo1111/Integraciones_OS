@@ -727,6 +727,20 @@ def consultar(
                 texto_extraido = res_vision['texto']
                 tokens_in_total  += res_vision.get('tokens_in', 0)
                 tokens_out_total += res_vision.get('tokens_out', 0)
+                # Si la imagen está en blanco o sin contenido útil, responder directo
+                sin_contenido = any(p in texto_extraido.lower() for p in [
+                    'en blanco', 'blank', 'no hay información', 'no contiene', 'vacía', 'vacío'
+                ])
+                if sin_contenido and not pregunta:
+                    return {
+                        'ok': True, 'conversacion_id': conv_id,
+                        'respuesta': texto_extraido + '\n\n¿Querías mostrarme algo en particular? Envíame la imagen de nuevo o cuéntame qué necesitas.',
+                        'formato': 'texto', 'tabla': None, 'sql_generado': None,
+                        'agente': agente_vision.get('slug','gemini-flash'), 'tema': tema,
+                        'tokens': {'in': tokens_in_total, 'out': tokens_out_total},
+                        'costo_usd': 0.0, 'pasos': ['vision'], 'log_id': None, 'error': None,
+                        'imagen_b64': None, 'imagen_mime': None,
+                    }
                 # Inyectar el texto extraído como contexto para el flujo normal
                 pregunta = (
                     f"[Imagen analizada — contenido extraído]\n{texto_extraido}\n\n"

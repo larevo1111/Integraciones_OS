@@ -5,7 +5,7 @@ python-telegram-bot v20 (async)
 Arranca con:
   python3 scripts/telegram_bot/bot.py
 """
-import sys, os, logging, asyncio
+import sys, os, logging, asyncio, base64, io
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
@@ -250,6 +250,71 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
 
+# ─── Handler de fotos (visión) ───────────────────────────────────────────────
+
+async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user   = update.effective_user
+    nombre = _nombre(user)
+
+    await update.effective_chat.send_action(ChatAction.TYPING)
+
+    # Descargar la foto en mayor resolución disponible
+    foto   = update.message.photo[-1]
+    archivo = await foto.get_file()
+    buf    = io.BytesIO()
+    await archivo.download_to_memory(buf)
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    # Texto del caption (puede venir vacío)
+    caption = (update.message.caption or '').strip()
+
+    sesion = db.obtener_sesion(user.id)
+    db.guardar_sesion(user.id, user.username or '', nombre)
+
+    resultado = api_ia.consultar(
+        pregunta       = caption,
+        usuario_id     = str(user.id),
+        nombre_usuario = nombre,
+        agente         = sesion.get('agente_preferido'),
+        empresa        = sesion.get('empresa', 'ori_sil_2'),
+        conversacion_id= sesion.get('conversacion_id'),
+        canal          = 'telegram',
+        imagen_b64     = img_b64,
+        imagen_mime    = 'image/jpeg',
+    )
+
+    if resultado.get('conversacion_id'):
+        db.guardar_sesion(user.id, user.username or '', nombre,
+                          conversacion_id=resultado['conversacion_id'])
+
+    info      = tabla_mod.procesar_tabla(resultado, caption, sesion.get('empresa', 'ori_sil_2'))
+    texto_resp = info['texto']
+    token      = info['token']
+    n_filas    = info['n_filas']
+
+    if not resultado.get('ok'):
+        await update.message.reply_text(
+            '😔 No pude procesar la imagen. Intenta de nuevo o envíala con una instrucción.',
+            reply_markup=REPLY_KB
+        )
+        return
+
+    kb = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
+
+    agente_usado = resultado.get('agente', '')
+    iconos = {'gemini-flash': '⚡', 'gemini-pro': '🧠', 'claude-sonnet': '🤖'}
+    pie    = f'\n\n_{iconos.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
+
+    try:
+        await update.message.reply_text(
+            texto_resp + pie,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=kb
+        )
+    except Exception:
+        await update.message.reply_text(texto_resp, reply_markup=kb)
+
+
 # ─── Handler de callbacks (botones inline) ───────────────────────────────────
 
 async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -310,6 +375,7 @@ def main():
     app.add_handler(CommandHandler('ventas',  cmd_ventas))
     app.add_handler(CommandHandler('mes',     cmd_mes))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_foto))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mensaje))
 
     log.info('Bot corriendo — polling...')

@@ -8,7 +8,8 @@ IA_URL = 'http://localhost:5100/ia/consultar'
 
 def consultar(pregunta: str, usuario_id: str, nombre_usuario: str = None,
               agente: str = None, empresa: str = 'ori_sil_2',
-              conversacion_id: int = None, canal: str = 'telegram') -> dict:
+              conversacion_id: int = None, canal: str = 'telegram',
+              imagen_b64: str = None, imagen_mime: str = 'image/jpeg') -> dict:
     payload = {
         'pregunta':       pregunta,
         'usuario_id':     str(usuario_id),
@@ -21,6 +22,9 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str = None,
         payload['agente'] = agente
     if conversacion_id:
         payload['conversacion_id'] = conversacion_id
+    if imagen_b64:
+        payload['imagen_base64'] = imagen_b64
+        payload['imagen_mime']   = imagen_mime
 
     data = json.dumps(payload).encode('utf-8')
     req  = urllib.request.Request(IA_URL, data=data,
