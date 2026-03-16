@@ -486,6 +486,8 @@ def consultar(
     nombre_usuario:  str  = None,
     contexto_extra:  str  = '',
     cliente:         dict = None,
+    imagen_b64:      str  = None,
+    imagen_mime:     str  = 'image/jpeg',
 ) -> dict:
     """
     Punto de entrada único del servicio de IA.
@@ -701,14 +703,45 @@ def consultar(
     if contexto_extra:
         system_prompt += f'\n\nContexto adicional: {contexto_extra}'
 
+    # ── 5b. Visión — si viene imagen, extraer texto antes de enrutar ─────────────
+    tokens_in_total  = 0
+    tokens_out_total = 0
+    if imagen_b64:
+        agente_vision = google.agente_con_capacidad('vision')
+        if agente_vision:
+            prompt_vision = (
+                "Eres un asistente que analiza documentos e imágenes de negocio. "
+                "Extrae toda la información relevante de esta imagen de forma estructurada: "
+                "números, nombres, fechas, cantidades, totales, referencias. "
+                "Si es un documento, indica el tipo (remisión, factura, conteo, etc.).\n\n"
+                f"Pregunta del usuario (si existe): {pregunta if pregunta else '(sin instrucción — describe lo que ves)'}"
+            )
+            res_vision = google.llamar(
+                agente_vision,
+                [{'role': 'user', 'content': prompt_vision}],
+                temperatura=0.1,
+                imagen_b64=imagen_b64,
+                imagen_mime=imagen_mime,
+            )
+            if res_vision.get('ok') and res_vision.get('texto'):
+                texto_extraido = res_vision['texto']
+                tokens_in_total  += res_vision.get('tokens_in', 0)
+                tokens_out_total += res_vision.get('tokens_out', 0)
+                # Inyectar el texto extraído como contexto para el flujo normal
+                pregunta = (
+                    f"[Imagen analizada — contenido extraído]\n{texto_extraido}\n\n"
+                    f"[Instrucción del usuario]\n{pregunta if pregunta else 'Interpreta esta información y dime qué debo saber o qué puedo consultar.'}"
+                )
+                system_prompt += "\n\nNota: el usuario envió una imagen. El contenido ya fue extraído y se incluye en su mensaje."
+            else:
+                pregunta = f"[Error al leer la imagen: {res_vision.get('error','desconocido')}] Pregunta original: {pregunta}"
+
     # ── 6. Ejecutar pasos ─────────────────────────────────────────────
     sql_generado    = None
     datos_crudos    = None
     tabla_resultado = None
     imagen_b64      = None
     imagen_mime     = None
-    tokens_in_total  = 0
-    tokens_out_total = 0
     respuesta_final  = ''
     resumen_nuevo    = None
     error            = None

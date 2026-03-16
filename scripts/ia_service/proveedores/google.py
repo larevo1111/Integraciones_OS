@@ -6,7 +6,34 @@ import time
 import requests
 
 
-def llamar(agente: dict, mensajes: list, temperatura: float = 0.3, max_tokens: int = 4096) -> dict:
+def agente_con_capacidad(capacidad: str) -> dict | None:
+    """
+    Busca en BD el agente activo con la capacidad dada (ej: 'vision').
+    Prioriza gemini-flash como default si tiene la capacidad.
+    Retorna el dict del agente o None si no hay ninguno disponible.
+    """
+    import pymysql, pymysql.cursors, json as _json
+    try:
+        conn = pymysql.connect(
+            host='localhost', user='osadmin', password='Epist2487.',
+            database='ia_service_os', cursorclass=pymysql.cursors.DictCursor
+        )
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM ia_agentes WHERE activo=1 AND api_key != '' ORDER BY orden ASC"
+            )
+            agentes = cur.fetchall()
+        conn.close()
+        # Primero intentar gemini-flash, luego cualquier otro con la capacidad
+        candidatos = [a for a in agentes if _json.loads(a.get('capacidades') or '{}').get(capacidad)]
+        preferido = next((a for a in candidatos if a['slug'] == 'gemini-flash'), None)
+        return preferido or (candidatos[0] if candidatos else None)
+    except Exception:
+        return None
+
+
+def llamar(agente: dict, mensajes: list, temperatura: float = 0.3, max_tokens: int = 4096,
+           imagen_b64: str = None, imagen_mime: str = None) -> dict:
     """
     Llama a la API de Google Gemini.
     Detecta automáticamente si el modelo genera imágenes según el modelo_id.
@@ -35,13 +62,17 @@ def llamar(agente: dict, mensajes: list, temperatura: float = 0.3, max_tokens: i
     system_instruction = None
     contents = []
 
-    for m in mensajes:
+    for i, m in enumerate(mensajes):
         role = m['role']
         content = m['content']
         if role == 'system':
             system_instruction = content
         elif role == 'user':
-            contents.append({'role': 'user', 'parts': [{'text': content}]})
+            parts = [{'text': content}]
+            # Si es el último mensaje de usuario y viene con imagen, adjuntarla
+            if imagen_b64 and imagen_mime and i == len(mensajes) - 1:
+                parts.append({'inlineData': {'mimeType': imagen_mime, 'data': imagen_b64}})
+            contents.append({'role': 'user', 'parts': parts})
         elif role == 'assistant':
             contents.append({'role': 'model', 'parts': [{'text': content}]})
 

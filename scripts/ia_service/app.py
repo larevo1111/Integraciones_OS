@@ -54,8 +54,10 @@ def endpoint_consultar():
     data = request.get_json(silent=True) or {}
 
     pregunta = data.get('pregunta', '').strip()
-    if not pregunta:
-        return jsonify({'ok': False, 'error': 'El campo "pregunta" es requerido.'}), 400
+    imagen_b64 = data.get('imagen_base64')
+    # Con imagen, pregunta puede venir vacía (el usuario solo mandó foto)
+    if not pregunta and not imagen_b64:
+        return jsonify({'ok': False, 'error': 'El campo "pregunta" o "imagen_base64" es requerido.'}), 400
 
     resultado = consultar(
         pregunta        = pregunta,
@@ -69,6 +71,8 @@ def endpoint_consultar():
         nombre_usuario  = data.get('nombre_usuario'),
         contexto_extra  = data.get('contexto_extra', ''),
         cliente         = data.get('cliente'),
+        imagen_b64      = imagen_b64,
+        imagen_mime     = data.get('imagen_mime', 'image/jpeg'),
     )
     # Si fue bloqueado por rate limit, devolver 429 con Retry-After header
     if not resultado.get('ok') and resultado.get('retry_after'):
