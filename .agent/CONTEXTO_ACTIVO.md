@@ -305,6 +305,33 @@ resultado = consultar(
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
 
+## Completado 2026-03-15 — Catálogo completo de tablas y campos (53 tablas)
+
+**Objetivo:** Ninguna tabla ni campo debe faltar en el catálogo del sistema de IA.
+
+### Cambios aplicados
+- ✅ **`ia_tipos_consulta.system_prompt` (analisis_datos) expandido** — de 40,452 → 64,368 chars
+  - `<tablas_disponibles>`: de 42 → **53 tablas** (añadidas 10 faltantes + 1 sección nueva)
+  - `<diccionario_campos>`: de 19 → **53+ tablas documentadas** (añadidas ~34 tablas)
+- ✅ **Columna `system_prompt` ampliada** — de `TEXT` a `MEDIUMTEXT` en `ia_tipos_consulta` (16MB límite)
+- ✅ **Nuevo tema `operaciones`** creado en `ia_temas`:
+  - Tablas: `zeffi_trazabilidad`, `zeffi_guias_transporte`, `zeffi_ajustes_inventario`, `zeffi_traslados_inventario`, `zeffi_inventario`, `catalogo_articulos`
+- ✅ **`ia_temas` actualizados:**
+  - `produccion`: añadido `zeffi_cambios_estado`
+  - `finanzas`: añadido `zeffi_comprobantes_ingreso_detalle` + `zeffi_tipos_egresos`
+  - `administracion`: añadidas todas las tablas de catálogos/maestros + `codigos_ciudades_dane` + `zeffi_empleados`
+- ✅ **CATALOGO_TABLAS.md actualizado** — descripciones corregidas para `zeffi_guias_transporte` y `zeffi_cambios_estado`
+
+### Tablas nuevas incorporadas al catálogo
+`crm_contactos`, `zeffi_ajustes_inventario`, `zeffi_cambios_estado`, `zeffi_comprobantes_ingreso_detalle`, `zeffi_guias_transporte`, `zeffi_otros_costos`, `zeffi_tipos_egresos`, `zeffi_traslados_inventario`, `zeffi_trazabilidad`, `codigos_ciudades_dane`
+
+### Pruebas post-actualización (3/3 OK)
+- crm_contactos: 362 Cliente directo, 106 Negocio amigo ✅
+- zeffi_trazabilidad: últimos movimientos de miel encontrados ✅
+- zeffi_comprobantes: $1,852,036 recaudado este mes ✅
+
+---
+
 ## Completado 2026-03-15/16 — QA completo ia_service + fixes críticos
 
 **Score QA: 12/12 preguntas correctas** — ver `.agent/QA_REGISTRO.md` para detalles

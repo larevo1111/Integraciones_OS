@@ -167,16 +167,16 @@ Ajustes manuales al inventario (entradas y salidas sin documento comercial).
 **Usar para**: ajustes del período, diferencias de inventario.
 
 ### zeffi_guias_transporte
-Guías de transporte generadas para despachos.
-**Usar para**: seguimiento de envíos, guías por período o cliente.
+Catálogo completo de artículos con stock desagregado por bodega/punto de consignación y precios por cada tarifa. A pesar del nombre, es una vista de inventario detallada (similar a zeffi_inventario pero con granularidad de bodega).
+**Usar para**: stock de un artículo en una bodega específica (Villa de Aburrá, Apicá, El Salvador, etc.), precios por tarifa de cada artículo, valoración por punto de entrega/consignación.
 
 ### zeffi_trazabilidad
-Trazabilidad de movimientos de inventario — registro del ciclo de vida de los productos.
-**Usar para**: historial de movimientos de un artículo específico.
+Historial completo de todos los movimientos de inventario: ventas, compras, producción, ajustes, traslados. La tabla más completa para trazabilidad de artículos.
+**Usar para**: historial de movimientos de un artículo, cuándo entró/salió stock, trazabilidad completa por período.
 
 ### zeffi_cambios_estado
-Historial de cambios de estado en documentos (facturas, remisiones, órdenes).
-**Usar para**: auditoría, saber cuándo pasó un documento de un estado a otro.
+Historial de cambios de estado de órdenes de producción. Cada fila registra cuándo y quién cambió el estado, con los valores financieros en ese momento.
+**Usar para**: auditoría de producción, tiempos en cada estado, historial completo de una orden de producción.
 
 ---
 

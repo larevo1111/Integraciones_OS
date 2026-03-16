@@ -1,6 +1,6 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.2 — 2026-03-15
+**Versión**: 2.3 — 2026-03-15
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
 **Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT 2 pasos.
 
@@ -990,14 +990,35 @@ Cuando se agregan tablas nuevas a Effi o cambian los campos:
    sudo systemctl restart ia-service.service
    ```
 
-### Tablas documentadas en el system_prompt (estado 2026-03-15)
+### Tablas documentadas en el system_prompt (estado 2026-03-15 — v2.3 — 53 tablas completas)
 
-Tablas de ventas: zeffi_facturas_venta_*, resumen_ventas_facturas_*
-Tablas de remisiones: zeffi_remisiones_venta_*, resumen_ventas_remisiones_*
-Tablas comerciales: zeffi_cotizaciones_ventas_*, zeffi_ordenes_venta_*, zeffi_notas_credito_venta_*
-Tablas de producción: zeffi_produccion_encabezados, zeffi_articulos_producidos, zeffi_materiales, zeffi_costos_produccion
-Tablas de compras: zeffi_facturas_compra_*, zeffi_ordenes_compra_*, zeffi_remisiones_compra_*, zeffi_proveedores
-Tablas maestras: zeffi_clientes, zeffi_inventario, catalogo_articulos, crm_contactos
+**`ia_tipos_consulta.system_prompt` tiene `MEDIUMTEXT` (ampliado de TEXT). Tamaño: ~64K chars.**
+
+**VENTAS FACTURADAS (6):** zeffi_facturas_venta_encabezados, zeffi_facturas_venta_detalle, zeffi_notas_credito_venta_encabezados, zeffi_notas_credito_venta_detalle, zeffi_devoluciones_venta_encabezados, zeffi_devoluciones_venta_detalle
+
+**REMISIONES (4):** zeffi_remisiones_venta_encabezados, zeffi_remisiones_venta_detalle, zeffi_cotizaciones_ventas_encabezados, zeffi_cotizaciones_ventas_detalle
+
+**ÓRDENES / CONSIGNACIÓN (2):** zeffi_ordenes_venta_encabezados, zeffi_ordenes_venta_detalle
+
+**RESÚMENES PRECALCULADOS (8):** resumen_ventas_facturas_mes, resumen_ventas_facturas_producto_mes, resumen_ventas_facturas_cliente_mes, resumen_ventas_facturas_canal_mes, resumen_ventas_remisiones_mes, resumen_ventas_remisiones_producto_mes, resumen_ventas_remisiones_cliente_mes, resumen_ventas_remisiones_canal_mes
+
+**COMPRAS (7):** zeffi_facturas_compra_encabezados, zeffi_facturas_compra_detalle, zeffi_ordenes_compra_encabezados, zeffi_ordenes_compra_detalle, zeffi_remisiones_compra_encabezados, zeffi_remisiones_compra_detalle, zeffi_proveedores
+
+**PRODUCCIÓN (6):** zeffi_produccion_encabezados, zeffi_articulos_producidos, zeffi_materiales, zeffi_costos_produccion, zeffi_otros_costos, zeffi_cambios_estado
+
+**FINANCIERO (5):** zeffi_cuentas_por_cobrar, zeffi_cuentas_por_pagar, zeffi_comprobantes_ingreso_encabezados, zeffi_comprobantes_ingreso_detalle, zeffi_tipos_egresos
+
+**CLIENTES Y PRODUCTOS (4):** zeffi_clientes, zeffi_inventario, catalogo_articulos, zeffi_categorias_articulos
+
+**INVENTARIO DETALLADO POR BODEGA (1):** zeffi_guias_transporte
+
+**CRM / MARKETING (1):** crm_contactos
+
+**OPERACIONES DE INVENTARIO (3):** zeffi_ajustes_inventario, zeffi_traslados_inventario, zeffi_trazabilidad
+
+**MAESTROS / CATÁLOGOS (5):** zeffi_empleados, zeffi_tarifas_precios, zeffi_tipos_marketing, zeffi_bodegas, codigos_ciudades_dane
+
+**Total: 52 tablas de negocio + sys_menu (excluida — tabla interna ERP).**
 
 ### Tablas más usadas — resumen rápido
 
