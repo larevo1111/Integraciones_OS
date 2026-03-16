@@ -48,6 +48,20 @@
 5. `servicio.py` — resumen delegado a Groq (_generar_resumen_groq)
 6. `servicio.py` — enrutador con contexto completo de conversación
 
+### Verificación adicional: contaminación de contexto (hallazgo del agente QA)
+
+El agente de testeo background encontró fallos aparentes al ejecutar preguntas en secuencia en la misma conversación. **Investigados y descartados como bugs reales**:
+
+| Pregunta "fallida" | Causa aparente | Validación aislada |
+|---|---|---|
+| Tiempo promedio producción | `requiere_sql=False` por contexto producción previo | ✅ Funciona — 25.8h / 1023 órdenes |
+| Top 5 productos | Contexto tenía ventas → enrutador asumió dato en historial | ✅ Funciona — Miel 640g $1,111,790 |
+| Compara enero vs febrero | Historial con Feb sesgó enrutador | ✅ Funciona — devuelve ambos meses exactos |
+
+**Conclusión**: El comportamiento `requiere_sql=False` es correcto — el enrutador tiene razón en no re-ejecutar SQL si el dato ya está en el contexto. El fallo era que el test contaminaba el contexto con temas no relacionados. En uso real por usuario, las conversaciones tienen coherencia temática y esto no ocurre.
+
+**Nota metodológica**: Para QA del ia_service, SIEMPRE usar `usuario_id` distinto por pregunta para evitar contaminación de contexto entre preguntas no relacionadas.
+
 ---
 
 ## Sesión QA — 2026-03-13
