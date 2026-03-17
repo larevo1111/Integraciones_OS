@@ -107,19 +107,19 @@ app.post('/api/gestion/auth/google', async (req, res) => {
 
     // Verificar en sys_usuarios (comunidad)
     const [[usuario]] = await db.comunidad.query(
-      'SELECT `Email`, `Nombre`, `Nivel`, `Estado` FROM `sys_usuarios` WHERE `Email` = ?',
+      'SELECT `Email`, `Nombre_Usuario`, `Nivel_Acceso`, `estado` FROM `sys_usuarios` WHERE `Email` = ?',
       [email]
     )
     if (!usuario)              return res.status(403).json({ error: 'No tienes acceso. Contacta al administrador.' })
-    if (usuario.Estado !== 'Activo') return res.status(403).json({ error: 'Usuario inactivo. Contacta al administrador.' })
+    if (usuario.estado !== 'Activo') return res.status(403).json({ error: 'Usuario inactivo. Contacta al administrador.' })
 
     // Obtener empresas del usuario
     const [empresas] = await db.comunidad.query(`
-      SELECT e.uid, e.nombre, e.siglas, ue.perfil
+      SELECT e.uid, e.nombre_empresa AS nombre, e.siglas, ue.Nivel_Acceso AS nivel_ue
       FROM sys_usuarios_empresas ue
       JOIN sys_empresa e ON e.uid = ue.empresa
-      WHERE ue.usuario = ? AND ue.estado = 'Activo' AND e.estado = 'Activo'
-      ORDER BY e.nombre
+      WHERE ue.usuario = ? AND ue.estado = 'Activo' AND (e.estado = 'Activa' OR e.estado IS NULL)
+      ORDER BY e.nombre_empresa
     `, [email])
 
     if (!empresas.length) return res.status(403).json({ error: 'No tienes empresas asignadas.' })
@@ -132,9 +132,9 @@ app.post('/api/gestion/auth/google', async (req, res) => {
 
     const userBase = {
       email:  usuario.Email,
-      nombre: usuario.Nombre,
+      nombre: usuario.Nombre_Usuario,
       foto:   payload.picture || '',
-      nivel:  usuario.Nivel,
+      nivel:  usuario.Nivel_Acceso,
       tema:   config?.tema  || 'dark',
       perfil: config?.perfil || null
     }
@@ -185,10 +185,10 @@ app.post('/api/gestion/auth/seleccionar_empresa', async (req, res) => {
 
   try {
     const [[emp]] = await db.comunidad.query(`
-      SELECT e.uid, e.nombre, e.siglas
+      SELECT e.uid, e.nombre_empresa AS nombre, e.siglas
       FROM sys_usuarios_empresas ue
       JOIN sys_empresa e ON e.uid = ue.empresa
-      WHERE ue.usuario = ? AND ue.empresa = ? AND ue.estado = 'Activo' AND e.estado = 'Activo'
+      WHERE ue.usuario = ? AND ue.empresa = ? AND ue.estado = 'Activo' AND (e.estado = 'Activa' OR e.estado IS NULL)
     `, [decoded.email, empresa_uid])
 
     if (!emp) return res.status(403).json({ error: 'No tienes acceso a esa empresa' })
@@ -271,13 +271,12 @@ app.use('/api/gestion', requireAuth)
 app.get('/api/gestion/usuarios', async (req, res) => {
   try {
     const [rows] = await db.comunidad.query(`
-      SELECT u.\`Email\` AS email, u.\`Nombre\` AS nombre, u.\`Nivel\` AS nivel,
-             ue.perfil, c.tema, c.perfil AS perfil_gestion
+      SELECT u.\`Email\` AS email, u.\`Nombre_Usuario\` AS nombre,
+             u.\`Nivel_Acceso\` AS nivel, u.\`foto_url\` AS foto, ue.rol
       FROM sys_usuarios_empresas ue
       JOIN sys_usuarios u ON u.\`Email\` = ue.usuario
-      LEFT JOIN u768061575_os_gestion.g_usuarios_config c ON c.email = u.\`Email\`
-      WHERE ue.empresa = ? AND ue.estado = 'Activo' AND u.\`Estado\` = 'Activo'
-      ORDER BY u.\`Nombre\`
+      WHERE ue.empresa = ? AND ue.estado = 'Activo' AND u.\`estado\` = 'Activo'
+      ORDER BY u.\`Nombre_Usuario\`
     `, [req.empresa])
     res.json({ ok: true, usuarios: rows })
   } catch (e) {
@@ -670,17 +669,43 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
 
 // ─── OP LOOKUP (Effi) ─────────────────────────────────────────────
 
-// GET /api/gestion/op/:id_op
+// GET /api/gestion/ops  — OPs pendientes (Vigente + no Procesada) con artículos
+// ?q=texto  → filtra por id_orden o descripción de artículo
+app.get('/api/gestion/ops', async (req, res) => {
+  const q = (req.query.q || '').trim()
+  try {
+    const [rows] = await db.integracion.query(`
+      SELECT e.id_orden, e.estado, e.fecha_final,
+             GROUP_CONCAT(DISTINCT a.descripcion_articulo_producido
+               ORDER BY a.descripcion_articulo_producido
+               SEPARATOR ' / ') AS articulos
+      FROM zeffi_produccion_encabezados e
+      LEFT JOIN zeffi_articulos_producidos a ON a.id_orden = e.id_orden
+      WHERE e.vigencia = 'Vigente' AND e.estado != 'Procesada'
+        ${q ? "AND (e.id_orden LIKE ? OR a.descripcion_articulo_producido LIKE ?)" : ''}
+      GROUP BY e.id_orden, e.estado, e.fecha_final
+      ORDER BY e.id_orden DESC
+      LIMIT 30
+    `, q ? [`%${q}%`, `%${q}%`] : [])
+    res.json({ ok: true, ops: rows })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/gestion/op/:id_op  — detalle de una OP
 app.get('/api/gestion/op/:id_op', async (req, res) => {
   try {
     const [[op]] = await db.integracion.query(`
-      SELECT id_orden, estado, vigencia, nombre_encargado,
-             fecha_inicial, fecha_final,
-             total_precios_de_venta, articulo
-      FROM zeffi_produccion_encabezados
-      WHERE id_orden = ?
+      SELECT e.id_orden, e.estado, e.vigencia, e.nombre_encargado,
+             e.fecha_inicial, e.fecha_final,
+             GROUP_CONCAT(DISTINCT a.descripcion_articulo_producido
+               ORDER BY a.descripcion_articulo_producido SEPARATOR ' / ') AS articulos
+      FROM zeffi_produccion_encabezados e
+      LEFT JOIN zeffi_articulos_producidos a ON a.id_orden = e.id_orden
+      WHERE e.id_orden = ?
+      GROUP BY e.id_orden, e.estado, e.vigencia, e.nombre_encargado, e.fecha_inicial, e.fecha_final
     `, [req.params.id_op])
-
     if (!op) return res.status(404).json({ error: 'OP no encontrada' })
     res.json({ ok: true, op })
   } catch (e) {

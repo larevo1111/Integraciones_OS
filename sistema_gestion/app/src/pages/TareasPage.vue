@@ -31,30 +31,60 @@
             </div>
           </div>
         </div>
-
-        <!-- Botón nueva tarea -->
-        <button class="btn btn-primary btn-sm" @click="mostrarForm = true">
-          <span class="material-icons" style="font-size:14px">add</span> Nueva
-        </button>
       </div>
 
-      <!-- Lista de tareas agrupadas -->
+      <!-- QuickAdd (solo desktop) -->
+      <div class="quickadd-wrap d-desktop-only">
+        <div class="quickadd-row" :class="{ activo: qaActivo }">
+          <span class="material-icons quickadd-plus">add</span>
+          <input
+            ref="qaInputRef"
+            class="quickadd-input"
+            v-model="qaTitulo"
+            placeholder="Agregar una tarea..."
+            @focus="qaActivo = true"
+            @keydown.enter.prevent="qaAgregar"
+            @keydown.escape="qaCancelar"
+          />
+          <template v-if="qaActivo">
+            <button class="btn btn-ghost btn-sm" @click="qaCancelar">Cancelar</button>
+            <button class="btn btn-primary btn-sm" :disabled="!qaTitulo || qaGuardando" @click="qaAgregar">
+              {{ qaGuardando ? '...' : 'Agregar' }}
+            </button>
+          </template>
+        </div>
+
+        <!-- Categorías chips + OP -->
+        <div v-if="qaActivo" class="quickadd-cats">
+          <button
+            v-for="c in categorias"
+            :key="c.id"
+            class="cat-chip"
+            :class="{ selected: qaCatId === c.id }"
+            @click="qaCatId = c.id"
+          >
+            <span class="cat-dot" :style="{ background: c.color }"></span>
+            {{ c.nombre.replace(/_/g, ' ') }}
+          </button>
+        </div>
+        <div v-if="qaActivo && qaCatEsProduccion" class="quickadd-op">
+          <OpSelector v-model="qaOp" style="max-width:360px" />
+        </div>
+      </div>
+
+      <!-- Lista de tareas -->
       <div class="page-body lista-tareas" v-if="!cargando">
-        <div v-if="!grupos.length" class="empty-state">
+        <div v-if="!grupos.length && !completadas.length" class="empty-state">
           <span class="material-icons" style="font-size:32px">check_circle_outline</span>
           <p>No hay tareas con estos filtros</p>
-          <button class="btn btn-secondary btn-sm" @click="mostrarForm = true">Crear tarea</button>
         </div>
 
         <template v-for="grupo in grupos" :key="grupo.key">
-          <!-- Header del grupo -->
           <div class="grupo-header">
             <div class="grupo-color-bar" :style="{ background: grupo.color }" />
             <span class="grupo-nombre">{{ grupo.nombre }}</span>
             <span class="grupo-count">{{ grupo.tareas.length }}</span>
           </div>
-
-          <!-- Tareas del grupo -->
           <TareaItem
             v-for="t in grupo.tareas"
             :key="t.id"
@@ -66,7 +96,7 @@
           />
         </template>
 
-        <!-- Completadas (colapsables) -->
+        <!-- Completadas al fondo (colapsables) -->
         <template v-if="completadas.length">
           <div class="completadas-header" @click="mostrarCompletadas = !mostrarCompletadas">
             <span class="material-icons" style="font-size:16px">{{ mostrarCompletadas ? 'expand_more' : 'chevron_right' }}</span>
@@ -86,7 +116,6 @@
         </template>
       </div>
 
-      <!-- Loading -->
       <div v-else class="empty-state"><span class="material-icons spin">refresh</span></div>
 
       <!-- FAB mobile -->
@@ -95,12 +124,13 @@
       </button>
     </div>
 
-    <!-- Panel lateral derecho -->
+    <!-- Panel lateral derecho (desktop) -->
     <Transition name="panel">
       <TareaPanel
         v-if="tareaSeleccionada"
         :tarea="tareaSeleccionada"
         :usuarios="usuarios"
+        :categorias="categorias"
         @cerrar="tareaSeleccionada = null"
         @actualizada="onTareaActualizada"
         @eliminar="eliminar"
@@ -108,7 +138,7 @@
       />
     </Transition>
 
-    <!-- Form nueva/editar tarea -->
+    <!-- Bottom sheet / modal nueva tarea (mobile) -->
     <TareaForm
       v-model="mostrarForm"
       :categorias="categorias"
@@ -119,27 +149,69 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
 import TareaItem  from 'src/components/TareaItem.vue'
 import TareaPanel from 'src/components/TareaPanel.vue'
 import TareaForm  from 'src/components/TareaForm.vue'
+import OpSelector from 'src/components/OpSelector.vue'
 
 const auth = useAuthStore()
 
-// Estado
-const tareas           = ref([])
-const completadas      = ref([])
-const categorias       = ref([])
-const usuarios         = ref([])
-const cargando         = ref(true)
+// Estado principal
+const tareas            = ref([])
+const completadas       = ref([])
+const categorias        = ref([])
+const usuarios          = ref([])
+const cargando          = ref(true)
 const tareaSeleccionada = ref(null)
-const mostrarForm      = ref(false)
+const mostrarForm       = ref(false)
 const mostrarCompletadas = ref(false)
-const menuAgrupar      = ref(false)
-const filtroActivo     = ref('hoy')
-const agruparPor       = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
+const menuAgrupar       = ref(false)
+const filtroActivo      = ref('hoy')
+const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
+
+// QuickAdd desktop
+const qaActivo    = ref(false)
+const qaTitulo    = ref('')
+const qaCatId     = ref(null)
+const qaOp        = ref('')
+const qaGuardando = ref(false)
+const qaInputRef  = ref(null)
+
+const qaCatEsProduccion = computed(() =>
+  categorias.value.find(c => c.id === qaCatId.value)?.es_produccion
+)
+
+watch(categorias, (cats) => {
+  if (cats.length && !qaCatId.value) qaCatId.value = cats[0].id
+}, { immediate: true })
+
+function qaCancelar() {
+  qaActivo.value = false
+  qaTitulo.value = ''
+  qaOp.value = ''
+}
+
+async function qaAgregar() {
+  if (!qaTitulo.value || qaGuardando.value) return
+  qaGuardando.value = true
+  try {
+    const body = {
+      titulo:      qaTitulo.value,
+      categoria_id: qaCatId.value || categorias.value[0]?.id,
+      id_op:       qaOp.value || null,
+      fecha_limite: filtroActivo.value === 'hoy'    ? hoyISO() :
+                    filtroActivo.value === 'manana'  ? mananaISO() : null
+    }
+    const data = await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(body) })
+    onTareaGuardada(data.tarea)
+    qaTitulo.value = ''
+    qaOp.value = ''
+    qaActivo.value = false
+  } catch (e) { console.error(e) } finally { qaGuardando.value = false }
+}
 
 const FILTROS = [
   { key: 'hoy',    label: 'Hoy' },
@@ -157,20 +229,17 @@ const AGRUPACIONES = [
 
 const conteoHoy = computed(() => tareas.value.filter(t => t.fecha_limite === hoyISO()).length)
 
-function hoyISO() {
-  return new Date().toISOString().slice(0,10)
-}
+function hoyISO()    { return new Date().toISOString().slice(0,10) }
+function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10) }
 
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
 
-// Agrupaciones
-const ORDEN_PRIORIDAD = ['Urgente','Alta','Media','Baja']
-const COLORES_PRIORIDAD = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280', Baja: '#374151' }
+const ORDEN_PRIORIDAD    = ['Urgente','Alta','Media','Baja']
+const COLORES_PRIORIDAD  = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280', Baja: '#374151' }
 
 const grupos = computed(() => {
   if (!tareas.value.length) return []
-
   if (agruparPor.value === 'categoria') {
     const map = {}
     tareas.value.forEach(t => {
@@ -180,7 +249,6 @@ const grupos = computed(() => {
     })
     return Object.values(map)
   }
-
   if (agruparPor.value === 'prioridad') {
     const map = {}
     tareas.value.forEach(t => {
@@ -190,7 +258,6 @@ const grupos = computed(() => {
     })
     return ORDEN_PRIORIDAD.filter(p => map[p]).map(p => map[p])
   }
-
   if (agruparPor.value === 'fecha') {
     const map = {}
     tareas.value.forEach(t => {
@@ -204,7 +271,6 @@ const grupos = computed(() => {
       return a.key.localeCompare(b.key)
     })
   }
-
   return []
 })
 
@@ -223,27 +289,22 @@ async function cargarTareas() {
     const params = new URLSearchParams()
     if (filtroActivo.value === 'mias') { params.set('solo_mias', '1') }
     else if (filtroActivo.value !== 'todas') { params.set('filtro', filtroActivo.value) }
-
     const [dataTareas, dataCompletadas] = await Promise.all([
       api(`/api/gestion/tareas?${params}`),
       api('/api/gestion/tareas/completadas')
     ])
     tareas.value     = dataTareas.tareas || []
     completadas.value = dataCompletadas.tareas || []
-  } catch (e) {
-    console.error(e)
-  } finally {
-    cargando.value = false
-  }
+  } catch (e) { console.error(e) } finally { cargando.value = false }
 }
 
 async function cargarCatalogos() {
-  const [dataCat, dataUsr] = await Promise.all([
+  const [resCat, resUsr] = await Promise.allSettled([
     api('/api/gestion/categorias'),
     api('/api/gestion/usuarios')
   ])
-  categorias.value = dataCat.categorias || []
-  usuarios.value   = dataUsr.usuarios   || []
+  if (resCat.status === 'fulfilled') categorias.value = resCat.value.categorias || []
+  if (resUsr.status === 'fulfilled') usuarios.value   = resUsr.value.usuarios   || []
 }
 
 function seleccionar(tarea) {
@@ -252,20 +313,19 @@ function seleccionar(tarea) {
 
 async function cambiarEstado(tarea) {
   const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente', 'Cancelada': 'Pendiente' }
-  const nuevoEstado = CICLO[tarea.estado] || 'Pendiente'
   try {
-    const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify({ estado: nuevoEstado }) })
+    const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify({ estado: CICLO[tarea.estado] || 'Pendiente' }) })
     onTareaActualizada(data.tarea)
   } catch (e) { console.error(e) }
 }
 
-function onTareaActualizada(tareaActualizada) {
-  const esCompletada = ['Completada','Cancelada'].includes(tareaActualizada.estado)
-  tareas.value = tareas.value.filter(t => t.id !== tareaActualizada.id)
-  completadas.value = completadas.value.filter(t => t.id !== tareaActualizada.id)
-  if (esCompletada) completadas.value.unshift(tareaActualizada)
-  else              tareas.value.push(tareaActualizada)
-  if (tareaSeleccionada.value?.id === tareaActualizada.id) tareaSeleccionada.value = tareaActualizada
+function onTareaActualizada(t) {
+  const esCompletada = ['Completada','Cancelada'].includes(t.estado)
+  tareas.value      = tareas.value.filter(x => x.id !== t.id)
+  completadas.value = completadas.value.filter(x => x.id !== t.id)
+  if (esCompletada) completadas.value.unshift(t)
+  else              tareas.value.push(t)
+  if (tareaSeleccionada.value?.id === t.id) tareaSeleccionada.value = t
 }
 
 function onTareaGuardada(tarea) {
@@ -291,8 +351,80 @@ onMounted(async () => {
 .d-desktop-only { }
 .d-mobile-only  { display: none; }
 @media (max-width: 768px) {
-  .d-desktop-only { display: none; }
+  .d-desktop-only { display: none !important; }
   .d-mobile-only  { display: flex; }
+}
+
+/* QuickAdd */
+.quickadd-wrap {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 16px 10px;
+}
+.quickadd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 6px;
+}
+.quickadd-plus {
+  font-size: 18px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.quickadd-row.activo .quickadd-plus { color: var(--accent); }
+.quickadd-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+.quickadd-input::placeholder { color: var(--text-tertiary); }
+
+/* Category chips */
+.quickadd-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 4px;
+  padding-left: 26px;
+}
+.cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 80ms;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+.cat-chip:hover { border-color: var(--border-default); color: var(--text-primary); }
+.cat-chip.selected {
+  background: var(--bg-row-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.cat-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* OP row */
+.quickadd-op {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 0 26px;
 }
 
 /* Dropdown agrupar */

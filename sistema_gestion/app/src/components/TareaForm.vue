@@ -1,36 +1,56 @@
 <template>
   <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="modelValue" class="modal-overlay" @click.self="$emit('update:modelValue', false)">
-        <div class="modal">
-          <div class="modal-header">
-            <span class="modal-title">{{ editar ? 'Editar tarea' : 'Nueva tarea' }}</span>
-            <button class="btn-icon" @click="$emit('update:modelValue', false)"><span class="material-icons">close</span></button>
+    <Transition :name="isMobile ? 'sheet' : 'modal'">
+      <div v-if="modelValue" class="form-overlay" @click.self="$emit('update:modelValue', false)">
+
+        <!-- Contenedor: modal en desktop, bottom sheet en mobile -->
+        <div class="form-container" :class="isMobile ? 'is-sheet' : 'is-modal'">
+
+          <!-- Handle (solo mobile) -->
+          <div v-if="isMobile" class="sheet-handle"></div>
+
+          <!-- Header -->
+          <div class="form-header">
+            <span class="form-title">{{ editar ? 'Editar tarea' : 'Nueva tarea' }}</span>
+            <button class="btn-icon" @click="$emit('update:modelValue', false)">
+              <span class="material-icons">close</span>
+            </button>
           </div>
-          <div class="modal-body">
+
+          <!-- Body -->
+          <div class="form-body">
             <!-- Título -->
-            <div class="input-group">
-              <label class="input-label">Título *</label>
-              <input class="input-field" v-model="form.titulo" placeholder="¿Qué hay que hacer?" autofocus />
+            <input
+              ref="tituloRef"
+              class="input-field titulo-input"
+              v-model="form.titulo"
+              placeholder="¿Qué hay que hacer?"
+              @keydown.enter.prevent="guardar"
+            />
+
+            <!-- Categorías como chips -->
+            <div class="form-section-label">Categoría</div>
+            <div class="cats-grid">
+              <button
+                v-for="c in categorias"
+                :key="c.id"
+                class="cat-chip"
+                :class="{ selected: form.categoria_id === c.id }"
+                @click="form.categoria_id = c.id"
+              >
+                <span class="cat-dot" :style="{ background: c.color }"></span>
+                {{ c.nombre.replace(/_/g, ' ') }}
+              </button>
             </div>
 
-            <!-- Fila de selects -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div class="input-group">
-                <label class="input-label">Categoría *</label>
-                <select class="input-field select-field" v-model="form.categoria_id">
-                  <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                </select>
-              </div>
-              <div class="input-group">
-                <label class="input-label">Prioridad</label>
-                <select class="input-field select-field" v-model="form.prioridad">
-                  <option>Baja</option><option>Media</option><option>Alta</option><option>Urgente</option>
-                </select>
-              </div>
+            <!-- OP Effi (solo si categoría es producción) -->
+            <div v-if="categoriaSeleccionada?.es_produccion" class="input-group">
+              <label class="input-label">OP Effi</label>
+              <OpSelector v-model="form.id_op" />
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <!-- Fila fecha + responsable + prioridad -->
+            <div class="form-row-3">
               <div class="input-group">
                 <label class="input-label">¿Para cuándo?</label>
                 <input type="date" class="input-field" v-model="form.fecha_limite" />
@@ -41,24 +61,26 @@
                   <option v-for="u in usuarios" :key="u.email" :value="u.email">{{ u.nombre }}</option>
                 </select>
               </div>
-            </div>
-
-            <!-- OP Effi (solo si categoría es_produccion) -->
-            <div v-if="categoriaSeleccionada?.es_produccion" class="input-group">
-              <label class="input-label">OP Effi</label>
-              <input class="input-field" v-model="form.id_op" placeholder="Número de OP" />
+              <div class="input-group">
+                <label class="input-label">Prioridad</label>
+                <select class="input-field select-field" v-model="form.prioridad">
+                  <option>Baja</option><option>Media</option><option>Alta</option><option>Urgente</option>
+                </select>
+              </div>
             </div>
 
             <!-- Descripción -->
             <div class="input-group">
-              <label class="input-label">Descripción</label>
-              <textarea class="input-field" v-model="form.descripcion" rows="4" placeholder="Contexto, pasos, notas..." />
+              <label class="input-label">Descripción (opcional)</label>
+              <textarea class="input-field" v-model="form.descripcion" rows="3" placeholder="Contexto, pasos, notas..." />
             </div>
           </div>
-          <div class="modal-footer">
+
+          <!-- Footer -->
+          <div class="form-footer">
             <button class="btn btn-ghost" @click="$emit('update:modelValue', false)">Cancelar</button>
             <button class="btn btn-primary" :disabled="!form.titulo || !form.categoria_id || guardando" @click="guardar">
-              {{ guardando ? 'Guardando...' : (editar ? 'Guardar' : 'Crear tarea') }}
+              {{ guardando ? 'Guardando...' : (editar ? 'Guardar cambios' : 'Crear tarea') }}
             </button>
           </div>
         </div>
@@ -68,21 +90,23 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
+import OpSelector from 'src/components/OpSelector.vue'
 
 const props = defineProps({
-  modelValue: Boolean,
+  modelValue:  Boolean,
   tareaEditar: { type: Object, default: null },
   categorias:  { type: Array, default: () => [] },
   usuarios:    { type: Array, default: () => [] }
 })
 const emit = defineEmits(['update:modelValue', 'guardada'])
-const auth = useAuthStore()
 
-const editar   = computed(() => !!props.tareaEditar)
+const auth     = useAuthStore()
 const guardando = ref(false)
+const tituloRef = ref(null)
+const isMobile  = computed(() => window.innerWidth <= 768)
 
 const form = ref({
   titulo: '', descripcion: '', categoria_id: null,
@@ -90,51 +114,181 @@ const form = ref({
   fecha_limite: '', id_op: ''
 })
 
-const categoriaSeleccionada = computed(() =>
-  props.categorias.find(c => c.id === form.value.categoria_id)
-)
+const editar = computed(() => !!props.tareaEditar)
+const categoriaSeleccionada = computed(() => props.categorias.find(c => c.id === form.value.categoria_id))
 
-watch(() => props.modelValue, (val) => {
-  if (val) {
-    if (props.tareaEditar) {
-      form.value = {
-        titulo:       props.tareaEditar.titulo || '',
-        descripcion:  props.tareaEditar.descripcion || '',
-        categoria_id: props.tareaEditar.categoria_id,
-        prioridad:    props.tareaEditar.prioridad || 'Media',
-        responsable:  props.tareaEditar.responsable || auth.usuario?.email || '',
-        fecha_limite: props.tareaEditar.fecha_limite || '',
-        id_op:        props.tareaEditar.id_op || ''
-      }
-    } else {
-      form.value = {
-        titulo: '', descripcion: '',
-        categoria_id: props.categorias[0]?.id || null,
-        prioridad: 'Media',
-        responsable: auth.usuario?.email || '',
-        fecha_limite: '', id_op: ''
-      }
+watch(() => props.modelValue, async (val) => {
+  if (!val) return
+  if (props.tareaEditar) {
+    form.value = {
+      titulo:       props.tareaEditar.titulo || '',
+      descripcion:  props.tareaEditar.descripcion || '',
+      categoria_id: props.tareaEditar.categoria_id,
+      prioridad:    props.tareaEditar.prioridad || 'Media',
+      responsable:  props.tareaEditar.responsable || auth.usuario?.email || '',
+      fecha_limite: props.tareaEditar.fecha_limite || '',
+      id_op:        props.tareaEditar.id_op || ''
+    }
+  } else {
+    form.value = {
+      titulo: '', descripcion: '',
+      categoria_id: props.categorias[0]?.id || null,
+      prioridad: 'Media',
+      responsable: auth.usuario?.email || '',
+      fecha_limite: '', id_op: ''
     }
   }
+  await nextTick()
+  tituloRef.value?.focus()
 })
 
 async function guardar() {
-  if (!form.value.titulo || !form.value.categoria_id) return
+  if (!form.value.titulo || !form.value.categoria_id || guardando.value) return
   guardando.value = true
   try {
     let data
     if (editar.value) {
       data = await api(`/api/gestion/tareas/${props.tareaEditar.id}`, { method: 'PUT', body: JSON.stringify(form.value) })
-      emit('guardada', data.tarea)
     } else {
       data = await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(form.value) })
-      emit('guardada', data.tarea)
     }
+    emit('guardada', data.tarea)
     emit('update:modelValue', false)
-  } catch (e) {
-    console.error(e)
-  } finally {
-    guardando.value = false
-  }
+  } catch (e) { console.error(e) } finally { guardando.value = false }
 }
 </script>
+
+<style scoped>
+/* Overlay */
+.form-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Contenedor común */
+.form-container {
+  background: var(--bg-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Desktop: modal centrado */
+.is-modal {
+  width: 540px;
+  max-width: 96vw;
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+}
+
+/* Mobile: bottom sheet */
+.is-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  border-radius: 16px 16px 0 0;
+  max-height: 92vh;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* Handle bar (mobile) */
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  margin: 10px auto 2px;
+}
+
+.form-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.form-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+.form-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.titulo-input {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 10px 12px;
+}
+
+/* Categorías grid */
+.form-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 80ms;
+  font-family: var(--font-sans);
+}
+.cat-chip:hover { border-color: var(--border-default); color: var(--text-primary); }
+.cat-chip.selected {
+  background: var(--bg-row-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.cat-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Fila de 3 */
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 768px) {
+  .form-row-3 { grid-template-columns: 1fr 1fr; }
+}
+
+.form-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Transiciones */
+.modal-enter-active, .modal-leave-active { transition: opacity 150ms; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-active .form-container, .modal-leave-active .form-container { transition: transform 150ms, opacity 150ms; }
+.modal-enter-from .form-container, .modal-leave-to .form-container { transform: scale(0.97); opacity: 0; }
+
+.sheet-enter-active, .sheet-leave-active { transition: opacity 200ms; }
+.sheet-enter-from, .sheet-leave-to { opacity: 0; }
+.sheet-enter-active .is-sheet, .sheet-leave-active .is-sheet { transition: transform 250ms cubic-bezier(0.32,0.72,0,1); }
+.sheet-enter-from .is-sheet, .sheet-leave-to .is-sheet { transform: translateY(100%); }
+</style>

@@ -20,8 +20,10 @@ const MYSQL_HOST   = '127.0.0.1'
 const MYSQL_PORT   = 3306
 const LOCAL_PORT   = 3311   // Puerto local del tunnel (3308=ERP, 3310=gestion-test)
 
-const DB_USER_GESTION    = 'u768061575_os_gestion'
-const DB_PASS            = 'Epist2487.'
+const DB_USER_GESTION    = 'u768061575_os_gestion'   // acceso a os_gestion
+const DB_USER_COMUNIDAD  = 'u768061575_ssierra047'    // acceso a os_comunidad
+const DB_USER_INTEGRACION= 'u768061575_osserver'      // acceso a os_integracion
+const DB_PASS            = 'Epist2487.'               // misma contraseña para todos
 const DB_COMUNIDAD       = 'u768061575_os_comunidad'
 const DB_GESTION         = 'u768061575_os_gestion'
 const DB_INTEGRACION     = 'u768061575_os_integracion'
@@ -102,16 +104,15 @@ function crearPools() {
   const base = {
     host:             '127.0.0.1',
     port:             LOCAL_PORT,
-    user:             DB_USER_GESTION,
     password:         DB_PASS,
     waitForConnections: true,
     connectionLimit:  10,
     timezone:         'local'
   }
 
-  poolComunidad   = mysql.createPool({ ...base, database: DB_COMUNIDAD })
-  poolGestion     = mysql.createPool({ ...base, database: DB_GESTION })
-  poolIntegracion = mysql.createPool({ ...base, database: DB_INTEGRACION })
+  poolComunidad   = mysql.createPool({ ...base, user: DB_USER_COMUNIDAD,   database: DB_COMUNIDAD })
+  poolIntegracion = mysql.createPool({ ...base, user: DB_USER_INTEGRACION, database: DB_INTEGRACION })
+  poolGestion     = mysql.createPool({ ...base, user: DB_USER_GESTION,     database: DB_GESTION })
 }
 
 module.exports = {
