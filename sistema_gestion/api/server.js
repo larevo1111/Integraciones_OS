@@ -350,7 +350,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
   const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id } = req.query
   const empresa = req.empresa
 
-  const where  = ['t.empresa = ?']
+  const where  = ['t.empresa = ?', 't.parent_id IS NULL']   // excluir subtareas de la lista principal
   const params = [empresa]
 
   // Filtro de fecha
@@ -381,7 +381,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
   try {
     const [tareas] = await db.gestion.query(`
       SELECT
-        t.id, t.empresa, t.titulo, t.estado, t.prioridad,
+        t.id, t.parent_id, t.empresa, t.titulo, t.estado, t.prioridad,
         t.responsable, t.categoria_id,
         c.nombre AS categoria_nombre, c.color AS categoria_color, c.icono AS categoria_icono,
         t.proyecto_id,
@@ -393,6 +393,9 @@ app.get('/api/gestion/tareas', async (req, res) => {
         -- ¿Hay cronómetro corriendo?
         (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
         (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio,
+        -- Conteo subtareas
+        (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id) AS subtareas_total,
+        (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id AND s.estado IN ('Completada','Cancelada')) AS subtareas_completadas,
         -- Etiquetas como JSON array
         (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', e.id, 'nombre', e.nombre, 'color', e.color))
          FROM g_etiquetas_tareas et JOIN g_etiquetas e ON e.id = et.etiqueta_id
@@ -439,7 +442,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
 // GET /api/gestion/tareas/completadas
 app.get('/api/gestion/tareas/completadas', async (req, res) => {
   const { categoria_id, responsable, proyecto_id } = req.query
-  const where  = ["t.empresa = ?", "t.estado IN ('Completada', 'Cancelada')"]
+  const where  = ["t.empresa = ?", "t.estado IN ('Completada', 'Cancelada')", "t.parent_id IS NULL"]
   const params = [req.empresa]
 
   if (categoria_id) { where.push('t.categoria_id = ?'); params.push(categoria_id) }
@@ -498,12 +501,49 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
   }
 })
 
+// GET /api/gestion/tareas/:id/subtareas
+app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
+  try {
+    const [subtareas] = await db.gestion.query(`
+      SELECT t.id, t.parent_id, t.titulo, t.estado, t.prioridad,
+             t.responsable, t.categoria_id,
+             c.nombre AS categoria_nombre, c.color AS categoria_color,
+             t.proyecto_id, t.fecha_limite, t.tiempo_real_min, t.tiempo_estimado_min,
+             t.fecha_inicio_real, t.fecha_fin_real,
+             (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
+             (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio
+      FROM g_tareas t
+      JOIN g_categorias c ON c.id = t.categoria_id
+      WHERE t.parent_id = ? AND t.empresa = ?
+      ORDER BY FIELD(t.estado,'Pendiente','En Progreso','Completada','Cancelada'),
+               FIELD(t.prioridad,'Urgente','Alta','Media','Baja'),
+               t.fecha_creacion ASC
+    `, [req.params.id, req.empresa])
+
+    // Enriquecer con nombre del responsable
+    const emails = [...new Set(subtareas.map(t => t.responsable).filter(Boolean))]
+    let nombreMap = {}
+    if (emails.length) {
+      try {
+        const [users] = await db.comunidad.query(
+          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${emails.map(() => '?').join(',')})`,
+          emails
+        )
+        nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
+      } catch {}
+    }
+    res.json({ ok: true, subtareas: subtareas.map(t => ({ ...t, responsable_nombre: nombreMap[t.responsable] || null })) })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // POST /api/gestion/tareas
 app.post('/api/gestion/tareas', async (req, res) => {
   const {
     titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-    tiempo_estimado_min, id_op, notas, etiquetas
+    tiempo_estimado_min, id_op, notas, etiquetas, parent_id
   } = req.body
 
   if (!titulo || !categoria_id) return res.status(400).json({ error: 'Faltan titulo y categoria_id' })
@@ -511,12 +551,13 @@ app.post('/api/gestion/tareas', async (req, res) => {
   try {
     const [result] = await db.gestion.query(`
       INSERT INTO g_tareas
-        (empresa, titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
+        (empresa, parent_id, titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
          fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
          tiempo_estimado_min, id_op, notas, usuario_creador, usuario_ult_modificacion)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      req.empresa, titulo, descripcion || null, categoria_id,
+      req.empresa, parent_id || null,
+      titulo, descripcion || null, categoria_id,
       proyecto_id || null,
       prioridad || 'Media',
       responsable || req.usuario.email,

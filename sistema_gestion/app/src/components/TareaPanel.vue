@@ -2,6 +2,11 @@
   <aside v-if="tarea" class="tarea-panel">
     <!-- Header -->
     <div class="tarea-panel-header">
+      <!-- Breadcrumb para subtareas -->
+      <div v-if="tarea.parent_id" class="subtarea-breadcrumb" @click="$emit('abrir-padre', tarea.parent_id)">
+        <span class="material-icons" style="font-size:13px">arrow_back</span>
+        <span>{{ padreNombre || 'Tarea padre' }}</span>
+      </div>
       <div style="display:flex;align-items:flex-start;gap:8px">
         <EstadoBadge :estado="tarea.estado" @click="ciclarEstado" style="margin-top:2px;flex-shrink:0" />
         <p class="tarea-panel-titulo">{{ tarea.titulo }}</p>
@@ -196,7 +201,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge       from './EstadoBadge.vue'
 import Cronometro        from './Cronometro.vue'
@@ -225,7 +230,17 @@ const props = defineProps({
   proyectos:  { type: Array, default: () => [] },
   etiquetas:  { type: Array, default: () => [] }
 })
-const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'proyecto-creado'])
+const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'proyecto-creado', 'abrir-padre'])
+
+// Breadcrumb subtarea
+const padreNombre = ref('')
+watch(() => props.tarea?.parent_id, async (parentId) => {
+  if (!parentId) { padreNombre.value = ''; return }
+  try {
+    const data = await api(`/api/gestion/tareas/${parentId}`)
+    padreNombre.value = data.tarea?.titulo || ''
+  } catch { padreNombre.value = '' }
+}, { immediate: true })
 
 // Acordeón fechas
 const mostrarFechas = ref(false)
@@ -328,6 +343,15 @@ async function completarSin() {
 </script>
 
 <style scoped>
+.subtarea-breadcrumb {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 0 6px;
+  font-size: 11px; color: var(--text-tertiary);
+  cursor: pointer; transition: color 80ms;
+  user-select: none;
+}
+.subtarea-breadcrumb:hover { color: var(--accent); }
+
 .prioridad-chips {
   display: flex; gap: 4px; flex-wrap: wrap;
 }

@@ -113,15 +113,49 @@
             <span class="grupo-nombre">{{ grupo.nombre }}</span>
             <span class="grupo-count">{{ grupo.tareas.length }}</span>
           </div>
-          <TareaItem
-            v-for="t in grupo.tareas"
-            :key="t.id"
-            :tarea="t"
-            :seleccionada="tareaSeleccionada?.id === t.id"
-            :usuario-actual="auth.usuario?.email"
-            @click="seleccionar"
-            @cambiar-estado="cambiarEstado"
-          />
+          <template v-for="t in grupo.tareas" :key="t.id">
+            <TareaItem
+              :tarea="t"
+              :seleccionada="tareaSeleccionada?.id === t.id"
+              :usuario-actual="auth.usuario?.email"
+              :expandida="!!subtareasExpandidas[t.id]"
+              @click="seleccionar"
+              @cambiar-estado="cambiarEstado"
+              @agregar-subtarea="iniciarSubtarea"
+              @toggle-subtareas="toggleSubtareas"
+            />
+            <!-- Subtareas expandidas -->
+            <template v-if="subtareasExpandidas[t.id]">
+              <TareaItem
+                v-for="sub in subtareasData[t.id] || []"
+                :key="sub.id"
+                :tarea="sub"
+                :seleccionada="tareaSeleccionada?.id === sub.id"
+                :usuario-actual="auth.usuario?.email"
+                @click="seleccionar"
+                @cambiar-estado="cambiarEstado"
+              />
+              <!-- Inline quickadd para nueva subtarea -->
+              <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
+                <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
+                <input
+                  ref="qaSubInputRef"
+                  v-model="qaSubTitulo"
+                  class="subtarea-input"
+                  placeholder="Nombre de la subtarea..."
+                  @keydown.enter.prevent="guardarSubtarea(t)"
+                  @keydown.escape="cancelarSubtarea"
+                />
+                <button class="btn btn-ghost btn-sm" @click="cancelarSubtarea">Cancelar</button>
+                <button class="btn btn-primary btn-sm" :disabled="!qaSubTitulo" @click="guardarSubtarea(t)">Agregar</button>
+              </div>
+              <!-- Botón + al final de subtareas expandidas -->
+              <div v-else class="subtarea-add-row" @click="iniciarSubtarea(t)">
+                <span class="material-icons" style="font-size:13px">subdirectory_arrow_right</span>
+                <span>Agregar subtarea</span>
+              </div>
+            </template>
+          </template>
         </template>
 
         <!-- Completadas al fondo (colapsables) -->
@@ -165,6 +199,7 @@
         @actualizada="onTareaActualizada"
         @eliminar="eliminar"
         @proyecto-creado="p => proyectos.push(p)"
+        @abrir-padre="abrirPadre"
         class="d-desktop-only"
       />
     </Transition>
@@ -185,6 +220,7 @@
               @actualizada="onTareaActualizada"
               @eliminar="eliminar"
               @proyecto-creado="p => proyectos.push(p)"
+              @abrir-padre="abrirPadre"
             />
           </div>
         </div>
@@ -204,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
@@ -240,6 +276,80 @@ const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'catego
 // Filtro por proyecto (desde query param)
 const proyectoFiltroId = computed(() => route.query.proyecto_id ? Number(route.query.proyecto_id) : null)
 const proyectoFiltro   = computed(() => proyectos.value.find(p => p.id === proyectoFiltroId.value) || null)
+
+// Subtareas
+const subtareasExpandidas = ref({})   // { [tareaId]: true }
+const subtareasData       = ref({})   // { [tareaId]: [subtarea, ...] }
+const qaSubtareaParentId  = ref(null)
+const qaSubTitulo         = ref('')
+const qaSubInputRef       = ref(null)
+
+async function toggleSubtareas(tarea) {
+  const id = tarea.id
+  if (subtareasExpandidas.value[id]) {
+    subtareasExpandidas.value = { ...subtareasExpandidas.value, [id]: false }
+    return
+  }
+  // Cargar subtareas si no están en caché
+  if (!subtareasData.value[id]) {
+    try {
+      const data = await api(`/api/gestion/tareas/${id}/subtareas`)
+      subtareasData.value = { ...subtareasData.value, [id]: data.subtareas || [] }
+    } catch (e) { console.error(e); return }
+  }
+  subtareasExpandidas.value = { ...subtareasExpandidas.value, [id]: true }
+}
+
+async function iniciarSubtarea(tarea) {
+  const id = tarea.id
+  // Expandir primero si no está expandido
+  if (!subtareasExpandidas.value[id]) {
+    if (!subtareasData.value[id]) {
+      try {
+        const data = await api(`/api/gestion/tareas/${id}/subtareas`)
+        subtareasData.value = { ...subtareasData.value, [id]: data.subtareas || [] }
+      } catch {}
+    }
+    subtareasExpandidas.value = { ...subtareasExpandidas.value, [id]: true }
+  }
+  qaSubtareaParentId.value = id
+  qaSubTitulo.value = ''
+  await nextTick()
+  const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
+  el?.focus()
+}
+
+function cancelarSubtarea() {
+  qaSubtareaParentId.value = null
+  qaSubTitulo.value = ''
+}
+
+async function guardarSubtarea(padre) {
+  if (!qaSubTitulo.value.trim()) return
+  try {
+    const data = await api('/api/gestion/tareas', {
+      method: 'POST',
+      body: JSON.stringify({
+        titulo:      qaSubTitulo.value.trim(),
+        categoria_id: padre.categoria_id,
+        proyecto_id:  padre.proyecto_id || null,
+        parent_id:    padre.id
+      })
+    })
+    // Agregar al array local de subtareas
+    const subs = subtareasData.value[padre.id] || []
+    subtareasData.value = { ...subtareasData.value, [padre.id]: [...subs, data.tarea] }
+    // Actualizar conteo en la tarea padre
+    const idx = tareas.value.findIndex(t => t.id === padre.id)
+    if (idx !== -1) {
+      tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
+    }
+    qaSubTitulo.value = ''
+    await nextTick()
+    const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
+    el?.focus()
+  } catch (e) { console.error(e) }
+}
 
 // QuickAdd desktop
 const qaActivo      = ref(false)
@@ -418,6 +528,18 @@ function onTareaActualizada(t) {
   if (tareaSeleccionada.value?.id === t.id) tareaSeleccionada.value = t
 }
 
+async function abrirPadre(parentId) {
+  // Buscar en lista local primero
+  let padre = tareas.value.find(t => t.id === parentId) || completadas.value.find(t => t.id === parentId)
+  if (!padre) {
+    try {
+      const data = await api(`/api/gestion/tareas/${parentId}`)
+      padre = data.tarea
+    } catch { return }
+  }
+  tareaSeleccionada.value = padre
+}
+
 function onTareaGuardada(tarea) {
   tareas.value.push(tarea)
   tareaSeleccionada.value = tarea
@@ -587,4 +709,25 @@ onUnmounted(() => { window.removeEventListener('resize', onResize) })
 .proyecto-header-nombre {
   font-size: 14px; font-weight: 600; color: var(--text-primary);
 }
+
+/* ─── SUBTAREAS ─── */
+.subtarea-quickadd {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 16px 4px 40px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+.subtarea-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-size: 13px; color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+.subtarea-input::placeholder { color: var(--text-tertiary); }
+.subtarea-add-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 16px 6px 42px;
+  font-size: 11px; color: var(--text-tertiary);
+  cursor: pointer; transition: color 80ms;
+}
+.subtarea-add-row:hover { color: var(--accent); }
 </style>

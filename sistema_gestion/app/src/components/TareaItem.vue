@@ -1,11 +1,26 @@
 <template>
   <div
     class="tarea-item"
-    :class="{ selected: seleccionada, completada: esCompletada }"
+    :class="{ selected: seleccionada, completada: esCompletada, 'is-subtarea': !!tarea.parent_id }"
     @click="$emit('click', tarea)"
+    @mouseenter="hover = true"
+    @mouseleave="hover = false"
   >
     <EstadoBadge :estado="tarea.estado" @click="$emit('cambiar-estado', tarea)" />
     <div class="cat-dot" :style="{ background: tarea.categoria_color }" />
+
+    <!-- Indicador subtareas expandibles (solo tareas padre) -->
+    <button
+      v-if="tarea.subtareas_total > 0 && !tarea.parent_id"
+      class="subtareas-badge"
+      :class="{ expandida: expandida }"
+      @click.stop="$emit('toggle-subtareas', tarea)"
+      :title="expandida ? 'Contraer subtareas' : 'Expandir subtareas'"
+    >
+      <span class="material-icons" style="font-size:12px">{{ expandida ? 'expand_more' : 'chevron_right' }}</span>
+      {{ tarea.subtareas_completadas }}/{{ tarea.subtareas_total }}
+    </button>
+
     <span class="tarea-titulo">{{ tarea.titulo }}</span>
 
     <div class="tarea-meta">
@@ -26,6 +41,14 @@
       />
 
       <span class="tarea-fecha" :class="clasesFecha">{{ fechaDisplay }}</span>
+
+      <!-- Botón + agregar subtarea (hover, solo tareas padre) -->
+      <button
+        v-if="hover && !tarea.parent_id && !esCompletada"
+        class="btn-add-subtarea"
+        title="Agregar subtarea"
+        @click.stop="$emit('agregar-subtarea', tarea)"
+      >+</button>
     </div>
   </div>
 </template>
@@ -38,9 +61,12 @@ import PrioridadIcon from './PrioridadIcon.vue'
 const props = defineProps({
   tarea:         { type: Object, required: true },
   seleccionada:  { type: Boolean, default: false },
-  usuarioActual: { type: String, default: '' }
+  usuarioActual: { type: String, default: '' },
+  expandida:     { type: Boolean, default: false }   // si sus subtareas están visibles
 })
-defineEmits(['click', 'cambiar-estado'])
+defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas'])
+
+const hover = ref(false)
 
 const esCompletada = computed(() => ['Completada','Cancelada'].includes(props.tarea.estado))
 
@@ -97,3 +123,37 @@ onMounted(() => {
 })
 onUnmounted(() => { if (interval) clearInterval(interval) })
 </script>
+
+<style scoped>
+/* Indicador ▶ N/M de subtareas */
+.subtareas-badge {
+  display: inline-flex; align-items: center; gap: 1px;
+  padding: 1px 5px; height: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: transparent;
+  font-size: 10px; color: var(--text-tertiary);
+  cursor: pointer; flex-shrink: 0;
+  transition: border-color 80ms, color 80ms;
+  white-space: nowrap;
+}
+.subtareas-badge:hover, .subtareas-badge.expandida {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Botón + agregar subtarea — solo visible en hover, derecha extrema */
+.btn-add-subtarea {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex-shrink: 0;
+  background: transparent; border: none;
+  font-size: 16px; color: var(--text-tertiary);
+  cursor: pointer; line-height: 1;
+  transition: color 80ms;
+  margin-left: 2px;
+}
+.btn-add-subtarea:hover { color: var(--accent); }
+
+/* Subtarea: indentación visual */
+.is-subtarea { padding-left: 32px !important; }
+</style>
