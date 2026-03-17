@@ -49,6 +49,18 @@
               <OpSelector v-model="form.id_op" />
             </div>
 
+            <!-- Proyecto + Etiquetas -->
+            <div class="form-row-2">
+              <div class="input-group">
+                <label class="input-label">Proyecto</label>
+                <ProyectoSelector v-model="form.proyecto_id" :proyectos="proyectos" />
+              </div>
+              <div class="input-group">
+                <label class="input-label">Etiquetas</label>
+                <EtiquetasSelector v-model="form.etiquetas" :etiquetas="etiquetas" />
+              </div>
+            </div>
+
             <!-- Fila fecha + responsable + prioridad -->
             <div class="form-row-3">
               <div class="input-group">
@@ -93,25 +105,29 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
-import OpSelector from 'src/components/OpSelector.vue'
+import OpSelector        from 'src/components/OpSelector.vue'
+import ProyectoSelector  from 'src/components/ProyectoSelector.vue'
+import EtiquetasSelector from 'src/components/EtiquetasSelector.vue'
 
 const props = defineProps({
   modelValue:  Boolean,
   tareaEditar: { type: Object, default: null },
   categorias:  { type: Array, default: () => [] },
+  proyectos:   { type: Array, default: () => [] },
+  etiquetas:   { type: Array, default: () => [] },
   usuarios:    { type: Array, default: () => [] }
 })
 const emit = defineEmits(['update:modelValue', 'guardada'])
 
-const auth     = useAuthStore()
+const auth      = useAuthStore()
 const guardando = ref(false)
 const tituloRef = ref(null)
 const isMobile  = computed(() => window.innerWidth <= 768)
 
 const form = ref({
-  titulo: '', descripcion: '', categoria_id: null,
+  titulo: '', descripcion: '', categoria_id: null, proyecto_id: null,
   prioridad: 'Media', responsable: auth.usuario?.email || '',
-  fecha_limite: '', id_op: ''
+  fecha_limite: '', id_op: '', etiquetas: []
 })
 
 const editar = computed(() => !!props.tareaEditar)
@@ -124,18 +140,21 @@ watch(() => props.modelValue, async (val) => {
       titulo:       props.tareaEditar.titulo || '',
       descripcion:  props.tareaEditar.descripcion || '',
       categoria_id: props.tareaEditar.categoria_id,
+      proyecto_id:  props.tareaEditar.proyecto_id || null,
       prioridad:    props.tareaEditar.prioridad || 'Media',
       responsable:  props.tareaEditar.responsable || auth.usuario?.email || '',
       fecha_limite: props.tareaEditar.fecha_limite || '',
-      id_op:        props.tareaEditar.id_op || ''
+      id_op:        props.tareaEditar.id_op || '',
+      etiquetas:    (props.tareaEditar.etiquetas || []).map(e => e.id)
     }
   } else {
     form.value = {
       titulo: '', descripcion: '',
       categoria_id: props.categorias[0]?.id || null,
+      proyecto_id: null,
       prioridad: 'Media',
       responsable: auth.usuario?.email || '',
-      fecha_limite: '', id_op: ''
+      fecha_limite: '', id_op: '', etiquetas: []
     }
   }
   await nextTick()
@@ -265,13 +284,20 @@ async function guardar() {
   flex-shrink: 0;
 }
 
-/* Fila de 3 */
+/* Filas */
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
 .form-row-3 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
 }
 @media (max-width: 768px) {
+  .form-row-2 { grid-template-columns: 1fr; }
   .form-row-3 { grid-template-columns: 1fr 1fr; }
 }
 

@@ -35,6 +35,23 @@
         </span>
       </div>
       <div class="field-row">
+        <span class="field-label">Proyecto</span>
+        <ProyectoSelector
+          :model-value="tarea.proyecto_id"
+          :proyectos="proyectos"
+          @update:model-value="actualizar('proyecto_id', $event)"
+        />
+      </div>
+      <div class="field-row" style="align-items:flex-start">
+        <span class="field-label" style="padding-top:4px">Etiquetas</span>
+        <EtiquetasSelector
+          :model-value="(tarea.etiquetas||[]).map(e=>e.id)"
+          :etiquetas="etiquetas"
+          @update:model-value="actualizarEtiquetas"
+          @etiqueta-creada="e => etiquetas.push(e)"
+        />
+      </div>
+      <div class="field-row">
         <span class="field-label">Responsable</span>
         <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.responsable" @change="actualizar('responsable', $event.target.value)">
           <option v-for="u in usuarios" :key="u.email" :value="u.email">{{ u.nombre }}</option>
@@ -130,12 +147,16 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { api } from 'src/services/api'
-import EstadoBadge from './EstadoBadge.vue'
-import Cronometro  from './Cronometro.vue'
+import EstadoBadge       from './EstadoBadge.vue'
+import Cronometro        from './Cronometro.vue'
+import ProyectoSelector  from './ProyectoSelector.vue'
+import EtiquetasSelector from './EtiquetasSelector.vue'
 
 const props = defineProps({
-  tarea:    { type: Object, default: null },
-  usuarios: { type: Array, default: () => [] }
+  tarea:     { type: Object, default: null },
+  usuarios:  { type: Array, default: () => [] },
+  proyectos: { type: Array, default: () => [] },
+  etiquetas: { type: Array, default: () => [] }
 })
 const emit = defineEmits(['cerrar', 'eliminar', 'actualizada'])
 
@@ -171,6 +192,17 @@ function ciclarEstado() {
 
 async function actualizarOP(val) {
   if (val !== props.tarea.id_op) actualizar('id_op', val)
+}
+
+async function actualizarEtiquetas(ids) {
+  if (!props.tarea) return
+  try {
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ etiquetas: ids })
+    })
+    emit('actualizada', data.tarea)
+  } catch (e) { console.error(e) }
 }
 
 function actualizarTiempoEst(parte, val) {

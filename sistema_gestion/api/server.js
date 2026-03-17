@@ -347,7 +347,7 @@ app.get('/api/gestion/perfiles', async (req, res) => {
 // GET /api/gestion/tareas
 // Filtros: ?filtro=hoy|manana|ayer|semana&responsable=email&categoria_id=&estado=&prioridad=&agrupar=categoria|prioridad|fecha|persona
 app.get('/api/gestion/tareas', async (req, res) => {
-  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias } = req.query
+  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id } = req.query
   const empresa = req.empresa
 
   const where  = ['t.empresa = ?']
@@ -365,11 +365,13 @@ app.get('/api/gestion/tareas', async (req, res) => {
   }
 
   // Filtros adicionales
-  if (responsable) { where.push('t.responsable = ?'); params.push(responsable) }
+  if (responsable)  { where.push('t.responsable = ?');   params.push(responsable) }
   if (solo_mias === '1') { where.push('t.responsable = ?'); params.push(req.usuario.email) }
   if (categoria_id) { where.push('t.categoria_id = ?'); params.push(categoria_id) }
   if (estado)       { where.push('t.estado = ?');        params.push(estado) }
   if (prioridad)    { where.push('t.prioridad = ?');     params.push(prioridad) }
+  if (proyecto_id === 'null') { where.push('t.proyecto_id IS NULL') }
+  else if (proyecto_id) { where.push('t.proyecto_id = ?'); params.push(proyecto_id) }
 
   // Por defecto excluir completadas y canceladas (se muestran en sección separada)
   if (!estado) {
@@ -382,15 +384,22 @@ app.get('/api/gestion/tareas', async (req, res) => {
         t.id, t.empresa, t.titulo, t.estado, t.prioridad,
         t.responsable, t.categoria_id,
         c.nombre AS categoria_nombre, c.color AS categoria_color, c.icono AS categoria_icono,
+        t.proyecto_id,
+        p.nombre AS proyecto_nombre, p.color AS proyecto_color,
         t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
         t.fecha_inicio_real, t.fecha_fin_real,
         t.id_op, t.tiempo_real_min, t.tiempo_estimado_min, t.notas,
         t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
         -- ¿Hay cronómetro corriendo?
         (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
-        (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio
+        (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio,
+        -- Etiquetas como JSON array
+        (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', e.id, 'nombre', e.nombre, 'color', e.color))
+         FROM g_etiquetas_tareas et JOIN g_etiquetas e ON e.id = et.etiqueta_id
+         WHERE et.tarea_id = t.id) AS etiquetas_json
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
+      LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
       WHERE ${where.join(' AND ')}
       ORDER BY
         FIELD(t.prioridad, 'Urgente', 'Alta', 'Media', 'Baja'),
@@ -398,7 +407,13 @@ app.get('/api/gestion/tareas', async (req, res) => {
         t.fecha_creacion DESC
     `, params)
 
-    res.json({ ok: true, tareas })
+    // Parsear etiquetas_json (viene como string de MySQL)
+    const tareasConEtiquetas = tareas.map(t => ({
+      ...t,
+      etiquetas: t.etiquetas_json ? (typeof t.etiquetas_json === 'string' ? JSON.parse(t.etiquetas_json) : t.etiquetas_json) : []
+    }))
+
+    res.json({ ok: true, tareas: tareasConEtiquetas })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -436,9 +451,11 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
   try {
     const [[tarea]] = await db.gestion.query(`
       SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
-             c.icono AS categoria_icono, c.es_produccion
+             c.icono AS categoria_icono, c.es_produccion,
+             p.nombre AS proyecto_nombre, p.color AS proyecto_color
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
+      LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
       WHERE t.id = ? AND t.empresa = ?
     `, [req.params.id, req.empresa])
 
@@ -450,7 +467,14 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
       [req.params.id]
     )
 
-    res.json({ ok: true, tarea: { ...tarea, tiempos } })
+    // Etiquetas de la tarea
+    const [etiquetas] = await db.gestion.query(`
+      SELECT e.id, e.nombre, e.color
+      FROM g_etiquetas_tareas et JOIN g_etiquetas e ON e.id = et.etiqueta_id
+      WHERE et.tarea_id = ?
+    `, [req.params.id])
+
+    res.json({ ok: true, tarea: { ...tarea, tiempos, etiquetas } })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -459,9 +483,9 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
 // POST /api/gestion/tareas
 app.post('/api/gestion/tareas', async (req, res) => {
   const {
-    titulo, descripcion, categoria_id, prioridad, responsable,
+    titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-    tiempo_estimado_min, id_op, notas
+    tiempo_estimado_min, id_op, notas, etiquetas
   } = req.body
 
   if (!titulo || !categoria_id) return res.status(400).json({ error: 'Faltan titulo y categoria_id' })
@@ -469,12 +493,13 @@ app.post('/api/gestion/tareas', async (req, res) => {
   try {
     const [result] = await db.gestion.query(`
       INSERT INTO g_tareas
-        (empresa, titulo, descripcion, categoria_id, prioridad, responsable,
+        (empresa, titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
          fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
          tiempo_estimado_min, id_op, notas, usuario_creador, usuario_ult_modificacion)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       req.empresa, titulo, descripcion || null, categoria_id,
+      proyecto_id || null,
       prioridad || 'Media',
       responsable || req.usuario.email,
       fecha_limite || null,
@@ -485,9 +510,22 @@ app.post('/api/gestion/tareas', async (req, res) => {
       req.usuario.email, req.usuario.email
     ])
 
+    const tareaId = result.insertId
+
+    // Insertar etiquetas si se pasaron
+    if (etiquetas && Array.isArray(etiquetas) && etiquetas.length > 0) {
+      const vals = etiquetas.map(eid => [tareaId, eid])
+      await db.gestion.query('INSERT IGNORE INTO g_etiquetas_tareas (tarea_id, etiqueta_id) VALUES ?', [vals])
+    }
+
     const [[tarea]] = await db.gestion.query(
-      'SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color FROM g_tareas t JOIN g_categorias c ON c.id = t.categoria_id WHERE t.id = ?',
-      [result.insertId]
+      `SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
+              p.nombre AS proyecto_nombre, p.color AS proyecto_color
+       FROM g_tareas t
+       JOIN g_categorias c ON c.id = t.categoria_id
+       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
+       WHERE t.id = ?`,
+      [tareaId]
     )
     res.status(201).json({ ok: true, tarea })
   } catch (e) {
@@ -498,10 +536,10 @@ app.post('/api/gestion/tareas', async (req, res) => {
 // PUT /api/gestion/tareas/:id
 app.put('/api/gestion/tareas/:id', async (req, res) => {
   const {
-    titulo, descripcion, categoria_id, estado, prioridad, responsable,
+    titulo, descripcion, categoria_id, proyecto_id, estado, prioridad, responsable,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
     fecha_inicio_real, fecha_fin_real,
-    tiempo_real_min, tiempo_estimado_min, id_op, notas
+    tiempo_real_min, tiempo_estimado_min, id_op, notas, etiquetas
   } = req.body
 
   try {
@@ -511,6 +549,7 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     if (titulo           !== undefined) { sets.push('titulo = ?');             params.push(titulo) }
     if (descripcion      !== undefined) { sets.push('descripcion = ?');        params.push(descripcion) }
     if (categoria_id     !== undefined) { sets.push('categoria_id = ?');       params.push(categoria_id) }
+    if (proyecto_id      !== undefined) { sets.push('proyecto_id = ?');        params.push(proyecto_id) }
     if (estado           !== undefined) { sets.push('estado = ?');             params.push(estado) }
     if (prioridad        !== undefined) { sets.push('prioridad = ?');          params.push(prioridad) }
     if (responsable      !== undefined) { sets.push('responsable = ?');        params.push(responsable) }
@@ -524,19 +563,33 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     if (id_op            !== undefined) { sets.push('id_op = ?');              params.push(id_op) }
     if (notas            !== undefined) { sets.push('notas = ?');              params.push(notas) }
 
-    if (!sets.length) return res.status(400).json({ error: 'Nada que actualizar' })
+    if (sets.length) {
+      sets.push('usuario_ult_modificacion = ?')
+      params.push(req.usuario.email)
+      params.push(req.params.id, req.empresa)
 
-    sets.push('usuario_ult_modificacion = ?')
-    params.push(req.usuario.email)
-    params.push(req.params.id, req.empresa)
+      await db.gestion.query(
+        `UPDATE g_tareas SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`,
+        params
+      )
+    }
 
-    await db.gestion.query(
-      `UPDATE g_tareas SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`,
-      params
-    )
+    // Actualizar etiquetas (si se pasó el array — reemplaza todas)
+    if (etiquetas !== undefined && Array.isArray(etiquetas)) {
+      await db.gestion.query('DELETE FROM g_etiquetas_tareas WHERE tarea_id = ?', [req.params.id])
+      if (etiquetas.length > 0) {
+        const vals = etiquetas.map(eid => [req.params.id, eid])
+        await db.gestion.query('INSERT IGNORE INTO g_etiquetas_tareas (tarea_id, etiqueta_id) VALUES ?', [vals])
+      }
+    }
 
     const [[tarea]] = await db.gestion.query(
-      'SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color FROM g_tareas t JOIN g_categorias c ON c.id = t.categoria_id WHERE t.id = ?',
+      `SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
+              p.nombre AS proyecto_nombre, p.color AS proyecto_color
+       FROM g_tareas t
+       JOIN g_categorias c ON c.id = t.categoria_id
+       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
+       WHERE t.id = ?`,
       [req.params.id]
     )
     res.json({ ok: true, tarea })
@@ -972,6 +1025,224 @@ app.put('/api/gestion/informes/:id', async (req, res) => {
 app.delete('/api/gestion/informes/:id', async (req, res) => {
   try {
     await db.gestion.query('DELETE FROM g_informes WHERE id = ? AND empresa = ?', [req.params.id, req.empresa])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── PROYECTOS ────────────────────────────────────────────────────
+
+// GET /api/gestion/proyectos — lista proyectos de la empresa
+app.get('/api/gestion/proyectos', async (req, res) => {
+  const { estado } = req.query
+  const where  = ['p.empresa = ?']
+  const params = [req.empresa]
+  if (estado) { where.push('p.estado = ?'); params.push(estado) }
+
+  try {
+    const [proyectos] = await db.gestion.query(`
+      SELECT p.*,
+        c.nombre AS categoria_nombre, c.color AS categoria_color,
+        (SELECT COUNT(*) FROM g_tareas t WHERE t.proyecto_id = p.id AND t.estado NOT IN ('Completada','Cancelada')) AS tareas_pendientes,
+        (SELECT GROUP_CONCAT(pr.email SEPARATOR ',') FROM g_proyectos_responsables pr WHERE pr.proyecto_id = p.id) AS responsables_csv,
+        (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', e.id, 'nombre', e.nombre, 'color', e.color))
+         FROM g_etiquetas_proyectos ep JOIN g_etiquetas e ON e.id = ep.etiqueta_id
+         WHERE ep.proyecto_id = p.id) AS etiquetas_json
+      FROM g_proyectos p
+      LEFT JOIN g_categorias c ON c.id = p.categoria_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY p.fecha_creacion DESC
+    `, params)
+
+    const result = proyectos.map(p => ({
+      ...p,
+      responsables: p.responsables_csv ? p.responsables_csv.split(',') : [],
+      etiquetas:    p.etiquetas_json ? (typeof p.etiquetas_json === 'string' ? JSON.parse(p.etiquetas_json) : p.etiquetas_json) : []
+    }))
+
+    res.json({ ok: true, proyectos: result })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/proyectos/:id
+app.get('/api/gestion/proyectos/:id', async (req, res) => {
+  try {
+    const [[proyecto]] = await db.gestion.query(`
+      SELECT p.*, c.nombre AS categoria_nombre, c.color AS categoria_color
+      FROM g_proyectos p
+      LEFT JOIN g_categorias c ON c.id = p.categoria_id
+      WHERE p.id = ? AND p.empresa = ?
+    `, [req.params.id, req.empresa])
+
+    if (!proyecto) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const [responsables] = await db.gestion.query(
+      'SELECT email FROM g_proyectos_responsables WHERE proyecto_id = ?', [req.params.id]
+    )
+    const [etiquetas] = await db.gestion.query(`
+      SELECT e.id, e.nombre, e.color
+      FROM g_etiquetas_proyectos ep JOIN g_etiquetas e ON e.id = ep.etiqueta_id
+      WHERE ep.proyecto_id = ?
+    `, [req.params.id])
+
+    res.json({ ok: true, proyecto: {
+      ...proyecto,
+      responsables: responsables.map(r => r.email),
+      etiquetas
+    }})
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/proyectos
+app.post('/api/gestion/proyectos', async (req, res) => {
+  const { nombre, descripcion, color, categoria_id, prioridad, estado,
+          fecha_estimada_fin, responsables, etiquetas } = req.body
+
+  if (!nombre) return res.status(400).json({ error: 'Falta nombre del proyecto' })
+
+  try {
+    const [result] = await db.gestion.query(`
+      INSERT INTO g_proyectos
+        (empresa, nombre, descripcion, color, categoria_id, prioridad, estado,
+         fecha_estimada_fin, usuario_creador, usuario_ult_modificacion)
+      VALUES (?,?,?,?,?,?,?,?,?,?)
+    `, [
+      req.empresa, nombre, descripcion||null, color||'#607D8B',
+      categoria_id||null, prioridad||'Media', estado||'Activo',
+      fecha_estimada_fin||null, req.usuario.email, req.usuario.email
+    ])
+
+    const pid = result.insertId
+
+    // Responsables
+    if (responsables && Array.isArray(responsables) && responsables.length > 0) {
+      const vals = responsables.map(e => [pid, e])
+      await db.gestion.query('INSERT IGNORE INTO g_proyectos_responsables (proyecto_id, email) VALUES ?', [vals])
+    } else {
+      await db.gestion.query('INSERT IGNORE INTO g_proyectos_responsables (proyecto_id, email) VALUES (?,?)', [pid, req.usuario.email])
+    }
+
+    // Etiquetas
+    if (etiquetas && Array.isArray(etiquetas) && etiquetas.length > 0) {
+      const vals = etiquetas.map(eid => [pid, eid])
+      await db.gestion.query('INSERT IGNORE INTO g_etiquetas_proyectos (proyecto_id, etiqueta_id) VALUES ?', [vals])
+    }
+
+    const [[proyecto]] = await db.gestion.query(
+      'SELECT p.*, c.nombre AS categoria_nombre, c.color AS categoria_color FROM g_proyectos p LEFT JOIN g_categorias c ON c.id = p.categoria_id WHERE p.id = ?',
+      [pid]
+    )
+    const [resps] = await db.gestion.query('SELECT email FROM g_proyectos_responsables WHERE proyecto_id = ?', [pid])
+    res.status(201).json({ ok: true, proyecto: { ...proyecto, responsables: resps.map(r=>r.email) } })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/proyectos/:id
+app.put('/api/gestion/proyectos/:id', async (req, res) => {
+  const { nombre, descripcion, color, categoria_id, prioridad, estado,
+          fecha_estimada_fin, responsables, etiquetas } = req.body
+
+  try {
+    const sets = []; const params = []
+    if (nombre            !== undefined) { sets.push('nombre = ?');            params.push(nombre) }
+    if (descripcion       !== undefined) { sets.push('descripcion = ?');       params.push(descripcion) }
+    if (color             !== undefined) { sets.push('color = ?');             params.push(color) }
+    if (categoria_id      !== undefined) { sets.push('categoria_id = ?');      params.push(categoria_id) }
+    if (prioridad         !== undefined) { sets.push('prioridad = ?');         params.push(prioridad) }
+    if (estado            !== undefined) { sets.push('estado = ?');            params.push(estado) }
+    if (fecha_estimada_fin !== undefined) { sets.push('fecha_estimada_fin = ?'); params.push(fecha_estimada_fin) }
+
+    if (sets.length) {
+      sets.push('usuario_ult_modificacion = ?'); params.push(req.usuario.email)
+      params.push(req.params.id, req.empresa)
+      await db.gestion.query(`UPDATE g_proyectos SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`, params)
+    }
+
+    // Responsables (reemplaza todos)
+    if (responsables !== undefined && Array.isArray(responsables)) {
+      await db.gestion.query('DELETE FROM g_proyectos_responsables WHERE proyecto_id = ?', [req.params.id])
+      if (responsables.length > 0) {
+        const vals = responsables.map(e => [req.params.id, e])
+        await db.gestion.query('INSERT IGNORE INTO g_proyectos_responsables (proyecto_id, email) VALUES ?', [vals])
+      }
+    }
+
+    // Etiquetas (reemplaza todas)
+    if (etiquetas !== undefined && Array.isArray(etiquetas)) {
+      await db.gestion.query('DELETE FROM g_etiquetas_proyectos WHERE proyecto_id = ?', [req.params.id])
+      if (etiquetas.length > 0) {
+        const vals = etiquetas.map(eid => [req.params.id, eid])
+        await db.gestion.query('INSERT IGNORE INTO g_etiquetas_proyectos (proyecto_id, etiqueta_id) VALUES ?', [vals])
+      }
+    }
+
+    const [[proyecto]] = await db.gestion.query(
+      'SELECT p.*, c.nombre AS categoria_nombre, c.color AS categoria_color FROM g_proyectos p LEFT JOIN g_categorias c ON c.id = p.categoria_id WHERE p.id = ?',
+      [req.params.id]
+    )
+    const [resps] = await db.gestion.query('SELECT email FROM g_proyectos_responsables WHERE proyecto_id = ?', [req.params.id])
+    res.json({ ok: true, proyecto: { ...proyecto, responsables: resps.map(r=>r.email) } })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// DELETE /api/gestion/proyectos/:id
+app.delete('/api/gestion/proyectos/:id', async (req, res) => {
+  try {
+    // Desanclar las tareas (proyecto_id → null) antes de eliminar
+    await db.gestion.query('UPDATE g_tareas SET proyecto_id = NULL WHERE proyecto_id = ? AND empresa = ?', [req.params.id, req.empresa])
+    await db.gestion.query('DELETE FROM g_proyectos WHERE id = ? AND empresa = ?', [req.params.id, req.empresa])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── ETIQUETAS ────────────────────────────────────────────────────
+
+// GET /api/gestion/etiquetas
+app.get('/api/gestion/etiquetas', async (req, res) => {
+  try {
+    const [etiquetas] = await db.gestion.query(
+      'SELECT * FROM g_etiquetas WHERE empresa = ? ORDER BY nombre',
+      [req.empresa]
+    )
+    res.json({ ok: true, etiquetas })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/etiquetas
+app.post('/api/gestion/etiquetas', async (req, res) => {
+  const { nombre, color } = req.body
+  if (!nombre) return res.status(400).json({ error: 'Falta nombre' })
+  try {
+    const [r] = await db.gestion.query(
+      'INSERT INTO g_etiquetas (empresa, nombre, color, usuario_creador) VALUES (?,?,?,?)',
+      [req.empresa, nombre.trim(), color||null, req.usuario.email]
+    )
+    const [[etiqueta]] = await db.gestion.query('SELECT * FROM g_etiquetas WHERE id = ?', [r.insertId])
+    res.status(201).json({ ok: true, etiqueta })
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ya existe esa etiqueta' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// PUT /api/gestion/etiquetas/:id
+app.put('/api/gestion/etiquetas/:id', async (req, res) => {
+  const { nombre, color } = req.body
+  const sets = []; const params = []
+  if (nombre !== undefined) { sets.push('nombre = ?'); params.push(nombre.trim()) }
+  if (color  !== undefined) { sets.push('color = ?');  params.push(color) }
+  if (!sets.length) return res.status(400).json({ error: 'Nada que actualizar' })
+  params.push(req.params.id, req.empresa)
+  try {
+    await db.gestion.query(`UPDATE g_etiquetas SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`, params)
+    const [[etiqueta]] = await db.gestion.query('SELECT * FROM g_etiquetas WHERE id = ?', [req.params.id])
+    res.json({ ok: true, etiqueta })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// DELETE /api/gestion/etiquetas/:id
+app.delete('/api/gestion/etiquetas/:id', async (req, res) => {
+  try {
+    await db.gestion.query('DELETE FROM g_etiquetas WHERE id = ? AND empresa = ?', [req.params.id, req.empresa])
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })

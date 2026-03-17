@@ -67,9 +67,30 @@
             {{ c.nombre.replace(/_/g, ' ') }}
           </button>
         </div>
+        <!-- Proyecto + etiquetas + OP -->
+        <div v-if="qaActivo" class="quickadd-extra">
+          <ProyectoSelector
+            v-model="qaProyectoId"
+            :proyectos="proyectos"
+          />
+          <EtiquetasSelector
+            v-model="qaEtiquetas"
+            :etiquetas="etiquetas"
+            @etiqueta-creada="e => etiquetas.push(e)"
+          />
+        </div>
         <div v-if="qaActivo && qaCatEsProduccion" class="quickadd-op">
           <OpSelector v-model="qaOp" style="max-width:360px" />
         </div>
+      </div>
+
+      <!-- Chip de proyecto activo -->
+      <div v-if="proyectoFiltro" class="proyecto-filtro-bar">
+        <span class="proyecto-dot-bar" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
+        <span>{{ proyectoFiltro.nombre }}</span>
+        <RouterLink to="/tareas" class="proyecto-filtro-clear" title="Ver todas">
+          <span class="material-icons" style="font-size:14px">close</span>
+        </RouterLink>
       </div>
 
       <!-- Lista de tareas -->
@@ -130,7 +151,8 @@
         v-if="tareaSeleccionada"
         :tarea="tareaSeleccionada"
         :usuarios="usuarios"
-        :categorias="categorias"
+        :proyectos="proyectos"
+        :etiquetas="etiquetas"
         @cerrar="tareaSeleccionada = null"
         @actualizada="onTareaActualizada"
         @eliminar="eliminar"
@@ -142,6 +164,8 @@
     <TareaForm
       v-model="mostrarForm"
       :categorias="categorias"
+      :proyectos="proyectos"
+      :etiquetas="etiquetas"
       :usuarios="usuarios"
       @guardada="onTareaGuardada"
     />
@@ -150,19 +174,25 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
-import TareaItem  from 'src/components/TareaItem.vue'
-import TareaPanel from 'src/components/TareaPanel.vue'
-import TareaForm  from 'src/components/TareaForm.vue'
-import OpSelector from 'src/components/OpSelector.vue'
+import TareaItem          from 'src/components/TareaItem.vue'
+import TareaPanel         from 'src/components/TareaPanel.vue'
+import TareaForm          from 'src/components/TareaForm.vue'
+import OpSelector         from 'src/components/OpSelector.vue'
+import ProyectoSelector   from 'src/components/ProyectoSelector.vue'
+import EtiquetasSelector  from 'src/components/EtiquetasSelector.vue'
 
-const auth = useAuthStore()
+const auth  = useAuthStore()
+const route = useRoute()
 
 // Estado principal
 const tareas            = ref([])
 const completadas       = ref([])
 const categorias        = ref([])
+const proyectos         = ref([])
+const etiquetas         = ref([])
 const usuarios          = ref([])
 const cargando          = ref(true)
 const tareaSeleccionada = ref(null)
@@ -172,13 +202,19 @@ const menuAgrupar       = ref(false)
 const filtroActivo      = ref('hoy')
 const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
 
+// Filtro por proyecto (desde query param)
+const proyectoFiltroId = computed(() => route.query.proyecto_id ? Number(route.query.proyecto_id) : null)
+const proyectoFiltro   = computed(() => proyectos.value.find(p => p.id === proyectoFiltroId.value) || null)
+
 // QuickAdd desktop
-const qaActivo    = ref(false)
-const qaTitulo    = ref('')
-const qaCatId     = ref(null)
-const qaOp        = ref('')
-const qaGuardando = ref(false)
-const qaInputRef  = ref(null)
+const qaActivo      = ref(false)
+const qaTitulo      = ref('')
+const qaCatId       = ref(null)
+const qaOp          = ref('')
+const qaProyectoId  = ref(null)
+const qaGuardando   = ref(false)
+const qaInputRef    = ref(null)
+const qaEtiquetas   = ref([])
 
 const qaCatEsProduccion = computed(() =>
   categorias.value.find(c => c.id === qaCatId.value)?.es_produccion
@@ -189,9 +225,11 @@ watch(categorias, (cats) => {
 }, { immediate: true })
 
 function qaCancelar() {
-  qaActivo.value = false
-  qaTitulo.value = ''
-  qaOp.value = ''
+  qaActivo.value    = false
+  qaTitulo.value    = ''
+  qaOp.value        = ''
+  qaProyectoId.value = null
+  qaEtiquetas.value  = []
 }
 
 async function qaAgregar() {
@@ -199,17 +237,21 @@ async function qaAgregar() {
   qaGuardando.value = true
   try {
     const body = {
-      titulo:      qaTitulo.value,
+      titulo:       qaTitulo.value,
       categoria_id: qaCatId.value || categorias.value[0]?.id,
-      id_op:       qaOp.value || null,
+      proyecto_id:  qaProyectoId.value ?? proyectoFiltroId.value ?? null,
+      id_op:        qaOp.value || null,
+      etiquetas:    qaEtiquetas.value,
       fecha_limite: filtroActivo.value === 'hoy'    ? hoyISO() :
                     filtroActivo.value === 'manana'  ? mananaISO() : null
     }
     const data = await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(body) })
     onTareaGuardada(data.tarea)
-    qaTitulo.value = ''
-    qaOp.value = ''
-    qaActivo.value = false
+    qaTitulo.value     = ''
+    qaOp.value         = ''
+    qaProyectoId.value = null
+    qaEtiquetas.value  = []
+    qaActivo.value     = false
   } catch (e) { console.error(e) } finally { qaGuardando.value = false }
 }
 
@@ -234,6 +276,7 @@ function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.
 
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
+watch(() => route.query.proyecto_id, () => cargarTareas())
 
 const ORDEN_PRIORIDAD    = ['Urgente','Alta','Media','Baja']
 const COLORES_PRIORIDAD  = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280', Baja: '#374151' }
@@ -289,22 +332,27 @@ async function cargarTareas() {
     const params = new URLSearchParams()
     if (filtroActivo.value === 'mias') { params.set('solo_mias', '1') }
     else if (filtroActivo.value !== 'todas') { params.set('filtro', filtroActivo.value) }
+    if (proyectoFiltroId.value) params.set('proyecto_id', proyectoFiltroId.value)
     const [dataTareas, dataCompletadas] = await Promise.all([
       api(`/api/gestion/tareas?${params}`),
       api('/api/gestion/tareas/completadas')
     ])
-    tareas.value     = dataTareas.tareas || []
+    tareas.value      = dataTareas.tareas || []
     completadas.value = dataCompletadas.tareas || []
   } catch (e) { console.error(e) } finally { cargando.value = false }
 }
 
 async function cargarCatalogos() {
-  const [resCat, resUsr] = await Promise.allSettled([
+  const [resCat, resUsr, resProy, resEtq] = await Promise.allSettled([
     api('/api/gestion/categorias'),
-    api('/api/gestion/usuarios')
+    api('/api/gestion/usuarios'),
+    api('/api/gestion/proyectos?estado=Activo'),
+    api('/api/gestion/etiquetas')
   ])
-  if (resCat.status === 'fulfilled') categorias.value = resCat.value.categorias || []
-  if (resUsr.status === 'fulfilled') usuarios.value   = resUsr.value.usuarios   || []
+  if (resCat.status  === 'fulfilled') categorias.value = resCat.value.categorias   || []
+  if (resUsr.status  === 'fulfilled') usuarios.value   = resUsr.value.usuarios     || []
+  if (resProy.status === 'fulfilled') proyectos.value  = resProy.value.proyectos   || []
+  if (resEtq.status  === 'fulfilled') etiquetas.value  = resEtq.value.etiquetas    || []
 }
 
 function seleccionar(tarea) {
@@ -455,4 +503,29 @@ onMounted(async () => {
 
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* QuickAdd extra (proyecto + etiquetas) */
+.quickadd-extra {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0 6px 26px;
+  flex-wrap: wrap;
+}
+
+/* Chip filtro proyecto activo */
+.proyecto-filtro-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 16px;
+  background: var(--bg-row-hover);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px; color: var(--text-secondary);
+}
+.proyecto-dot-bar {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.proyecto-filtro-clear {
+  display: inline-flex; align-items: center;
+  margin-left: auto; color: var(--text-tertiary);
+  text-decoration: none; transition: color 80ms;
+}
+.proyecto-filtro-clear:hover { color: var(--text-primary); }
 </style>

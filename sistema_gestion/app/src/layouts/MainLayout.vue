@@ -18,7 +18,7 @@
       <nav class="sidebar-nav">
         <div class="sidebar-section">
           <div class="sidebar-section-label">Tareas</div>
-          <RouterLink to="/tareas" class="nav-item" :class="{ active: ruta === '/tareas' }">
+          <RouterLink to="/tareas" class="nav-item" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
             <span class="nav-item-icon material-icons">check_circle_outline</span>
             <span class="nav-item-label">Mis Tareas</span>
           </RouterLink>
@@ -26,6 +26,48 @@
             <span class="nav-item-icon material-icons">group</span>
             <span class="nav-item-label">Equipo</span>
           </RouterLink>
+        </div>
+
+        <!-- PROYECTOS -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Proyectos</span>
+            <button class="btn-icon-tiny" title="Nuevo proyecto" @click="nuevoProyectoInline">
+              <span class="material-icons" style="font-size:14px">add</span>
+            </button>
+          </div>
+
+          <!-- Nuevo proyecto inline -->
+          <div v-if="creandoProyecto" class="proyecto-create-row">
+            <span class="proyecto-color-dot" :style="{ background: nuevoProyectoColor }"></span>
+            <input
+              ref="inputNuevoProyecto"
+              v-model="nuevoProyectoNombre"
+              class="proyecto-create-input"
+              placeholder="Nombre del proyecto..."
+              @keydown.enter="guardarProyecto"
+              @keydown.escape="cancelarProyecto"
+            />
+          </div>
+
+          <!-- Lista de proyectos -->
+          <RouterLink
+            v-for="p in proyectos"
+            :key="p.id"
+            :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+            class="nav-item nav-item-proyecto"
+            :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
+          >
+            <span class="nav-item-icon">
+              <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
+            </span>
+            <span class="nav-item-label">{{ p.nombre }}</span>
+            <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
+          </RouterLink>
+
+          <div v-if="!proyectos.length && !cargandoProyectos" class="sidebar-empty-hint">
+            Sin proyectos activos
+          </div>
         </div>
 
         <div class="sidebar-section">
@@ -126,9 +168,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
+import { api } from 'src/services/api'
 
 const auth             = useAuthStore()
 const router           = useRouter()
@@ -136,6 +179,47 @@ const route            = useRoute()
 const sidebarCollapsed = ref(false)
 const drawerOpen       = ref(false)
 const menuUsuario      = ref(false)
+
+// Proyectos en sidebar
+const proyectos           = ref([])
+const cargandoProyectos   = ref(false)
+const creandoProyecto     = ref(false)
+const nuevoProyectoNombre = ref('')
+const nuevoProyectoColor  = ref('#607D8B')
+const inputNuevoProyecto  = ref(null)
+
+async function cargarProyectos() {
+  cargandoProyectos.value = true
+  try {
+    const data = await api('/api/gestion/proyectos?estado=Activo')
+    proyectos.value = data.proyectos || []
+  } catch {} finally { cargandoProyectos.value = false }
+}
+
+async function nuevoProyectoInline() {
+  creandoProyecto.value = true
+  nuevoProyectoNombre.value = ''
+  await nextTick()
+  inputNuevoProyecto.value?.focus()
+}
+
+async function guardarProyecto() {
+  if (!nuevoProyectoNombre.value.trim()) return cancelarProyecto()
+  try {
+    const data = await api('/api/gestion/proyectos', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: nuevoProyectoNombre.value.trim(), color: nuevoProyectoColor.value })
+    })
+    proyectos.value.push(data.proyecto)
+    cancelarProyecto()
+    router.push({ path: '/tareas', query: { proyecto_id: data.proyecto.id } })
+  } catch (e) { console.error(e) }
+}
+
+function cancelarProyecto() {
+  creandoProyecto.value = false
+  nuevoProyectoNombre.value = ''
+}
 
 const ruta = computed(() => route.path)
 
@@ -162,6 +246,10 @@ function cerrarSesion() {
   auth.cerrarSesion()
   router.push('/login')
 }
+
+onMounted(() => {
+  if (auth.token) cargarProyectos()
+})
 </script>
 
 <style scoped>
@@ -190,6 +278,42 @@ function cerrarSesion() {
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
 .drawer-enter-active .drawer-panel, .drawer-leave-active .drawer-panel { transition: transform 150ms ease-out; }
 .drawer-enter-from .drawer-panel, .drawer-leave-to .drawer-panel { transform: translateX(-100%); }
+
+/* Proyectos sidebar */
+.btn-icon-tiny {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-tertiary); transition: background 80ms, color 80ms;
+}
+.btn-icon-tiny:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+
+.nav-item-proyecto { position: relative; }
+.nav-item-count {
+  margin-left: auto; font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 16px; text-align: right;
+}
+.proyecto-dot-sm {
+  width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+}
+.sidebar-empty-hint {
+  padding: 4px 16px 6px;
+  font-size: 11px; color: var(--text-tertiary); font-style: italic;
+}
+
+/* Crear proyecto inline */
+.proyecto-create-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 8px 4px 16px; margin: 2px 0;
+}
+.proyecto-color-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.proyecto-create-input {
+  flex: 1; background: transparent;
+  border: none; border-bottom: 1px solid var(--accent);
+  outline: none; font-size: 13px; color: var(--text-primary);
+  padding: 2px 0;
+}
 
 /* Menú usuario */
 .usuario-menu {
