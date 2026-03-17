@@ -27,6 +27,7 @@
 15. [Bot de Telegram](#telegram)
 16. [Sistema de usuarios, niveles y configuración](#usuarios)
 17. [Multi-empresa](#multiempresa)
+17bis. [Protocolo de aprendizaje — ia_logica_negocio](#aprendizaje)
 18. [Cómo agregar / configurar un agente](#agregar-agente)
 19. [Monitoreo del consumo](#monitoreo)
 20. [Operación diaria — comandos útiles](#operacion)
@@ -1277,9 +1278,8 @@ Si un agente acumula `circuit_breaker_errores` (5) errores en `circuit_breaker_v
 ### Asignar nivel a un usuario
 
 ```sql
-INSERT INTO ia_usuarios (usuario_id, nombre, nivel, canal, empresa, activo)
-VALUES ('TELEGRAM_ID', 'Santi', 7, 'telegram', 'ori_sil_2', 1)
-ON DUPLICATE KEY UPDATE nivel=7;
+-- Cambiar nivel de un usuario existente
+UPDATE ia_usuarios SET nivel = 7 WHERE email = 'usuario@origensilvestre.com';
 ```
 
 ### Actualizar parámetros de configuración
@@ -1334,6 +1334,66 @@ resultado = consultar(pregunta="...", empresa="ori_sil_2", ...)
 ### Empresa activa OS
 
 `uid = 'ori_sil_2'` — Origen Silvestre. Santiago = admin (nivel 7). Jennifer = viewer.
+
+---
+
+## 17bis. Protocolo de aprendizaje — ia_logica_negocio {#aprendizaje}
+
+### Qué es
+
+La IA puede aprender lógica de negocio sobre la marcha. Cuando el agente detecta que explicó algo que vale la pena recordar, genera un bloque especial en su respuesta que el servicio interpreta y guarda automáticamente en `ia_logica_negocio`.
+
+### Tabla ia_logica_negocio
+
+```sql
+SELECT id, concepto, keywords, siempre_presente, palabras, activo, creado_por
+FROM ia_logica_negocio ORDER BY siempre_presente DESC, activo DESC;
+```
+
+| Columna | Descripción |
+|---|---|
+| `concepto` | Nombre del concepto aprendido (VARCHAR 100) |
+| `explicacion` | Texto completo de la lógica (TEXT) |
+| `keywords` | Palabras clave que activan este fragmento en el RAG (VARCHAR 500) |
+| `siempre_presente` | 1 = se inyecta en TODAS las consultas, 0 = solo si coincide keyword |
+| `palabras` | Conteo de palabras de la explicación (actualizado automáticamente) |
+| `activo` | 1 = se usa, 0 = desactivado (depurador o manualmente) |
+| `creado_por` | `'usuario-aprendizaje'`, `'depurador-auto'`, o email de quien lo creó |
+| `empresa` | FK empresa (default `'ori_sil_2'`) |
+
+**Estado actual (2026-03-17):** 1 fragmento activo "Lógica de negocio consolidada" (455 palabras, siempre_presente=1), 9 inactivos depurados.
+
+### Cómo el agente aprende
+
+El agente genera un bloque `[GUARDAR_NEGOCIO]` en su respuesta cuando detecta que explicó algo importante:
+
+```
+[GUARDAR_NEGOCIO]
+concepto: Nombre del concepto
+keywords: palabra1, palabra2, palabra3
+explicacion: Explicación detallada de la lógica de negocio...
+[/GUARDAR_NEGOCIO]
+```
+
+El servicio (`servicio.py._procesar_bloque_aprendizaje()`) detecta este bloque, lo extrae, guarda en `ia_logica_negocio`, y elimina el bloque de la respuesta que ve el usuario.
+
+### Depurador automático
+
+Cuando el total de palabras en `ia_logica_negocio` supera ~800, el servicio corre `_depurar_logica_negocio()` que:
+
+1. Llama a un agente (fallback: groq → cerebras → gemini-flash-lite → gemini-flash)
+2. Le pide consolidar todos los fragmentos en uno solo (~600 palabras)
+3. Marca los fragmentos antiguos como `activo=0`
+4. Inserta el consolidado con `creado_por='depurador-auto'`, `siempre_presente=1`
+5. **Regla estricta:** nunca modifica cifras, porcentajes, nombres de campos ni tablas
+
+### Admin UI
+
+Los fragmentos se gestionan en ia-admin → **Lógica de negocio** (nivel 7):
+- Ver todos los fragmentos con conteo de palabras
+- Editar concepto, keywords, explicación
+- Toggle siempre_presente / activo
+- Crear o eliminar fragmentos manualmente
 
 ---
 
