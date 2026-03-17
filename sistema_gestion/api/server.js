@@ -568,7 +568,17 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     if (descripcion      !== undefined) { sets.push('descripcion = ?');        params.push(descripcion) }
     if (categoria_id     !== undefined) { sets.push('categoria_id = ?');       params.push(categoria_id) }
     if (proyecto_id      !== undefined) { sets.push('proyecto_id = ?');        params.push(proyecto_id) }
-    if (estado           !== undefined) { sets.push('estado = ?');             params.push(estado) }
+    if (estado           !== undefined) {
+      sets.push('estado = ?')
+      params.push(estado)
+      // Auto-fechas reales según cambio de estado
+      if (estado === 'En Progreso') {
+        sets.push('fecha_inicio_real = NOW()')  // Opción B: siempre actualiza
+      }
+      if (estado === 'Completada') {
+        sets.push('fecha_fin_real = COALESCE(fecha_fin_real, NOW())')  // solo si no tiene
+      }
+    }
     if (prioridad        !== undefined) { sets.push('prioridad = ?');          params.push(prioridad) }
     if (responsable      !== undefined) { sets.push('responsable = ?');        params.push(responsable) }
     if (fecha_limite     !== undefined) { sets.push('fecha_limite = ?');       params.push(fecha_limite) }

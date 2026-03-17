@@ -77,10 +77,41 @@
           @update:model-value="v => actualizar('responsable', v[0] || null)"
         />
       </div>
+      <!-- Fecha estimada (campo principal) -->
       <div class="field-row">
-        <span class="field-label">Fecha</span>
-        <input type="date" class="input-field" style="height:28px;font-size:12px" :value="tarea.fecha_limite" @change="actualizar('fecha_limite', $event.target.value)" />
+        <span class="field-label">Fecha estimada</span>
+        <input type="date" class="input-field" style="height:28px;font-size:12px"
+          :value="tarea.fecha_limite ? String(tarea.fecha_limite).slice(0,10) : ''"
+          @change="actualizarFechaEstimada($event.target.value)" />
       </div>
+
+      <!-- Acordeón: más fechas -->
+      <div class="accordion-toggle" @click="mostrarFechas = !mostrarFechas">
+        <span class="material-icons" style="font-size:14px">{{ mostrarFechas ? 'expand_more' : 'chevron_right' }}</span>
+        <span style="font-size:11px;color:var(--text-tertiary)">Más fechas</span>
+      </div>
+      <template v-if="mostrarFechas">
+        <div class="field-row">
+          <span class="field-label">Inicio estimado</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).slice(0,10) : ''"
+            @change="actualizar('fecha_inicio_estimada', $event.target.value || null)" />
+        </div>
+        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
+          <span class="field-label">Inicio real</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_inicio_real ? String(tarea.fecha_inicio_real).slice(0,10) : ''"
+            :disabled="!esCompletada"
+            @change="actualizar('fecha_inicio_real', $event.target.value || null)" />
+        </div>
+        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
+          <span class="field-label">Fin real</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_fin_real ? String(tarea.fecha_fin_real).slice(0,10) : ''"
+            :disabled="!esCompletada"
+            @change="actualizar('fecha_fin_real', $event.target.value || null)" />
+        </div>
+      </template>
       <div v-if="tarea.es_produccion || tarea.id_op" class="field-row">
         <span class="field-label">OP Effi</span>
         <input class="input-field" style="height:28px;font-size:12px" :value="tarea.id_op" placeholder="Nro. OP" @blur="actualizarOP($event.target.value)" />
@@ -165,7 +196,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge       from './EstadoBadge.vue'
 import Cronometro        from './Cronometro.vue'
@@ -196,18 +227,34 @@ const props = defineProps({
 })
 const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'proyecto-creado'])
 
+// Acordeón fechas
+const mostrarFechas = ref(false)
+
+const esCompletada = computed(() =>
+  ['Completada', 'Cancelada'].includes(props.tarea?.estado)
+)
+
 // Modal completar
 const modalCompletar  = ref(false)
 const tiempoFinalH    = ref(0)
 const tiempoFinalM    = ref(0)
 
+// Al setear fecha_estimada: sincroniza fecha_inicio_estimada si no tiene valor
+async function actualizarFechaEstimada(valor) {
+  const body = { fecha_limite: valor || null }
+  if (!props.tarea.fecha_inicio_estimada) body.fecha_inicio_estimada = valor || null
+  try {
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    })
+    emit('actualizada', data.tarea)
+  } catch (e) { console.error(e) }
+}
+
 const tiempoRegistradoDisplay = computed(() => {
   const min = props.tarea?.tiempo_real_min || 0
   return `${Math.floor(min/60)}h ${min%60}min`
-})
-
-watch(() => props.tarea?.id, () => {
-  // nada — refresca automáticamente
 })
 
 async function actualizar(campo, valor) {
@@ -299,4 +346,13 @@ async function completarSin() {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   opacity: 0.85;
 }
+.accordion-toggle {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 0 2px; cursor: pointer;
+  user-select: none;
+  color: var(--text-tertiary);
+  transition: color 80ms;
+}
+.accordion-toggle:hover { color: var(--text-secondary); }
+.field-row-disabled { opacity: 0.45; pointer-events: none; }
 </style>
