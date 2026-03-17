@@ -19,7 +19,7 @@ from telegram.ext import (
 from telegram.constants import ParseMode, ChatAction
 
 import api_ia, db, tabla as tabla_mod
-from teclado import REPLY_KB, inline_ajustes, MAX_INLINE
+from teclado import REPLY_KB, inline_ajustes, MAX_INLINE, teclado_compartir_telefono, AGENTES
 
 logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
@@ -36,6 +36,112 @@ log = logging.getLogger('os_ia_bot')
 
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 
+NOMBRES_AGENTES = {
+    'gemini-flash':      'Gemini Flash ⚡',
+    'gemini-flash-lite': 'Gemini Flash Lite ⚡',
+    'gpt-oss-120b':      'GPT-OSS 120B 🧪',
+    'gemini-pro':        'Gemini Pro 🧠',
+    'claude-sonnet':     'Claude Sonnet 🤖',
+    'deepseek-chat':     'DeepSeek Chat 💡',
+    'automático':        'Automático 🔀',
+}
+
+ICONOS_AGENTES = {
+    'gemini-pro':        '🧠',
+    'gemini-flash':      '⚡',
+    'gemini-flash-lite': '⚡',
+    'claude-sonnet':     '🤖',
+    'deepseek-chat':     '💡',
+    'deepseek-reasoner': '💡',
+    'groq-llama':        '🔥',
+    'gemma-router':      '🔀',
+    'gpt-oss-120b':      '🧪',
+    'cerebras-llama':    '🔥',
+}
+
+
+# ─── Autenticación ────────────────────────────────────────────────────────────
+
+async def _verificar_acceso(update: Update) -> dict | None:
+    """
+    Verifica si el usuario tiene acceso al bot.
+
+    Flujo:
+    1. Si ya está autorizado en bot_sesiones → OK, retorna sesión.
+    2. Si tiene telegram_id en ia_usuarios → autorizar y guardar sesión.
+    3. Si no → pedir que comparta el número de teléfono.
+
+    Retorna la sesión dict si tiene acceso, None si no.
+    """
+    user   = update.effective_user
+    sesion = db.obtener_sesion(user.id)
+
+    # Ya autorizado previamente
+    if sesion.get('autorizado'):
+        return sesion
+
+    # Verificar por telegram_id (puede haber sido añadido manualmente en BD)
+    usuario = db.verificar_por_telegram_id(user.id)
+    if usuario:
+        db.guardar_sesion(
+            user.id, user.username or '', usuario['nombre'],
+            autorizado=1, nivel=usuario['nivel']
+        )
+        return db.obtener_sesion(user.id)
+
+    # No autorizado — pedir teléfono
+    await update.message.reply_text(
+        '👋 Hola, soy el asistente IA de *Origen Silvestre*.\n\n'
+        'Para usar el bot necesito verificar tu identidad.\n'
+        'Comparte tu número de teléfono para continuar:',
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=teclado_compartir_telefono()
+    )
+    return None
+
+
+async def handle_contacto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Recibe el número de teléfono y verifica contra ia_usuarios."""
+    user     = update.effective_user
+    contacto = update.message.contact
+
+    # Telegram solo permite compartir el propio contacto
+    if contacto.user_id != user.id:
+        await update.message.reply_text('Por favor comparte tu propio número.')
+        return
+
+    telefono = contacto.phone_number
+    if not telefono.startswith('+'):
+        telefono = '+' + telefono
+
+    usuario = db.verificar_por_telefono(telefono)
+
+    if not usuario:
+        await update.message.reply_text(
+            '❌ Tu número no está registrado.\n\n'
+            'Contacta a Santiago para que te dé acceso.',
+            reply_markup=teclado_compartir_telefono()
+        )
+        log.warning(f'Acceso denegado: {user.id} (@{user.username}) tel={telefono}')
+        return
+
+    # Vincular telegram_id al usuario en ia_usuarios
+    db.vincular_telegram_id(telefono, user.id)
+    db.guardar_sesion(
+        user.id, user.username or '', usuario['nombre'],
+        autorizado=1, nivel=usuario['nivel']
+    )
+
+    log.info(f'Acceso concedido: {usuario["nombre"]} (nivel {usuario["nivel"]}) tel={telefono}')
+
+    await update.message.reply_text(
+        f'✅ ¡Bienvenida/o, *{usuario["nombre"]}*!\n\n'
+        'Ya puedes usar el bot. Escribe tu pregunta sobre ventas, '
+        'productos, clientes o cualquier dato del negocio.',
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=REPLY_KB
+    )
+
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -44,7 +150,6 @@ def _nombre(user) -> str:
 
 
 def _escape(texto: str) -> str:
-    """Escapa caracteres especiales para MarkdownV2."""
     for ch in r'_*[]()~`>#+-=|{}.!':
         texto = texto.replace(ch, f'\\{ch}')
     return texto
@@ -73,8 +178,11 @@ def _inline_solo_nuevo() -> InlineKeyboardMarkup:
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user   = update.effective_user
-    nombre = _nombre(user)
-    db.guardar_sesion(user.id, user.username or '', nombre)
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
+    nombre = sesion.get('nombre') or _nombre(user)
     await update.message.reply_text(
         f'¡Hola {nombre}! 👋\n\n'
         'Soy el asistente IA de Origen Silvestre. Pregúntame lo que quieras sobre ventas, '
@@ -85,6 +193,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_ayuda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
     await update.message.reply_text(
         '📖 *Cómo usar el bot*\n\n'
         'Escribe cualquier pregunta en lenguaje natural. Ejemplos:\n'
@@ -104,19 +216,17 @@ async def cmd_ayuda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_estado(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    sesion = db.obtener_sesion(update.effective_user.id)
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
     agente = sesion.get('agente_preferido') or 'automático'
-    nombres = {
-        'gemini-flash':   'Gemini Flash ⚡ (rápido, gratis)',
-        'gemini-pro':     'Gemini Pro 🧠 (análisis)',
-        'claude-sonnet':  'Claude Sonnet 🤖 (premium)',
-        'deepseek-chat':  'DeepSeek Chat 💡 (económico)',
-        'automático':     'Automático 🔀 (el sistema elige según la pregunta)',
-    }
+    nivel  = sesion.get('nivel', 1)
     await update.message.reply_text(
         '📊 *Estado actual*\n\n'
-        f'🤖 Agente: {nombres.get(agente, agente)}\n'
-        f'🏢 Empresa: Origen Silvestre\n\n'
+        f'🤖 Agente: {NOMBRES_AGENTES.get(agente, agente)}\n'
+        f'🏢 Empresa: Origen Silvestre\n'
+        f'🔑 Nivel de acceso: {nivel}\n\n'
         'Usa /agente para cambiar el modelo.',
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=REPLY_KB
@@ -124,20 +234,26 @@ async def cmd_estado(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_agente(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    sesion = db.obtener_sesion(update.effective_user.id)
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
     agente = sesion.get('agente_preferido')
+    nivel  = sesion.get('nivel', 1)
+
     await update.message.reply_text(
         '🤖 *Selecciona el agente de IA*\n\n'
-        '🧠 *Gemini Pro* — recomendado. Análisis profundo de ventas y datos.\n'
-        '⚡ *Gemini Flash* — rápido para preguntas simples.\n'
-        '💡 *DeepSeek Chat* — económico (puede ser lento).\n'
-        '🤖 *Claude Sonnet* — mejor redacción y documentos.',
+        'Solo se muestran los agentes disponibles para tu nivel de acceso.',
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=inline_ajustes(agente)
+        reply_markup=inline_ajustes(agente, nivel)
     )
 
 
 async def cmd_limpiar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
     user = update.effective_user
     db.guardar_sesion(user.id, user.username or '', _nombre(user), conversacion_id=0)
     await update.message.reply_text(
@@ -159,9 +275,15 @@ async def cmd_mes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─── Handler principal de mensajes ───────────────────────────────────────────
 
 async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    user    = update.effective_user
-    texto   = update.message.text.strip()
-    nombre  = _nombre(user)
+    user  = update.effective_user
+    texto = update.message.text.strip()
+
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
+    nombre = sesion.get('nombre') or _nombre(user)
+    nivel  = sesion.get('nivel', 1)
 
     # Shortcuts de los botones rápidos
     if texto == '📊 Ventas hoy':
@@ -169,29 +291,36 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif texto == '📈 Este mes':
         texto = '¿Cuánto llevamos vendido este mes y cómo vamos vs el mes anterior?'
     elif texto == '⚙️ Ajustes':
-        sesion = db.obtener_sesion(user.id)
         agente = sesion.get('agente_preferido')
         await update.message.reply_text(
             '⚙️ *Ajustes*\n\n'
             f'Agente actual: `{agente or "automático"}`',
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=inline_ajustes(agente)
+            reply_markup=inline_ajustes(agente, nivel)
         )
         return
 
-    # Registrar / actualizar sesión
-    sesion = db.obtener_sesion(user.id)
+    # Actualizar sesión
     db.guardar_sesion(user.id, user.username or '', nombre)
 
     # Indicador de escritura
     await update.effective_chat.send_action(ChatAction.TYPING)
+
+    # Validar que el agente guardado está permitido para el nivel del usuario
+    agente_sesion = sesion.get('agente_preferido')
+    agente_slug   = None
+    if agente_sesion:
+        nivel_min_agente = next(
+            (n for _, d, n in AGENTES if agente_sesion in d), 1
+        )
+        agente_slug = agente_sesion if nivel >= nivel_min_agente else None
 
     # Llamar ia_service
     resultado = api_ia.consultar(
         pregunta=texto,
         usuario_id=str(user.id),
         nombre_usuario=nombre,
-        agente=sesion.get('agente_preferido'),
+        agente=agente_slug,
         empresa=sesion.get('empresa', 'ori_sil_2'),
         conversacion_id=sesion.get('conversacion_id'),
         canal='telegram'
@@ -203,8 +332,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                           conversacion_id=resultado['conversacion_id'])
 
     # Procesar tabla si hay datos
-    info = tabla_mod.procesar_tabla(resultado, texto,
-                                    sesion.get('empresa', 'ori_sil_2'))
+    info       = tabla_mod.procesar_tabla(resultado, texto, sesion.get('empresa', 'ori_sil_2'))
     texto_resp = info['texto']
     token      = info['token']
     n_filas    = info['n_filas']
@@ -219,24 +347,14 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, reply_markup=REPLY_KB)
         return
 
-    # Construir teclado inline
-    if token or n_filas > 0:
-        kb = _inline_datos(token, n_filas)
-    else:
-        kb = _inline_solo_nuevo()
+    # Teclado inline
+    kb = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
 
-    # Pie sutil con el agente usado
+    # Pie con agente usado
     agente_usado = resultado.get('agente', '')
-    iconos = {
-        'gemini-pro':    '🧠', 'gemini-flash': '⚡',
-        'gemini-flash-lite': '⚡', 'claude-sonnet': '🤖',
-        'deepseek-chat': '💡', 'deepseek-reasoner': '💡',
-        'groq-llama': '🔥', 'gemma-router': '🔀',
-    }
-    icono = iconos.get(agente_usado, '🤖')
+    icono = ICONOS_AGENTES.get(agente_usado, '🤖')
     pie   = f'\n\n_{icono} {agente_usado}_' if agente_usado else ''
 
-    # Enviar respuesta — intentar Markdown, caer a texto plano si falla
     try:
         await update.message.reply_text(
             texto_resp + pie,
@@ -244,50 +362,47 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=kb
         )
     except Exception:
-        await update.message.reply_text(
-            texto_resp,
-            reply_markup=kb
-        )
+        await update.message.reply_text(texto_resp, reply_markup=kb)
 
 
 # ─── Handler de fotos (visión) ───────────────────────────────────────────────
 
 async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user   = update.effective_user
-    nombre = _nombre(user)
 
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
+    nombre = sesion.get('nombre') or _nombre(user)
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-    # Descargar la foto en mayor resolución disponible
-    foto   = update.message.photo[-1]
+    foto    = update.message.photo[-1]
     archivo = await foto.get_file()
-    buf    = io.BytesIO()
+    buf     = io.BytesIO()
     await archivo.download_to_memory(buf)
     img_b64 = base64.b64encode(buf.getvalue()).decode()
-
-    # Texto del caption (puede venir vacío)
     caption = (update.message.caption or '').strip()
 
-    sesion = db.obtener_sesion(user.id)
     db.guardar_sesion(user.id, user.username or '', nombre)
 
     resultado = api_ia.consultar(
-        pregunta       = caption,
-        usuario_id     = str(user.id),
-        nombre_usuario = nombre,
-        agente         = sesion.get('agente_preferido'),
-        empresa        = sesion.get('empresa', 'ori_sil_2'),
-        conversacion_id= sesion.get('conversacion_id'),
-        canal          = 'telegram',
-        imagen_b64     = img_b64,
-        imagen_mime    = 'image/jpeg',
+        pregunta        = caption,
+        usuario_id      = str(user.id),
+        nombre_usuario  = nombre,
+        agente          = sesion.get('agente_preferido'),
+        empresa         = sesion.get('empresa', 'ori_sil_2'),
+        conversacion_id = sesion.get('conversacion_id'),
+        canal           = 'telegram',
+        imagen_b64      = img_b64,
+        imagen_mime     = 'image/jpeg',
     )
 
     if resultado.get('conversacion_id'):
         db.guardar_sesion(user.id, user.username or '', nombre,
                           conversacion_id=resultado['conversacion_id'])
 
-    info      = tabla_mod.procesar_tabla(resultado, caption, sesion.get('empresa', 'ori_sil_2'))
+    info       = tabla_mod.procesar_tabla(resultado, caption, sesion.get('empresa', 'ori_sil_2'))
     texto_resp = info['texto']
     token      = info['token']
     n_filas    = info['n_filas']
@@ -299,11 +414,9 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    kb = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
-
+    kb     = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
     agente_usado = resultado.get('agente', '')
-    iconos = {'gemini-flash': '⚡', 'gemini-pro': '🧠', 'claude-sonnet': '🤖'}
-    pie    = f'\n\n_{iconos.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
+    pie    = f'\n\n_{ICONOS_AGENTES.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
 
     try:
         await update.message.reply_text(
@@ -323,6 +436,9 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data  = query.data
     user  = query.from_user
 
+    sesion = db.obtener_sesion(user.id)
+    nivel  = sesion.get('nivel', 1)
+
     if data == 'nueva_consulta':
         await query.message.reply_text(
             '¿Sobre qué quieres consultar ahora?',
@@ -330,8 +446,7 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
     elif data == 'limpiar_historial':
-        db.guardar_sesion(user.id, user.username or '', _nombre(user),
-                          conversacion_id=0)
+        db.guardar_sesion(user.id, user.username or '', _nombre(user), conversacion_id=0)
         await query.edit_message_text('🗑️ Historial limpiado. Empezamos de cero.')
 
     elif data == 'cerrar':
@@ -339,16 +454,17 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith('agente:'):
         agente = data.split(':', 1)[1]
+
+        # Verificar nivel de acceso para el agente
+        nivel_min = next((n for _, d, n in AGENTES if agente in d), 1)
+        if nivel < nivel_min:
+            await query.answer('No tienes acceso a este agente.', show_alert=True)
+            return
+
         db.guardar_sesion(user.id, user.username or '', _nombre(user),
                           agente_preferido=agente)
-        nombres = {
-            'gemini-flash':    'Gemini Flash ⚡',
-            'gemini-pro':      'Gemini Pro 🧠',
-            'claude-sonnet':   'Claude Sonnet 🤖',
-            'deepseek-chat':   'DeepSeek Chat 💡',
-        }
         await query.edit_message_text(
-            f'✅ Agente cambiado a *{nombres.get(agente, agente)}*\n\n'
+            f'✅ Agente cambiado a *{NOMBRES_AGENTES.get(agente, agente)}*\n\n'
             'Ya puedes hacer tu próxima consulta.',
             parse_mode=ParseMode.MARKDOWN
         )
@@ -375,6 +491,7 @@ def main():
     app.add_handler(CommandHandler('ventas',  cmd_ventas))
     app.add_handler(CommandHandler('mes',     cmd_mes))
     app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.CONTACT, handle_contacto))
     app.add_handler(MessageHandler(filters.PHOTO, handle_foto))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mensaje))
 

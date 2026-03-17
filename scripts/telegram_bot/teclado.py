@@ -10,39 +10,27 @@ REPLY_KB = ReplyKeyboardMarkup(
     input_field_placeholder='Escribe tu pregunta...'
 )
 
-
-def inline_respuesta(token: str = None, n_filas: int = 0) -> InlineKeyboardMarkup | None:
-    """
-    Botones inline debajo de cada respuesta con datos.
-    """
-    botones = []
-
-    if token and n_filas > MAX_INLINE:
-        botones.append(
-            InlineKeyboardButton(
-                f'📋 Ver tabla completa ({n_filas} filas)',
-                web_app=None,  # Se setea en bot.py con WebAppInfo
-                url=f'https://menu.oscomunidad.com/bot/tabla?token={token}'
-            )
-        )
-
-    botones.append(InlineKeyboardButton('↩ Nueva consulta', callback_data='nueva_consulta'))
-
-    return InlineKeyboardMarkup([botones]) if botones else None
-
-
 MAX_INLINE = 5
 
+# Todos los agentes seleccionables: (label, callback_data, nivel_minimo)
+AGENTES = [
+    ('⚡ Gemini Flash ★ recomendado', 'agente:gemini-flash',  1),
+    ('🧪 GPT-OSS 120B (análisis)',    'agente:gpt-oss-120b',  1),
+    ('💡 DeepSeek Chat (económico)',  'agente:deepseek-chat', 1),
+    ('🧠 Gemini Pro (premium)',       'agente:gemini-pro',    6),
+    ('🤖 Claude Sonnet (premium)',    'agente:claude-sonnet', 6),
+]
 
-def inline_ajustes(agente_actual: str = None) -> InlineKeyboardMarkup:
-    agentes = [
-        ('🧠 Gemini Pro ★ recomendado', 'agente:gemini-pro'),
-        ('⚡ Gemini Flash (rápido)', 'agente:gemini-flash'),
-        ('💡 DeepSeek Chat (económico)', 'agente:deepseek-chat'),
-        ('🤖 Claude Sonnet (premium)', 'agente:claude-sonnet'),
-    ]
+
+def inline_ajustes(agente_actual: str = None, nivel: int = 1) -> InlineKeyboardMarkup:
+    """
+    Menú de selección de agente filtrado por nivel del usuario.
+    Agentes premium (nivel 6+) solo se muestran a quienes tienen acceso.
+    """
     filas = []
-    for label, data in agentes:
+    for label, data, nivel_min in AGENTES:
+        if nivel < nivel_min:
+            continue
         prefix = '✓ ' if agente_actual and agente_actual in data else ''
         filas.append([InlineKeyboardButton(prefix + label, callback_data=data)])
 
@@ -51,3 +39,26 @@ def inline_ajustes(agente_actual: str = None) -> InlineKeyboardMarkup:
         InlineKeyboardButton('❌ Cerrar', callback_data='cerrar'),
     ])
     return InlineKeyboardMarkup(filas)
+
+
+def inline_respuesta(token: str = None, n_filas: int = 0) -> InlineKeyboardMarkup | None:
+    botones = []
+    if token and n_filas > MAX_INLINE:
+        botones.append(
+            InlineKeyboardButton(
+                f'📋 Ver tabla completa ({n_filas} filas)',
+                url=f'https://menu.oscomunidad.com/bot/tabla?token={token}'
+            )
+        )
+    botones.append(InlineKeyboardButton('↩ Nueva consulta', callback_data='nueva_consulta'))
+    return InlineKeyboardMarkup([botones]) if botones else None
+
+
+def teclado_compartir_telefono() -> ReplyKeyboardMarkup:
+    """Teclado que le pide al usuario compartir su número de teléfono."""
+    from telegram import KeyboardButton
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton('📱 Compartir mi número', request_contact=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
