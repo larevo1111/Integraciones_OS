@@ -249,7 +249,8 @@ Ver manual completo: `sistema_gestion/MANUAL_DISENO_HIBRIDO.md`
 - **Transiciones**: `.modal-enter-active` (opacity 150ms) + `.sheet-enter-active` (translateY cubic-bezier)
 - **Prioridad chips**: 4 chips (Urgente/Alta/Media/Baja) con colores #ef4444/#f59e0b/#6b7280/#374151. El activo se resalta con `background: color+'22'` y `borderColor: color`
 - **Teleport dropdown** (ProyectoSelector, EtiquetasSelector): `calcularPosicion()` con `getBoundingClientRect()` → `position: fixed` → evita clipping por overflow
-- **ProyectoSelector**: siempre muestra "Nuevo proyecto" al fondo; si hay búsqueda sin coincidencia → "Crear X"; `crearNuevoVacio()` usa `window.prompt()`
+- **ProyectoSelector**: dropdown con lista scrollable (`.proyecto-lista`) + botón "Nuevo proyecto" sticky al fondo siempre visible. Crea vía `ProyectoModal`. Si hay búsqueda sin coincidencia → "Crear X". Fix: endpoint usuarios = `/api/gestion/usuarios` (NO `/api/usuarios`)
+- **ProyectoModal**: modal completo con paleta 10 colores, nombre, descripción, responsables (chips multi-select), etiquetas (chips), fecha estimada. Carga catálogos en `watch(modelValue)`. Usable para crear Y editar.
 - **EtiquetasSelector**: multi-select chips, toggle individual, "Crear etiqueta X" si no hay match exacto
 - **Sidebar colapsado** (64px): al colapsar, `sidebar-logo` queda centrado con solo el botón chevron rotado (chevron_left → chevron_right via `rotate(180deg)`) — nav-item-labels, proyectos y counters ocultos
 
@@ -263,6 +264,14 @@ Ver manual completo: `sistema_gestion/MANUAL_DISENO_HIBRIDO.md`
 ```css
 --accent: #00C853;  /* ≠ ERP que usa #5E6AD2 (violeta) */
 ```
+
+### CSS global — input date/time en dark mode
+**REGLA**: el icono del calendario nativo no se ve en dark mode. Siempre aplicar en `app.scss`:
+```css
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); opacity: 0.7; cursor: pointer; }
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator { filter: none; opacity: 0.6; }
+```
+**Ya está en `app.scss` globalmente** — aplica a todos los inputs date/time/datetime-local de la app.
 
 ---
 
