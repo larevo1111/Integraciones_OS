@@ -20,9 +20,9 @@
       <!-- Avatar responsable (solo si no es el usuario actual) -->
       <img
         v-if="tarea.responsable && tarea.responsable !== usuarioActual"
-        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(tarea.responsable)}&size=20&background=1e1e1e&color=888&rounded=true`"
+        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(tarea.responsable_nombre || tarea.responsable)}&size=20&background=1e1e1e&color=888&rounded=true`"
         class="avatar-mini"
-        :title="tarea.responsable"
+        :title="tarea.responsable_nombre || tarea.responsable"
       />
 
       <span class="tarea-fecha" :class="clasesFecha">{{ fechaDisplay }}</span>
@@ -44,11 +44,18 @@ defineEmits(['click', 'cambiar-estado'])
 
 const esCompletada = computed(() => ['Completada','Cancelada'].includes(props.tarea.estado))
 
+// Normaliza fecha_limite a YYYY-MM-DD sin importar si llega como string ISO o Date
+function isoFecha(f) {
+  if (!f) return null
+  const s = typeof f === 'string' ? f : f.toISOString()
+  return s.slice(0, 10)  // "2026-03-17"
+}
+
 // Fecha display
 const fechaDisplay = computed(() => {
-  const f = props.tarea.fecha_limite
-  if (!f) return ''
-  const d     = new Date(f + 'T00:00:00')
+  const iso = isoFecha(props.tarea.fecha_limite)
+  if (!iso) return ''
+  const d     = new Date(iso + 'T00:00:00')
   const hoy   = new Date(); hoy.setHours(0,0,0,0)
   const manana = new Date(hoy); manana.setDate(hoy.getDate()+1)
   const ayer   = new Date(hoy); ayer.setDate(hoy.getDate()-1)
@@ -59,9 +66,9 @@ const fechaDisplay = computed(() => {
 })
 
 const clasesFecha = computed(() => {
-  const f = props.tarea.fecha_limite
-  if (!f) return ''
-  const d   = new Date(f + 'T00:00:00')
+  const iso = isoFecha(props.tarea.fecha_limite)
+  if (!iso) return ''
+  const d   = new Date(iso + 'T00:00:00')
   const hoy = new Date(); hoy.setHours(0,0,0,0)
   if (d < hoy) return 'vencida'
   if (d.getTime() === hoy.getTime()) return 'hoy'

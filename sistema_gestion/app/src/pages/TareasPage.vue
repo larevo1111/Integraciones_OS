@@ -16,29 +16,31 @@
       </div>
 
       <!-- Barra de filtros -->
-      <div class="filtros-bar">
-        <button v-for="f in FILTROS" :key="f.key" class="chip" :class="{ active: filtroActivo === f.key }" @click="filtroActivo = f.key">
-          {{ f.label }}
-          <span v-if="f.key === 'hoy' && conteoHoy" class="chip-count">{{ conteoHoy }}</span>
-        </button>
-
-        <!-- Agrupar por -->
-        <div style="position:relative;margin-left:auto">
-          <button class="chip chip-agrupar" @click="menuAgrupar = !menuAgrupar">
-            <span class="material-icons" style="font-size:13px">sort</span>
-            {{ AGRUPACIONES.find(a => a.key === agruparPor)?.label }}
-            <span class="material-icons" style="font-size:13px">expand_more</span>
+      <div class="filtros-bar-wrap">
+        <div class="filtros-bar">
+          <button v-for="f in FILTROS" :key="f.key" class="chip" :class="{ active: filtroActivo === f.key }" @click="filtroActivo = f.key">
+            {{ f.label }}
+            <span v-if="f.key === 'hoy' && conteoHoy" class="chip-count">{{ conteoHoy }}</span>
           </button>
-          <div v-if="menuAgrupar" class="dropdown-menu" @mouseleave="menuAgrupar=false">
-            <div
-              v-for="ag in AGRUPACIONES"
-              :key="ag.key"
-              class="dropdown-item"
-              :class="{ active: agruparPor === ag.key }"
-              @click="agruparPor = ag.key; menuAgrupar = false"
-            >
-              <span class="material-icons" style="font-size:14px">{{ agruparPor === ag.key ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
-              {{ ag.label }}
+
+          <!-- Agrupar por -->
+          <div style="position:relative;margin-left:auto;flex-shrink:0">
+            <button class="chip chip-agrupar" @click="menuAgrupar = !menuAgrupar">
+              <span class="material-icons" style="font-size:13px">sort</span>
+              {{ AGRUPACIONES.find(a => a.key === agruparPor)?.label }}
+              <span class="material-icons" style="font-size:13px">expand_more</span>
+            </button>
+            <div v-if="menuAgrupar" class="dropdown-menu" @mouseleave="menuAgrupar=false">
+              <div
+                v-for="ag in AGRUPACIONES"
+                :key="ag.key"
+                class="dropdown-item"
+                :class="{ active: agruparPor === ag.key }"
+                @click="agruparPor = ag.key; menuAgrupar = false"
+              >
+                <span class="material-icons" style="font-size:14px">{{ agruparPor === ag.key ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
+                {{ ag.label }}
+              </div>
             </div>
           </div>
         </div>

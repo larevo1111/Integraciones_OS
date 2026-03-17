@@ -47,7 +47,7 @@
       <div class="field-row">
         <span class="field-label">Categoría</span>
         <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.categoria_id" @change="actualizar('categoria_id', Number($event.target.value))">
-          <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+          <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre.replace(/_/g, ' ') }}</option>
         </select>
       </div>
       <div class="field-row">

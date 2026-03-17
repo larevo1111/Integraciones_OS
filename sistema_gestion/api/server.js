@@ -407,10 +407,27 @@ app.get('/api/gestion/tareas', async (req, res) => {
         t.fecha_creacion DESC
     `, params)
 
-    // Parsear etiquetas_json (viene como string de MySQL)
-    const tareasConEtiquetas = tareas.map(t => ({
+    // Parsear etiquetas_json
+    const tareasBase = tareas.map(t => ({
       ...t,
       etiquetas: t.etiquetas_json ? (typeof t.etiquetas_json === 'string' ? JSON.parse(t.etiquetas_json) : t.etiquetas_json) : []
+    }))
+
+    // Enriquecer con nombre del responsable (pool comunidad, diferente BD)
+    const emails = [...new Set(tareasBase.map(t => t.responsable).filter(Boolean))]
+    let nombreMap = {}
+    if (emails.length) {
+      try {
+        const [users] = await db.comunidad.query(
+          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${emails.map(() => '?').join(',')})`,
+          emails
+        )
+        nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
+      } catch {}
+    }
+    const tareasConEtiquetas = tareasBase.map(t => ({
+      ...t,
+      responsable_nombre: nombreMap[t.responsable] || null
     }))
 
     res.json({ ok: true, tareas: tareasConEtiquetas })
