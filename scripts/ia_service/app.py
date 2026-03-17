@@ -327,6 +327,70 @@ def endpoint_sync_esquema():
     return jsonify(resultado)
 
 
+@app.route('/ia/logica-negocio', methods=['GET'])
+def endpoint_logica_negocio_list():
+    """Lista todos los fragmentos de lógica de negocio activos."""
+    empresa = request.args.get('empresa', 'ori_sil_2')
+    conn = get_local_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, concepto, palabras, siempre_presente, keywords, created_at "
+            "FROM ia_logica_negocio WHERE empresa=%s AND activo=1 ORDER BY siempre_presente DESC, id",
+            (empresa,)
+        )
+        rows = cur.fetchall()
+    conn.close()
+    return jsonify({'ok': True, 'fragmentos': rows})
+
+
+@app.route('/ia/logica-negocio', methods=['POST'])
+def endpoint_logica_negocio_crear():
+    """
+    Crea o actualiza un fragmento de lógica de negocio.
+    Body: {concepto, explicacion, keywords, siempre_presente, empresa}
+    Después de guardar, dispara el depurador si supera 800 palabras.
+    """
+    import threading
+    from ia_service.servicio import _depurar_logica_negocio
+    data = request.get_json(silent=True) or {}
+    empresa   = data.get('empresa', 'ori_sil_2')
+    concepto  = data.get('concepto', '').strip()
+    explicacion = data.get('explicacion', '').strip()
+    keywords  = data.get('keywords', '')
+    siempre   = int(data.get('siempre_presente', 0))
+
+    if not concepto or not explicacion:
+        return jsonify({'ok': False, 'mensaje': 'concepto y explicacion son requeridos'}), 400
+
+    palabras = len(explicacion.split())
+    conn = get_local_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM ia_logica_negocio WHERE empresa=%s AND concepto=%s AND activo=1",
+            (empresa, concepto)
+        )
+        existente = cur.fetchone()
+        if existente:
+            cur.execute(
+                "UPDATE ia_logica_negocio SET explicacion=%s, keywords=%s, palabras=%s, updated_at=NOW() WHERE id=%s",
+                (explicacion, keywords, palabras, existente['id'])
+            )
+            nuevo_id = existente['id']
+        else:
+            cur.execute(
+                "INSERT INTO ia_logica_negocio (empresa, concepto, explicacion, keywords, siempre_presente, palabras) VALUES (%s,%s,%s,%s,%s,%s)",
+                (empresa, concepto, explicacion, keywords, siempre, palabras)
+            )
+            nuevo_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    # Depurar en background si es necesario
+    threading.Thread(target=_depurar_logica_negocio, args=(empresa,), daemon=True).start()
+
+    return jsonify({'ok': True, 'id': nuevo_id, 'palabras': palabras})
+
+
 if __name__ == '__main__':
     print("Iniciando IA Service OS en puerto 5100...")
     app.run(host='0.0.0.0', port=5100, debug=False)

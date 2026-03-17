@@ -277,6 +277,72 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) 
     return None
 
 
+def _depurar_logica_negocio(empresa: str):
+    """
+    Bot depurador: si la lógica de negocio supera 800 palabras totales,
+    llama a Groq para comprimirla a ~600 palabras preservando precisión exacta.
+    Se llama en background después de guardar un nuevo fragmento.
+    """
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, concepto, explicacion FROM ia_logica_negocio "
+                "WHERE empresa=%s AND activo=1 ORDER BY siempre_presente DESC, id",
+                (empresa,)
+            )
+            fragmentos = cur.fetchall()
+        conn.close()
+
+        texto_total = '\n\n'.join(f"### {f['concepto']}\n{f['explicacion']}" for f in fragmentos)
+        total_palabras = len(texto_total.split())
+
+        if total_palabras <= 800:
+            return  # No necesita depuración
+
+        # Buscar agente Groq para comprimir
+        agente_cfg = _cargar_agente('groq-llama')
+        if not agente_cfg:
+            return
+
+        prompt = (
+            f"El siguiente es el documento de lógica de negocio de Origen Silvestre ({total_palabras} palabras). "
+            f"Comprímelo a máximo 600 palabras.\n"
+            f"REGLAS CRÍTICAS:\n"
+            f"- NUNCA elimines ni cambies cifras, porcentajes ni reglas exactas\n"
+            f"- NUNCA cambies nombres de campos, tablas o agentes\n"
+            f"- Elimina redundancias y ejemplos repetidos\n"
+            f"- Mantén la estructura ### Concepto\n"
+            f"- Solo devuelve el texto comprimido, sin explicaciones\n\n"
+            f"{texto_total}"
+        )
+        msgs = [
+            {'role': 'system', 'content': 'Eres un asistente que comprime documentos técnicos preservando toda la precisión.'},
+            {'role': 'user',   'content': prompt},
+        ]
+        res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
+        if not res['ok'] or not res.get('texto'):
+            return
+
+        texto_comprimido = res['texto'].strip()
+        palabras_nuevas = len(texto_comprimido.split())
+
+        # Reemplazar: marcar todos como inactivos y crear uno nuevo consolidado
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute("UPDATE ia_logica_negocio SET activo=0 WHERE empresa=%s", (empresa,))
+            cur.execute("""
+                INSERT INTO ia_logica_negocio (empresa, concepto, explicacion, keywords, siempre_presente, palabras, creado_por)
+                VALUES (%s, %s, %s, %s, 1, %s, %s)
+            """, (empresa, 'Lógica de negocio consolidada', texto_comprimido,
+                  'negocio,tarifa,agente,canal,cliente,venta,produccion', palabras_nuevas, 'depurador-auto'))
+        conn.commit()
+        conn.close()
+        _notificar(f"🗜️ <b>Lógica de negocio depurada</b>\n{total_palabras} → {palabras_nuevas} palabras")
+    except Exception:
+        pass
+
+
 def _extraer_palabras_clave(texto: str) -> str:
     """Extrae palabras relevantes de una pregunta para indexar ejemplos SQL."""
     import re
@@ -715,8 +781,13 @@ def consultar(
         if partes:
             _cliente_ctx = 'Cliente que consulta:\n' + '\n'.join(f'  {p}' for p in partes)
 
+    # CAPA 0: Lógica de negocio — siempre presente o activada por keywords
+    _logica_negocio = _obtener_logica_negocio(empresa, pregunta)
+
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
     system_prompt = _fecha_ctx + '\n\n'
+    if _logica_negocio:
+        system_prompt += _logica_negocio + '\n\n'
     if _cliente_ctx:
         system_prompt += _cliente_ctx + '\n\n'
     if tema_cfg and tema_cfg.get('system_prompt'):
@@ -1135,6 +1206,46 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
                 return (slug_t, tema_default, True)
 
     return ('analisis_datos', 'general', True)  # default conservador: si todo falla, intentar SQL
+
+
+def _obtener_logica_negocio(empresa: str, pregunta: str) -> str:
+    """
+    Capa 0: recupera fragmentos de lógica de negocio relevantes para la pregunta.
+    - siempre_presente=1 → siempre se inyectan sin importar la pregunta
+    - otros → se inyectan si alguna keyword aparece en la pregunta
+    Falla silenciosamente si hay error de BD.
+    """
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT concepto, explicacion, keywords, siempre_presente "
+                "FROM ia_logica_negocio WHERE empresa=%s AND activo=1",
+                (empresa,)
+            )
+            fragmentos = cur.fetchall()
+        conn.close()
+
+        if not fragmentos:
+            return ''
+
+        pregunta_lower = pregunta.lower()
+        relevantes = []
+        for f in fragmentos:
+            if f.get('siempre_presente'):
+                relevantes.append(f)
+                continue
+            keywords = [k.strip().lower() for k in (f.get('keywords') or '').split(',') if k.strip()]
+            if any(kw in pregunta_lower for kw in keywords):
+                relevantes.append(f)
+
+        if not relevantes:
+            return ''
+
+        partes = [f"### {f['concepto']}\n{f['explicacion']}" for f in relevantes]
+        return '<logica_negocio>\n' + '\n\n'.join(partes) + '\n</logica_negocio>'
+    except Exception:
+        return ''
 
 
 def _cargar_agente(slug: str) -> dict | None:
