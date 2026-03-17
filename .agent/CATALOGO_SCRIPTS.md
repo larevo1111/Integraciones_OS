@@ -642,7 +642,66 @@ python3 bot.py
 
 ---
 
-## 4. Skills / Comandos Claude (`.claude/commands/`)
+## 4. Sistema Gestión OS (`sistema_gestion/`)
+
+> App independiente: Vue+Quasar frontend + Express API. Puerto 9300. URL: gestion.oscomunidad.com.
+> Directorio raíz: `sistema_gestion/` — autónomo (api/ + app/).
+
+### sistema_gestion/api/server.js
+- **Propósito**: API Express 9300 — auth Google OAuth + JWT multi-empresa + CRUD tareas + OPs
+- **Tipo**: servidor principal
+- **Arrancar (dev)**:
+  ```bash
+  cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/sistema_gestion/api
+  node server.js
+  ```
+- **Systemd**: `os-gestion.service` — `systemctl status/start/restart os-gestion`
+- **Dependencias**: `sistema_gestion/api/.env` (GOOGLE_CLIENT_ID, JWT_SECRET), `db.js`, SSH tunnel activo
+- **Endpoints activos**: Ver sección en CONTEXTO_ACTIVO.md → "Sistema Gestión OS"
+
+### sistema_gestion/api/db.js
+- **Propósito**: SSH tunnel a Hostinger + 3 pools MySQL (comunidad/gestion/integracion)
+- **Tipo**: módulo de conexión (no se ejecuta directo)
+- **Credenciales**: cada pool tiene su propio usuario (Hostinger no comparte usuarios entre BDs)
+  - poolComunidad → `u768061575_ssierra047` / `Epist2487.`
+  - poolGestion → `u768061575_os_gestion` / `Epist2487.`
+  - poolIntegracion → `u768061575_osserver` / `Epist2487.`
+- **⚠️ NUNCA usar u768061575_osserver para os_comunidad** — Access Denied garantizado
+
+### sistema_gestion/app (Vue+Quasar)
+- **Propósito**: Frontend SPA — LoginPage, TareasPage, MainLayout (sidebar/drawer)
+- **Dev**:
+  ```bash
+  cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/sistema_gestion/app
+  npx quasar dev    # puerto 9301
+  ```
+- **Build prod**:
+  ```bash
+  npx quasar build  # output: dist/spa/ — servido por server.js
+  ```
+- **⚠️ BUILD OBLIGATORIO** tras cualquier cambio Vue — server.js sirve dist/spa/ estático.
+
+### Comandos útiles Sistema Gestión
+```bash
+# Ver logs del servicio
+journalctl -u os-gestion -f
+
+# Reiniciar tras cambios en API
+systemctl restart os-gestion
+
+# Build frontend
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/sistema_gestion/app && npx quasar build
+
+# Probar endpoint categorías
+curl -s http://localhost:9300/api/gestion/categorias -H "Authorization: Bearer <JWT>" | jq
+
+# Probar OPs
+curl -s "http://localhost:9300/api/gestion/ops?q=2847" -H "Authorization: Bearer <JWT>" | jq
+```
+
+---
+
+## 5. Skills / Comandos Claude (`.claude/commands/`)
 
 Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en la conversación.
 **⚠️ LEER ANTES de construir cualquier cosa — evitan errores ya documentados.**
@@ -676,6 +735,12 @@ Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en l
 |---|---|
 | `/ia-service` | Contexto completo del servicio IA: BD, endpoints, agentes, flujos, tiempos, troubleshooting. Cargar SIEMPRE antes de modificar `scripts/ia_service/`. |
 | `.agent/skills/manejo_ia.md` | Regla de los 3 Pasos (anti-alucinación) para cualquier bot IA que consulte la BD. Arquitectura obligatoria para el bot Telegram. |
+
+### Skill Sistema Gestión
+
+| Skill | Cuándo usarlo |
+|---|---|
+| `.agent/skills/sistema_gestion.md` | App de gestión OS: arquitectura, credenciales 3 pools, errores documentados (SQL, auth, Vue), endpoints activos, diseño TickTick-style. Cargar SIEMPRE antes de modificar `sistema_gestion/`. |
 
 > **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla. Archivo en `.claude/commands/nombre.md`.
 

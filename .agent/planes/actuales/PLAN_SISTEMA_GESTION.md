@@ -1,5 +1,5 @@
 # Plan: Sistema de Gestión OS
-**Estado**: 🟡 En construcción — Fase 1: BD ✅ completa
+**Estado**: 🟡 En construcción — Fases 1+2+3 (base) ✅ completas
 **Fecha inicio**: 2026-03-16
 **URL destino**: gestion.oscomunidad.com
 **Directorio**: `Integraciones_OS/sistema_gestion/`
@@ -313,28 +313,31 @@ Del ERP `u768061575_os_comunidad.sys_usuarios` — empresa `Ori_Sil_2`:
 - [x] 1.5 Seed 5 perfiles con sus categorías (Director, Comercial, Produccion, Logistica, Sistemas)
 - [x] 1.6 Ajustes de schema: prioridad en todas las tablas, campos de contenido en ideas, fechas reales/estimadas en tareas, responsable en tareas y pendientes
 
-### Fase 2 — API Express (9300)
-- [ ] 2.1 Crear `sistema_gestion/api/` — init npm + dependencias
-- [ ] 2.2 `db.js` — SSH tunnel + 3 pools (comunidad/gestion/integracion)
-- [ ] 2.3 `server.js` — auth Google OAuth (leyendo sys_usuarios) + JWT 2 pasos
-- [ ] 2.4 Endpoints: auth + usuarios + tareas + cronómetro + OP lookup
-- [ ] 2.5 Endpoints: dificultades, ideas, pendientes, informes
-- [ ] 2.6 systemd `os-gestion.service` — puerto 9300
-- [ ] 2.7 Cloudflare — agregar gestion.oscomunidad.com
+### Fase 2 — API Express (9300) ✅ BASE COMPLETA
+- [x] 2.1 Crear `sistema_gestion/api/` — init npm + dependencias
+- [x] 2.2 `db.js` — SSH tunnel + 3 pools (comunidad/gestion/integracion) — credenciales verificadas por cPanel
+- [x] 2.3 `server.js` — auth Google OAuth (leyendo sys_usuarios) + JWT 2 pasos — verificado columnas reales: Nombre_Usuario, Nivel_Acceso, nombre_empresa, estado='Activa', rol
+- [x] 2.4 Endpoints: auth + usuarios + tareas CRUD + OP lookup (con JOIN artículos producidos)
+- [x] 2.6 systemd `os-gestion.service` — puerto 9300 ✅ activo
+- [x] 2.7 Cloudflare — gestion.oscomunidad.com ✅ activo
+- [ ] 2.5 Endpoints: dificultades, ideas, pendientes, informes (Fase 3)
+- [ ] 2.8 Endpoints: cronómetro start/stop/complete
 
-### Fase 3 — Frontend Vue + Quasar
-- [ ] 3.1 Init Quasar con Capacitor en `sistema_gestion/app/`
-- [ ] 3.2 app.scss — variables del manual + verde #00C853
-- [ ] 3.3 LoginPage.vue — Google OAuth, mobile-first
-- [ ] 3.4 MainLayout.vue — sidebar colapsable (íconos/expandido) + drawer mobile
-- [ ] 3.5 FiltrosChips.vue — Hoy/Mañana/Ayer/Semana/Mis tareas/Pendientes
-- [ ] 3.6 TareaItem.vue + EstadoBadge.vue — fila compacta Linear
-- [ ] 3.7 TareasPage.vue — lista agrupada por categoría + panel lateral derecho
-- [ ] 3.8 TareaForm.vue — modal crear/editar + TipTap + OpLookup
+### Fase 3 — Frontend Vue + Quasar ✅ BASE COMPLETA
+- [x] 3.1 Init Quasar con Capacitor en `sistema_gestion/app/`
+- [x] 3.2 app.scss — variables del manual + verde #00C853
+- [x] 3.3 LoginPage.vue — Google OAuth con GSI renderButton (NO slots custom de vue3-google-login)
+- [x] 3.4 MainLayout.vue — sidebar 240px desktop + drawer mobile + hamburger
+- [x] 3.7 TareasPage.vue — lista agrupada por categoría + QuickAdd inline desktop + Promise.allSettled
+- [x] 3.8 TareaForm.vue — bottom sheet mobile + modal desktop + category chips + OpSelector
+- [x] OpSelector.vue — autocomplete OPs con debounce + teclado + tag valor seleccionado
+- [x] 3.12 Build y deploy — gestion.oscomunidad.com activo ✅
+- [ ] 3.5 FiltrosChips.vue — Hoy/Mañana/Ayer/Semana/Mis tareas (siguiente sesión)
+- [ ] 3.6 TareaItem.vue + EstadoBadge.vue — fila compacta Linear con cronómetro
 - [ ] 3.9 Cronometro.vue — start/stop/complete tiempo real
-- [ ] 3.10 EquipoPage.vue — vista del equipo
-- [ ] 3.11 Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
-- [ ] 3.12 Build y deploy
+- [ ] 3.10 TareaPanel.vue — panel lateral derecho detalle (desktop)
+- [ ] 3.11 EquipoPage.vue — vista del equipo
+- [ ] 3.12 Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
 
 ### Fase 4 — Android + Push
 - [ ] 4.1 Firebase project "os-gestion" + google-services.json

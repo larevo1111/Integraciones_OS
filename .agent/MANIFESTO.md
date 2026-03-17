@@ -324,6 +324,32 @@ updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CUR
 
 
 
+### ⚠️ REGLA ABSOLUTA: VERIFICAR CREDENCIALES Y COLUMNAS ANTES DE IMPLEMENTAR
+
+**Esta regla nació de 4+ errores consecutivos en la misma sesión (2026-03-16).**
+
+**Para credenciales MySQL en Hostinger:**
+1. **NUNCA asumir usuario MySQL** — Hostinger NO permite compartir el mismo usuario entre 2 BDs distintas.
+2. Verificar en cPanel (Hostinger) → MySQL Databases → Database Users qué usuario tiene acceso a cada BD.
+3. Credenciales verificadas (fuente de verdad en MEMORY.md):
+   - `u768061575_os_comunidad` → user: `u768061575_ssierra047`, pass: `Epist2487.`
+   - `u768061575_os_integracion` → user: `u768061575_osserver`, pass: `Epist2487.`
+   - `u768061575_os_gestion` → user: `u768061575_os_gestion`, pass: `Epist2487.`
+
+**Para columnas SQL:**
+1. **NUNCA inventar nombres de columnas** — siempre verificar con `DESCRIBE <tabla>` antes de escribir el query.
+2. `sys_usuarios`: columnas reales son `Nombre_Usuario`, `Nivel_Acceso`, `estado` (minúsculas en nombre), `Email` (mayúscula).
+3. `sys_empresa`: `nombre_empresa` (no `nombre`), `estado='Activa'` (femenino, no 'Activo').
+4. `sys_usuarios_empresas`: relación usa `rol` (no `perfil`).
+5. Las tablas del ERP SOS tienen convenciones distintas al estándar snake_case — siempre verificar.
+
+**Para JOINs cross-database en Hostinger:**
+- Cada usuario MySQL solo tiene acceso a su propia BD. JOIN entre BDs distintas = Access Denied.
+- Si necesitas datos de 2 BDs en un query → hacer 2 queries separados en Node y combinar en JS.
+- Alternativa: subquery dentro de la misma BD (no funciona cross-DB de todas formas).
+
+---
+
 ### Gotchas críticos — zeffi_facturas_venta_detalle
 - **`precio_neto_total` INCLUYE IVA**: usar `precio_bruto_total - descuento_total` para "ventas sin IVA". Nombre engañoso — nunca asumir.
 - **Número de factura**: en detalle se llama `id_numeracion`.

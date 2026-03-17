@@ -443,6 +443,65 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
   - JWT temporal → JWT final con `empresa_activa`
   - DashboardPage: bug fecha y optional chaining corregidos
 
+## Sistema Gestión OS — Estado (2026-03-16)
+
+> App de tareas y conocimiento del equipo. Reemplaza Notion. Web (gestion.oscomunidad.com) + Android futuro (Capacitor).
+
+### Lo que está funcionando
+- ✅ **API Express puerto 9300** — systemd `os-gestion.service`, Cloudflare tunnel activo
+- ✅ **Login Google OAuth** — GSI `renderButton` → JWT doble (temporal si >1 empresa, final con empresa_activa)
+- ✅ **BD `u768061575_os_gestion`** — tablas `g_categorias` (13 seeds), `g_tareas`, `g_tarea_tiempo`, `g_usuarios_config`, `g_perfiles`, `g_categorias_perfiles`
+- ✅ **Frontend Vue+Quasar** — LoginPage, MainLayout (sidebar 240px desktop / drawer mobile), TareasPage (TickTick-style)
+- ✅ **QuickAdd inline desktop** — crear tarea rápido sin abrir modal, directo en la lista
+- ✅ **TareaForm** — bottom sheet mobile / modal desktop, category chips, fechas, prioridades, responsable
+- ✅ **OpSelector** — autocomplete con debounce, búsqueda por número OP y artículo producido, teclado, tag de valor seleccionado. Solo OPs vigentes y no procesadas.
+- ✅ **Promise.allSettled** — carga paralela tolerante a fallos de categorías + usuarios + tareas
+- ✅ **Router guard** — decodifica JWT payload.tipo==='final' para evitar que token temporal acceda a /tareas
+
+### Rutas y servicios
+- **URL**: gestion.oscomunidad.com
+- **Puerto API**: 9300
+- **Directorio**: `sistema_gestion/`
+- **Systemd**: `os-gestion.service`
+- **Dev frontend**: `cd sistema_gestion/app && npx quasar dev` (puerto 9301)
+- **Build prod**: `cd sistema_gestion/app && npx quasar build`
+
+### Credenciales BD (3 pools)
+| Pool | BD | Usuario | Pass |
+|---|---|---|---|
+| poolComunidad | `u768061575_os_comunidad` | `u768061575_ssierra047` | `Epist2487.` |
+| poolGestion | `u768061575_os_gestion` | `u768061575_os_gestion` | `Epist2487.` |
+| poolIntegracion | `u768061575_os_integracion` | `u768061575_osserver` | `Epist2487.` |
+
+⚠️ **Hostinger NO permite compartir usuario entre BDs** — cada BD tiene su propio usuario MySQL.
+
+### Endpoints API activos
+```
+POST /api/auth/google              — Google ID token → JWT (busca en sys_usuarios)
+POST /api/auth/seleccionar_empresa — JWT temporal → JWT final
+GET  /api/auth/me                  — perfil del usuario autenticado
+GET  /api/usuarios                 — lista usuarios de la empresa
+GET  /api/gestion/categorias       — 13 categorías con color e icono
+GET  /api/gestion/tareas           — lista con filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=
+POST /api/gestion/tareas           — crear tarea
+PUT  /api/gestion/tareas/:id       — actualizar tarea
+GET  /api/gestion/ops              — OPs pendientes vigentes (JOIN artículos producidos). Acepta ?q=
+GET  /api/gestion/op/:id           — detalle de una OP específica
+```
+
+### Pendiente — Fase 2 (próxima sesión)
+- [ ] Cronómetro start/stop/complete (endpoints + Cronometro.vue)
+- [ ] Panel lateral de detalle de tarea (TareaPanel.vue — desktop)
+- [ ] Filtros chips Hoy/Mañana/Semana/Mis tareas
+- [ ] Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
+- [ ] Push notifications FCM (Fase 4)
+- [ ] APK Android (Fase 4)
+
+### Manual de diseño
+- `sistema_gestion/MANUAL_DISENO_HIBRIDO.md` — sistema de diseño completo, TickTick-style
+
+---
+
 ## Archivos Clave
 - Scripts: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/`
 - Exports: `/home/osserver/playwright/exports/`
