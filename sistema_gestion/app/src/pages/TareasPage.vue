@@ -4,6 +4,17 @@
     <!-- Lista principal -->
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">
 
+      <!-- Header de proyecto activo (breadcrumb) -->
+      <div v-if="proyectoFiltro" class="proyecto-header-bar">
+        <RouterLink to="/tareas" class="proyecto-back-link">
+          <span class="material-icons" style="font-size:15px">arrow_back</span>
+          Mis Tareas
+        </RouterLink>
+        <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
+        <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
+        <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
+      </div>
+
       <!-- Barra de filtros -->
       <div class="filtros-bar">
         <button v-for="f in FILTROS" :key="f.key" class="chip" :class="{ active: filtroActivo === f.key }" @click="filtroActivo = f.key">
@@ -83,15 +94,6 @@
         <div v-if="qaActivo && qaCatEsProduccion" class="quickadd-op">
           <OpSelector v-model="qaOp" style="max-width:360px" />
         </div>
-      </div>
-
-      <!-- Chip de proyecto activo -->
-      <div v-if="proyectoFiltro" class="proyecto-filtro-bar">
-        <span class="proyecto-dot-bar" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
-        <span>{{ proyectoFiltro.nombre }}</span>
-        <RouterLink to="/tareas" class="proyecto-filtro-clear" title="Ver todas">
-          <span class="material-icons" style="font-size:14px">close</span>
-        </RouterLink>
       </div>
 
       <!-- Lista de tareas -->
@@ -524,20 +526,23 @@ onMounted(async () => {
 }
 
 /* Chip filtro proyecto activo */
-.proyecto-filtro-bar {
+/* Header de proyecto activo */
+.proyecto-header-bar {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 16px;
-  background: var(--bg-row-hover);
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 12px; color: var(--text-secondary);
+  font-size: 12px; flex-shrink: 0;
 }
-.proyecto-dot-bar {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+.proyecto-back-link {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--text-tertiary); text-decoration: none;
+  transition: color 80ms;
 }
-.proyecto-filtro-clear {
-  display: inline-flex; align-items: center;
-  margin-left: auto; color: var(--text-tertiary);
-  text-decoration: none; transition: color 80ms;
+.proyecto-back-link:hover { color: var(--text-primary); }
+.proyecto-dot-hdr {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
 }
-.proyecto-filtro-clear:hover { color: var(--text-primary); }
+.proyecto-header-nombre {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
 </style>
