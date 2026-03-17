@@ -21,18 +21,24 @@
           <option>Cancelada</option>
         </select>
       </div>
-      <div class="field-row">
-        <span class="field-label">Prioridad</span>
-        <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.prioridad" @change="actualizar('prioridad', $event.target.value)">
-          <option>Baja</option><option>Media</option><option>Alta</option><option>Urgente</option>
-        </select>
+      <div class="field-row" style="align-items:flex-start;padding-top:4px">
+        <span class="field-label" style="padding-top:2px">Prioridad</span>
+        <div class="prioridad-chips">
+          <button
+            v-for="p in PRIORIDADES"
+            :key="p.key"
+            class="prioridad-chip"
+            :class="{ active: tarea.prioridad === p.key }"
+            :style="tarea.prioridad === p.key ? { background: p.color + '22', borderColor: p.color, color: p.color } : {}"
+            @click="actualizar('prioridad', p.key)"
+          >{{ p.key }}</button>
+        </div>
       </div>
       <div class="field-row">
         <span class="field-label">Categoría</span>
-        <span class="field-value" style="display:flex;align-items:center;gap:6px">
-          <span class="cat-dot" :style="{ background: tarea.categoria_color }" />
-          {{ tarea.categoria_nombre }}
-        </span>
+        <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.categoria_id" @change="actualizar('categoria_id', Number($event.target.value))">
+          <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+        </select>
       </div>
       <div class="field-row">
         <span class="field-label">Proyecto</span>
@@ -152,11 +158,19 @@ import Cronometro        from './Cronometro.vue'
 import ProyectoSelector  from './ProyectoSelector.vue'
 import EtiquetasSelector from './EtiquetasSelector.vue'
 
+const PRIORIDADES = [
+  { key: 'Urgente', color: '#ef4444' },
+  { key: 'Alta',    color: '#f59e0b' },
+  { key: 'Media',   color: '#6b7280' },
+  { key: 'Baja',    color: '#374151' }
+]
+
 const props = defineProps({
-  tarea:     { type: Object, default: null },
-  usuarios:  { type: Array, default: () => [] },
-  proyectos: { type: Array, default: () => [] },
-  etiquetas: { type: Array, default: () => [] }
+  tarea:      { type: Object, default: null },
+  usuarios:   { type: Array, default: () => [] },
+  categorias: { type: Array, default: () => [] },
+  proyectos:  { type: Array, default: () => [] },
+  etiquetas:  { type: Array, default: () => [] }
 })
 const emit = defineEmits(['cerrar', 'eliminar', 'actualizada'])
 
@@ -243,3 +257,20 @@ async function completarSin() {
   } catch(e) { console.error(e) }
 }
 </script>
+
+<style scoped>
+.prioridad-chips {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.prioridad-chip {
+  padding: 2px 8px; height: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 11px;
+  background: transparent;
+  font-size: 11px; color: var(--text-tertiary);
+  cursor: pointer; transition: all 80ms;
+  white-space: nowrap;
+}
+.prioridad-chip:hover { border-color: var(--border-default); color: var(--text-secondary); }
+.prioridad-chip.active { font-weight: 500; }
+</style>

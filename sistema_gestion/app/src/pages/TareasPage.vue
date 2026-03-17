@@ -151,6 +151,7 @@
         v-if="tareaSeleccionada"
         :tarea="tareaSeleccionada"
         :usuarios="usuarios"
+        :categorias="categorias"
         :proyectos="proyectos"
         :etiquetas="etiquetas"
         @cerrar="tareaSeleccionada = null"

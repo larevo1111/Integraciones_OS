@@ -280,6 +280,24 @@ body {
 .sidebar-collapse-btn:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 .sidebar.collapsed .sidebar-collapse-btn { transform: rotate(180deg); }
 
+/* Cuando está colapsado: centrar solo el botón de expandir */
+.sidebar.collapsed .sidebar-logo {
+  justify-content: center;
+  padding: 0 8px;
+}
+.sidebar.collapsed .sidebar-logo-icon { display: none; }
+.sidebar.collapsed .sidebar-logo-name { display: none; }
+
+/* Ocultar labels de nav cuando colapsado */
+.sidebar.collapsed .nav-item-label { display: none; }
+.sidebar.collapsed .nav-item { justify-content: center; padding: 0; }
+.sidebar.collapsed .sidebar-section { padding: 8px 0 4px; }
+.sidebar.collapsed .sidebar-footer { padding: 4px; }
+.sidebar.collapsed .sidebar-user-foto { margin: 0 auto; }
+.sidebar.collapsed .sidebar-user { justify-content: center; }
+.sidebar.collapsed .btn-icon-tiny { display: none; }
+.sidebar.collapsed .nav-item-count { display: none; }
+
 /* ─── MAIN CONTENT ─── */
 .main-content {
   flex: 1;

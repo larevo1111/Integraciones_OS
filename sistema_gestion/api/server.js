@@ -592,7 +592,13 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
        WHERE t.id = ?`,
       [req.params.id]
     )
-    res.json({ ok: true, tarea })
+    // Incluir etiquetas en la respuesta del PUT (para que el panel no las pierda)
+    const [etiqPut] = await db.gestion.query(
+      `SELECT e.id, e.nombre, e.color FROM g_etiquetas_tareas et
+       JOIN g_etiquetas e ON e.id = et.etiqueta_id WHERE et.tarea_id = ?`,
+      [req.params.id]
+    )
+    res.json({ ok: true, tarea: { ...tarea, etiquetas: etiqPut } })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }

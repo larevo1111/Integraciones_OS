@@ -39,10 +39,14 @@
           Sin resultados para "{{ busqueda }}"
         </div>
 
-        <!-- Crear nuevo (si hay búsqueda sin coincidencia exacta) -->
+        <!-- Crear nuevo: si hay búsqueda sin coincidencia exacta → "Crear X"; si no → "Nuevo proyecto" -->
         <div v-if="busqueda && !coincidenciaExacta" class="proyecto-crear" @click="crearProyecto">
           <span class="material-icons" style="font-size:14px">add</span>
           Crear "{{ busqueda }}"
+        </div>
+        <div v-else class="proyecto-crear" @click="crearNuevoVacio">
+          <span class="material-icons" style="font-size:14px">add</span>
+          Nuevo proyecto
         </div>
       </div>
     </Teleport>
@@ -127,6 +131,21 @@ async function crearProyecto() {
     if (props.proyectos === null) lista.value.push(data.proyecto)
     emit('proyecto-creado', data.proyecto)
     seleccionar(data.proyecto.id)
+  } catch (e) { console.error(e) }
+}
+
+async function crearNuevoVacio() {
+  const nombre = window.prompt('Nombre del proyecto:')
+  if (!nombre?.trim()) return
+  try {
+    const data = await api('/api/gestion/proyectos', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: nombre.trim() })
+    })
+    if (props.proyectos === null) lista.value.push(data.proyecto)
+    emit('proyecto-creado', data.proyecto)
+    seleccionar(data.proyecto.id)
+    cerrar()
   } catch (e) { console.error(e) }
 }
 
