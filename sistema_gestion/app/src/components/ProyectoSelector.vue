@@ -39,23 +39,27 @@
           Sin resultados para "{{ busqueda }}"
         </div>
 
-        <!-- Crear nuevo: si hay búsqueda sin coincidencia exacta → "Crear X"; si no → "Nuevo proyecto" -->
-        <div v-if="busqueda && !coincidenciaExacta" class="proyecto-crear" @click="crearProyecto">
+        <!-- Crear nuevo -->
+        <div class="proyecto-crear" @click="abrirModalCrear">
           <span class="material-icons" style="font-size:14px">add</span>
-          Crear "{{ busqueda }}"
-        </div>
-        <div v-else class="proyecto-crear" @click="crearNuevoVacio">
-          <span class="material-icons" style="font-size:14px">add</span>
-          Nuevo proyecto
+          {{ busqueda && !coincidenciaExacta ? `Crear "${busqueda}"` : 'Nuevo proyecto' }}
         </div>
       </div>
     </Teleport>
+
+    <!-- Modal crear proyecto -->
+    <ProyectoModal
+      v-model="mostrarModal"
+      :proyecto-editar="null"
+      @guardado="onProyectoCreado"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
+import ProyectoModal from './ProyectoModal.vue'
 
 const props = defineProps({
   modelValue: { type: Number, default: null },
@@ -63,11 +67,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'proyecto-creado'])
 
-const wrapRef   = ref(null)
-const searchRef = ref(null)
-const abierto   = ref(false)
-const busqueda  = ref('')
-const lista     = ref([])
+const wrapRef      = ref(null)
+const searchRef    = ref(null)
+const abierto      = ref(false)
+const busqueda     = ref('')
+const lista        = ref([])
+const mostrarModal = ref(false)
 const dropdownStyle = ref({})
 
 const proyectosData = computed(() => props.proyectos !== null ? props.proyectos : lista.value)
@@ -121,32 +126,15 @@ function seleccionar(id) {
   cerrar()
 }
 
-async function crearProyecto() {
-  if (!busqueda.value.trim()) return
-  try {
-    const data = await api('/api/gestion/proyectos', {
-      method: 'POST',
-      body: JSON.stringify({ nombre: busqueda.value.trim() })
-    })
-    if (props.proyectos === null) lista.value.push(data.proyecto)
-    emit('proyecto-creado', data.proyecto)
-    seleccionar(data.proyecto.id)
-  } catch (e) { console.error(e) }
+function abrirModalCrear() {
+  cerrar()
+  mostrarModal.value = true
 }
 
-async function crearNuevoVacio() {
-  const nombre = window.prompt('Nombre del proyecto:')
-  if (!nombre?.trim()) return
-  try {
-    const data = await api('/api/gestion/proyectos', {
-      method: 'POST',
-      body: JSON.stringify({ nombre: nombre.trim() })
-    })
-    if (props.proyectos === null) lista.value.push(data.proyecto)
-    emit('proyecto-creado', data.proyecto)
-    seleccionar(data.proyecto.id)
-    cerrar()
-  } catch (e) { console.error(e) }
+function onProyectoCreado(p) {
+  if (props.proyectos === null) lista.value.push(p)
+  emit('proyecto-creado', p)
+  seleccionar(p.id)
 }
 
 function onClickOutside(e) {
