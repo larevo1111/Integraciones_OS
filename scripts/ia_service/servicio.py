@@ -935,7 +935,10 @@ def consultar(
 
                 sql_generado = formateador.extraer_sql(res['texto'])
                 if not sql_generado:
-                    raise Exception("La IA no generó un SQL válido.")
+                    # El agente respondió en texto plano sin SQL → la información no existe en BD
+                    # Usar la respuesta directa del agente como respuesta final
+                    respuesta_final = res['texto'].strip()
+                    break  # Salir del loop de pasos — no hay SQL que ejecutar
 
             elif paso == 'ejecutar':
                 pasos_ejecutados.append('ejecutar')
