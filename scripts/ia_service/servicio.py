@@ -300,8 +300,13 @@ def _depurar_logica_negocio(empresa: str):
         if total_palabras <= 800:
             return  # No necesita depuración
 
-        # Buscar agente Groq para comprimir
-        agente_cfg = _cargar_agente('groq-llama')
+        # Buscar agente para comprimir — Groq primero, suplentes si falla
+        agente_cfg = None
+        for slug_dep in ('groq-llama', 'gemini-flash-lite', 'gemini-flash'):
+            cand = _cargar_agente(slug_dep)
+            if cand and cand.get('api_key'):
+                agente_cfg = cand
+                break
         if not agente_cfg:
             return
 
@@ -322,7 +327,18 @@ def _depurar_logica_negocio(empresa: str):
         ]
         res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
         if not res['ok'] or not res.get('texto'):
-            return
+            # Suplente si el primero falló
+            for slug_dep in ('groq-llama', 'gemini-flash-lite', 'gemini-flash'):
+                if agente_cfg and agente_cfg.get('slug') == slug_dep:
+                    continue
+                cand = _cargar_agente(slug_dep)
+                if cand and cand.get('api_key'):
+                    res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=900)
+                    if res['ok'] and res.get('texto'):
+                        agente_cfg = cand
+                        break
+            if not res['ok'] or not res.get('texto'):
+                return
 
         texto_comprimido = res['texto'].strip()
         palabras_nuevas = len(texto_comprimido.split())
