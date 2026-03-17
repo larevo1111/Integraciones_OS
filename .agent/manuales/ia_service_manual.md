@@ -497,6 +497,13 @@ Las capacidades están en `ia_agentes.capacidades` (JSON). El servicio las consu
 2. Vincular billing en `console.cloud.google.com/billing`
 3. Key empieza con `AIzaSy...`
 
+> ⚠️ **Control de costos Gemini — IMPORTANTE**
+> El "Límite de inversión mensual" de AI Studio está marcado como **Experimental** y NO es un freno real de facturación.
+> Solo intenta bloquear nuevas llamadas pero permite excedentes y no cancela cargos ya generados.
+> **El control real de gasto** se configura en Google Cloud Console → Facturación → **Presupuestos y alertas**:
+> ahí se puede definir un tope que desactiva la facturación del proyecto al alcanzarlo.
+> Costo esperado en uso normal (producción, sin QA intensivo): **< COP 10,000/mes**.
+
 **Groq** (gratis, sin tarjeta):
 1. `console.groq.com` → API Keys → Create API Key
 2. Key empieza con `gsk_...`
