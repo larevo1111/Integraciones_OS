@@ -443,7 +443,7 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
   - JWT temporal → JWT final con `empresa_activa`
   - DashboardPage: bug fecha y optional chaining corregidos
 
-## Sistema Gestión OS — Estado (2026-03-16)
+## Sistema Gestión OS — Estado (2026-03-17)
 
 > App de tareas y conocimiento del equipo. Reemplaza Notion. Web (gestion.oscomunidad.com) + Android futuro (Capacitor).
 
@@ -451,12 +451,16 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
 - ✅ **API Express puerto 9300** — systemd `os-gestion.service`, Cloudflare tunnel activo
 - ✅ **Login Google OAuth** — GSI `renderButton` → JWT doble (temporal si >1 empresa, final con empresa_activa)
 - ✅ **BD `u768061575_os_gestion`** — tablas `g_categorias` (13 seeds), `g_tareas`, `g_tarea_tiempo`, `g_usuarios_config`, `g_perfiles`, `g_categorias_perfiles`
-- ✅ **Frontend Vue+Quasar** — LoginPage, MainLayout (sidebar 240px desktop / drawer mobile), TareasPage (TickTick-style)
-- ✅ **QuickAdd inline desktop** — crear tarea rápido sin abrir modal, directo en la lista
-- ✅ **TareaForm** — bottom sheet mobile / modal desktop, category chips, fechas, prioridades, responsable
+- ✅ **Módulo Proyectos** — tablas `g_proyectos`, `g_proyectos_responsables`, CRUD completo, sidebar con lista, filtro por proyecto en TareasPage
+- ✅ **Módulo Etiquetas** — tablas `g_etiquetas`, `g_etiquetas_tareas`, `g_etiquetas_proyectos`, multi-select chips, crear inline
+- ✅ **Frontend Vue+Quasar** — LoginPage, MainLayout (sidebar 240px ↔ 64px colapsado), TareasPage (TickTick-style)
+- ✅ **QuickAdd inline desktop** — crear tarea rápido sin abrir modal, con proyecto y etiquetas heredados del filtro activo
+- ✅ **TareaForm** — bottom sheet mobile / modal desktop, category chips, fechas, prioridades, responsable, proyecto, etiquetas
+- ✅ **TareaPanel** — panel lateral desktop: todos los campos editables inline incl. Categoría (select), Prioridad (chips visuales), Proyecto (ProyectoSelector), Etiquetas (EtiquetasSelector)
 - ✅ **OpSelector** — autocomplete con debounce, búsqueda por número OP y artículo producido, teclado, tag de valor seleccionado. Solo OPs vigentes y no procesadas.
-- ✅ **Promise.allSettled** — carga paralela tolerante a fallos de categorías + usuarios + tareas
+- ✅ **Promise.allSettled** — carga paralela tolerante a fallos de categorías + usuarios + tareas + proyectos + etiquetas
 - ✅ **Router guard** — decodifica JWT payload.tipo==='final' para evitar que token temporal acceda a /tareas
+- ✅ **Sidebar colapsado** — 64px con solo botón chevron centrado (rotado 180° como expand). nav-items muestran solo icono.
 
 ### Rutas y servicios
 - **URL**: gestion.oscomunidad.com
@@ -482,17 +486,20 @@ POST /api/auth/seleccionar_empresa — JWT temporal → JWT final
 GET  /api/auth/me                  — perfil del usuario autenticado
 GET  /api/usuarios                 — lista usuarios de la empresa
 GET  /api/gestion/categorias       — 13 categorías con color e icono
-GET  /api/gestion/tareas           — lista con filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=
-POST /api/gestion/tareas           — crear tarea
-PUT  /api/gestion/tareas/:id       — actualizar tarea
-GET  /api/gestion/ops              — OPs pendientes vigentes (JOIN artículos producidos). Acepta ?q=
-GET  /api/gestion/op/:id           — detalle de una OP específica
+GET  /api/gestion/tareas           — filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=&proyecto_id=
+POST /api/gestion/tareas           — crear tarea (acepta proyecto_id, etiquetas:[])
+PUT  /api/gestion/tareas/:id       — actualizar (acepta proyecto_id, etiquetas:[]) → retorna etiquetas en response
+POST /api/gestion/tareas/:id/completar — completa con tiempo_real_min opcional
+GET  /api/gestion/proyectos        — ?estado=Activo. retorna tareas_pendientes
+POST /api/gestion/proyectos        — crear {nombre, color?}
+PUT  /api/gestion/proyectos/:id    — actualizar
+DELETE /api/gestion/proyectos/:id  — desancla tareas y elimina
+GET/POST/PUT/DELETE /api/gestion/etiquetas/:id — CRUD etiquetas por empresa
+GET  /api/gestion/ops              — OPs pendientes vigentes. Acepta ?q=
+GET  /api/gestion/op/:id           — detalle OP
 ```
 
-### Pendiente — Fase 2 (próxima sesión)
-- [ ] Cronómetro start/stop/complete (endpoints + Cronometro.vue)
-- [ ] Panel lateral de detalle de tarea (TareaPanel.vue — desktop)
-- [ ] Filtros chips Hoy/Mañana/Semana/Mis tareas
+### Pendiente — próximas fases
 - [ ] Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
 - [ ] Push notifications FCM (Fase 4)
 - [ ] APK Android (Fase 4)

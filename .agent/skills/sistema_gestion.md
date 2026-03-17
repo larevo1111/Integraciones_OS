@@ -92,26 +92,32 @@ GET  /api/gestion/categorias       — 13 categorías {id, nombre, color, icono,
 
 ### Tareas
 ```
-GET  /api/gestion/tareas           — lista con filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=
-POST /api/gestion/tareas           — crear tarea
-PUT  /api/gestion/tareas/:id       — actualizar tarea
+GET  /api/gestion/tareas           — lista con filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=&proyecto_id=
+POST /api/gestion/tareas           — crear tarea (acepta proyecto_id, etiquetas:[])
+PUT  /api/gestion/tareas/:id       — actualizar tarea (acepta proyecto_id, etiquetas:[]) → retorna etiquetas en response
+POST /api/gestion/tareas/:id/completar — completa tarea con tiempo_real_min opcional
+```
+
+### Proyectos
+```
+GET  /api/gestion/proyectos        — lista. ?estado=Activo para solo activos. retorna tareas_pendientes
+POST /api/gestion/proyectos        — crear proyecto {nombre, color?}
+PUT  /api/gestion/proyectos/:id    — actualizar {nombre, color, descripcion, estado}
+DELETE /api/gestion/proyectos/:id  — desancla tareas (proyecto_id=NULL) y elimina
+```
+
+### Etiquetas
+```
+GET  /api/gestion/etiquetas        — lista etiquetas de la empresa
+POST /api/gestion/etiquetas        — crear {nombre, color?}
+PUT  /api/gestion/etiquetas/:id    — actualizar {nombre, color}
+DELETE /api/gestion/etiquetas/:id  — elimina etiqueta y sus relaciones
 ```
 
 ### OPs Effi (solo categorías con es_produccion=1)
 ```
 GET  /api/gestion/ops              — OPs vigentes pendientes. Acepta ?q= (busca por id_orden o artículo)
 GET  /api/gestion/op/:id           — detalle de una OP específica
-```
-
-### (Pendientes — próxima sesión)
-```
-POST /api/gestion/tareas/:id/iniciar   — inicia cronómetro
-POST /api/gestion/tareas/:id/detener   — detiene cronómetro
-POST /api/gestion/tareas/:id/completar — completa tarea
-GET/POST/PUT/DELETE /api/gestion/dificultades/:id
-GET/POST/PUT/DELETE /api/gestion/ideas/:id
-GET/POST/PUT/DELETE /api/gestion/pendientes/:id
-GET/POST/PUT/DELETE /api/gestion/informes/:id
 ```
 
 ---
@@ -124,7 +130,12 @@ GET/POST/PUT/DELETE /api/gestion/informes/:id
 | `g_perfiles` | Roles de la app (Director, Comercial, Produccion, Logistica, Sistemas) |
 | `g_categorias_perfiles` | Junction: qué categorías ve cada perfil |
 | `g_usuarios_config` | Config por usuario (tema, FCM token, perfil) |
-| `g_tareas` | Tareas centrales — empresa, titulo, estado, prioridad, responsable, id_op |
+| `g_tareas` | Tareas centrales — empresa, titulo, estado, prioridad, responsable, id_op, proyecto_id |
+| `g_proyectos` | Proyectos por empresa — nombre, color, descripcion, estado (Activo/Archivado) |
+| `g_proyectos_responsables` | Junction: proyectos × usuarios |
+| `g_etiquetas` | Etiquetas libres por empresa — nombre, color |
+| `g_etiquetas_tareas` | Junction: etiquetas × tareas |
+| `g_etiquetas_proyectos` | Junction: etiquetas × proyectos |
 | `g_tarea_tiempo` | Sesiones de cronómetro (inicio/fin/duración) |
 | `g_dificultades` | Banco de dificultades y estrategias |
 | `g_ideas_hechos` | Ideas y hechos relevantes del equipo |
@@ -236,6 +247,17 @@ Ver manual completo: `sistema_gestion/MANUAL_DISENO_HIBRIDO.md`
 - **OpSelector**: `position: relative` + dropdown absoluto con `z-index: 100`
 - **Promise.allSettled**: para cargas paralelas tolerantes a fallos
 - **Transiciones**: `.modal-enter-active` (opacity 150ms) + `.sheet-enter-active` (translateY cubic-bezier)
+- **Prioridad chips**: 4 chips (Urgente/Alta/Media/Baja) con colores #ef4444/#f59e0b/#6b7280/#374151. El activo se resalta con `background: color+'22'` y `borderColor: color`
+- **Teleport dropdown** (ProyectoSelector, EtiquetasSelector): `calcularPosicion()` con `getBoundingClientRect()` → `position: fixed` → evita clipping por overflow
+- **ProyectoSelector**: siempre muestra "Nuevo proyecto" al fondo; si hay búsqueda sin coincidencia → "Crear X"; `crearNuevoVacio()` usa `window.prompt()`
+- **EtiquetasSelector**: multi-select chips, toggle individual, "Crear etiqueta X" si no hay match exacto
+- **Sidebar colapsado** (64px): al colapsar, `sidebar-logo` queda centrado con solo el botón chevron rotado (chevron_left → chevron_right via `rotate(180deg)`) — nav-item-labels, proyectos y counters ocultos
+
+### Componentes nuevos (desde sesión 2026-03-16)
+| Componente | Archivo | Propósito |
+|---|---|---|
+| ProyectoSelector | `components/ProyectoSelector.vue` | Dropdown simple para seleccionar/crear proyecto |
+| EtiquetasSelector | `components/EtiquetasSelector.vue` | Multi-select para etiquetas con chips |
 
 ### Acento: verde OS
 ```css
