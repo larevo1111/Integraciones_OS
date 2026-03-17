@@ -467,10 +467,10 @@ WHERE slug = 'conversacion';
 
 ## 6. Agentes disponibles {#agentes}
 
-### Estado actual (2026-03-14)
+### Estado actual (2026-03-17)
 
 ```bash
-mysql -u osadmin -pEpist2487. ia_service_os -e \
+mariadb -u osadmin -pEpist2487. ia_service_os -e \
   "SELECT slug, nombre, modelo_id, activo, LENGTH(api_key)>0 AS tiene_key,
           rate_limit_rpd, nivel_minimo, orden
    FROM ia_agentes ORDER BY orden;" 2>/dev/null
@@ -478,15 +478,24 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 | slug | modelo_id | tiene_key | RPD | nivel_min | Rol principal | Capacidades |
 |---|---|---|---|---|---|---|
-| `gemini-pro` | `gemini-2.5-pro` | ✅ | 1,000 | 1 | SQL complejo + análisis | vision, sql, codigo, razonamiento, documentos |
-| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | **Default** — analítico + visión | vision, sql, codigo, documentos |
-| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | Alto volumen, conversación | vision, enrutamiento |
-| `gemma-router` | `gemma-3-27b-it` | ✅ | 14,400 | 1 | Enrutador fallback | enrutamiento |
-| `gemini-image` | `gemini-2.5-flash-image` | ✅ | 70 | 1 | Generación de imágenes | imagen_generacion |
+| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | **Default analítico** — sql, visión | vision, sql, codigo, documentos |
+| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | Alto volumen, router fallback 2 | vision, enrutamiento |
+| `gpt-oss-120b` | `openai/gpt-oss-120b` | ✅ (key Groq) | 1,000 | 1 | Analítico alternativo — 500 t/s, razonamiento variable | sql, codigo, razonamiento |
 | `groq-llama` | `llama-3.3-70b-versatile` | ✅ | 14,400 | 1 | **Enrutador principal** (NUNCA agente final) | enrutamiento |
-| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Análisis económico | sql, codigo, razonamiento |
-| `deepseek-reasoner` | `deepseek-reasoner` | ✅ | — | 7 | Razonamiento complejo (solo admin) | sql, codigo, razonamiento |
-| `claude-sonnet` | `claude-sonnet-4-6` | ✅ | — | 1 | Documentos premium | vision, sql, codigo, razonamiento, documentos |
+| `cerebras-llama` | `llama3.1-8b` | ✅ | 1M TPD | 1 | **Router suplente** — 2,200 t/s, gratis | enrutamiento |
+| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Fallback analítico | sql, codigo, razonamiento |
+| `gemini-image` | `gemini-2.5-flash-image` | ✅ | 70 | 1 | Generación de imágenes | imagen_generacion |
+| `gemma-router` | `gemma-3-27b-it` | ❌ (inactivo) | 14,400 | 1 | Router fallback (inactivo) | enrutamiento |
+| `gemini-pro` | `gemini-2.5-pro` | ✅ | 1,000 | **6** | SQL complejo + premium (nivel 6+) | vision, sql, codigo, razonamiento |
+| `deepseek-reasoner` | `deepseek-reasoner` | ✅ | — | 7 | Razonamiento complejo (solo admin) | razonamiento |
+| `claude-sonnet` | `claude-sonnet-4-6` | ✅ | — | **6** | Documentos premium (nivel 6+) | vision, sql, codigo, documentos |
+
+**Restricción de nivel en bot Telegram:**
+- **Nivel 1–5**: gemini-flash, gpt-oss-120b, deepseek-chat
+- **Nivel 6–7**: + gemini-pro, claude-sonnet
+
+**Fallback del router** (hardcodeado en `_enrutar()`):
+`groq-llama → cerebras-llama → gemini-flash-lite → gemini-flash`
 
 Las capacidades están en `ia_agentes.capacidades` (JSON). El servicio las consulta dinámicamente para elegir el agente correcto según la tarea — no hay hardcoding de slugs para capacidades específicas.
 
@@ -1129,15 +1138,29 @@ mysql -u osadmin -pEpist2487. ia_service_os -e \
 
 El orquestador (`orquestador.py`) usa `TELEGRAM_NOTIF_BOT_TOKEN` para notificaciones. El bot de IA usa `TELEGRAM_BOT_TOKEN`.
 
+### Autenticación del bot — por número de teléfono
+
+**Todo mensaje es rechazado si el usuario no está autorizado.**
+
+Flujo de primer acceso:
+1. Usuario escribe al bot → bot detecta que no está en `bot_sesiones.autorizado=1`
+2. Verifica si su `telegram_id` ya está en `ia_usuarios` (si admin lo añadió manualmente)
+3. Si no → muestra botón "Compartir mi número"
+4. Usuario comparte → bot verifica contra `ia_usuarios.telefono`
+5. Si el número está → acceso concedido, se guarda `telegram_id` + `nivel` en `bot_sesiones`
+6. Si no → "Tu número no está registrado, contacta a Santiago"
+
+Usuarios registrados: ver tabla en sección 16.
+
 ### Archivos del bot de IA
 
 ```
 scripts/telegram_bot/
-  bot.py      — handlers principales (texto + fotos)
+  bot.py      — handlers + _verificar_acceso() + handle_contacto()
   api_ia.py   — cliente del ia_service (POST /ia/consultar)
-  db.py       — sesiones en MariaDB local
+  db.py       — sesiones + auth (verificar_por_telefono, vincular_telegram_id)
   tabla.py    — procesar tablas de datos para el bot
-  teclado.py  — construcción de teclados reply e inline
+  teclado.py  — teclados reply e inline (inline_ajustes filtra por nivel)
 ```
 
 ### Capacidad de visión — fotos y documentos
@@ -1194,22 +1217,40 @@ https://menu.oscomunidad.com/bot/tabla?token=TOKEN_TEMPORAL
 
 ### Niveles de acceso (1–7)
 
-El nivel controla qué agentes puede usar el usuario y qué secciones del ia-admin puede ver.
+El nivel controla qué agentes puede usar el usuario en el bot Telegram y qué ve en ia-admin.
 
-| Nivel | Acceso ia-admin | Agentes disponibles |
+| Nivel | Acceso ia-admin | Agentes en bot Telegram |
 |---|---|---|
-| 1 | Dashboard, Playground | Todos excepto deepseek-reasoner |
-| 3 | + Logs | Todos excepto deepseek-reasoner |
-| 5 | + Contextos RAG | Todos excepto deepseek-reasoner |
-| 7 | Todo — Agentes, Tipos, Usuarios, Config, Conexiones | Todos incluyendo deepseek-reasoner |
+| 1 | Dashboard, Playground | gemini-flash, gpt-oss-120b, deepseek-chat |
+| 3 | + Logs | ídem |
+| 5 | + Contextos RAG | ídem (Jen tiene nivel 5) |
+| 6 | + Agentes, Tipos | + gemini-pro, claude-sonnet |
+| 7 | Todo — Usuarios, Config, Conexiones | Todos incluyendo deepseek-reasoner |
 
 (Umbrales configurables en `ia_config.acceso_*`)
 
-### Tabla ia_usuarios
+### Tabla ia_usuarios — estructura y usuarios activos
 
 ```sql
-SELECT usuario_id, nombre, nivel, canal, empresa, activo
-FROM ia_usuarios ORDER BY nivel DESC;
+-- Campos: email, nombre, rol, nivel, activo, telefono, telegram_id
+SELECT email, nombre, nivel, telefono, telegram_id, activo FROM ia_usuarios;
+```
+
+| email | nombre | nivel | teléfono | rol |
+|---|---|---|---|---|
+| santiago@origensilvestre.com | Santiago Sierra | 7 | +573214550933 | admin |
+| jen@origensilvestre.com | Jen | 5 | +572307085143 | viewer |
+
+**Agregar nuevo usuario:**
+```sql
+INSERT INTO ia_usuarios (email, nombre, rol, nivel, activo, telefono)
+VALUES ('nuevo@email.com', 'Nombre', 'viewer', 3, 1, '+57XXXXXXXXXX');
+```
+El `telegram_id` se llena automáticamente cuando el usuario hace su primer login en el bot.
+
+**Agregar por telegram_id directamente (sin esperar login):**
+```sql
+UPDATE ia_usuarios SET telegram_id = 123456789 WHERE telefono = '+57XXXXXXXXXX';
 ```
 
 ### Rate limiting (sliding window in-memory)
