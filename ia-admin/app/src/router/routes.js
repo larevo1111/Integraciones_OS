@@ -18,8 +18,10 @@ const routes = [
       { path: 'playground', component: () => import('pages/PlaygroundPage.vue') },
       { path: 'usuarios',   component: () => import('pages/UsuariosPage.vue') },
       { path: 'contextos',  component: () => import('pages/ContextosPage.vue') },
-      { path: 'conexiones', component: () => import('pages/ConexionesPage.vue') },
-      { path: 'config',     component: () => import('pages/ConfigPage.vue') },
+      { path: 'conexiones',      component: () => import('pages/ConexionesPage.vue') },
+      { path: 'config',          component: () => import('pages/ConfigPage.vue') },
+      { path: 'logica-negocio',  component: () => import('pages/LogicaNegocioPage.vue') },
+      { path: 'bot-sesiones',    component: () => import('pages/BotSesionesPage.vue') },
     ]
   },
   { path: '/:catchAll(.*)*', redirect: '/dashboard' }

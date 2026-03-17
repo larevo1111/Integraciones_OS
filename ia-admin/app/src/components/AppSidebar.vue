@@ -43,6 +43,10 @@
           <LinkIcon :size="15" class="nav-icon" />
           <span>Conexiones BD</span>
         </router-link>
+        <router-link v-if="nivel >= 7" to="/logica-negocio" class="nav-item" active-class="active">
+          <BookOpenIcon :size="15" class="nav-icon" />
+          <span>Lógica de negocio</span>
+        </router-link>
         <router-link v-if="nivel >= 7" to="/config" class="nav-item" active-class="active">
           <SlidersHorizontalIcon :size="15" class="nav-icon" />
           <span>Configuración</span>
@@ -54,6 +58,10 @@
       <div class="nav-group-label">Monitoreo</div>
 
       <div class="nav-section">
+        <router-link v-if="nivel >= 7" to="/bot-sesiones" class="nav-item" active-class="active">
+          <MessageSquareIcon :size="15" class="nav-icon" />
+          <span>Bot Telegram</span>
+        </router-link>
         <router-link v-if="nivel >= 3" to="/logs" class="nav-item" active-class="active">
           <ScrollIcon :size="15" class="nav-icon" />
           <span>Logs</span>
@@ -88,7 +96,7 @@ import { computed } from 'vue'
 import {
   LayoutDashboardIcon, BotIcon, SettingsIcon, UsersIcon,
   ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon, LinkIcon,
-  SlidersHorizontalIcon
+  SlidersHorizontalIcon, BookOpenIcon, MessageSquareIcon
 } from 'lucide-vue-next'
 import { useAuthStore } from 'stores/authStore'
 

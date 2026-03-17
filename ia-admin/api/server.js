@@ -555,26 +555,26 @@ app.delete('/api/ia/tipos-admin/:tipo', requireAdmin, async (req, res) => {
 // ─── USUARIOS ─────────────────────────────────────────────────────
 app.get('/api/ia/usuarios', requireAdmin, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT email, nombre, rol, nivel, activo, created_at FROM ia_usuarios ORDER BY nivel DESC, nombre')
+    const [rows] = await db.query('SELECT email, nombre, rol, nivel, activo, telefono, telegram_id, created_at FROM ia_usuarios ORDER BY nivel DESC, nombre')
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 app.post('/api/ia/usuarios', requireAdmin, async (req, res) => {
-  const { email, nombre, rol, nivel, activo } = req.body
+  const { email, nombre, rol, nivel, activo, telefono } = req.body
   if (!email || !nombre) return res.status(400).send('email y nombre son requeridos')
   try {
-    await db.query('INSERT INTO ia_usuarios (email, nombre, rol, nivel, activo) VALUES (?, ?, ?, ?, ?)',
-      [email, nombre, rol || 'viewer', nivel || 1, activo ? 1 : 0])
+    await db.query('INSERT INTO ia_usuarios (email, nombre, rol, nivel, activo, telefono) VALUES (?, ?, ?, ?, ?, ?)',
+      [email, nombre, rol || 'viewer', nivel || 1, activo ? 1 : 0, telefono || null])
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
 })
 
 app.put('/api/ia/usuarios/:email', requireAdmin, async (req, res) => {
-  const { nombre, rol, nivel, activo } = req.body
+  const { nombre, rol, nivel, activo, telefono } = req.body
   try {
-    await db.query('UPDATE ia_usuarios SET nombre=?, rol=?, nivel=?, activo=? WHERE email=?',
-      [nombre, rol || 'viewer', nivel || 1, activo ? 1 : 0, req.params.email])
+    await db.query('UPDATE ia_usuarios SET nombre=?, rol=?, nivel=?, activo=?, telefono=? WHERE email=?',
+      [nombre, rol || 'viewer', nivel || 1, activo ? 1 : 0, telefono || null, req.params.email])
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
 })
@@ -592,6 +592,62 @@ app.delete('/api/ia/usuarios/:email', requireAdmin, async (req, res) => {
     await db.query('DELETE FROM ia_usuarios WHERE email=?', [req.params.email])
     res.json({ ok: true })
   } catch (e) { res.status(500).send(e.message) }
+})
+
+
+// ─── LÓGICA DE NEGOCIO ────────────────────────────────────────────────────────
+app.get('/api/ia/logica-negocio', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT id, concepto, keywords, explicacion, siempre_presente, palabras, activo, empresa, created_at FROM ia_logica_negocio ORDER BY siempre_presente DESC, concepto')
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.post('/api/ia/logica-negocio', requireAdmin, async (req, res) => {
+  const { concepto, keywords, explicacion, siempre_presente, activo, empresa } = req.body
+  if (!concepto || !explicacion) return res.status(400).send('concepto y explicacion son requeridos')
+  const palabras = explicacion.trim().split(/\s+/).filter(Boolean).length
+  try {
+    await db.query('INSERT INTO ia_logica_negocio (concepto, keywords, explicacion, siempre_presente, activo, palabras, empresa) VALUES (?,?,?,?,?,?,?)',
+      [concepto, keywords || null, explicacion, siempre_presente ? 1 : 0, activo !== false ? 1 : 0, palabras, empresa || 'ori_sil_2'])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).send(e.message) }
+})
+
+app.put('/api/ia/logica-negocio/:id', requireAdmin, async (req, res) => {
+  const { concepto, keywords, explicacion, siempre_presente, activo } = req.body
+  const palabras = explicacion ? explicacion.trim().split(/\s+/).filter(Boolean).length : 0
+  try {
+    await db.query('UPDATE ia_logica_negocio SET concepto=?, keywords=?, explicacion=?, siempre_presente=?, activo=?, palabras=? WHERE id=?',
+      [concepto, keywords || null, explicacion, siempre_presente ? 1 : 0, activo ? 1 : 0, palabras, req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).send(e.message) }
+})
+
+app.patch('/api/ia/logica-negocio/:id', requireAdmin, async (req, res) => {
+  try {
+    const sets = Object.keys(req.body).map(k => `${k}=?`).join(',')
+    await db.query(`UPDATE ia_logica_negocio SET ${sets} WHERE id=?`, [...Object.values(req.body), req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).send(e.message) }
+})
+
+app.delete('/api/ia/logica-negocio/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.query('DELETE FROM ia_logica_negocio WHERE id=?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).send(e.message) }
+})
+
+
+// ─── BOT SESIONES ─────────────────────────────────────────────────────────────
+app.get('/api/ia/bot-sesiones', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT telegram_user_id, username, nombre, autorizado, nivel, agente_preferido, empresa, created_at, updated_at FROM bot_sesiones ORDER BY updated_at DESC'
+    )
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 

@@ -21,6 +21,8 @@
               <th>Email</th>
               <th>Nombre</th>
               <th>Nivel</th>
+              <th>Teléfono</th>
+              <th>Telegram</th>
               <th>Activo</th>
               <th>Creado</th>
               <th></th>
@@ -34,6 +36,13 @@
                 <div class="nivel-pill" :class="`nivel-${u.nivel}`" :title="nivelLabel(u.nivel)">
                   {{ u.nivel }} <span class="nivel-text">{{ nivelLabel(u.nivel) }}</span>
                 </div>
+              </td>
+              <td class="mono" style="font-size:12px">{{ u.telefono || '—' }}</td>
+              <td>
+                <span v-if="u.telegram_id" class="tg-pill" title="Vinculado">
+                  ✓ {{ u.telegram_id }}
+                </span>
+                <span v-else style="color:var(--text-tertiary);font-size:12px">—</span>
               </td>
               <td>
                 <label class="toggle" @click.stop>
@@ -101,6 +110,15 @@
             </div>
             <div class="nivel-desc">{{ nivelDesc(form.nivel) }}</div>
           </div>
+          <div class="input-group">
+            <label class="input-label">Teléfono (con código país)</label>
+            <input class="input-field" v-model="form.telefono" placeholder="+573214550933" />
+            <div style="font-size:11px;color:var(--text-tertiary);margin-top:3px">Se usa para autenticación del Bot Telegram</div>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Telegram ID</label>
+            <input class="input-field" v-model.number="form.telegram_id" placeholder="Se vincula automáticamente al verificar teléfono" :readonly="true" style="background:var(--bg-tertiary);color:var(--text-tertiary)" />
+          </div>
           <div class="input-group" style="display:flex;align-items:center;gap:10px;margin-top:4px">
             <label class="toggle">
               <input type="checkbox" v-model="form.activo" />
@@ -152,7 +170,7 @@ function seleccionar(u) {
 function abrirNuevo() {
   esNuevo.value = true
   seleccionado.value = { email: '' }
-  form.value = { email: '', nombre: '', rol: 'viewer', nivel: 1, activo: true }
+  form.value = { email: '', nombre: '', rol: 'viewer', nivel: 1, activo: true, telefono: '', telegram_id: null }
 }
 
 function nivelLabel(n) {
@@ -269,5 +287,16 @@ onMounted(cargar)
   background: var(--bg-tertiary);
   border-radius: 6px;
   border-left: 3px solid #5e6ad2;
+}
+.tg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: rgba(16,185,129,0.1);
+  color: #059669;
 }
 </style>
