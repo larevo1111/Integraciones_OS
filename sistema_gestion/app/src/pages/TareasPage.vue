@@ -91,6 +91,8 @@
             v-model="qaEtiquetas"
             :etiquetas="etiquetas"
             @etiqueta-creada="e => etiquetas.push(e)"
+            @etiqueta-actualizada="e => { const i = etiquetas.findIndex(x => x.id === e.id); if (i !== -1) etiquetas[i] = e }"
+            @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
           />
         </div>
         <div v-if="qaActivo && qaCatEsProduccion" class="quickadd-op">

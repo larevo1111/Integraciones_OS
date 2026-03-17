@@ -32,13 +32,38 @@
             v-for="e in etiquetasFiltradas"
             :key="e.id"
             class="etiqueta-option"
-            :class="{ selected: modelValue.includes(e.id) }"
-            @click="toggle(e.id)"
+            :class="{ selected: modelValue.includes(e.id) && editandoId !== e.id }"
+            @mouseenter="hoverId = e.id"
+            @mouseleave="hoverId = null"
           >
-            <span v-if="e.color" class="etiqueta-dot" :style="{ background: e.color }"></span>
-            <span v-else class="etiqueta-dot" style="background:var(--text-tertiary)"></span>
-            <span class="etiqueta-option-nombre">{{ e.nombre }}</span>
-            <span v-if="modelValue.includes(e.id)" class="material-icons" style="font-size:14px;margin-left:auto;color:var(--accent)">check</span>
+            <!-- Modo normal -->
+            <template v-if="editandoId !== e.id">
+              <span class="etiqueta-dot" :style="{ background: e.color || 'var(--text-tertiary)' }"></span>
+              <span class="etiqueta-option-nombre" @click="toggle(e.id)">{{ e.nombre }}</span>
+              <span v-if="modelValue.includes(e.id) && hoverId !== e.id" class="material-icons check-icon">check</span>
+              <button v-if="hoverId === e.id" class="etiqueta-menu-btn" @click.stop="iniciarEdicion(e)" title="Editar o eliminar">
+                <span class="material-icons" style="font-size:15px">more_vert</span>
+              </button>
+            </template>
+
+            <!-- Modo edición inline -->
+            <template v-else>
+              <span class="etiqueta-dot" :style="{ background: e.color || 'var(--text-tertiary)' }"></span>
+              <input
+                ref="editInputRef"
+                v-model="editandoNombre"
+                class="etiqueta-edit-input"
+                @keydown.enter.stop="confirmarRename(e)"
+                @keydown.escape.stop="cancelarEdicion"
+                @click.stop
+              />
+              <button class="etiqueta-action-btn" title="Guardar" @click.stop="confirmarRename(e)">
+                <span class="material-icons" style="font-size:14px;color:var(--accent)">check</span>
+              </button>
+              <button class="etiqueta-action-btn etiqueta-action-danger" title="Eliminar" @click.stop="eliminarEtiqueta(e)">
+                <span class="material-icons" style="font-size:14px">delete_outline</span>
+              </button>
+            </template>
           </div>
 
           <div v-if="!etiquetasFiltradas.length && busqueda" class="etiqueta-empty">
@@ -64,14 +89,18 @@ const props = defineProps({
   modelValue: { type: Array, default: () => [] },   // array de IDs
   etiquetas:  { type: Array, default: null }         // si se pasa, no carga de API
 })
-const emit = defineEmits(['update:modelValue', 'etiqueta-creada'])
+const emit = defineEmits(['update:modelValue', 'etiqueta-creada', 'etiqueta-actualizada', 'etiqueta-eliminada'])
 
-const wrapRef    = ref(null)
-const searchRef  = ref(null)
-const abierto    = ref(false)
-const busqueda   = ref('')
-const lista      = ref([])
+const wrapRef       = ref(null)
+const searchRef     = ref(null)
+const editInputRef  = ref(null)
+const abierto       = ref(false)
+const busqueda      = ref('')
+const lista         = ref([])
 const dropdownStyle = ref({})
+const hoverId       = ref(null)
+const editandoId    = ref(null)
+const editandoNombre = ref('')
 
 const etiquetasData = computed(() => props.etiquetas !== null ? props.etiquetas : lista.value)
 const seleccionadas = computed(() => etiquetasData.value.filter(e => props.modelValue.includes(e.id)))
@@ -111,13 +140,19 @@ async function abrirMenu() {
   calcularPosicion()
   abierto.value = true
   busqueda.value = ''
+  editandoId.value = null
   await nextTick()
   searchRef.value?.focus()
 }
 
-function cerrar() { abierto.value = false; busqueda.value = '' }
+function cerrar() {
+  abierto.value = false
+  busqueda.value = ''
+  editandoId.value = null
+}
 
 function toggle(id) {
+  if (editandoId.value) return   // no toggle mientras se edita
   const nueva = props.modelValue.includes(id)
     ? props.modelValue.filter(x => x !== id)
     : [...props.modelValue, id]
@@ -142,8 +177,58 @@ async function crearEtiqueta() {
   } catch (e) { console.error(e) }
 }
 
-function onClickOutside(e) {
-  if (!wrapRef.value?.contains(e.target)) cerrar()
+// ─── Edición inline ───────────────────────────────────────────────
+
+async function iniciarEdicion(e) {
+  editandoId.value = e.id
+  editandoNombre.value = e.nombre
+  await nextTick()
+  // editInputRef puede ser array cuando hay múltiples refs en v-for
+  const el = Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value
+  el?.focus()
+  el?.select()
+}
+
+function cancelarEdicion() {
+  editandoId.value = null
+  editandoNombre.value = ''
+}
+
+async function confirmarRename(e) {
+  const nombre = editandoNombre.value.trim()
+  if (!nombre || nombre === e.nombre) { cancelarEdicion(); return }
+  try {
+    const data = await api(`/api/gestion/etiquetas/${e.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ nombre })
+    })
+    // Actualizar en lista local
+    if (props.etiquetas === null) {
+      const idx = lista.value.findIndex(x => x.id === e.id)
+      if (idx !== -1) lista.value[idx] = { ...lista.value[idx], nombre }
+    }
+    emit('etiqueta-actualizada', data.etiqueta)
+    cancelarEdicion()
+  } catch (err) { console.error(err) }
+}
+
+async function eliminarEtiqueta(e) {
+  try {
+    await api(`/api/gestion/etiquetas/${e.id}`, { method: 'DELETE' })
+    if (props.etiquetas === null) {
+      lista.value = lista.value.filter(x => x.id !== e.id)
+    }
+    // Quitar del modelValue si estaba seleccionada
+    if (props.modelValue.includes(e.id)) {
+      emit('update:modelValue', props.modelValue.filter(x => x !== e.id))
+    }
+    emit('etiqueta-eliminada', e.id)
+    cancelarEdicion()
+  } catch (err) { console.error(err) }
+}
+
+function onClickOutside(ev) {
+  if (!wrapRef.value?.contains(ev.target)) cerrar()
 }
 
 onMounted(() => document.addEventListener('click', onClickOutside))
@@ -202,15 +287,52 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   background: transparent; border: none; outline: none;
   font-size: 13px; color: var(--text-primary); flex: 1;
 }
+
+/* Fila de etiqueta */
 .etiqueta-option {
   display: flex; align-items: center; gap: 8px;
-  padding: 7px 12px; font-size: 13px; color: var(--text-secondary);
+  padding: 6px 10px; font-size: 13px; color: var(--text-secondary);
   cursor: pointer; transition: background 60ms;
+  min-height: 32px;
 }
 .etiqueta-option:hover, .etiqueta-option.selected { background: var(--bg-row-hover); color: var(--text-primary); }
 .etiqueta-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .etiqueta-option-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check-icon { font-size: 14px; margin-left: auto; color: var(--accent); flex-shrink: 0; }
 .etiqueta-empty { padding: 8px 12px; font-size: 12px; color: var(--text-tertiary); font-style: italic; }
+
+/* Botón ⋮ */
+.etiqueta-menu-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-left: auto; flex-shrink: 0;
+  background: transparent; border: none; cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary); transition: background 60ms, color 60ms;
+}
+.etiqueta-menu-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+
+/* Input edición inline */
+.etiqueta-edit-input {
+  flex: 1; background: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px; font-size: 12px;
+  color: var(--text-primary); outline: none;
+  font-family: var(--font-sans);
+}
+
+/* Botones acción (✓ y 🗑) */
+.etiqueta-action-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0;
+  background: transparent; border: none; cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary); transition: background 60ms, color 60ms;
+}
+.etiqueta-action-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.etiqueta-action-danger:hover { color: var(--color-error) !important; }
+
+/* Crear nueva */
 .etiqueta-crear {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 12px; font-size: 13px; color: var(--accent);
