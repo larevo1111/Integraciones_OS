@@ -168,7 +168,7 @@
     <!-- Bottom sheet detalle de tarea (mobile) -->
     <Teleport to="body">
       <Transition name="bsheet">
-        <div v-if="tareaSeleccionada" class="bsheet-overlay" @click.self="tareaSeleccionada = null">
+        <div v-if="tareaSeleccionada && isMobile" class="bsheet-overlay" @click.self="tareaSeleccionada = null">
           <div class="bsheet-panel">
             <div class="bsheet-handle"></div>
             <TareaPanel
@@ -200,7 +200,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
@@ -213,6 +213,10 @@ import EtiquetasSelector  from 'src/components/EtiquetasSelector.vue'
 
 const auth  = useAuthStore()
 const route = useRoute()
+
+// Detección mobile (≤768px) — controla bottom sheet vs panel lateral
+const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+function onResize() { isMobile.value = window.innerWidth <= 768 }
 
 // Estado principal
 const tareas            = ref([])
@@ -396,7 +400,9 @@ function seleccionar(tarea) {
 }
 
 async function cambiarEstado(tarea) {
-  const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente', 'Cancelada': 'Pendiente' }
+  // Ciclo del check: Pendiente→EnProgreso→Completada→Pendiente
+  // Cancelada: el check no la reactiva (se gestiona desde el panel de estado)
+  const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente' }
   try {
     const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify({ estado: CICLO[tarea.estado] || 'Pendiente' }) })
     onTareaActualizada(data.tarea)
@@ -427,8 +433,10 @@ async function eliminar(tarea) {
 }
 
 onMounted(async () => {
+  window.addEventListener('resize', onResize)
   await Promise.all([cargarTareas(), cargarCatalogos()])
 })
+onUnmounted(() => { window.removeEventListener('resize', onResize) })
 </script>
 
 <style scoped>

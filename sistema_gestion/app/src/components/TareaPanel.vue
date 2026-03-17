@@ -12,14 +12,21 @@
     <!-- Body -->
     <div class="tarea-panel-body">
       <!-- Campos -->
-      <div class="field-row">
-        <span class="field-label">Estado</span>
-        <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.estado" @change="actualizar('estado', $event.target.value)">
-          <option>Pendiente</option>
-          <option>En Progreso</option>
-          <option>Completada</option>
-          <option>Cancelada</option>
-        </select>
+      <div class="field-row" style="align-items:flex-start;padding-top:4px">
+        <span class="field-label" style="padding-top:2px">Estado</span>
+        <div class="prioridad-chips">
+          <button
+            v-for="e in ESTADOS"
+            :key="e.key"
+            class="prioridad-chip"
+            :class="{ active: tarea.estado === e.key }"
+            :style="tarea.estado === e.key ? { background: e.color + '22', borderColor: e.color, color: e.color } : {}"
+            @click="actualizar('estado', e.key)"
+          >
+            <span class="p-dot" :style="{ background: e.color }"></span>
+            {{ e.label }}
+          </button>
+        </div>
       </div>
       <div class="field-row" style="align-items:flex-start;padding-top:4px">
         <span class="field-label" style="padding-top:2px">Prioridad</span>
@@ -31,7 +38,10 @@
             :class="{ active: tarea.prioridad === p.key }"
             :style="tarea.prioridad === p.key ? { background: p.color + '22', borderColor: p.color, color: p.color } : {}"
             @click="actualizar('prioridad', p.key)"
-          >{{ p.key }}</button>
+          >
+            <span class="p-dot" :style="{ background: p.color }"></span>
+            {{ p.key }}
+          </button>
         </div>
       </div>
       <div class="field-row">
@@ -163,6 +173,13 @@ import ProyectoSelector  from './ProyectoSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 
+const ESTADOS = [
+  { key: 'Pendiente',   label: 'Pendiente',   color: '#6b7280' },
+  { key: 'En Progreso', label: 'En Progreso', color: '#3b82f6' },
+  { key: 'Completada',  label: 'Completada',  color: '#22c55e' },
+  { key: 'Cancelada',   label: 'Cancelada',   color: '#ef4444' }
+]
+
 const PRIORIDADES = [
   { key: 'Urgente', color: '#ef4444' },
   { key: 'Alta',    color: '#f59e0b' },
@@ -278,4 +295,8 @@ async function completarSin() {
 }
 .prioridad-chip:hover { border-color: var(--border-default); color: var(--text-secondary); }
 .prioridad-chip.active { font-weight: 500; }
+.p-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  opacity: 0.85;
+}
 </style>
