@@ -1,8 +1,8 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.5 — 2026-03-16
+**Versión**: 2.6 — 2026-03-17
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
-**Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT 2 pasos.
+**Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 9 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos, Lógica de negocio, Bot Telegram. Auth Google OAuth + JWT 2 pasos.
 
 > **REGLA DE SEGURIDAD ABSOLUTA**: Las API keys van SOLO en la BD (`ia_agentes.api_key`) y en `scripts/.env`. NUNCA en archivos .md, código commiteado, comentarios ni mensajes de commit.
 
@@ -174,7 +174,8 @@ mysql -u osadmin -pEpist2487. ia_service_os -e "SHOW TABLES;" 2>/dev/null
 | `ia_config` | Parámetros globales del sistema (circuit breaker, rate limits, costo max) |
 | `ia_conexiones_bd` | Conexiones a BDs externas por empresa (para conector.py) |
 | `ia_esquemas` | DDL de tablas por tema+conexión (para inyectar en system prompt) |
-| `bot_sesiones` | Sesiones del bot de Telegram (agente preferido por usuario) |
+| `ia_logica_negocio` | Fragmentos de lógica de negocio aprendidos (RAG contextual) |
+| `bot_sesiones` | Sesiones del bot de Telegram (agente preferido, nivel, autorizado) |
 | `bot_tablas_temp` | Tablas de datos temporales para la mini app web del bot |
 | `v_consumo_hoy` | Vista — consumo del día actual aggregado (atajos de monitoreo) |
 
@@ -214,7 +215,9 @@ FROM ia_tipos_consulta;
 | `slug` | `analisis_datos`, `redaccion`, `enrutamiento`, `conversacion`, `clasificacion`, `generacion_imagen` |
 | `pasos` | JSON array — pasos del flujo: `["enrutar","generar_sql","ejecutar","redactar"]` |
 | `agente_preferido` | Slug del agente para redactar respuesta |
+| `agente_fallback` | Slug del agente de respaldo si el preferido falla o alcanza su límite |
 | `agente_sql` | Slug del agente para generar SQL (capa mecánica, distinto al analítico) |
+| `requiere_sql` | TINYINT 0|1 — si el tipo genera SQL antes de responder |
 | `system_prompt` | TEXT — prompt completo con XML estructurado |
 | `tema` | Campo libre para clasificar temas RAG |
 

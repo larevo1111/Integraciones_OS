@@ -46,8 +46,8 @@
         </div>
       </div>
 
-      <!-- QuickAdd (solo desktop) -->
-      <div class="quickadd-wrap d-desktop-only">
+      <!-- QuickAdd (desktop y mobile) -->
+      <div class="quickadd-wrap">
         <div class="quickadd-row" :class="{ activo: qaActivo }">
           <span class="material-icons quickadd-plus">add</span>
           <input
@@ -441,8 +441,20 @@ onUnmounted(() => { window.removeEventListener('resize', onResize) })
 .d-desktop-only { }
 .d-mobile-only  { display: none; }
 @media (max-width: 768px) {
-  .d-desktop-only { display: none !important; }
   .d-mobile-only  { display: flex; }
+  /* QuickAdd en mobile: padding ajustado */
+  .quickadd-wrap { padding: 0 12px 8px; }
+  /* Chips de categoría: scroll horizontal en lugar de wrap */
+  .quickadd-cats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-left: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .quickadd-cats::-webkit-scrollbar { display: none; }
+  /* Extra (proyecto + etiquetas) en móvil */
+  .quickadd-extra { padding-left: 0; }
 }
 
 /* QuickAdd */
