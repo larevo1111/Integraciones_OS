@@ -8,38 +8,41 @@
 
     <Teleport to="body">
       <div v-if="abierto" class="proyecto-dropdown" :style="dropdownStyle" @click.stop>
-        <!-- Buscar -->
+        <!-- Buscar (sticky top) -->
         <div class="proyecto-search-wrap">
           <span class="material-icons" style="font-size:14px">search</span>
           <input ref="searchRef" v-model="busqueda" class="proyecto-search" placeholder="Buscar proyecto..." @keydown.escape="cerrar" />
         </div>
 
-        <!-- Opción sin proyecto -->
-        <div class="proyecto-option" :class="{ selected: !modelValue }" @click="seleccionar(null)">
-          <span class="proyecto-dot" style="background:var(--border-default)"></span>
-          <span>Sin proyecto</span>
-          <span v-if="!modelValue" class="material-icons" style="font-size:14px;margin-left:auto;color:var(--accent)">check</span>
+        <!-- Lista scrollable -->
+        <div class="proyecto-lista">
+          <!-- Sin proyecto -->
+          <div class="proyecto-option" :class="{ selected: !modelValue }" @click="seleccionar(null)">
+            <span class="proyecto-dot" style="background:var(--border-default)"></span>
+            <span>Sin proyecto</span>
+            <span v-if="!modelValue" class="material-icons" style="font-size:14px;margin-left:auto;color:var(--accent)">check</span>
+          </div>
+
+          <!-- Proyectos filtrados -->
+          <div
+            v-for="p in proyectosFiltrados"
+            :key="p.id"
+            class="proyecto-option"
+            :class="{ selected: modelValue === p.id }"
+            @click="seleccionar(p.id)"
+          >
+            <span class="proyecto-dot" :style="{ background: p.color }"></span>
+            <span class="proyecto-nombre">{{ p.nombre }}</span>
+            <span v-if="modelValue === p.id" class="material-icons" style="font-size:14px;margin-left:auto;color:var(--accent)">check</span>
+          </div>
+
+          <!-- Sin resultados -->
+          <div v-if="!proyectosFiltrados.length && busqueda" class="proyecto-empty">
+            Sin resultados para "{{ busqueda }}"
+          </div>
         </div>
 
-        <!-- Proyectos filtrados -->
-        <div
-          v-for="p in proyectosFiltrados"
-          :key="p.id"
-          class="proyecto-option"
-          :class="{ selected: modelValue === p.id }"
-          @click="seleccionar(p.id)"
-        >
-          <span class="proyecto-dot" :style="{ background: p.color }"></span>
-          <span class="proyecto-nombre">{{ p.nombre }}</span>
-          <span v-if="modelValue === p.id" class="material-icons" style="font-size:14px;margin-left:auto;color:var(--accent)">check</span>
-        </div>
-
-        <!-- Sin resultados -->
-        <div v-if="!proyectosFiltrados.length && busqueda" class="proyecto-empty">
-          Sin resultados para "{{ busqueda }}"
-        </div>
-
-        <!-- Crear nuevo -->
+        <!-- Crear nuevo (sticky bottom — siempre visible) -->
         <div class="proyecto-crear" @click="abrirModalCrear">
           <span class="material-icons" style="font-size:14px">add</span>
           {{ busqueda && !coincidenciaExacta ? `Crear "${busqueda}"` : 'Nuevo proyecto' }}
@@ -180,9 +183,14 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  min-width: 200px; max-height: 280px;
+  min-width: 200px; max-height: 300px;
   display: flex; flex-direction: column;
   overflow: hidden;
+}
+/* Lista scrollable — el botón crear queda sticky abajo */
+.proyecto-lista {
+  flex: 1;
+  overflow-y: auto;
 }
 .proyecto-search-wrap {
   display: flex; align-items: center; gap: 6px;

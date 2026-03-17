@@ -163,7 +163,7 @@ function resetForm(p = null) {
 async function cargarCatalogos() {
   try {
     const [uData, eData] = await Promise.all([
-      api('/api/usuarios'),
+      api('/api/gestion/usuarios'),
       api('/api/gestion/etiquetas')
     ])
     usuarios.value             = uData.usuarios || []
