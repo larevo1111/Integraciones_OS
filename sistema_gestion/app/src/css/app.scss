@@ -797,8 +797,9 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   margin: 10px auto 4px;
   flex-shrink: 0;
 }
-/* Override panel dentro del bottom sheet */
+/* Override panel dentro del bottom sheet — visible siempre, incluso en mobile */
 .bsheet-panel .tarea-panel {
+  display: flex !important;   /* cancela el display:none del media query mobile */
   width: 100% !important;
   min-width: 0 !important;
   height: auto !important;
