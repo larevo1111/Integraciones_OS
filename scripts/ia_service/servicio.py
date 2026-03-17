@@ -248,7 +248,7 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) 
     Retorna el nuevo resumen como texto plano, o None si falla.
     """
     agente_cfg = None
-    for slug in ('groq-llama', 'gemini-flash-lite'):
+    for slug in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite'):
         cand = _cargar_agente(slug)
         if cand and cand.get('api_key'):
             agente_cfg = cand
@@ -302,7 +302,7 @@ def _depurar_logica_negocio(empresa: str):
 
         # Buscar agente para comprimir — Groq primero, suplentes si falla
         agente_cfg = None
-        for slug_dep in ('groq-llama', 'gemini-flash-lite', 'gemini-flash'):
+        for slug_dep in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
             cand = _cargar_agente(slug_dep)
             if cand and cand.get('api_key'):
                 agente_cfg = cand
@@ -328,7 +328,7 @@ def _depurar_logica_negocio(empresa: str):
         res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
         if not res['ok'] or not res.get('texto'):
             # Suplente si el primero falló
-            for slug_dep in ('groq-llama', 'gemini-flash-lite', 'gemini-flash'):
+            for slug_dep in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
                 if agente_cfg and agente_cfg.get('slug') == slug_dep:
                     continue
                 cand = _cargar_agente(slug_dep)
@@ -1278,7 +1278,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
     # Intentar cada agente candidato hasta obtener respuesta válida
-    for slug in ('groq-llama', 'gemini-flash-lite', 'gemini-flash'):
+    for slug in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
         cand = _cargar_agente(slug)
         if not (cand and cand.get('api_key')):
             continue
