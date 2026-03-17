@@ -1145,7 +1145,7 @@ app.post('/api/gestion/proyectos', async (req, res) => {
 // PUT /api/gestion/proyectos/:id
 app.put('/api/gestion/proyectos/:id', async (req, res) => {
   const { nombre, descripcion, color, categoria_id, prioridad, estado,
-          fecha_estimada_fin, responsables, etiquetas } = req.body
+          fecha_estimada_fin, fecha_finalizacion_real, responsables, etiquetas } = req.body
 
   try {
     const sets = []; const params = []
@@ -1155,7 +1155,8 @@ app.put('/api/gestion/proyectos/:id', async (req, res) => {
     if (categoria_id      !== undefined) { sets.push('categoria_id = ?');      params.push(categoria_id) }
     if (prioridad         !== undefined) { sets.push('prioridad = ?');         params.push(prioridad) }
     if (estado            !== undefined) { sets.push('estado = ?');            params.push(estado) }
-    if (fecha_estimada_fin !== undefined) { sets.push('fecha_estimada_fin = ?'); params.push(fecha_estimada_fin) }
+    if (fecha_estimada_fin     !== undefined) { sets.push('fecha_estimada_fin = ?');     params.push(fecha_estimada_fin) }
+    if (fecha_finalizacion_real !== undefined) { sets.push('fecha_finalizacion_real = ?'); params.push(fecha_finalizacion_real) }
 
     if (sets.length) {
       sets.push('usuario_ult_modificacion = ?'); params.push(req.usuario.email)

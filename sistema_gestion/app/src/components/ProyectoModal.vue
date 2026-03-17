@@ -56,37 +56,20 @@
 
             <!-- Responsables -->
             <div class="pmodal-campo-label" style="margin-top:14px">Responsables</div>
-            <div class="pmodal-responsables">
-              <button
-                v-for="u in usuarios"
-                :key="u.email"
-                class="pmodal-resp-chip"
-                :class="{ selected: form.responsables.includes(u.email) }"
-                @click="toggleResponsable(u.email)"
-              >
-                <span class="pmodal-resp-avatar">{{ iniciales(u.nombre) }}</span>
-                <span class="pmodal-resp-nombre">{{ u.nombre.split(' ')[0] }}</span>
-                <span v-if="form.responsables.includes(u.email)" class="material-icons" style="font-size:12px;color:var(--accent)">check</span>
-              </button>
-              <div v-if="!usuarios.length" class="pmodal-vacio">Cargando...</div>
-            </div>
+            <ResponsablesSelector
+              :model-value="form.responsables"
+              :usuarios="usuarios"
+              @update:model-value="form.responsables = $event"
+            />
 
             <!-- Etiquetas -->
             <div class="pmodal-campo-label" style="margin-top:14px">Etiquetas</div>
-            <div class="pmodal-etiquetas">
-              <button
-                v-for="e in etiquetasDisponibles"
-                :key="e.id"
-                class="pmodal-etq-chip"
-                :class="{ selected: form.etiquetas.includes(e.id) }"
-                :style="form.etiquetas.includes(e.id) ? { background: e.color + '22', borderColor: e.color, color: e.color } : {}"
-                @click="toggleEtiqueta(e.id)"
-              >
-                <span class="pmodal-etq-dot" :style="{ background: e.color }"></span>
-                {{ e.nombre }}
-              </button>
-              <div v-if="!etiquetasDisponibles.length" class="pmodal-vacio">Sin etiquetas creadas</div>
-            </div>
+            <EtiquetasSelector
+              :model-value="form.etiquetas"
+              :etiquetas="etiquetasDisponibles"
+              @update:model-value="form.etiquetas = $event"
+              @etiqueta-creada="e => etiquetasDisponibles.push(e)"
+            />
 
             <!-- Fecha estimada -->
             <div class="pmodal-campo-label" style="margin-top:14px">
@@ -122,6 +105,8 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
+import ResponsablesSelector from './ResponsablesSelector.vue'
+import EtiquetasSelector    from './EtiquetasSelector.vue'
 
 const COLORES = [
   '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -162,12 +147,12 @@ function resetForm(p = null) {
 
 async function cargarCatalogos() {
   try {
-    const [uData, eData] = await Promise.all([
+    const [uData, eData] = await Promise.allSettled([
       api('/api/gestion/usuarios'),
       api('/api/gestion/etiquetas')
     ])
-    usuarios.value             = uData.usuarios || []
-    etiquetasDisponibles.value = eData.etiquetas || []
+    if (uData.status === 'fulfilled') usuarios.value = uData.value.usuarios || []
+    if (eData.status === 'fulfilled') etiquetasDisponibles.value = eData.value.etiquetas || []
   } catch {}
 }
 
@@ -180,22 +165,6 @@ watch(() => props.modelValue, (val) => {
 })
 
 function cerrar() { emit('update:modelValue', false) }
-
-function toggleResponsable(email) {
-  const idx = form.value.responsables.indexOf(email)
-  if (idx === -1) form.value.responsables.push(email)
-  else form.value.responsables.splice(idx, 1)
-}
-
-function toggleEtiqueta(id) {
-  const idx = form.value.etiquetas.indexOf(id)
-  if (idx === -1) form.value.etiquetas.push(id)
-  else form.value.etiquetas.splice(idx, 1)
-}
-
-function iniciales(nombre) {
-  return nombre.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase()
-}
 
 async function guardar() {
   if (!form.value.nombre.trim() || guardando.value) return
@@ -291,48 +260,6 @@ async function guardar() {
   transform: scale(1.2);
   box-shadow: 0 0 0 1px var(--bg-card);
 }
-
-/* Responsables */
-.pmodal-responsables {
-  display: flex; gap: 6px; flex-wrap: wrap;
-}
-.pmodal-resp-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-  background: transparent; cursor: pointer;
-  font-size: 12px; color: var(--text-secondary);
-  transition: border-color 80ms, background 80ms, color 80ms;
-}
-.pmodal-resp-chip:hover { border-color: var(--border-default); color: var(--text-primary); }
-.pmodal-resp-chip.selected {
-  border-color: var(--accent-border);
-  background: var(--accent-muted);
-  color: var(--text-primary);
-}
-.pmodal-resp-avatar {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--bg-row-hover);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 9px; font-weight: 700; color: var(--text-secondary);
-  flex-shrink: 0;
-}
-.pmodal-resp-nombre { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Etiquetas */
-.pmodal-etiquetas { display: flex; gap: 6px; flex-wrap: wrap; }
-.pmodal-etq-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px; border-radius: var(--radius-full);
-  border: 1px solid var(--border-subtle);
-  background: transparent; cursor: pointer;
-  font-size: 12px; color: var(--text-secondary);
-  transition: border-color 80ms, background 80ms, color 80ms;
-}
-.pmodal-etq-chip:hover { border-color: var(--border-default); color: var(--text-primary); }
-.pmodal-etq-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-.pmodal-vacio { font-size: 12px; color: var(--text-tertiary); font-style: italic; }
 
 /* Footer */
 .pmodal-footer {

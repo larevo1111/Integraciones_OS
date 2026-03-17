@@ -152,6 +152,10 @@
           <span class="material-icons" style="font-size:15px">edit</span>
           Editar
         </div>
+        <div class="ctx-item ctx-item-success" @click="completarProyecto(menuProyecto.proyecto)">
+          <span class="material-icons" style="font-size:15px">check_circle_outline</span>
+          Completar
+        </div>
         <div class="ctx-item ctx-item-warn" @click="archivarProyecto(menuProyecto.proyecto)">
           <span class="material-icons" style="font-size:15px">archive</span>
           Archivar
@@ -265,6 +269,19 @@ function editarProyecto(p) {
   cerrarMenuProyecto()
   proyectoEditando.value = p
   modalProyecto.value = true
+}
+
+async function completarProyecto(p) {
+  cerrarMenuProyecto()
+  const hoy = new Date().toISOString().slice(0, 10)
+  try {
+    await api(`/api/gestion/proyectos/${p.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ estado: 'Completado', fecha_finalizacion_real: hoy })
+    })
+    proyectos.value = proyectos.value.filter(x => x.id !== p.id)
+    if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
+  } catch (e) { console.error(e) }
 }
 
 async function archivarProyecto(p) {
@@ -400,6 +417,7 @@ onMounted(() => {
   cursor: pointer; transition: background 60ms;
 }
 .ctx-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.ctx-item-success:hover { color: var(--accent); }
 .ctx-item-warn:hover { color: var(--color-warning); }
 .ctx-item-danger:hover { color: var(--color-error); }
 
