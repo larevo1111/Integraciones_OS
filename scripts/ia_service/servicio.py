@@ -11,6 +11,63 @@ from .config import get_local_conn
 from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
 from . import embeddings as embeddings_module
 from .proveedores import openai_compat, google, anthropic_prov
+import os, requests as _requests
+
+
+# ── Notificaciones Telegram (bot de alertas) ──────────────────────────────────
+
+def _notificar(mensaje: str):
+    """Envía una alerta al bot de notificaciones del sistema. Falla silenciosamente."""
+    try:
+        token    = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN') or os.getenv('TELEGRAM_BOT_TOKEN')
+        chat_id  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')
+        if not token or not chat_id:
+            return
+        _requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id': chat_id, 'text': mensaje, 'parse_mode': 'HTML'},
+            timeout=5
+        )
+    except Exception:
+        pass
+
+
+_alertas_enviadas = {}  # clave → timestamp último envío (anti-spam 1h)
+
+def _verificar_gasto_y_notificar(empresa: str, costo_llamada: float):
+    """Verifica gasto diario y por hora — notifica si supera umbrales."""
+    try:
+        ahora = time.time()
+        conn  = get_local_conn()
+        with conn.cursor() as cur:
+            # Gasto del día
+            cur.execute(
+                "SELECT COALESCE(SUM(costo_usd),0) AS total FROM ia_logs "
+                "WHERE empresa=%s AND DATE(created_at)=CURDATE()", (empresa,)
+            )
+            gasto_dia = float(cur.fetchone()['total'])
+            # Gasto última hora
+            cur.execute(
+                "SELECT COALESCE(SUM(costo_usd),0) AS total FROM ia_logs "
+                "WHERE empresa=%s AND created_at >= NOW() - INTERVAL 1 HOUR", (empresa,)
+            )
+            gasto_hora = float(cur.fetchone()['total'])
+        conn.close()
+
+        def _alerta_si(clave, condicion, msg):
+            ultimo = _alertas_enviadas.get(clave, 0)
+            if condicion and (ahora - ultimo) > 3600:
+                _notificar(msg)
+                _alertas_enviadas[clave] = ahora
+
+        _alerta_si('gasto_dia_2',  gasto_dia  >= 2.0,
+            f"💸 <b>Gasto Gemini alto hoy</b>: ${gasto_dia:.2f} USD (~COP {gasto_dia*4200:,.0f})\n"
+            f"Límite sugerido: $2 USD/día. Revisa si hay uso excesivo.")
+        _alerta_si('gasto_hora_05', gasto_hora >= 0.5,
+            f"⚡ <b>Gasto elevado última hora</b>: ${gasto_hora:.2f} USD\n"
+            f"Posible pico de consultas o bucle de llamadas.")
+    except Exception:
+        pass
 
 
 # ── Rate limiter por usuario — sliding window in-memory ──────────────────────
@@ -191,7 +248,7 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) 
     Retorna el nuevo resumen como texto plano, o None si falla.
     """
     agente_cfg = None
-    for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite'):
+    for slug in ('groq-llama', 'gemini-flash-lite'):
         cand = _cargar_agente(slug)
         if cand and cand.get('api_key'):
             agente_cfg = cand
@@ -784,18 +841,23 @@ def consultar(
                 tokens_in_total  += res.get('tokens_in', 0)
                 tokens_out_total += res.get('tokens_out', 0)
 
-                # Fallback a deepseek-chat si hay 429 (cuota agotada) en el agente SQL
-                # (groq-llama tiene límite de 6K TPM — insuficiente para el DDL de 27K tokens)
-                if not res['ok'] and '429' in str(res.get('error', '')):
-                    for slug_fb in ('deepseek-chat', 'gemini-pro', 'gemini-flash-lite'):
-                        agente_fallback = _cargar_agente(slug_fb)
-                        if agente_fallback:
-                            res_fb = _llamar_agente(agente_fallback, msgs, temperatura=0.1)
+                # Fallback general — si el agente SQL falla por cualquier error
+                if not res['ok']:
+                    slug_fb = tipo_cfg.get('agente_fallback')
+                    if slug_fb and slug_fb != agente_cfg_sql.get('slug'):
+                        ag_fb = _cargar_agente(slug_fb)
+                        if ag_fb:
+                            _notificar(
+                                f"⚠️ <b>Agente SQL fallback activado</b>\n"
+                                f"Principal: <code>{agente_cfg_sql.get('slug')}</code> falló\n"
+                                f"Respaldo: <code>{slug_fb}</code>\n"
+                                f"Error: {str(res.get('error',''))[:120]}"
+                            )
+                            res_fb = _llamar_agente(ag_fb, msgs, temperatura=0.1)
                             tokens_in_total  += res_fb.get('tokens_in', 0)
                             tokens_out_total += res_fb.get('tokens_out', 0)
                             if res_fb['ok']:
                                 res = res_fb
-                                break
 
                 if not res['ok']:
                     raise Exception(f"Error generando SQL: {res['error']}")
@@ -882,17 +944,23 @@ def consultar(
                 tokens_in_total  += res.get('tokens_in', 0)
                 tokens_out_total += res.get('tokens_out', 0)
 
-                # Fallback si el agente principal da 429 (cuota agotada)
-                if not res['ok'] and '429' in str(res.get('error', '')):
-                    for slug_fb in ('deepseek-chat', 'gemini-flash-lite', 'groq-llama'):
-                        agente_fallback = _cargar_agente(slug_fb)
-                        if agente_fallback:
-                            res_fb = _llamar_agente(agente_fallback, msgs, temperatura=temperatura)
+                # Fallback general — si el agente principal falla por cualquier error
+                if not res['ok']:
+                    slug_fb = tipo_cfg.get('agente_fallback')
+                    if slug_fb and slug_fb != agente_cfg.get('slug'):
+                        ag_fb = _cargar_agente(slug_fb)
+                        if ag_fb:
+                            _notificar(
+                                f"⚠️ <b>Agente fallback activado</b>\n"
+                                f"Principal: <code>{agente_cfg.get('slug')}</code> falló\n"
+                                f"Respaldo: <code>{slug_fb}</code>\n"
+                                f"Error: {str(res.get('error',''))[:120]}"
+                            )
+                            res_fb = _llamar_agente(ag_fb, msgs, temperatura=temperatura)
                             tokens_in_total  += res_fb.get('tokens_in', 0)
                             tokens_out_total += res_fb.get('tokens_out', 0)
                             if res_fb['ok']:
                                 res = res_fb
-                                break
 
                 if not res['ok']:
                     raise Exception(f"Error generando respuesta: {res['error']}")
@@ -970,6 +1038,9 @@ def consultar(
         error=error,
     )
 
+    # ── 9b. Alertas de gasto ──────────────────────────────────────────
+    _verificar_gasto_y_notificar(empresa, costo_usd)
+
     # ── 10. Devolver resultado estándar ───────────────────────────────
     return {
         'ok':              error is None,
@@ -1030,7 +1101,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
     # Intentar cada agente candidato hasta obtener respuesta válida
-    for slug in ('groq-llama', 'gemma-router', 'gemini-flash-lite', 'gemini-flash'):
+    for slug in ('groq-llama', 'gemini-flash-lite', 'gemini-flash'):
         cand = _cargar_agente(slug)
         if not (cand and cand.get('api_key')):
             continue
