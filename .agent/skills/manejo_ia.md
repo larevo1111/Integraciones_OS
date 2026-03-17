@@ -155,17 +155,22 @@ El campo `ia_temas.schema_tablas` controla el DDL que recibe el agente SQL. **Si
 
 **Error corregido**: `produccion` tenía `zeffi_articulos` (inexistente). Ahora tiene las tablas de producción reales.
 
-## Agentes activos (2026-03-15)
+## Agentes activos (2026-03-16)
 
-| slug | modelo | RPD | Rol |
-|---|---|---|---|
-| `gemini-pro` | gemini-2.5-pro | 1,000 | Análisis finanzas/comercial/estrategia — SQL complejo |
-| `gemini-flash` | gemini-2.5-flash | 10,000 | agente_sql principal para generar SQL |
-| `gemini-flash-lite` | gemini-2.5-flash-lite | 150,000 | Producción, marketing, conversación, alto volumen |
-| `gemma-router` | gemma-3-27b-it | 14,400 | Enrutador fallback (si groq falla) |
-| `groq-llama` | llama-3.3-70b-versatile | 14,400 | **Enrutador principal** + generador de resúmenes |
-| `deepseek-chat` | deepseek-chat | — | Opción económica para usuarios (18–30s con SQL) |
-| `claude-sonnet` | claude-sonnet-4-6 | — | Documentos premium |
+| slug | modelo | RPD | Rol | Costo input/M |
+|---|---|---|---|---|
+| `gemini-flash` | gemini-2.5-flash | 10,000 | **Principal** — todos los flujos (analisis, conversacion, redaccion) | $0.075 |
+| `deepseek-chat` | deepseek-chat | — | **Respaldo** de gemini-flash en todos los flujos | $0.14 |
+| `groq-llama` | llama-3.3-70b-versatile | 14,400 | Enrutador principal + generador de resúmenes | gratis |
+| `gemini-flash-lite` | gemini-2.5-flash-lite | 150,000 | Enrutador fallback (si groq falla) | $0.0375 |
+| `gemini-pro` | gemini-2.5-pro | 1,000 | SQL complejo (reservado — $1.25/M, 20s latencia) | $1.25 |
+| `gemini-image` | gemini-2.5-flash-image | 70 | Generación de imágenes | $52.00 |
+| `claude-sonnet` | claude-sonnet-4-6 | — | Documentos premium | $3.00 |
+| `deepseek-reasoner` | deepseek-reasoner | — | Razonamiento complejo (nivel_minimo=7) | $0.55 |
+| `gemma-router` | gemma-3-27b-it | — | ❌ **Desactivado** — eliminado de todos los chains | gratis |
+
+**Regla de enrutamiento**: `groq-llama` → `gemini-flash-lite` → `gemini-flash` (primero disponible).
+**Groq y flash-lite NUNCA son agentes finales** — solo enrutan y generan resúmenes.
 
 ## Catálogo de tablas — dónde vive y cómo actualizar
 
@@ -180,10 +185,21 @@ Para actualizar cuando se agrega una tabla nueva:
 2. Editar `ia_tipos_consulta.system_prompt` donde slug='analisis_datos'
 3. Reiniciar servicio: `sudo systemctl restart ia-service.service`
 
+## Sistema de Fallback (implementado 2026-03-16)
+
+Campo `agente_fallback` en `ia_tipos_consulta` e `ia_temas`. Si el agente principal falla (cualquier error):
+1. Se intenta con `agente_fallback` (deepseek-chat por defecto)
+2. Se envía notificación Telegram via `@os_notificaciones_sys_bot`
+
+**Notificaciones automáticas** (función `_notificar()` + `_verificar_gasto_y_notificar()` en servicio.py):
+- Cuando fallback se activa: tipo de error, agente que falló, agente de respaldo
+- Gasto diario > $2 USD (anti-spam 1h por empresa)
+- Gasto por hora > $0.5 USD (anti-spam 1h por empresa)
+
 ## Enrutamiento automático
 
-Flujo del enrutador: `groq-llama` → `gemma-router` → `gemini-flash-lite` (primero disponible con key).
-**Groq y Gemma NUNCA son agentes finales** — solo enrutan y generan resúmenes.
+Flujo del enrutador: `groq-llama` → `gemini-flash-lite` → `gemini-flash` (primero disponible con key).
+**Groq y flash-lite NUNCA son agentes finales** — solo enrutan y generan resúmenes.
 
 ## Monitoreo de consumo
 

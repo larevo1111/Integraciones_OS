@@ -262,19 +262,20 @@ CAPA 6 — Pregunta actual del usuario        → input directo
 Ver manual completo: `.agent/manuales/ia_service_manual.md`
 Tablas clave: `ia_agentes`, `ia_tipos_consulta`, `ia_temas`, `ia_conversaciones`, `ia_logs`, `ia_consumo_diario`, `ia_ejemplos_sql`, `ia_rag_documentos`, `ia_rag_fragmentos`, `ia_usuarios`, `ia_empresas`, `ia_usuarios_empresas`, `ia_config`, `ia_conexiones_bd`, `ia_esquemas`, `bot_sesiones`, `bot_tablas_temp`, `v_consumo_hoy`
 
-### Agentes configurados
-| slug | modelo | Estado |
-|---|---|---|
-| `gemini-pro` | gemini-2.5-pro | ✅ Activo — SQL complejo |
-| `gemini-flash` | gemini-2.5-flash | ✅ Activo — redacción |
-| `gemini-flash-lite` | gemini-2.5-flash-lite | ✅ Activo — alto volumen |
-| `gemma-router` | gemma-3-27b-it | ✅ Activo — enrutador fallback |
-| `groq-llama` | llama-3.3-70b-versatile | ✅ Activo — enrutador principal (key configurada 2026-03-13) |
-| `deepseek-chat` | deepseek-chat | ✅ Activo — recomendado para bot (nivel_minimo=1) |
-| `deepseek-reasoner` | deepseek-reasoner | ✅ Activo (nivel_minimo=7 — solo admin) |
-| `claude-sonnet` | claude-sonnet-4-6 | ✅ Activo — documentos premium |
+### Agentes configurados (actualizado 2026-03-16)
+| slug | modelo | Estado | Costo input/M tokens |
+|---|---|---|---|
+| `gemini-pro` | gemini-2.5-pro | ✅ Activo — SQL complejo | $1.25 |
+| `gemini-flash` | gemini-2.5-flash | ✅ Activo — **principal** todos los flujos | $0.075 |
+| `gemini-flash-lite` | gemini-2.5-flash-lite | ✅ Activo — enrutador fallback + resúmenes | $0.0375 |
+| `gemma-router` | gemma-3-27b-it | ❌ **Desactivado** (activo=0) — no autorizado, gratis pero eliminado | $0.00 |
+| `groq-llama` | llama-3.3-70b-versatile | ✅ Activo — enrutador principal + resúmenes | $0.00 |
+| `deepseek-chat` | deepseek-chat | ✅ Activo — **respaldo** en todos los flujos | $0.14 |
+| `deepseek-reasoner` | deepseek-reasoner | ✅ Activo (nivel_minimo=7 — solo admin) | $0.55 |
+| `claude-sonnet` | claude-sonnet-4-6 | ✅ Activo — documentos premium | $3.00 |
+| `gemini-image` | gemini-2.5-flash-image | ✅ Activo — generación de imágenes | $52.00 |
 
-**Estado del servicio (2026-03-13):** ✅ Activo — RAG + temas + empresa + enrutador dual (tipo+tema)
+**Estado del servicio (2026-03-16):** ✅ Activo — sistema de fallback + notificaciones Telegram activos
 **Módulo RAG:** `scripts/ia_service/rag.py` — fragmentación + búsqueda FULLTEXT por empresa+tema
 **Temas seeded:** 7 temas para ori_sil_2 (comercial, finanzas, produccion, administracion, marketing, estrategia, general)
 **⚠️ `ia_rag_colecciones` fue eliminada** — reemplazada por `ia_temas` (con empresa, schema_tablas, system_prompt)
@@ -375,6 +376,43 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
 
 ### Próximo paso pendiente
 1. Bot Telegram: probar en real con Santi
+
+---
+
+## Completado 2026-03-16 — Sistema de fallback + notificaciones + precios Gemini reales
+
+### Sistema de fallback general (implementado en servicio.py)
+- ✅ **Campo `agente_fallback`** añadido a `ia_tipos_consulta` e `ia_temas` (VARCHAR 50)
+- ✅ **Fallback en paso SQL y redacción**: si el agente falla (cualquier error, no solo 429), se intenta `agente_fallback`
+- ✅ **Configuración final**: gemini-flash (principal) → deepseek-chat (respaldo) en todos los tipos y temas
+- ✅ **Gemma desactivado** (`activo=0`) y eliminado de todos los chains (enrutador + resúmenes)
+- ✅ **Chain enrutador**: groq-llama → gemini-flash-lite → gemini-flash (Gemma eliminado)
+- ✅ **Chain resúmenes**: groq-llama → gemini-flash-lite (Gemma eliminado)
+
+### Notificaciones Telegram via @os_notificaciones_sys_bot
+- ✅ **Función `_notificar(mensaje)`**: usa `TELEGRAM_NOTIF_BOT_TOKEN` (fallback a `TELEGRAM_BOT_TOKEN`)
+- ✅ **Función `_verificar_gasto_y_notificar(empresa, costo)`**: alertas anti-spam (1h) cuando:
+  - Gasto diario total > $2 USD
+  - Gasto última hora > $0.5 USD
+- ✅ **Alerta cuando fallback se activa**: "⚠️ Agente SQL fallback activado" con detalles del error
+- ✅ **Variable global `_alertas_enviadas`**: anti-spam por clave+empresa
+
+### Precios reales actualizados en ia_agentes (de screenshots Google AI Studio Feb 17 - Mar 16)
+| Agente | costo_input ($/M) | costo_output ($/M) |
+|---|---|---|
+| gemini-flash | $0.075 | $0.30 |
+| gemini-flash-lite | $0.0375 | $0.15 |
+| gemini-pro | $1.25 | $10.00 |
+| gemini-image | $52.00 | $0.00 |
+| gemma-router | $0.00 | $0.00 |
+
+### Circuit breaker reset (inicio sesión)
+- gemini-flash estaba suspendido por 5 errores 429 → reseteado limpiando `error=NULL` en `ia_logs`
+
+### Google Cloud billing
+- Causa raíz cuota: sesión QA intensiva (~6.7M tokens) + límite inversión COP5 en AI Studio
+- Spending limit AI Studio actualizado a COP50,000 como freno principal
+- Pub/Sub tema `billing-cut` creado y conectado al presupuesto (Cloud Function pendiente — no prioritaria)
 
 ---
 
