@@ -736,11 +736,13 @@ Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en l
 | `/ia-service` | Contexto completo del servicio IA: BD, endpoints, agentes, flujos, tiempos, troubleshooting. Cargar SIEMPRE antes de modificar `scripts/ia_service/`. |
 | `.agent/skills/manejo_ia.md` | Regla de los 3 Pasos (anti-alucinación) para cualquier bot IA que consulte la BD. Arquitectura obligatoria para el bot Telegram. |
 
-### Skill Sistema Gestión
+### Skill y Manuales — Sistema Gestión
 
-| Skill | Cuándo usarlo |
+| Archivo | Cuándo usarlo |
 |---|---|
-| `.agent/skills/sistema_gestion.md` | App de gestión OS: arquitectura, credenciales 3 pools, errores documentados (SQL, auth, Vue), endpoints activos, diseño TickTick-style. Cargar SIEMPRE antes de modificar `sistema_gestion/`. |
+| `.agent/skills/sistema_gestion.md` | Skill rápida: arquitectura, credenciales 3 pools, errores documentados (SQL, auth, Vue), endpoints activos. Cargar SIEMPRE antes de modificar `sistema_gestion/`. |
+| `sistema_gestion/ACTA_APLICACION.md` | **Acta de decisiones** — schema BD completo, decisiones de diseño UX, opciones descartadas con razón, próximos pasos. Actualizar con cada decisión nueva. |
+| `sistema_gestion/MANUAL_DISENO_HIBRIDO.md` | Referencia de diseño visual: variables CSS, layout desktop/mobile, componentes, patrones (QuickAdd, bottom sheet, OpSelector, etiquetas, proyectos). |
 
 > **Nota**: Al crear un nuevo skill, agregar entrada en esta tabla. Archivo en `.claude/commands/nombre.md`.
 
