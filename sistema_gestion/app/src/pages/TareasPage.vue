@@ -253,10 +253,6 @@ const qaCatEsProduccion = computed(() =>
   categorias.value.find(c => c.id === qaCatId.value)?.es_produccion
 )
 
-watch(categorias, (cats) => {
-  if (cats.length && !qaCatId.value) qaCatId.value = cats[0].id
-}, { immediate: true })
-
 function qaCancelar() {
   qaActivo.value    = false
   qaTitulo.value    = ''

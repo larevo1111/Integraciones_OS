@@ -370,26 +370,6 @@ onMounted(() => {
   .sidebar { display: none; }
 }
 
-/* Drawer mobile */
-.drawer-overlay {
-  position: fixed; inset: 0;
-  background: var(--bg-overlay);
-  z-index: 300;
-  display: flex;
-}
-.drawer-panel {
-  width: 260px;
-  height: 100%;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-subtle);
-  display: flex; flex-direction: column;
-  overflow-y: auto;
-}
-.drawer-enter-active, .drawer-leave-active { transition: opacity 150ms; }
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-.drawer-enter-active .drawer-panel, .drawer-leave-active .drawer-panel { transition: transform 150ms ease-out; }
-.drawer-enter-from .drawer-panel, .drawer-leave-to .drawer-panel { transform: translateX(-100%); }
-
 /* Proyectos sidebar */
 .btn-icon-tiny {
   display: flex; align-items: center; justify-content: center;

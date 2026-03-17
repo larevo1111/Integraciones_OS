@@ -1,6 +1,6 @@
 # Contexto Activo - Integraciones_OS
 
-## Estado Actual (2026-03-11)
+## Estado Actual (2026-03-17)
 Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **completamente automatizada**.
 - Pipeline verificado 2026-03-11: **50/50 tablas** sincronizadas, 487 contactos, 0 errores.
 - Pasos 3a/3b/3c/3d (facturas) + 4a/4b/4c/4d (remisiones) analíticos activos.
@@ -213,7 +213,7 @@ ConsignacionPage — tab Por producto
 - Tooltips: carga `/api/tooltips` automáticamente (caché global, no necesita prop)
 - Formato: `fin_/cto_/car_` → `$COP`, `_pct/_margen` → `%` (×100), resto → número con `.` miles
 
-## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-13)
+## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-17)
 
 > **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
 > Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
@@ -241,9 +241,57 @@ ConsignacionPage — tab Por producto
 **Plan RAG/Contexto:** `.agent/planes/rag_contexto.md`
 **Tareas Antigravity:** `.agent/tareas_antigravity_rag.md`
 
+### Agentes activos (2026-03-17)
+
+| slug | modelo | rol | nivel_min | key |
+|---|---|---|---|---|
+| groq-llama | llama-3.3-70b-versatile | Router principal | 1 | ✅ Groq |
+| cerebras-llama | llama3.1-8b | Router suplente (2,200 t/s) | 1 | ✅ Cerebras |
+| gemini-flash | gemini-2.5-flash | **Default analítico** | 1 | ✅ Google |
+| gemini-flash-lite | gemini-2.5-flash-lite | Router fallback 2 | 1 | ✅ Google |
+| gpt-oss-120b | openai/gpt-oss-120b | Analítico alternativo 500t/s | 1 | ✅ Groq |
+| deepseek-chat | deepseek-chat | Fallback analítico | 1 | ✅ DeepSeek |
+| gemini-pro | gemini-2.5-pro | Análisis premium | **6** | ✅ Google |
+| claude-sonnet | claude-sonnet-4-6 | Documentos premium | **6** | ✅ Anthropic |
+| deepseek-reasoner | deepseek-reasoner | Admin only | 7 | ✅ DeepSeek |
+
+**Router fallback** (código `_enrutar()`): groq → cerebras → gemini-flash-lite → gemini-flash
+
+### Tipos de consulta — agentes por defecto
+
+| tipo | principal | suplente |
+|---|---|---|
+| analisis_datos | gemini-flash | deepseek-chat |
+| conversacion | gemini-flash | deepseek-chat |
+| redaccion | gemini-flash | deepseek-chat |
+| resumen | gemini-flash | deepseek-chat |
+| aprendizaje | gemini-flash | deepseek-chat |
+| enrutamiento | groq-llama | cerebras-llama |
+| clasificacion | groq-llama | cerebras-llama |
+| generacion_documento | claude-sonnet | gpt-oss-120b |
+| generacion_imagen | gemini-image | gemini-flash |
+
+### Bot Telegram — ACTIVO (2026-03-17)
+
+`scripts/telegram_bot/` — python-telegram-bot v20 async. Proceso nohup.
+
+**Auth por teléfono:** todo usuario debe compartir su número → se verifica contra `ia_usuarios.telefono` → se asigna nivel. Número no registrado → acceso denegado.
+
+**Usuarios registrados:**
+- Santiago Sierra: +573214550933, nivel 7
+- Jen: +572307085143, nivel 5
+
+**Agentes en bot según nivel:**
+- Nivel 1–5: gemini-flash ★ (default), gpt-oss-120b, deepseek-chat
+- Nivel 6–7: + gemini-pro, claude-sonnet
+
+**Capa 0 — Lógica de negocio (ia_logica_negocio):** 8 fragmentos seed insertados. siempre_presente=1 se inyecta en toda consulta; resto filtra por keywords. Depurador automático si supera 800 palabras (Groq → Cerebras → Gemini).
+
+**Protocolo de aprendizaje:** IA aprende lógica de negocio en tiempo real. Activado por variaciones de "enseñar/aprender/memorizar" O automáticamente cuando no puede responder. Flujo Sócrates: IA pregunta → usuario explica → IA confirma → guarda en ia_logica_negocio + notifica Telegram.
+
 ### Arquitectura
 - **Código:** `scripts/ia_service/` — módulo Python con función `consultar()`
-- **BD:** `ia_service_os` en MariaDB local (8 tablas: 5 originales + 3 RAG)
+- **BD:** `ia_service_os` en MariaDB local (17 tablas + 1 vista)
 - **API Flask:** puerto 5100, systemd `ia-service.service`
 - **Admin:** Express puerto 9200, `os-ia-admin.service`, sirve frontend Quasar compilado
 - **Uso:** cualquier proyecto llama `POST http://localhost:5100/ia/consultar`
