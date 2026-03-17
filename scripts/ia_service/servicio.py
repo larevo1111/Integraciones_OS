@@ -343,6 +343,71 @@ def _depurar_logica_negocio(empresa: str):
         pass
 
 
+def _procesar_bloque_aprendizaje(respuesta: str, empresa: str):
+    """
+    Detecta [GUARDAR_NEGOCIO]...[/GUARDAR_NEGOCIO] en la respuesta del agente.
+    Si lo encuentra, guarda el fragmento en ia_logica_negocio y llama al depurador.
+    Falla silenciosamente para no interrumpir la respuesta al usuario.
+    """
+    import re
+    match = re.search(
+        r'\[GUARDAR_NEGOCIO\](.*?)\[/GUARDAR_NEGOCIO\]',
+        respuesta, re.DOTALL | re.IGNORECASE
+    )
+    if not match:
+        return
+
+    try:
+        bloque = match.group(1).strip()
+        # Parsear concepto, keywords, explicacion
+        concepto  = re.search(r'concepto\s*:\s*(.+)', bloque, re.IGNORECASE)
+        keywords  = re.search(r'keywords\s*:\s*(.+)', bloque, re.IGNORECASE)
+        explicacion = re.search(r'explicacion\s*:\s*([\s\S]+)', bloque, re.IGNORECASE)
+
+        if not (concepto and keywords and explicacion):
+            return
+
+        concepto_txt    = concepto.group(1).strip()[:100]
+        keywords_txt    = keywords.group(1).strip()[:500]
+        explicacion_txt = explicacion.group(1).strip()
+
+        # Limpiar si explicacion capturó keywords o concepto al final
+        for tag in ['concepto', 'keywords']:
+            idx = explicacion_txt.lower().find(f'\n{tag}')
+            if idx > 0:
+                explicacion_txt = explicacion_txt[:idx].strip()
+
+        palabras = len(explicacion_txt.split())
+
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            # Si ya existe un fragmento con el mismo concepto, desactivarlo
+            cur.execute(
+                "UPDATE ia_logica_negocio SET activo=0 WHERE empresa=%s AND concepto=%s",
+                (empresa, concepto_txt)
+            )
+            cur.execute("""
+                INSERT INTO ia_logica_negocio
+                (empresa, concepto, explicacion, keywords, siempre_presente, palabras, creado_por)
+                VALUES (%s, %s, %s, %s, 0, %s, %s)
+            """, (empresa, concepto_txt, explicacion_txt, keywords_txt, palabras, 'usuario-aprendizaje'))
+        conn.commit()
+        conn.close()
+
+        _notificar(
+            f"🧠 <b>Nueva lógica de negocio aprendida</b>\n"
+            f"Concepto: <i>{concepto_txt}</i>\n"
+            f"Palabras: {palabras}"
+        )
+
+        # Depurar si supera el límite
+        import threading
+        threading.Thread(target=_depurar_logica_negocio, args=(empresa,), daemon=True).start()
+
+    except Exception:
+        pass
+
+
 def _extraer_palabras_clave(texto: str) -> str:
     """Extrae palabras relevantes de una pregunta para indexar ejemplos SQL."""
     import re
@@ -935,9 +1000,13 @@ def consultar(
 
                 sql_generado = formateador.extraer_sql(res['texto'])
                 if not sql_generado:
-                    # El agente respondió en texto plano sin SQL → la información no existe en BD
-                    # Usar la respuesta directa del agente como respuesta final
-                    respuesta_final = res['texto'].strip()
+                    # El agente respondió en texto plano sin SQL → info no existe en BD
+                    # Agregar oferta de aprendizaje al final de la respuesta
+                    texto_base = res['texto'].strip()
+                    respuesta_final = (
+                        texto_base + "\n\n"
+                        "💡 ¿Quieres enseñarme cómo funciona esto para que pueda responder mejor en el futuro?"
+                    )
                     break  # Salir del loop de pasos — no hay SQL que ejecutar
 
             elif paso == 'ejecutar':
@@ -1007,6 +1076,23 @@ def consultar(
 
                 # Auto-mejora: guardar este Q→SQL exitoso para futuras consultas similares
                 _guardar_ejemplo_sql(empresa, pregunta, sql_generado)
+
+            elif paso == 'conversar':
+                # Modo aprendizaje — conversación multi-turno con guardado al confirmar
+                pasos_ejecutados.append('conversar')
+                msgs = mensajes_base + [{'role': 'user', 'content': pregunta}]
+                res = _llamar_agente(agente_cfg, msgs, temperatura=0.3)
+                tokens_in_total  += res.get('tokens_in', 0)
+                tokens_out_total += res.get('tokens_out', 0)
+
+                if not res['ok']:
+                    raise Exception(f"Error en modo aprendizaje: {res['error']}")
+
+                respuesta_final = res['texto'].strip()
+                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
+
+                # Detectar bloque [GUARDAR_NEGOCIO] en la respuesta
+                _procesar_bloque_aprendizaje(respuesta_final, empresa)
 
             elif paso in ('redactar', 'resumir', 'generar_doc'):
                 pasos_ejecutados.append(paso)
@@ -1171,7 +1257,8 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     tipo_default = 'conversacion'
     tema_default = 'general'
     tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                     'generacion_documento', 'generacion_imagen', 'conversacion', 'enrutamiento'}
+                     'generacion_documento', 'generacion_imagen', 'conversacion',
+                     'aprendizaje', 'enrutamiento'}
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
     # Intentar cada agente candidato hasta obtener respuesta válida
@@ -1203,10 +1290,10 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
 
         # Fallback: buscar tipo en texto plano
         texto_lower = texto.lower()
-        for slug_t in ('analisis_datos', 'redaccion', 'clasificacion', 'resumen',
-                       'generacion_documento', 'generacion_imagen', 'conversacion'):
+        for slug_t in ('aprendizaje', 'analisis_datos', 'redaccion', 'clasificacion',
+                       'resumen', 'generacion_documento', 'generacion_imagen', 'conversacion'):
             if slug_t in texto_lower:
-                return (slug_t, tema_default, True)
+                return (slug_t, tema_default, slug_t == 'analisis_datos')
 
     return ('analisis_datos', 'general', True)  # default conservador: si todo falla, intentar SQL
 
