@@ -72,10 +72,17 @@ const searchRef    = ref(null)
 const abierto      = ref(false)
 const busqueda     = ref('')
 const lista        = ref([])
+const extras       = ref([])   // proyectos recién creados cuando props.proyectos es externo
 const mostrarModal = ref(false)
 const dropdownStyle = ref({})
 
-const proyectosData = computed(() => props.proyectos !== null ? props.proyectos : lista.value)
+// Si props.proyectos se pasa externamente, usar ese + extras locales recién creados
+const proyectosData = computed(() => {
+  const base = props.proyectos !== null ? props.proyectos : lista.value
+  if (!extras.value.length) return base
+  const ids = new Set(base.map(p => p.id))
+  return [...base, ...extras.value.filter(p => !ids.has(p.id))]
+})
 const proyectoSeleccionado = computed(() => proyectosData.value.find(p => p.id === props.modelValue) || null)
 const proyectosFiltrados = computed(() => {
   if (!busqueda.value) return proyectosData.value
@@ -133,6 +140,7 @@ function abrirModalCrear() {
 
 function onProyectoCreado(p) {
   if (props.proyectos === null) lista.value.push(p)
+  else extras.value.push(p)  // si el array es externo, guardar en extras para que el selector lo muestre
   emit('proyecto-creado', p)
   seleccionar(p.id)
 }

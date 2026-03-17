@@ -46,6 +46,7 @@
           :model-value="tarea.proyecto_id"
           :proyectos="proyectos"
           @update:model-value="actualizar('proyecto_id', $event)"
+          @proyecto-creado="p => $emit('proyecto-creado', p)"
         />
       </div>
       <div class="field-row" style="align-items:flex-start">
@@ -172,7 +173,7 @@ const props = defineProps({
   proyectos:  { type: Array, default: () => [] },
   etiquetas:  { type: Array, default: () => [] }
 })
-const emit = defineEmits(['cerrar', 'eliminar', 'actualizada'])
+const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'proyecto-creado'])
 
 // Modal completar
 const modalCompletar  = ref(false)

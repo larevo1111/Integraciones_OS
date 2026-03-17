@@ -72,6 +72,7 @@
           <ProyectoSelector
             v-model="qaProyectoId"
             :proyectos="proyectos"
+            @proyecto-creado="p => proyectos.push(p)"
           />
           <EtiquetasSelector
             v-model="qaEtiquetas"
@@ -157,6 +158,7 @@
         @cerrar="tareaSeleccionada = null"
         @actualizada="onTareaActualizada"
         @eliminar="eliminar"
+        @proyecto-creado="p => proyectos.push(p)"
         class="d-desktop-only"
       />
     </Transition>
