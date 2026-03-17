@@ -165,6 +165,28 @@
       />
     </Transition>
 
+    <!-- Bottom sheet detalle de tarea (mobile) -->
+    <Teleport to="body">
+      <Transition name="bsheet">
+        <div v-if="tareaSeleccionada" class="bsheet-overlay" @click.self="tareaSeleccionada = null">
+          <div class="bsheet-panel">
+            <div class="bsheet-handle"></div>
+            <TareaPanel
+              :tarea="tareaSeleccionada"
+              :usuarios="usuarios"
+              :categorias="categorias"
+              :proyectos="proyectos"
+              :etiquetas="etiquetas"
+              @cerrar="tareaSeleccionada = null"
+              @actualizada="onTareaActualizada"
+              @eliminar="eliminar"
+              @proyecto-creado="p => proyectos.push(p)"
+            />
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Bottom sheet / modal nueva tarea (mobile) -->
     <TareaForm
       v-model="mostrarForm"

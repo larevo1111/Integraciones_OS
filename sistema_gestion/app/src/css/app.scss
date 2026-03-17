@@ -773,6 +773,47 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   cursor: pointer;
 }
 
+/* ─── BOTTOM SHEET DETALLE TAREA (mobile) ─── */
+.bsheet-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: none; align-items: flex-end;  /* hidden on desktop */
+}
+@media (max-width: 768px) {
+  .bsheet-overlay { display: flex; }
+}
+.bsheet-panel {
+  width: 100%;
+  max-height: 88vh;
+  background: var(--bg-surface);
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.bsheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border-default);
+  margin: 10px auto 6px;
+  flex-shrink: 0;
+}
+/* Override panel dentro del bottom sheet */
+.bsheet-panel .tarea-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  border-left: none !important;
+  flex: 1; min-height: 0;
+}
+/* Transición bottom sheet */
+.bsheet-enter-active, .bsheet-leave-active { transition: opacity 220ms ease; }
+.bsheet-enter-from, .bsheet-leave-to { opacity: 0; }
+.bsheet-enter-active .bsheet-panel,
+.bsheet-leave-active .bsheet-panel { transition: transform 260ms cubic-bezier(0.32,0.72,0,1); }
+.bsheet-enter-from .bsheet-panel,
+.bsheet-leave-to .bsheet-panel { transform: translateY(100%); }
+
 /* ─── MOBILE ─── */
 @media (max-width: 768px) {
   .sidebar { display: none; }
