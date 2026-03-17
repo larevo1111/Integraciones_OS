@@ -259,6 +259,21 @@ Ver manual completo: `sistema_gestion/MANUAL_DISENO_HIBRIDO.md`
 |---|---|---|
 | ProyectoSelector | `components/ProyectoSelector.vue` | Dropdown simple para seleccionar/crear proyecto |
 | EtiquetasSelector | `components/EtiquetasSelector.vue` | Multi-select para etiquetas con chips |
+| ResponsablesSelector | `components/ResponsablesSelector.vue` | Multi-select para usuarios (emails), igual patrón que EtiquetasSelector |
+
+### Regla de consistencia de campos (ver REGLAS_APP.md)
+- **SIEMPRE** usar los selectors existentes — nunca reimplementar inline
+- Cada tipo de campo = un componente = igual en toda la app
+- Reglas documentadas en `sistema_gestion/REGLAS_APP.md`
+
+### Estados de proyecto
+| Estado | Qué significa |
+|---|---|
+| `Activo` | En curso, aparece en selectores |
+| `Archivado` | Pausado, oculto en selectores |
+| `Completado` | Finalizado, guarda `fecha_finalizacion_real` |
+
+Menú ⋮ en sidebar: Editar / Completar / Archivar / Eliminar
 
 ### Acento: verde OS
 ```css

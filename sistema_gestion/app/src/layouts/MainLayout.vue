@@ -55,19 +55,40 @@
               </span>
               <span class="nav-item-label">{{ p.nombre }}</span>
               <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-              <!-- Botón ⋮ en hover -->
-              <button
-                v-if="proyectoHover === p.id"
-                class="btn-proyecto-menu"
-                @click.prevent.stop="abrirMenuProyecto($event, p)"
-              >
-                <span class="material-icons" style="font-size:16px">more_vert</span>
-              </button>
+              <!-- Botones en hover: ✓ completar + ⋮ menú -->
+              <template v-if="proyectoHover === p.id">
+                <button class="btn-proyecto-check" title="Completar proyecto" @click.prevent.stop="completarProyecto(p)">
+                  <span class="material-icons" style="font-size:15px">check_circle_outline</span>
+                </button>
+                <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
+                  <span class="material-icons" style="font-size:16px">more_vert</span>
+                </button>
+              </template>
             </RouterLink>
           </div>
 
           <div v-if="!proyectos.length && !cargandoProyectos" class="sidebar-empty-hint">
             Sin proyectos activos
+          </div>
+
+          <!-- Proyectos completados (acordeón) -->
+          <div v-if="proyectosCompletados.length" class="completados-wrap">
+            <div class="completados-header" @click="mostrarCompletados = !mostrarCompletados">
+              <span class="material-icons" style="font-size:14px">{{ mostrarCompletados ? 'expand_more' : 'chevron_right' }}</span>
+              Completados ({{ proyectosCompletados.length }})
+            </div>
+            <template v-if="mostrarCompletados">
+              <div
+                v-for="p in proyectosCompletados"
+                :key="p.id"
+                class="nav-item nav-item-proyecto nav-item-completado"
+              >
+                <span class="nav-item-icon">
+                  <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B', opacity: 0.5 }"></span>
+                </span>
+                <span class="nav-item-label nav-item-label-completado">{{ p.nombre }}</span>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -152,10 +173,6 @@
           <span class="material-icons" style="font-size:15px">edit</span>
           Editar
         </div>
-        <div class="ctx-item ctx-item-success" @click="completarProyecto(menuProyecto.proyecto)">
-          <span class="material-icons" style="font-size:15px">check_circle_outline</span>
-          Completar
-        </div>
         <div class="ctx-item ctx-item-warn" @click="archivarProyecto(menuProyecto.proyecto)">
           <span class="material-icons" style="font-size:15px">archive</span>
           Archivar
@@ -212,9 +229,11 @@ const drawerOpen       = ref(false)
 const menuUsuario      = ref(false)
 
 // Proyectos en sidebar
-const proyectos         = ref([])
-const cargandoProyectos = ref(false)
-const proyectoHover     = ref(null)
+const proyectos           = ref([])
+const proyectosCompletados = ref([])
+const mostrarCompletados  = ref(false)
+const cargandoProyectos   = ref(false)
+const proyectoHover       = ref(null)
 
 // Modal crear/editar
 const modalProyecto   = ref(false)
@@ -226,8 +245,12 @@ const menuProyecto = ref({ visible: false, proyecto: null, style: {} })
 async function cargarProyectos() {
   cargandoProyectos.value = true
   try {
-    const data = await api('/api/gestion/proyectos?estado=Activo')
-    proyectos.value = data.proyectos || []
+    const [activos, completados] = await Promise.all([
+      api('/api/gestion/proyectos?estado=Activo'),
+      api('/api/gestion/proyectos?estado=Completado')
+    ])
+    proyectos.value            = activos.proyectos    || []
+    proyectosCompletados.value = completados.proyectos || []
   } catch {} finally { cargandoProyectos.value = false }
 }
 
@@ -280,6 +303,7 @@ async function completarProyecto(p) {
       body: JSON.stringify({ estado: 'Completado', fecha_finalizacion_real: hoy })
     })
     proyectos.value = proyectos.value.filter(x => x.id !== p.id)
+    proyectosCompletados.value.unshift({ ...p, estado: 'Completado', fecha_finalizacion_real: hoy })
     if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
   } catch (e) { console.error(e) }
 }
@@ -393,14 +417,36 @@ onMounted(() => {
 .nav-item-proyecto-wrap { position: relative; }
 
 /* Botón ⋮ dentro del nav-item */
-.btn-proyecto-menu {
+.btn-proyecto-check {
   display: flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border-radius: var(--radius-sm);
   background: transparent; border: none; cursor: pointer;
   color: var(--text-tertiary); margin-left: auto; flex-shrink: 0;
   transition: background 80ms, color 80ms;
 }
+.btn-proyecto-check:hover { color: var(--accent); background: var(--accent-muted); }
+
+.btn-proyecto-menu {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: var(--radius-sm);
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-tertiary); flex-shrink: 0;
+  transition: background 80ms, color 80ms;
+}
 .btn-proyecto-menu:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+
+/* Acordeón completados */
+.completados-wrap { margin-top: 4px; }
+.completados-header {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px; font-size: 11px;
+  color: var(--text-tertiary); cursor: pointer;
+  border-radius: var(--radius-sm); transition: color 80ms;
+  user-select: none;
+}
+.completados-header:hover { color: var(--text-secondary); }
+.nav-item-completado { opacity: 0.55; pointer-events: none; }
+.nav-item-label-completado { text-decoration: line-through; }
 
 /* Menú contextual ⋮ */
 .proyecto-ctx-menu {

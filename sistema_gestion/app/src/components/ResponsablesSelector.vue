@@ -55,7 +55,8 @@ import { api } from 'src/services/api'
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },  // array de emails
-  usuarios:   { type: Array, default: null }        // si se pasa, no carga de API
+  usuarios:   { type: Array, default: null },       // si se pasa, no carga de API
+  single:     { type: Boolean, default: false }     // si true: selección única (reemplaza)
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -108,9 +109,15 @@ async function abrirMenu() {
 function cerrar() { abierto.value = false; busqueda.value = '' }
 
 function toggle(email) {
-  const nueva = props.modelValue.includes(email)
-    ? props.modelValue.filter(x => x !== email)
-    : [...props.modelValue, email]
+  let nueva
+  if (props.single) {
+    nueva = props.modelValue.includes(email) ? [] : [email]
+    if (nueva.length) cerrar()  // auto-cierra al seleccionar
+  } else {
+    nueva = props.modelValue.includes(email)
+      ? props.modelValue.filter(x => x !== email)
+      : [...props.modelValue, email]
+  }
   emit('update:modelValue', nueva)
 }
 

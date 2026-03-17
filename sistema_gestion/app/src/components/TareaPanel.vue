@@ -58,11 +58,14 @@
           @etiqueta-creada="e => etiquetas.push(e)"
         />
       </div>
-      <div class="field-row">
-        <span class="field-label">Responsable</span>
-        <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.responsable" @change="actualizar('responsable', $event.target.value)">
-          <option v-for="u in usuarios" :key="u.email" :value="u.email">{{ u.nombre }}</option>
-        </select>
+      <div class="field-row" style="align-items:flex-start">
+        <span class="field-label" style="padding-top:4px">Responsable</span>
+        <ResponsablesSelector
+          :single="true"
+          :model-value="tarea.responsable ? [tarea.responsable] : []"
+          :usuarios="usuarios"
+          @update:model-value="v => actualizar('responsable', v[0] || null)"
+        />
       </div>
       <div class="field-row">
         <span class="field-label">Fecha</span>
@@ -157,7 +160,8 @@ import { api } from 'src/services/api'
 import EstadoBadge       from './EstadoBadge.vue'
 import Cronometro        from './Cronometro.vue'
 import ProyectoSelector  from './ProyectoSelector.vue'
-import EtiquetasSelector from './EtiquetasSelector.vue'
+import EtiquetasSelector    from './EtiquetasSelector.vue'
+import ResponsablesSelector from './ResponsablesSelector.vue'
 
 const PRIORIDADES = [
   { key: 'Urgente', color: '#ef4444' },

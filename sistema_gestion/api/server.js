@@ -421,12 +421,13 @@ app.get('/api/gestion/tareas', async (req, res) => {
 
 // GET /api/gestion/tareas/completadas
 app.get('/api/gestion/tareas/completadas', async (req, res) => {
-  const { categoria_id, responsable } = req.query
+  const { categoria_id, responsable, proyecto_id } = req.query
   const where  = ["t.empresa = ?", "t.estado IN ('Completada', 'Cancelada')"]
   const params = [req.empresa]
 
   if (categoria_id) { where.push('t.categoria_id = ?'); params.push(categoria_id) }
   if (responsable)  { where.push('t.responsable = ?');  params.push(responsable) }
+  if (proyecto_id)  { where.push('t.proyecto_id = ?');  params.push(proyecto_id) }
 
   try {
     const [tareas] = await db.gestion.query(`

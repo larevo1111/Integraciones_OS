@@ -333,12 +333,21 @@ async function cargarTareas() {
   cargando.value = true
   try {
     const params = new URLSearchParams()
-    if (filtroActivo.value === 'mias') { params.set('solo_mias', '1') }
-    else if (filtroActivo.value !== 'todas') { params.set('filtro', filtroActivo.value) }
-    if (proyectoFiltroId.value) params.set('proyecto_id', proyectoFiltroId.value)
+    if (proyectoFiltroId.value) {
+      // En vista de proyecto: mostrar TODAS las tareas del proyecto (sin filtro de fecha)
+      // Solo aplicar filtro 'mias' si estaba activo
+      if (filtroActivo.value === 'mias') params.set('solo_mias', '1')
+      params.set('proyecto_id', proyectoFiltroId.value)
+    } else {
+      if (filtroActivo.value === 'mias') { params.set('solo_mias', '1') }
+      else if (filtroActivo.value !== 'todas') { params.set('filtro', filtroActivo.value) }
+    }
+    const completadasUrl = proyectoFiltroId.value
+      ? `/api/gestion/tareas/completadas?proyecto_id=${proyectoFiltroId.value}`
+      : '/api/gestion/tareas/completadas'
     const [dataTareas, dataCompletadas] = await Promise.all([
       api(`/api/gestion/tareas?${params}`),
-      api('/api/gestion/tareas/completadas')
+      api(completadasUrl)
     ])
     tareas.value      = dataTareas.tareas || []
     completadas.value = dataCompletadas.tareas || []
