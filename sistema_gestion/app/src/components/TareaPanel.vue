@@ -92,7 +92,7 @@
           @change="actualizarFechaEstimada($event.target.value)" />
       </div>
 
-      <div class="field-row">
+      <div v-if="esProduccion" class="field-row">
         <span class="field-label">OP Effi</span>
         <input class="input-field" style="height:28px;font-size:12px" :value="tarea.id_op" placeholder="Nro. OP" @blur="actualizarOP($event.target.value)" />
       </div>
@@ -258,6 +258,13 @@ const mostrarFechas = ref(false)
 const esCompletada = computed(() =>
   ['Completada', 'Cancelada'].includes(props.tarea?.estado)
 )
+
+// Mostrar OP Effi solo si la categoría seleccionada es Producción
+const esProduccion = computed(() => {
+  if (!props.tarea?.categoria_id) return false
+  const cat = props.categorias.find(c => c.id === props.tarea.categoria_id)
+  return cat?.nombre?.toLowerCase().includes('produccion') || false
+})
 
 // Popover completar
 const popoverTiempo   = ref(false)
