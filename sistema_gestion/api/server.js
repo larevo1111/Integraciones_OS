@@ -7,11 +7,12 @@
  * OPs: READ de u768061575_os_integracion (zeffi_produccion_encabezados)
  */
 
-const express = require('express')
-const path    = require('path')
-const https   = require('https')
-const fs      = require('fs')
-const jwt     = require('jsonwebtoken')
+const express  = require('express')
+const path     = require('path')
+const https    = require('https')
+const fs       = require('fs')
+const jwt      = require('jsonwebtoken')
+const { execFile } = require('child_process')
 const db      = require('./db')
 
 // ─── Cargar .env ───────────────────────────────────────────────────
@@ -906,6 +907,30 @@ app.get('/api/gestion/op/:id_op', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
+})
+
+// GET /api/gestion/op/:id_op/pdf — descarga PDF de la OP via Playwright
+app.get('/api/gestion/op/:id_op/pdf', requireAuth, (req, res) => {
+  const idOp   = req.params.id_op.replace(/[^0-9]/g, '')  // solo números
+  if (!idOp) return res.status(400).json({ error: 'ID inválido' })
+
+  const tmpPdf  = `/tmp/op_${idOp}_${Date.now()}.pdf`
+  const script  = '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/get_op_pdf.js'
+  const node    = process.execPath
+
+  res.setTimeout(90000)  // 90s timeout para Playwright
+
+  execFile(node, [script, idOp, tmpPdf], { timeout: 85000 }, (err, stdout, stderr) => {
+    if (err || !fs.existsSync(tmpPdf)) {
+      console.error('PDF error:', err?.message || stderr)
+      return res.status(500).json({ error: 'No se pudo generar el PDF', detalle: err?.message })
+    }
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="OP_${idOp}.pdf"`)
+    const stream = fs.createReadStream(tmpPdf)
+    stream.pipe(res)
+    stream.on('close', () => fs.unlink(tmpPdf, () => {}))  // limpiar tmp
+  })
 })
 
 // ─── DIFICULTADES ─────────────────────────────────────────────────

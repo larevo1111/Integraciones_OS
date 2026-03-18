@@ -21,6 +21,28 @@
       <div v-if="modelValue && !abierto" class="op-tag">
         <span class="op-tag-num">{{ modelValue }}</span>
         <span class="op-tag-desc">{{ articuloSeleccionado }}</span>
+        <!-- Acciones hover -->
+        <div class="op-tag-acciones">
+          <a
+            class="op-tag-accion"
+            href="https://effi.com.co/app/orden_produccion"
+            target="_blank"
+            rel="noopener"
+            title="Ver en Effi"
+            @click.stop
+          >
+            <span class="material-icons" style="font-size:13px">open_in_new</span>
+          </a>
+          <button
+            class="op-tag-accion"
+            :class="{ 'cargando-pdf': descargandoPdf }"
+            title="Ver PDF"
+            @click.stop="verPdf"
+          >
+            <span v-if="!descargandoPdf" class="material-icons" style="font-size:13px">picture_as_pdf</span>
+            <span v-else class="material-icons spin" style="font-size:13px">refresh</span>
+          </button>
+        </div>
         <button class="op-tag-clear" @click.stop="limpiar">
           <span class="material-icons" style="font-size:14px">close</span>
         </button>
@@ -88,7 +110,8 @@ const cargando   = ref(false)
 const resultados = ref([])
 const focoIdx    = ref(0)
 const articuloSeleccionado = ref('')
-const dropdownStyle = ref({})
+const dropdownStyle    = ref({})
+const descargandoPdf   = ref(false)
 
 let debounceTimer = null
 
@@ -172,6 +195,27 @@ function badgeClass(estado) {
   if (e === 'generada') return 'badge-generada'
   if (e === 'en proceso') return 'badge-proceso'
   return 'badge-otro'
+}
+
+async function verPdf() {
+  if (descargandoPdf.value || !props.modelValue) return
+  descargandoPdf.value = true
+  try {
+    const token = localStorage.getItem('gestion_token')
+    const resp  = await fetch(`/api/gestion/op/${encodeURIComponent(props.modelValue)}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    if (!resp.ok) throw new Error('Error al generar PDF')
+    const blob = await resp.blob()
+    const url  = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
+  } catch (e) {
+    console.error(e)
+    alert('No se pudo obtener el PDF. Intenta desde Effi directamente.')
+  } finally {
+    descargandoPdf.value = false
+  }
 }
 
 // Cerrar al hacer clic fuera
@@ -258,6 +302,31 @@ watch(() => props.modelValue, async (val) => {
   text-overflow: ellipsis;
   flex: 1;
 }
+.op-tag-acciones {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 100ms;
+  flex-shrink: 0;
+}
+.op-input-wrap:hover .op-tag-acciones { opacity: 1; }
+
+.op-tag-accion {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  padding: 2px 3px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: color 80ms, background 80ms;
+}
+.op-tag-accion:hover { color: var(--accent); background: var(--accent-muted); }
+.op-tag-accion.cargando-pdf { color: var(--accent); }
+
 .op-tag-clear {
   background: none;
   border: none;
