@@ -262,6 +262,10 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, reactive } from
 import { useRoute } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
+
+const props = defineProps({
+  soloMias: { type: Boolean, default: true }
+})
 import TareaItem            from 'src/components/TareaItem.vue'
 import TareaPanel           from 'src/components/TareaPanel.vue'
 import TareaForm            from 'src/components/TareaForm.vue'
@@ -530,6 +534,7 @@ async function cargarTareas() {
     const params = new URLSearchParams()
     // Siempre enviar fecha local del cliente para evitar desfase de zona horaria con servidor Hostinger
     params.set('fecha_hoy', hoyISO())
+    if (props.soloMias) params.set('solo_mias', '1')
     if (proyectoFiltroId.value) {
       params.set('proyecto_id', proyectoFiltroId.value)
     } else if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {
@@ -545,9 +550,10 @@ async function cargarTareas() {
     } else if (filtroActivo.value !== 'todas' && filtroActivo.value !== 'personalizado') {
       params.set('filtro', filtroActivo.value)
     }
-    const completadasUrl = proyectoFiltroId.value
-      ? `/api/gestion/tareas/completadas?proyecto_id=${proyectoFiltroId.value}`
-      : '/api/gestion/tareas/completadas'
+    const completadasParams = new URLSearchParams()
+    if (props.soloMias) completadasParams.set('solo_mias', '1')
+    if (proyectoFiltroId.value) completadasParams.set('proyecto_id', proyectoFiltroId.value)
+    const completadasUrl = `/api/gestion/tareas/completadas?${completadasParams}`
     const [dataTareas, dataCompletadas] = await Promise.all([
       api(`/api/gestion/tareas?${params}`),
       api(completadasUrl)
@@ -726,7 +732,7 @@ onUnmounted(() => { window.removeEventListener('resize', onResize) })
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   min-width: 160px;
-  z-index: 50;
+  z-index: 200;
   overflow: hidden;
 }
 .dropdown-item {
