@@ -1164,6 +1164,8 @@ def consultar(
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
                 resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
+                # Red de seguridad: clasificacion mal enrutada puede contener una enseñanza
+                _procesar_bloque_aprendizaje(res['texto'], empresa)
 
             elif paso == 'generar_imagen':
                 pasos_ejecutados.append('generar_imagen')
