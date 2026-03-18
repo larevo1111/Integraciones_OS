@@ -439,9 +439,9 @@ body {
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
-  transition: border-color 80ms, background 80ms;
+  transition: border-color 80ms, background 80ms, box-shadow 80ms;
 }
-.estado-circle:hover { border-color: var(--text-secondary); }
+.estado-circle:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-muted); }
 .estado-circle.pendiente { border-color: var(--border-strong); }
 .estado-circle.en-progreso { border-color: var(--color-info); background: radial-gradient(circle, var(--color-info) 40%, transparent 40%); }
 .estado-circle.completada { border-color: var(--color-success); background: var(--color-success); }
