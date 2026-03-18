@@ -209,10 +209,13 @@
       </div>
     </div>
   </aside>
+
+  <!-- Toast deshacer -->
+  <ToastUndo ref="toastRef" />
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
@@ -221,6 +224,7 @@ import CategoriaSelector    from './CategoriaSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import OpSelector           from './OpSelector.vue'
+import ToastUndo            from './ToastUndo.vue'
 
 const ESTADOS = [
   { key: 'Pendiente',   label: 'Pendiente',   color: '#6b7280' },
@@ -269,6 +273,16 @@ const esProduccion = computed(() => {
   return cat?.nombre?.toLowerCase().includes('produccion') || false
 })
 
+// Toast deshacer
+const toastRef = ref(null)
+
+const LABELS_CAMPO = {
+  estado: 'Estado', prioridad: 'Prioridad', categoria_id: 'Categoría',
+  proyecto_id: 'Proyecto', responsable: 'Responsable', fecha_limite: 'Fecha',
+  id_op: 'OP Effi', descripcion: 'Descripción', notas: 'Notas',
+  tiempo_estimado_min: 'T. estimado'
+}
+
 // Popover completar
 const popoverTiempo   = ref(false)
 const popoverHRef     = ref(null)
@@ -295,12 +309,22 @@ const tiempoRegistradoDisplay = computed(() => {
 
 async function actualizar(campo, valor) {
   if (!props.tarea) return
+  const valorAnterior = props.tarea[campo]  // guardar antes de actualizar
   try {
     const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
       method: 'PUT',
       body: JSON.stringify({ [campo]: valor })
     })
     emit('actualizada', data.tarea)
+    // Mostrar toast solo si el valor realmente cambió
+    if (valorAnterior !== valor) {
+      const label = LABELS_CAMPO[campo] || campo
+      await nextTick()
+      toastRef.value?.mostrar(
+        `${label} actualizado`,
+        () => actualizar(campo, valorAnterior)
+      )
+    }
   } catch (e) { console.error(e) }
 }
 
