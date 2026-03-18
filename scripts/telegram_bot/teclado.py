@@ -60,7 +60,7 @@ def inline_respuesta(token: str = None, n_filas: int = 0) -> InlineKeyboardMarku
         botones.append(
             InlineKeyboardButton(
                 f'📋 Ver tabla ({n_filas} filas)',
-                web_app=WebAppInfo(url=f'https://menu.oscomunidad.com/bot/tabla?token={token}')
+                web_app=WebAppInfo(url=f'https://menu.oscomunidad.com/#/bot/tabla?token={token}')
             )
         )
     botones.append(InlineKeyboardButton('↩ Nueva consulta', callback_data='nueva_consulta'))
