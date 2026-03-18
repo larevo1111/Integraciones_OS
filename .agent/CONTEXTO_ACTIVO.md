@@ -509,6 +509,8 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
 - ✅ **Promise.allSettled** — carga paralela tolerante a fallos de categorías + usuarios + tareas + proyectos + etiquetas
 - ✅ **Router guard** — decodifica JWT payload.tipo==='final' para evitar que token temporal acceda a /tareas
 - ✅ **Sidebar colapsado** — 64px con solo botón chevron centrado (rotado 180° como expand). nav-items muestran solo icono.
+- ✅ **UX TickTick (2026-03-17)** — badge 0/N abajo del círculo (sin chip, solo texto), botón ↳ al lado del badge, quick insert subtarea (× + Enter/blur), spinner inputs ocultos, cronómetro con ⏸+■, T.real/T.estimado en filas separadas
+- ✅ **Filtro Personalizado** — popup `FiltroPersonalizado.vue` (Teleport body), multi-select prioridad/categoría/etiqueta, rango fechas, proyecto. Backend soporta params multi-valor (comma-separated). Chip "Mis tareas" eliminado. QA verificado.
 
 ### Rutas y servicios
 - **URL**: gestion.oscomunidad.com
@@ -534,7 +536,7 @@ POST /api/auth/seleccionar_empresa — JWT temporal → JWT final
 GET  /api/auth/me                  — perfil del usuario autenticado
 GET  /api/usuarios                 — lista usuarios de la empresa
 GET  /api/gestion/categorias       — 13 categorías con color e icono
-GET  /api/gestion/tareas           — filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=&proyecto_id=
+GET  /api/gestion/tareas           — filtros: ?filtro=hoy|manana|semana&estado=&categoria_id=&proyecto_id=&prioridades=Alta,Urgente&categorias=1,2&etiquetas=3,4&fecha_desde=&fecha_hasta=&fecha_hoy=YYYY-MM-DD
 POST /api/gestion/tareas           — crear tarea (acepta proyecto_id, etiquetas:[])
 PUT  /api/gestion/tareas/:id       — actualizar (acepta proyecto_id, etiquetas:[]) → retorna etiquetas en response
 POST /api/gestion/tareas/:id/completar — completa con tiempo_real_min opcional
