@@ -867,6 +867,8 @@ def consultar(
 
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
     system_prompt = _fecha_ctx + '\n\n'
+    if nombre_usuario:
+        system_prompt += f'El usuario que consulta se llama: {nombre_usuario}\n\n'
     if _logica_negocio:
         system_prompt += _logica_negocio + '\n\n'
     if _cliente_ctx:
