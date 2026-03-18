@@ -308,20 +308,19 @@ async def cmd_mes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─── Detección de búsqueda web (para mensaje intermedio) ─────────────────────
 
 _WEB_KEYWORDS = [
+    'busca en internet', 'consulta en internet', 'buscar en internet',
+    'busca en la web', 'consulta en la web', 'búscalo en internet',
+    'búscalo en la web', 'consúltalo en internet', 'busca en google',
+    'googlealo', 'googléalo',
     'precio del dólar', 'precio del euro', 'precio del dolar', 'tasa de cambio',
-    'cotización de', 'cotizacion de', 'precio de la', 'precio del ',
-    'en bolsa', 'bolsa de valores', 'precio de referencia',
+    'cotización de', 'cotizacion de', 'precio de referencia',
+    'en bolsa', 'bolsa de valores',
     'noticias de', 'noticias del', 'qué pasó con', 'que paso con',
-    'novedades sobre', 'qué está pasando', 'que esta pasando',
     'regulación', 'regulacion', 'normativa', 'ley de', 'decreto ',
     'requisitos invima', 'requisitos ica', 'certificación', 'certificacion',
     'clima en', 'temperatura en', 'pronóstico del tiempo',
-    'tendencias de', 'mercado de', 'quién es ', 'quien es ',
+    'tendencias de', 'quién es ', 'quien es ',
     'cuánto vale el dólar', 'cuanto vale el dolar',
-    'trm de hoy', 'trm hoy', 'cuál es el trm', 'cual es el trm',
-    'guerra de', 'conflicto en', 'crisis en',
-    'busca en internet', 'consulta en internet', 'buscar en internet',
-    'competidores de', 'competencia de',
 ]
 
 def _es_busqueda_web(texto: str) -> bool:

@@ -766,10 +766,24 @@ def consultar(
             tema = tema or 'general'
             requiere_sql = False
 
-        tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
+        # Detección pre-router: si el usuario pide EXPLÍCITAMENTE buscar en internet
+        # → forzar busqueda_web sin pasar por el router (que puede equivocarse con el contexto)
+        _intento_internet = [
+            'busca en internet', 'buscar en internet', 'consulta en internet',
+            'consultes en internet', 'búscalo en internet', 'consúltalo en internet',
+            'busca en la web', 'consulta en la web', 'búscalo en la web',
+            'busca en google', 'googlealo', 'googléalo', 'míralo en internet',
+            'búscalo online', 'busca online',
+        ]
+        _pregunta_norm = pregunta.lower()
+        if not tipo and any(kw in _pregunta_norm for kw in _intento_internet):
+            tipo = 'busqueda_web'
+            tema = 'general'
+            requiere_sql = False
+
         if not tipo:
+            tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
             tipo = tipo_enrutado
-        if not tema:
             tema = tema_enrutado
         pasos_ejecutados.append('enrutar')
 
