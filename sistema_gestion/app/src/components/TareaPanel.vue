@@ -90,10 +90,10 @@
           @change="actualizarFechaEstimada($event.target.value)" />
       </div>
 
-      <!-- Acordeón: más fechas -->
+      <!-- Acordeón: más campos -->
       <div class="accordion-toggle" @click="mostrarFechas = !mostrarFechas">
-        <span class="material-icons" style="font-size:14px">{{ mostrarFechas ? 'expand_more' : 'chevron_right' }}</span>
-        <span style="font-size:11px;color:var(--text-tertiary)">Más fechas</span>
+        <span class="material-icons" style="font-size:13px">{{ mostrarFechas ? 'expand_more' : 'chevron_right' }}</span>
+        <span style="font-size:10px;color:var(--text-tertiary)">Más campos</span>
       </div>
       <template v-if="mostrarFechas">
         <div class="field-row">
@@ -124,21 +124,30 @@
 
       <div class="divider" />
 
-      <!-- Cronómetro -->
-      <Cronometro
-        :tarea-id="tarea.id"
-        :tiempo-base="tarea.tiempo_real_min"
-        :cronometro-activo="!!tarea.cronometro_activo"
-        :cronometro-inicio="tarea.cronometro_inicio"
-        @update="onCronometroUpdate"
-      />
-
-      <!-- Tiempo estimado -->
-      <div class="field-row" style="margin-top:8px">
-        <span class="field-label">Estimado</span>
-        <div style="display:flex;align-items:center;gap:6px">
-          <input type="number" class="input-field" style="height:28px;width:60px;font-size:12px" :value="Math.floor((tarea.tiempo_estimado_min||0)/60)" min="0" @change="actualizarTiempoEst('h', $event.target.value)" /> h
-          <input type="number" class="input-field" style="height:28px;width:50px;font-size:12px" :value="(tarea.tiempo_estimado_min||0)%60" min="0" max="59" @change="actualizarTiempoEst('m', $event.target.value)" /> min
+      <!-- Cronómetro + tiempos — sección compacta -->
+      <div class="tiempos-section">
+        <Cronometro
+          :tarea-id="tarea.id"
+          :tiempo-base="tarea.tiempo_real_min"
+          :cronometro-activo="!!tarea.cronometro_activo"
+          :cronometro-inicio="tarea.cronometro_inicio"
+          @update="onCronometroUpdate"
+        />
+        <div class="tiempos-row">
+          <div class="tiempo-campo">
+            <span class="tiempo-label">Real</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" class="input-field tiempo-input" :value="Math.floor((tarea.tiempo_real_min||0)/60)" min="0" @change="actualizarTiempoReal('h', $event.target.value)" />h
+              <input type="number" class="input-field tiempo-input" :value="(tarea.tiempo_real_min||0)%60" min="0" max="59" @change="actualizarTiempoReal('m', $event.target.value)" />m
+            </div>
+          </div>
+          <div class="tiempo-campo">
+            <span class="tiempo-label">Estimado</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" class="input-field tiempo-input" :value="Math.floor((tarea.tiempo_estimado_min||0)/60)" min="0" @change="actualizarTiempoEst('h', $event.target.value)" />h
+              <input type="number" class="input-field tiempo-input" :value="(tarea.tiempo_estimado_min||0)%60" min="0" max="59" @change="actualizarTiempoEst('m', $event.target.value)" />m
+            </div>
+          </div>
         </div>
       </div>
 
@@ -166,37 +175,28 @@
     </div>
 
     <!-- Footer -->
-    <div class="tarea-panel-footer">
-      <button class="btn btn-danger btn-sm" @click="$emit('eliminar', tarea)">Eliminar</button>
-      <div style="flex:1" />
-      <button class="btn btn-secondary btn-sm" @click="$emit('cerrar')">Cerrar</button>
-      <button class="btn btn-accent btn-sm" @click="completar">✓ Completar</button>
-    </div>
-
-    <!-- Modal completar (tiempo real) -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="modalCompletar" class="modal-overlay" @click.self="modalCompletar=false">
-          <div class="modal" style="max-width:360px">
-            <div class="modal-header">
-              <span class="modal-title">¿Cuánto tiempo te tomó?</span>
-              <button class="btn-icon" @click="modalCompletar=false"><span class="material-icons">close</span></button>
-            </div>
-            <div class="modal-body">
-              <p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px">El cronómetro registró {{ tiempoRegistradoDisplay }}. Puedes ajustarlo:</p>
-              <div style="display:flex;align-items:center;gap:8px">
-                <input type="number" class="input-field" style="width:70px" v-model.number="tiempoFinalH" min="0" /> h
-                <input type="number" class="input-field" style="width:60px" v-model.number="tiempoFinalM" min="0" max="59" /> min
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn btn-ghost btn-sm" @click="completarSin">Saltar</button>
-              <button class="btn btn-accent btn-sm" @click="confirmarCompletar">✓ Completar</button>
-            </div>
+    <div class="tarea-panel-footer" style="flex-direction:column;gap:6px">
+      <!-- Popover de tiempo (solo si no tiene tiempo real) -->
+      <Transition name="popover">
+        <div v-if="popoverTiempo" class="popover-tiempo">
+          <span style="font-size:10px;color:var(--text-tertiary)">¿Cuánto te tomó?</span>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+            <input ref="popoverHRef" type="number" class="input-field" style="width:48px;height:26px;font-size:11px" v-model.number="tiempoFinalH" min="0" placeholder="0" />
+            <span style="font-size:10px;color:var(--text-tertiary)">h</span>
+            <input type="number" class="input-field" style="width:42px;height:26px;font-size:11px" v-model.number="tiempoFinalM" min="0" max="59" placeholder="0" />
+            <span style="font-size:10px;color:var(--text-tertiary)">m</span>
+            <button class="btn btn-ghost btn-sm" style="padding:0 6px" @click="popoverTiempo=false;completarSin()">Saltar</button>
+            <button class="btn btn-accent btn-sm" style="padding:0 8px" @click="confirmarCompletar">✓</button>
           </div>
         </div>
       </Transition>
-    </Teleport>
+      <div style="display:flex;gap:6px;width:100%">
+        <button class="btn btn-danger btn-sm" @click="$emit('eliminar', tarea)">Eliminar</button>
+        <div style="flex:1" />
+        <button class="btn btn-secondary btn-sm" @click="$emit('cerrar')">Cerrar</button>
+        <button class="btn btn-accent btn-sm" @click="completar">✓ Completar</button>
+      </div>
+    </div>
   </aside>
 </template>
 
@@ -249,8 +249,9 @@ const esCompletada = computed(() =>
   ['Completada', 'Cancelada'].includes(props.tarea?.estado)
 )
 
-// Modal completar
-const modalCompletar  = ref(false)
+// Popover completar
+const popoverTiempo   = ref(false)
+const popoverHRef     = ref(null)
 const tiempoFinalH    = ref(0)
 const tiempoFinalM    = ref(0)
 
@@ -314,27 +315,39 @@ function onCronometroUpdate(evento, tiempoMin) {
   emit('actualizada', { ...props.tarea, cronometro_activo: evento === 'iniciado' ? 1 : 0 })
 }
 
+function actualizarTiempoReal(parte, val) {
+  const h = parte === 'h' ? parseInt(val)||0 : Math.floor((props.tarea.tiempo_real_min||0)/60)
+  const m = parte === 'm' ? parseInt(val)||0 : (props.tarea.tiempo_real_min||0)%60
+  actualizar('tiempo_real_min', h*60+m)
+}
+
 function completar() {
   const min = props.tarea.tiempo_real_min || 0
-  tiempoFinalH.value = Math.floor(min/60)
-  tiempoFinalM.value = min % 60
-  modalCompletar.value = true
+  if (min > 0) {
+    // Ya tiene tiempo real → completar directo
+    confirmarCompletar()
+    return
+  }
+  tiempoFinalH.value = 0
+  tiempoFinalM.value = 0
+  popoverTiempo.value = true
+  setTimeout(() => popoverHRef.value?.focus(), 50)
 }
 
 async function confirmarCompletar() {
   const totalMin = tiempoFinalH.value*60 + tiempoFinalM.value
-  modalCompletar.value = false
+  popoverTiempo.value = false
   try {
     const data = await api(`/api/gestion/tareas/${props.tarea.id}/completar`, {
       method: 'POST',
-      body: JSON.stringify({ tiempo_real_min: totalMin })
+      body: JSON.stringify({ tiempo_real_min: totalMin || undefined })
     })
     emit('actualizada', data.tarea)
   } catch(e) { console.error(e) }
 }
 
 async function completarSin() {
-  modalCompletar.value = false
+  popoverTiempo.value = false
   try {
     const data = await api(`/api/gestion/tareas/${props.tarea.id}/completar`, { method: 'POST' })
     emit('actualizada', data.tarea)
@@ -379,4 +392,40 @@ async function completarSin() {
 }
 .accordion-toggle:hover { color: var(--text-secondary); }
 .field-row-disabled { opacity: 0.45; pointer-events: none; }
+
+/* Sección cronómetro + tiempos compacta */
+.tiempos-section {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 4px 0;
+}
+.tiempos-row {
+  display: flex; gap: 12px;
+}
+.tiempo-campo {
+  display: flex; flex-direction: column; gap: 3px;
+}
+.tiempo-label {
+  font-size: 10px; color: var(--text-tertiary); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.tiempo-input {
+  width: 44px !important; height: 24px !important;
+  font-size: 11px !important; text-align: center; padding: 0 4px !important;
+}
+
+/* Popover completar */
+.popover-tiempo {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.popover-enter-active, .popover-leave-active {
+  transition: opacity 120ms, transform 120ms;
+}
+.popover-enter-from, .popover-leave-to {
+  opacity: 0; transform: translateY(4px);
+}
 </style>

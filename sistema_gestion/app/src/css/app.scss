@@ -112,7 +112,7 @@
 html, body, #q-app { height: 100%; margin: 0; padding: 0; }
 body {
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-app);
@@ -168,15 +168,15 @@ body {
   flex-shrink: 0;
 }
 .sidebar-logo-icon {
-  width: 28px; height: 28px;
+  width: 24px; height: 24px;
   background: var(--accent);
   border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  font-weight: 700; font-size: 13px; color: #000;
+  font-weight: 700; font-size: 11px; color: #000;
 }
 .sidebar-logo-name {
-  font-size: 14px; font-weight: 600; color: var(--text-primary);
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
   white-space: nowrap; overflow: hidden;
   transition: opacity 200ms;
 }
@@ -207,12 +207,12 @@ body {
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  height: 34px;
+  height: 30px;
   border-radius: var(--radius-md);
   margin: 1px 8px;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   text-decoration: none;
   transition: background 80ms, color 80ms;
@@ -223,7 +223,7 @@ body {
 .nav-item.active { background: var(--bg-row-selected); color: var(--text-primary); }
 .nav-item.active .nav-dot { opacity: 1; }
 .nav-item-icon {
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
   display: flex; align-items: center;
 }
@@ -266,8 +266,8 @@ body {
   transition: opacity 200ms;
 }
 .sidebar.collapsed .sidebar-user-info { opacity: 0; pointer-events: none; }
-.sidebar-user-name { font-size: 12px; font-weight: 600; color: var(--text-primary); truncate: ellipsis; white-space: nowrap; overflow: hidden; }
-.sidebar-user-empresa { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; }
+.sidebar-user-name { font-size: 11px; font-weight: 600; color: var(--text-primary); truncate: ellipsis; white-space: nowrap; overflow: hidden; }
+.sidebar-user-empresa { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; }
 .sidebar-collapse-btn {
   width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
@@ -307,17 +307,17 @@ body {
   min-width: 0;
 }
 .topbar {
-  height: var(--topbar-height);
+  height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 12px;
+  padding: 0 16px;
+  gap: 10px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   background: var(--bg-app);
 }
 .topbar-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -354,10 +354,10 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 0 10px;
-  height: 26px;
+  padding: 0 9px;
+  height: 22px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -405,14 +405,14 @@ body {
   flex-shrink: 0;
 }
 .grupo-nombre {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-tertiary);
 }
 .grupo-count {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
 }
 
@@ -420,9 +420,9 @@ body {
 .tarea-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 20px;
-  height: 38px;
+  gap: 6px;
+  padding: 0 16px;
+  height: 32px;
   cursor: pointer;
   transition: background 60ms;
   border-bottom: 1px solid transparent;
@@ -433,7 +433,7 @@ body {
 
 /* Estado círculo (Linear style) */
 .estado-circle {
-  width: 16px; height: 16px;
+  width: 14px; height: 14px;
   border-radius: var(--radius-full);
   border: 1.5px solid var(--border-strong);
   flex-shrink: 0;
@@ -445,13 +445,13 @@ body {
 .estado-circle.pendiente { border-color: var(--border-strong); }
 .estado-circle.en-progreso { border-color: var(--color-info); background: radial-gradient(circle, var(--color-info) 40%, transparent 40%); }
 .estado-circle.completada { border-color: var(--color-success); background: var(--color-success); }
-.estado-circle.completada::after { content: '✓'; font-size: 9px; color: #000; font-weight: 700; }
+.estado-circle.completada::after { content: '✓'; font-size: 8px; color: #000; font-weight: 700; }
 .estado-circle.cancelada { border-color: var(--text-tertiary); background: var(--text-tertiary); }
-.estado-circle.cancelada::after { content: '×'; font-size: 11px; color: var(--bg-app); font-weight: 700; }
+.estado-circle.cancelada::after { content: '×'; font-size: 10px; color: var(--bg-app); font-weight: 700; }
 
 /* Dot de categoría */
 .cat-dot {
-  width: 8px; height: 8px;
+  width: 6px; height: 6px;
   border-radius: var(--radius-full);
   flex-shrink: 0;
 }
@@ -459,7 +459,7 @@ body {
 /* Título de tarea */
 .tarea-titulo {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -468,37 +468,44 @@ body {
 }
 .tarea-item.completada .tarea-titulo { text-decoration: line-through; color: var(--text-tertiary); }
 
-/* Meta de tarea (prioridad, avatar, fecha, cronómetro) */
+/* Meta de tarea (prioridad, avatar, fecha, duración, cronómetro) */
 .tarea-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-shrink: 0;
 }
 .prioridad-icon {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-tertiary);
 }
 .prioridad-icon.urgente { color: var(--color-urgente); }
 .prioridad-icon.alta    { color: var(--color-alta); }
 .avatar-mini {
-  width: 20px; height: 20px;
+  width: 16px; height: 16px;
   border-radius: var(--radius-full);
   object-fit: cover;
   background: var(--bg-card-hover);
 }
 .tarea-fecha {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-tertiary);
   white-space: nowrap;
 }
 .tarea-fecha.vencida { color: var(--color-error); }
 .tarea-fecha.hoy { color: var(--text-secondary); }
+/* Duración real en fila */
+.tarea-duracion {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
 .cronometro-activo {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--accent);
   font-family: var(--font-mono);
@@ -519,10 +526,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 20px 4px;
+  padding: 8px 16px 4px;
   cursor: pointer;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
 }
 .completadas-header:hover { color: var(--text-secondary); }
@@ -545,7 +552,7 @@ body {
   flex-shrink: 0;
 }
 .tarea-panel-titulo {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
@@ -570,14 +577,14 @@ body {
   min-height: 30px;
 }
 .field-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-tertiary);
   width: 90px;
   flex-shrink: 0;
 }
 .field-value {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-primary);
 }
 
@@ -586,15 +593,15 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: 6px 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 8px 0;
+  gap: 8px;
+  margin: 6px 0;
 }
 .cronometro-tiempo {
   font-family: var(--font-mono);
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -606,10 +613,10 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 14px;
-  height: 32px;
+  padding: 0 12px;
+  height: 28px;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -633,7 +640,7 @@ body {
 .btn-ghost:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 .btn-danger { background: var(--color-error-bg); color: var(--color-error); }
 .btn-icon {
-  width: 30px; height: 30px; padding: 0;
+  width: 26px; height: 26px; padding: 0;
   border-radius: var(--radius-md);
   border: none;
   background: transparent;
@@ -641,10 +648,10 @@ body {
   cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   transition: background 70ms, color 70ms;
-  font-size: 18px;
+  font-size: 16px;
 }
 .btn-icon:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.btn-sm { height: 26px; padding: 0 10px; font-size: 12px; }
+.btn-sm { height: 24px; padding: 0 9px; font-size: 11px; }
 
 /* FAB — mobile */
 .fab {
@@ -665,11 +672,11 @@ body {
 /* ─── INPUTS ─── */
 .input-field {
   width: 100%;
-  height: 34px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 8px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-sans);
   color: var(--text-primary);
   background: var(--bg-input);
@@ -700,7 +707,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   filter: none;
   opacity: 0.6;
 }
-.input-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; display: block; }
+.input-label { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-bottom: 3px; display: block; }
 .input-group { margin-bottom: 14px; }
 
 /* ─── MODAL ─── */
@@ -731,7 +738,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   justify-content: space-between;
   flex-shrink: 0;
 }
-.modal-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.modal-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .modal-body { flex: 1; padding: 20px; overflow-y: auto; }
 .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
 
@@ -775,7 +782,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   padding: 60px 24px; gap: 8px; color: var(--text-tertiary);
   text-align: center;
 }
-.empty-state p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.empty-state p { font-size: 11px; color: var(--text-secondary); margin: 0; }
 
 /* ─── SELECT DROPDOWN ─── */
 .select-field {
@@ -856,8 +863,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   .topbar { padding: 0 12px; }
   .filtros-bar { padding: 8px 12px; }
   .lista-tareas { padding: 4px 0; }
-  .tarea-item { padding: 0 12px; }
-  .grupo-header { padding: 8px 12px 2px; }
+  .tarea-item { padding: 0 10px; }
+  .grupo-header { padding: 6px 10px 2px; }
 }
 
 /* ─── BOTTOM NAV MOBILE ─── */

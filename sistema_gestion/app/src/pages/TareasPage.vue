@@ -149,11 +149,6 @@
                 <button class="btn btn-ghost btn-sm" @click="cancelarSubtarea">Cancelar</button>
                 <button class="btn btn-primary btn-sm" :disabled="!qaSubTitulo" @click="guardarSubtarea(t)">Agregar</button>
               </div>
-              <!-- Botón + al final de subtareas expandidas -->
-              <div v-else class="subtarea-add-row" @click="iniciarSubtarea(t)">
-                <span class="material-icons" style="font-size:13px">subdirectory_arrow_right</span>
-                <span>Agregar subtarea</span>
-              </div>
             </template>
           </template>
         </template>
