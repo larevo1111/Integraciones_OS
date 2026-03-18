@@ -582,14 +582,22 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     agente_usado = resultado.get('agente', '')
     pie          = f'\n\n_{ICONOS_AGENTES.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
 
+    MAX_LEN = 4000
+    texto_enviar = texto_resp + pie
+    if len(texto_enviar) > MAX_LEN:
+        if token:
+            texto_enviar = f'El detalle tiene {n_filas} filas — demasiado para mostrar en el chat.\n\nAbrí la tabla para verlo completo con filtros y totales.{pie}'
+        else:
+            texto_enviar = texto_resp[:MAX_LEN] + '\n\n_… respuesta recortada._'
+
     try:
         await update.message.reply_text(
-            texto_resp + pie,
+            texto_enviar,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=kb
         )
     except Exception:
-        await update.message.reply_text(texto_resp, reply_markup=kb)
+        await update.message.reply_text(texto_enviar[:MAX_LEN], reply_markup=kb)
 
 
 # ─── Handler de callbacks (botones inline) ───────────────────────────────────
