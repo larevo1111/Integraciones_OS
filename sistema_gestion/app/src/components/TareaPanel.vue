@@ -94,7 +94,9 @@
 
       <div v-if="esProduccion" class="field-row" style="align-items:flex-start">
         <span class="field-label" style="padding-top:8px">OP Effi</span>
-        <OpSelector :modelValue="tarea.id_op || ''" @update:modelValue="val => actualizar('id_op', val)" />
+        <div style="flex:1;min-width:0">
+          <OpSelector :modelValue="tarea.id_op || ''" @update:modelValue="val => actualizar('id_op', val)" />
+        </div>
       </div>
 
       <div class="divider" />
