@@ -51,9 +51,11 @@
       </div>
       <div class="field-row">
         <span class="field-label">Categoría</span>
-        <select class="input-field select-field" style="height:28px;font-size:12px" :value="tarea.categoria_id" @change="actualizar('categoria_id', Number($event.target.value))">
-          <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre.replace(/_/g, ' ') }}</option>
-        </select>
+        <CategoriaSelector
+          :model-value="tarea.categoria_id"
+          :categorias="categorias"
+          @update:model-value="actualizar('categoria_id', $event)"
+        />
       </div>
       <div class="field-row">
         <span class="field-label">Proyecto</span>
@@ -209,9 +211,10 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { api } from 'src/services/api'
-import EstadoBadge       from './EstadoBadge.vue'
-import Cronometro        from './Cronometro.vue'
-import ProyectoSelector  from './ProyectoSelector.vue'
+import EstadoBadge          from './EstadoBadge.vue'
+import Cronometro           from './Cronometro.vue'
+import ProyectoSelector     from './ProyectoSelector.vue'
+import CategoriaSelector    from './CategoriaSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 
