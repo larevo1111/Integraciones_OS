@@ -238,6 +238,7 @@
       :categorias="categorias"
       :etiquetas="etiquetas"
       :proyectos="proyectos"
+      :usuarios="usuarios"
       :anchor-el="btnPersonalizadoRef"
       :valor="filtroPersonalizado || {}"
       @aplicar="onAplicarFiltro"
@@ -533,12 +534,14 @@ async function cargarTareas() {
       params.set('proyecto_id', proyectoFiltroId.value)
     } else if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {
       const f = filtroPersonalizado.value
-      if (f.fecha_desde)              params.set('fecha_desde', f.fecha_desde)
-      if (f.fecha_hasta)              params.set('fecha_hasta', f.fecha_hasta)
-      if (f.prioridades?.length)      params.set('prioridades', f.prioridades.join(','))
-      if (f.categorias?.length)       params.set('categorias',  f.categorias.join(','))
-      if (f.etiquetas?.length)        params.set('etiquetas',   f.etiquetas.join(','))
-      if (f.proyecto_id)              params.set('proyecto_id', f.proyecto_id)
+      if (f.fecha_desde)              params.set('fecha_desde',  f.fecha_desde)
+      if (f.fecha_hasta)              params.set('fecha_hasta',  f.fecha_hasta)
+      if (f.prioridades?.length)      params.set('prioridades',  f.prioridades.join(','))
+      if (f.categorias?.length)       params.set('categorias',   f.categorias.join(','))
+      if (f.etiquetas?.length)        params.set('etiquetas',    f.etiquetas.join(','))
+      if (f.proyecto_id)              params.set('proyecto_id',  f.proyecto_id)
+      if (f.responsables?.length)     params.set('responsables', f.responsables.join(','))
+      if (f.id_op)                    params.set('id_op',        f.id_op)
     } else if (filtroActivo.value !== 'todas' && filtroActivo.value !== 'personalizado') {
       params.set('filtro', filtroActivo.value)
     }

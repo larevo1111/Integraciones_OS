@@ -843,6 +843,11 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   background: var(--bg-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
   cursor: pointer;
 }
+/* Native select dropdown — dark mode: opciones visibles (browser usa fondo claro por defecto) */
+.select-field option {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
 
 /* ─── BOTTOM SHEET DETALLE TAREA (mobile) ─── */
 /* Controlado por v-if="isMobile" en Vue — no necesita display:none en CSS */

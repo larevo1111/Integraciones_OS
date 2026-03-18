@@ -78,14 +78,14 @@
         </div>
       </div>
 
-      <!-- Proyecto -->
-      <div class="fpop-section" v-if="proyectos.length">
+      <!-- Proyecto (siempre visible) -->
+      <div class="fpop-section">
         <p class="fpop-label">Proyecto</p>
         <div class="fpop-chips">
           <button
             class="fpop-chip"
-            :class="{ active: local.proyecto_id === null && local.sinProyecto }"
-            @click="local.proyecto_id = null; local.sinProyecto = !local.sinProyecto"
+            :class="{ active: local.sinProyecto }"
+            @click="local.sinProyecto = !local.sinProyecto; if (local.sinProyecto) local.proyecto_id = null"
           >Sin proyecto</button>
           <button
             v-for="p in proyectos"
@@ -99,6 +99,35 @@
             {{ p.nombre }}
           </button>
         </div>
+      </div>
+
+      <!-- Responsable multi-select -->
+      <div class="fpop-section" v-if="usuarios.length">
+        <p class="fpop-label">Responsable</p>
+        <div class="fpop-chips">
+          <button
+            v-for="u in usuarios"
+            :key="u.email"
+            class="fpop-chip"
+            :class="{ active: local.responsables.includes(u.email) }"
+            :style="local.responsables.includes(u.email) ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-muted)' } : {}"
+            @click="toggleArr(local.responsables, u.email)"
+          >
+            {{ u.nombre_corto || u.nombre || u.email.split('@')[0] }}
+          </button>
+        </div>
+      </div>
+
+      <!-- OP Effi -->
+      <div class="fpop-section">
+        <p class="fpop-label">OP Effi</p>
+        <input
+          type="text"
+          class="input-field fpop-date"
+          v-model="local.id_op"
+          placeholder="Número de OP..."
+          style="width:100%"
+        />
       </div>
 
       <!-- Footer -->
@@ -117,7 +146,8 @@ const props = defineProps({
   categorias: { type: Array, default: () => [] },
   etiquetas:  { type: Array, default: () => [] },
   proyectos:  { type: Array, default: () => [] },
-  anchorEl:   { type: Object, default: null },   // ref del botón que abre el popup
+  usuarios:   { type: Array, default: () => [] },
+  anchorEl:   { type: Object, default: null },
   valor:      { type: Object, default: () => ({}) }
 })
 const emit = defineEmits(['aplicar', 'cerrar'])
@@ -130,13 +160,15 @@ const PRIORIDADES = [
 ]
 
 const local = reactive({
-  fecha_desde:  props.valor.fecha_desde  || '',
-  fecha_hasta:  props.valor.fecha_hasta  || '',
-  prioridades:  [...(props.valor.prioridades  || [])],
-  categorias:   [...(props.valor.categorias   || [])],
-  etiquetas:    [...(props.valor.etiquetas    || [])],
-  proyecto_id:  props.valor.proyecto_id  ?? null,
-  sinProyecto:  false
+  fecha_desde:  props.valor.fecha_desde   || '',
+  fecha_hasta:  props.valor.fecha_hasta   || '',
+  prioridades:  [...(props.valor.prioridades   || [])],
+  categorias:   [...(props.valor.categorias    || [])],
+  etiquetas:    [...(props.valor.etiquetas     || [])],
+  proyecto_id:  props.valor.proyecto_id   ?? null,
+  sinProyecto:  props.valor.sinProyecto   || false,
+  responsables: [...(props.valor.responsables  || [])],
+  id_op:        props.valor.id_op         || ''
 })
 
 // Posición del popup debajo del botón ancla
@@ -171,17 +203,22 @@ function limpiar() {
   local.etiquetas.splice(0)
   local.proyecto_id = null
   local.sinProyecto = false
+  local.responsables.splice(0)
+  local.id_op = ''
   emit('aplicar', null)
 }
 
 function aplicar() {
   const f = {
-    fecha_desde: local.fecha_desde || null,
-    fecha_hasta: local.fecha_hasta || null,
-    prioridades: [...local.prioridades],
-    categorias:  [...local.categorias],
-    etiquetas:   [...local.etiquetas],
-    proyecto_id: local.sinProyecto ? 'null' : (local.proyecto_id ?? null)
+    fecha_desde:  local.fecha_desde  || null,
+    fecha_hasta:  local.fecha_hasta  || null,
+    prioridades:  [...local.prioridades],
+    categorias:   [...local.categorias],
+    etiquetas:    [...local.etiquetas],
+    proyecto_id:  local.sinProyecto ? 'null' : (local.proyecto_id ?? null),
+    sinProyecto:  local.sinProyecto,
+    responsables: [...local.responsables],
+    id_op:        local.id_op.trim() || null
   }
   emit('aplicar', f)
 }

@@ -347,7 +347,7 @@ app.get('/api/gestion/perfiles', async (req, res) => {
 // GET /api/gestion/tareas
 // Filtros: ?filtro=hoy|manana|ayer|semana&responsable=email&categoria_id=&estado=&prioridad=&agrupar=categoria|prioridad|fecha|persona
 app.get('/api/gestion/tareas', async (req, res) => {
-  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id, fecha_hoy } = req.query
+  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id, fecha_hoy, id_op } = req.query
   const empresa = req.empresa
 
   const where  = ['t.empresa = ?', 't.parent_id IS NULL']   // excluir subtareas de la lista principal
@@ -393,6 +393,17 @@ app.get('/api/gestion/tareas', async (req, res) => {
   if (responsable)  { where.push('t.responsable = ?');   params.push(responsable) }
   if (solo_mias === '1') { where.push('t.responsable = ?'); params.push(req.usuario.email) }
   if (estado)       { where.push('t.estado = ?');        params.push(estado) }
+
+  // responsables: multi (comma-separated emails)
+  const responsablesRaw = req.query.responsables
+  if (responsablesRaw) {
+    const emails = String(responsablesRaw).split(',').map(s => s.trim()).filter(Boolean)
+    if (emails.length === 1) { where.push('t.responsable = ?'); params.push(emails[0]) }
+    else if (emails.length > 1) { where.push(`t.responsable IN (${emails.map(() => '?').join(',')})`); params.push(...emails) }
+  }
+
+  // id_op: búsqueda parcial en OP Effi
+  if (id_op) { where.push('t.id_op LIKE ?'); params.push(`%${id_op}%`) }
 
   // categoria_id: soporte simple y multi (categorias=1,2,3)
   const categoriasRaw = req.query.categorias || categoria_id
