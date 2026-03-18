@@ -190,19 +190,21 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
   flex-shrink: 0;
   width: 14px;
-  align-self: flex-start;
-  padding-top: 3px; /* alinea el círculo con el texto de la fila */
+  position: relative;
 }
 
-/* Badge 0/N + botón ↳ en la misma fila, debajo del círculo */
+/* Badge 0/N + botón ↳ — flotante debajo del círculo, no afecta altura de fila */
 .sub-controls {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 2px;
-  /* Desborda el ancho de 14px hacia la derecha sin afectar el layout */
+  white-space: nowrap;
 }
 
 /* Badge expandir subtareas — sin chip, solo texto sutil */
