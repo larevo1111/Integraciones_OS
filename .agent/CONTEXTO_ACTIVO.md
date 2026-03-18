@@ -1,6 +1,6 @@
 # Contexto Activo - Integraciones_OS
 
-## Estado Actual (2026-03-17)
+## Estado Actual (2026-03-18)
 Pipeline Effi → MariaDB funcional + integración EspoCRM bidireccional **completamente automatizada**.
 - Pipeline verificado 2026-03-11: **50/50 tablas** sincronizadas, 487 contactos, 0 errores.
 - Pasos 3a/3b/3c/3d (facturas) + 4a/4b/4c/4d (remisiones) analíticos activos.
@@ -213,7 +213,7 @@ ConsignacionPage — tab Por producto
 - Tooltips: carga `/api/tooltips` automáticamente (caché global, no necesita prop)
 - Formato: `fin_/cto_/car_` → `$COP`, `_pct/_margen` → `%` (×100), resto → número con `.` miles
 
-## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-17)
+## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-18)
 
 > **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
 > Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
@@ -232,10 +232,10 @@ ConsignacionPage — tab Por producto
 - **Empresa activa**: `ori_sil_2` (Origen Silvestre). Santiago=admin, Jennifer=viewer.
 - **Frontend**: Header con nombre usuario + empresa, LoginPage con paso 2 selección, authStore con `empresa_activa`
 
-**Pendientes menores:**
-- 2.7 `GET /api/ia/empresa-activa` endpoint (datos de empresa actual)
-- 3.3 Filtro empresa en `/ia/logs` Flask
-- 4.5 Empresa switcher refresca datos en páginas (cuando haya >1 empresa)
+**Pendientes menores:** ✅ TODOS CERRADOS (2026-03-18)
+- 2.7 `GET /api/ia/empresa-activa` — implementado en ia-admin/api/server.js ✅
+- 3.3 Filtro empresa en `/api/ia/logs` — ya estaba, confirmado ✅
+- 4.5 Empresa switcher refresca datos — watch en DashboardPage, LogsPage, TiposPage, LogicaNegocioPage ✅
 
 **Plan completo:** `.agent/planes/plan_ia_service.md`
 **Plan RAG/Contexto:** `.agent/planes/rag_contexto.md`
@@ -347,9 +347,9 @@ resultado = consultar(
 # Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id, tema, empresa
 ```
 
-## Próximos Pasos
-1. **QA bot IA** — probar en Telegram: preguntas de días de semana, consultas vacías, /agente con DeepSeek
-2. **Migrar embeddings históricos** — `python3 -m scripts.ia_service.actualizar_system_prompt` (ya corrido) + `migrar_embeddings_faltantes()` cuando haya ejemplos acumulados
+## Próximos Pasos (2026-03-18)
+1. **Búsqueda web** — integrar Tavily API (gratis 1000 búsquedas/mes). Nuevo tipo `busqueda_web`, router detecta consultas externas al negocio.
+2. **Perfil/preferencias de usuario** — campos en el bot (idioma, agente preferido, apodo, etc.). Probablemente en `ia_usuarios`.
 3. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual

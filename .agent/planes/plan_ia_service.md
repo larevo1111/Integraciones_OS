@@ -23,6 +23,54 @@
 | 10 | Agregar API keys al .env (Gemini ✅, Groq pendiente, DeepSeek pendiente) | ✅ |
 | 11 | Prueba end-to-end con Gemini (Groq/DeepSeek sin key aún) | ✅ |
 | 12 | Commit + documentación final | ✅ |
+| 13 | Protocolo aprendizaje completo + pruebas reales | ✅ |
+| 14 | Bug productos terminados corregido | ✅ |
+| 15 | Multi-empresa pendientes 2.7/3.3/4.5 | ✅ |
+
+---
+
+## Historial de sesiones
+
+### Sesión 2026-03-18 — Protocolo aprendizaje + fixes críticos
+
+**Problema raíz identificado:** el protocolo de aprendizaje no estaba guardando reglas porque la función `_procesar_bloque_aprendizaje` solo se llamaba en el paso `conversar` (tipo `aprendizaje`). Los tipos `conversacion` y `clasificacion` nunca la llamaban.
+
+**Fixes aplicados (commits `97dd9a0`, `586c896`, `ea6062d`):**
+
+1. **`_procesar_bloque_aprendizaje` en paso `redactar`** — tipo `conversacion` ahora guarda si el agente genera `[GUARDAR_NEGOCIO]`
+2. **`_procesar_bloque_aprendizaje` en paso `analizar`** — tipo `clasificacion` también guarda (el router a veces manda enseñanzas implícitas ahí)
+3. **Prompts actualizados** — `conversacion` y `clasificacion` ahora detectan afirmaciones de negocio y activan el protocolo de guardado
+4. **Detección pre-router para confirmaciones** — si el bot preguntó "¿Lo guardo en mi memoria de negocio?" y el usuario responde "sí/dale/ok/etc.", el sistema fuerza `tipo=conversacion` sin pasar por el router (el router clasificaba "sí" como `analisis_datos`)
+
+**El protocolo ahora cubre 3 caminos:**
+- `aprendizaje` → `conversar` → guarda ✅ (siempre estuvo)
+- `conversacion` → `redactar` → guarda ✅ (fix sesión 2026-03-17)
+- `clasificacion` → `analizar` → guarda ✅ (fix sesión 2026-03-18)
+
+**Bug productos terminados corregido (commit `94929fe`):**
+- El modelo usaba `gestion_de_stock = '1'` (incorrecto) a pesar de la nota en el esquema
+- Causa: ejemplos SQL incorrectos guardados en `ia_ejemplos_sql` que el modelo copiaba
+- Fix: eliminados ejemplos malos; el filtro correcto es solo `categoria IN ('TPT.01...', 'TPT.02...')` sin `gestion_de_stock`
+- Prueba: 80 productos retornados correctamente (antes: 0)
+
+**Multi-empresa pendientes cerrados (commit `fe01ece`):**
+- `2.7` — `GET /api/ia/empresa-activa` implementado en ia-admin/api/server.js
+- `3.3` — `/api/ia/logs` ya tenía filtro empresa (confirmado)
+- `4.5` — 4 páginas Vue (Dashboard, Logs, Tipos, LogicaNegocio) recargan datos al cambiar empresa via `watch(() => authStore.empresa_activa?.uid)`
+
+**Pruebas realizadas 2026-03-18 — todos ✅:**
+1. Saludo con nombre: "¡Hola, Santiago!" ✅
+2. Productos terminados: 59 filas, SQL correcto con TPT ✅
+3. Aprendizaje explícito ("te voy a enseñar"): guardado en BD ✅
+4. Aprendizaje implícito (frase declarativa): detectado, preguntó confirmación ✅
+5. Confirmación "sí" no va a SQL: pasos `['enrutar','redactar']` ✅
+6. Guardado en `ia_logica_negocio` con `creado_por: usuario-aprendizaje` ✅
+7. Endpoint `GET /api/ia/empresa-activa` existe ✅
+8. 4 páginas Vue tienen `watch` de empresa ✅
+
+**Próximos pasos del servicio IA:**
+- Búsqueda web (Tavily API — 1000 búsquedas/mes gratis)
+- Preferencias y perfil del usuario en el bot
 
 ## Notas de implementación
 

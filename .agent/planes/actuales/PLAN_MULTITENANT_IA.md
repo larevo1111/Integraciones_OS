@@ -1,7 +1,7 @@
 # PLAN: Arquitectura Multi-Empresa en ia_service_os + ia-admin
 
 **Creado**: 2026-03-13
-**Estado**: 🟢 Completado (Fases 1-4) — pendientes menores: 2.7, 3.3, 4.5
+**Estado**: 🟢 Completado (Fases 1-4) ✅ CERRADO
 **Objetivo**: Implementar empresa como eje de seguridad y organización en todo el sistema IA, siguiendo el patrón de SOS_ERP.
 
 ---
@@ -72,13 +72,13 @@ updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIME
   - `/api/ia/tipos` → filtrar por empresa (mostrar globales + de empresa)
 - [x] **2.5** Actualizar endpoints POST/PUT/DELETE para inyectar empresa desde JWT (nunca del body)
 - [x] **2.6** Agregar endpoint `GET /api/ia/mis-empresas` — lista empresas del usuario autenticado
-- [ ] **2.7** Agregar endpoint `GET /api/ia/empresa-activa` — datos de la empresa actual del JWT
+- [x] **2.7** Agregar endpoint `GET /api/ia/empresa-activa` — datos de la empresa actual del JWT
 
 ### FASE 3 — ia-service (Flask) ✅
 
 - [x] **3.1** Endpoint `/ia/consumo` — aceptar parámetro `empresa` en query string → filtrar ia_consumo_diario
 - [x] **3.2** Endpoint `/ia/consumo/historico` — igual, filtrar por empresa
-- [ ] **3.3** Endpoint `/ia/logs` (si existe) — filtrar por empresa
+- [x] **3.3** Endpoint `/ia/logs` (si existe) — filtrar por empresa
 - [x] **3.4** Guardar `empresa` en ia_logs al registrar cada llamada (ya lo hace via consultar())
 - [x] **3.5** Guardar `empresa` en ia_consumo_diario al agregar consumo diario
 
@@ -93,7 +93,7 @@ updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIME
   - Si usuario tiene 1 empresa → auto-selecciona y va al dashboard
   - Si tiene múltiples → muestra grid de empresas para elegir
 - [x] **4.4** Actualizar `authStore.js` — agregar `empresa_activa`, `empresa_nombre`, `empresa_siglas`, `empresas_disponibles`
-- [ ] **4.5** Actualizar todas las páginas Vue para que el empresa switcher refresque los datos
+- [x] **4.5** Actualizar todas las páginas Vue para que el empresa switcher refresque los datos
 - [x] **4.6** Actualizar `DashboardPage.vue` — mostrar empresa activa en el encabezado
 
 ### FASE 5 — Documentación ✅/🔲

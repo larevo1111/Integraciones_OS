@@ -216,3 +216,48 @@ El agente de testeo background encontró fallos aparentes al ejecutar preguntas 
 **Descripción:** Layout roto, datos no cargaban
 **Screenshot:** `screenshots_temporales/detalle_final_canal_roto_1773280513712.png` (borrar)
 **Fix:** Corregido en DetalleCanalMesPage.vue
+
+---
+
+## Sesión QA — 2026-03-18 — ia_service: Protocolo aprendizaje + bugs críticos
+
+**Feature testeada:** Protocolo de aprendizaje end-to-end + corrección productos terminados + multi-empresa
+**Testeado por:** Claude Code
+**Servicio:** ia_service_os puerto 5100 + ia-admin puerto 5200
+**Commits:** `97dd9a0`, `586c896`, `ea6062d`, `94929fe`, `fe01ece`
+
+### Bugs corregidos
+
+#### BUG-IA-01 — Protocolo aprendizaje no guardaba reglas
+**Causa raíz:** `_procesar_bloque_aprendizaje()` solo se llamaba en el paso `conversar` (tipo `aprendizaje`). Los tipos `conversacion` y `clasificacion` nunca la llamaban, entonces aunque el agente generara `[GUARDAR_NEGOCIO]`, el bloque nunca se procesaba ni guardaba en BD.
+**Fix:**
+- `_procesar_bloque_aprendizaje` agregada al paso `redactar` (tipo `conversacion`) — commit `97dd9a0`
+- `_procesar_bloque_aprendizaje` agregada al paso `analizar` (tipo `clasificacion`) — commit `586c896`
+- Prompts de `conversacion` y `clasificacion` actualizados para detectar afirmaciones de negocio
+**Estado:** 🟢 Resuelto
+
+#### BUG-IA-02 — Confirmación "sí" iba a analisis_datos
+**Causa raíz:** Router sin contexto de conversación clasificaba "sí" como `analisis_datos` (el tipo más común). Cuando el bot preguntaba "¿Lo guardo?" y el usuario respondía "sí", el sistema ejecutaba SQL en lugar de confirmar el guardado.
+**Fix:** Detección pre-router en código: si último mensaje del bot contiene "¿Lo guardo en mi memoria de negocio?" y el usuario responde con confirmación → forzar `tipo=conversacion` sin consultar router — commit `ea6062d`
+**Estado:** 🟢 Resuelto
+
+#### BUG-IA-03 — Productos terminados devolvía 0 filas
+**Causa raíz:** Ejemplos SQL guardados en `ia_ejemplos_sql` usaban `tipo_de_articulo='Producto'` y `gestion_de_stock='1'` (incorrecto). El modelo los copiaba en lugar de seguir la regla de negocio que decía usar `categoria IN ('TPT.01...', 'TPT.02...')`.
+**Fix:** Eliminados ejemplos incorrectos (IDs 241, 259, 260). Filtro correcto: solo `categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')` sin `gestion_de_stock`. Actualizada nota manual del esquema 7. — commit `94929fe`
+**Estado:** 🟢 Resuelto — 80 productos retornados correctamente
+
+### Tests ejecutados 2026-03-18
+
+| # | Test | Resultado |
+|---|---|---|
+| 1 | Saludo con nombre (nombre_usuario="Santiago") | ✅ "¡Hola, Santiago!" |
+| 2 | Productos terminados con stock | ✅ 59 filas, SQL con TPT, sin gestion_de_stock |
+| 3 | Aprendizaje explícito + confirmación | ✅ Guardado en ia_logica_negocio |
+| 4 | Aprendizaje implícito (frase declarativa) | ✅ Bot detectó y preguntó "¿Lo guardo?" |
+| 5 | Confirmación "sí" → no va a SQL | ✅ Pasos: enrutar+redactar (sin generar_sql) |
+| 6 | "dale" como confirmación → guarda en BD | ✅ creado_por: usuario-aprendizaje |
+| 7 | GET /api/ia/empresa-activa existe | ✅ Endpoint en línea 395 server.js |
+| 8 | 4 páginas Vue con watch empresa_activa | ✅ Dashboard, Logs, Tipos, LogicaNegocio |
+
+**Score: 8/8 ✅**
+
