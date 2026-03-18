@@ -6,7 +6,7 @@ Formateador de tablas para Telegram.
 import uuid, json
 from db import guardar_tabla_temp
 
-TABLA_BASE_URL = 'https://menu.oscomunidad.com/#/bot/tabla'
+TABLA_BASE_URL = 'https://menu.oscomunidad.com/bot/tabla'
 MAX_FILAS_INLINE = 2
 
 

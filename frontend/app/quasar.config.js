@@ -7,7 +7,7 @@ export default defineConfig((/* ctx */) => {
     extras: [],
     build: {
       target: { browser: ['es2022'] },
-      vueRouterMode: 'hash',
+      vueRouterMode: 'history',
       vitePlugins: []
     },
     devServer: {
