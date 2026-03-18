@@ -391,14 +391,20 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     icono = ICONOS_AGENTES.get(agente_usado, '🤖')
     pie   = f'\n\n_{icono} {agente_usado}_' if agente_usado else ''
 
+    MAX_LEN = 4000
+    def truncar(t):
+        if len(t) <= MAX_LEN:
+            return t
+        return t[:MAX_LEN] + '\n\n_… respuesta recortada — abre la tabla para ver el detalle completo._'
+
     try:
         await update.message.reply_text(
-            texto_resp + pie,
+            truncar(texto_resp + pie),
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=kb
         )
     except Exception:
-        await update.message.reply_text(texto_resp, reply_markup=kb)
+        await update.message.reply_text(truncar(texto_resp), reply_markup=kb)
 
 
 # ─── Handler de fotos (visión) ───────────────────────────────────────────────
