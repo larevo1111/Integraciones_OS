@@ -3,7 +3,6 @@
 
     <!-- Input trigger -->
     <div class="op-input-wrap" :class="{ abierto: abierto, 'tiene-valor': !!modelValue }">
-      <span class="material-icons op-icon">precision_manufacturing</span>
       <input
         ref="inputRef"
         class="op-input"
@@ -298,7 +297,7 @@ watch(() => props.modelValue, async (val) => {
 .op-tag-num {
   font-size: 12px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 .op-tag-desc {
