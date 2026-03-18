@@ -18,7 +18,7 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode, ChatAction
 
-import api_ia, db, tabla as tabla_mod
+import api_ia, db, tabla as tabla_mod, whisper as whisper_mod
 from teclado import REPLY_KB, inline_ajustes, MAX_INLINE, teclado_compartir_telefono, AGENTES
 
 logging.basicConfig(
@@ -428,6 +428,90 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(texto_resp, reply_markup=kb)
 
 
+# ─── Handler de voz (Whisper) ────────────────────────────────────────────────
+
+async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user   = update.effective_user
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
+    nombre = sesion.get('nombre') or _nombre(user)
+    await update.effective_chat.send_action(ChatAction.TYPING)
+
+    # Descargar audio de Telegram
+    voz     = update.message.voice or update.message.audio
+    archivo = await voz.get_file()
+    buf     = io.BytesIO()
+    await archivo.download_to_memory(buf)
+
+    # Transcribir con Groq Whisper
+    texto = whisper_mod.transcribir(buf.getvalue(), 'audio.ogg')
+
+    if not texto:
+        await update.message.reply_text(
+            '😔 No pude entender el audio. Intenta de nuevo o escribe tu pregunta.',
+            reply_markup=REPLY_KB
+        )
+        return
+
+    # Mostrar transcripción al usuario
+    await update.message.reply_text(
+        f'🎙️ _Escuché:_ "{_escape(texto)}"',
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
+
+    # Procesar como mensaje de texto normal
+    await update.effective_chat.send_action(ChatAction.TYPING)
+    db.guardar_sesion(user.id, user.username or '', nombre)
+
+    agente_sesion = sesion.get('agente_preferido')
+    nivel         = sesion.get('nivel', 1)
+    agente_slug   = None
+    if agente_sesion:
+        nivel_min_agente = next((n for _, d, n in AGENTES if agente_sesion in d), 1)
+        agente_slug = agente_sesion if nivel >= nivel_min_agente else None
+
+    resultado = api_ia.consultar(
+        pregunta        = texto,
+        usuario_id      = str(user.id),
+        nombre_usuario  = nombre,
+        agente          = agente_slug,
+        empresa         = sesion.get('empresa', 'ori_sil_2'),
+        conversacion_id = sesion.get('conversacion_id'),
+        canal           = 'telegram'
+    )
+
+    if resultado.get('conversacion_id'):
+        db.guardar_sesion(user.id, user.username or '', nombre,
+                          conversacion_id=resultado['conversacion_id'])
+
+    info       = tabla_mod.procesar_tabla(resultado, texto, sesion.get('empresa', 'ori_sil_2'))
+    texto_resp = info['texto']
+    token      = info['token']
+    n_filas    = info['n_filas']
+
+    if not resultado.get('ok'):
+        await update.message.reply_text(
+            '😔 No pude obtener esa información. Intenta reformular la pregunta.',
+            reply_markup=REPLY_KB
+        )
+        return
+
+    kb           = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
+    agente_usado = resultado.get('agente', '')
+    pie          = f'\n\n_{ICONOS_AGENTES.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
+
+    try:
+        await update.message.reply_text(
+            texto_resp + pie,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=kb
+        )
+    except Exception:
+        await update.message.reply_text(texto_resp, reply_markup=kb)
+
+
 # ─── Handler de callbacks (botones inline) ───────────────────────────────────
 
 async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -493,6 +577,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contacto))
     app.add_handler(MessageHandler(filters.PHOTO, handle_foto))
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voz))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_mensaje))
 
     log.info('Bot corriendo — polling...')
