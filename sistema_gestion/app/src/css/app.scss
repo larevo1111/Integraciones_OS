@@ -449,6 +449,14 @@ body {
 .estado-circle.cancelada { border-color: var(--text-tertiary); background: var(--text-tertiary); }
 .estado-circle.cancelada::after { content: '×'; font-size: 10px; color: var(--bg-app); font-weight: 700; }
 
+/* Círculo de subtarea — ligeramente más pequeño para diferenciar visualmente del padre */
+.is-subtarea .estado-circle {
+  width: 11px !important;
+  height: 11px !important;
+}
+.is-subtarea .estado-circle.completada::after { font-size: 7px; }
+.is-subtarea .estado-circle.cancelada::after  { font-size: 8px; }
+
 /* Dot de categoría */
 .cat-dot {
   width: 6px; height: 6px;

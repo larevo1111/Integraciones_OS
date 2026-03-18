@@ -18,9 +18,17 @@
       <!-- Barra de filtros -->
       <div class="filtros-bar-wrap">
         <div class="filtros-bar">
-          <button v-for="f in FILTROS" :key="f.key" class="chip" :class="{ active: filtroActivo === f.key }" @click="filtroActivo = f.key">
+          <button
+            v-for="f in FILTROS"
+            :key="f.key"
+            class="chip"
+            :class="{ active: filtroActivo === f.key }"
+            :ref="f.key === 'personalizado' ? (el) => btnPersonalizadoRef = el : undefined"
+            @click="onFiltroClick(f.key)"
+          >
             {{ f.label }}
             <span v-if="f.key === 'hoy' && conteoHoy" class="chip-count">{{ conteoHoy }}</span>
+            <span v-if="f.key === 'personalizado' && filtroPersonalizadoCount" class="chip-count">{{ filtroPersonalizadoCount }}</span>
           </button>
 
           <!-- Agrupar por -->
@@ -135,19 +143,21 @@
                 @click="seleccionar"
                 @cambiar-estado="cambiarEstado"
               />
-              <!-- Inline quickadd para nueva subtarea -->
+              <!-- Inline quickadd para nueva subtarea — Enter guarda, blur guarda, × cancela -->
               <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
-                <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
+                <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
                 <input
                   ref="qaSubInputRef"
                   v-model="qaSubTitulo"
                   class="subtarea-input"
-                  placeholder="Nombre de la subtarea..."
+                  placeholder="Nueva subtarea..."
                   @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
+                  @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
                 />
-                <button class="btn btn-ghost btn-sm" @click="cancelarSubtarea">Cancelar</button>
-                <button class="btn btn-primary btn-sm" :disabled="!qaSubTitulo" @click="guardarSubtarea(t)">Agregar</button>
+                <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
+                  <span class="material-icons" style="font-size:13px">close</span>
+                </button>
               </div>
             </template>
           </template>
@@ -222,6 +232,18 @@
       </Transition>
     </Teleport>
 
+    <!-- Popup filtro personalizado -->
+    <FiltroPersonalizado
+      v-if="mostrarFiltroPopup"
+      :categorias="categorias"
+      :etiquetas="etiquetas"
+      :proyectos="proyectos"
+      :anchor-el="btnPersonalizadoRef"
+      :valor="filtroPersonalizado || {}"
+      @aplicar="onAplicarFiltro"
+      @cerrar="onCerrarFiltroPopup"
+    />
+
     <!-- Bottom sheet / modal nueva tarea (mobile) -->
     <TareaForm
       v-model="mostrarForm"
@@ -239,12 +261,13 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, reactive } from
 import { useRoute } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
-import TareaItem          from 'src/components/TareaItem.vue'
-import TareaPanel         from 'src/components/TareaPanel.vue'
-import TareaForm          from 'src/components/TareaForm.vue'
-import OpSelector         from 'src/components/OpSelector.vue'
-import ProyectoSelector   from 'src/components/ProyectoSelector.vue'
-import EtiquetasSelector  from 'src/components/EtiquetasSelector.vue'
+import TareaItem            from 'src/components/TareaItem.vue'
+import TareaPanel           from 'src/components/TareaPanel.vue'
+import TareaForm            from 'src/components/TareaForm.vue'
+import OpSelector           from 'src/components/OpSelector.vue'
+import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
+import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
+import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
 
 const auth  = useAuthStore()
 const route = useRoute()
@@ -392,13 +415,51 @@ async function qaAgregar() {
 }
 
 const FILTROS = [
-  { key: 'hoy',    label: 'Hoy' },
-  { key: 'manana', label: 'Mañana' },
-  { key: 'ayer',   label: 'Ayer' },
-  { key: 'semana', label: 'Esta semana' },
-  { key: 'mias',   label: 'Mis tareas' },
-  { key: 'todas',  label: 'Todas' }
+  { key: 'hoy',          label: 'Hoy' },
+  { key: 'manana',       label: 'Mañana' },
+  { key: 'ayer',         label: 'Ayer' },
+  { key: 'semana',       label: 'Esta semana' },
+  { key: 'todas',        label: 'Todas' },
+  { key: 'personalizado', label: 'Personalizado' }
 ]
+
+// Filtro personalizado
+const filtroPersonalizado   = ref(null)   // null = sin filtro activo
+const mostrarFiltroPopup    = ref(false)
+const btnPersonalizadoRef   = ref(null)
+
+const filtroPersonalizadoCount = computed(() => {
+  if (!filtroPersonalizado.value) return 0
+  const f = filtroPersonalizado.value
+  return [
+    f.fecha_desde, f.fecha_hasta,
+    ...(f.prioridades || []),
+    ...(f.categorias  || []),
+    ...(f.etiquetas   || []),
+    f.proyecto_id
+  ].filter(Boolean).length
+})
+
+function onFiltroClick(key) {
+  if (key === 'personalizado') {
+    mostrarFiltroPopup.value = !mostrarFiltroPopup.value
+    filtroActivo.value = 'personalizado'
+  } else {
+    filtroActivo.value = key
+    mostrarFiltroPopup.value = false
+  }
+}
+
+function onAplicarFiltro(filtros) {
+  filtroPersonalizado.value = filtros
+  mostrarFiltroPopup.value  = false
+  cargarTareas()
+}
+
+function onCerrarFiltroPopup() {
+  mostrarFiltroPopup.value = false
+  if (!filtroPersonalizado.value) filtroActivo.value = 'hoy'
+}
 const AGRUPACIONES = [
   { key: 'categoria', label: 'Categoría' },
   { key: 'prioridad', label: 'Prioridad' },
@@ -469,13 +530,17 @@ async function cargarTareas() {
     // Siempre enviar fecha local del cliente para evitar desfase de zona horaria con servidor Hostinger
     params.set('fecha_hoy', hoyISO())
     if (proyectoFiltroId.value) {
-      // En vista de proyecto: mostrar TODAS las tareas del proyecto (sin filtro de fecha)
-      // Solo aplicar filtro 'mias' si estaba activo
-      if (filtroActivo.value === 'mias') params.set('solo_mias', '1')
       params.set('proyecto_id', proyectoFiltroId.value)
-    } else {
-      if (filtroActivo.value === 'mias') { params.set('solo_mias', '1') }
-      else if (filtroActivo.value !== 'todas') { params.set('filtro', filtroActivo.value) }
+    } else if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {
+      const f = filtroPersonalizado.value
+      if (f.fecha_desde)              params.set('fecha_desde', f.fecha_desde)
+      if (f.fecha_hasta)              params.set('fecha_hasta', f.fecha_hasta)
+      if (f.prioridades?.length)      params.set('prioridades', f.prioridades.join(','))
+      if (f.categorias?.length)       params.set('categorias',  f.categorias.join(','))
+      if (f.etiquetas?.length)        params.set('etiquetas',   f.etiquetas.join(','))
+      if (f.proyecto_id)              params.set('proyecto_id', f.proyecto_id)
+    } else if (filtroActivo.value !== 'todas' && filtroActivo.value !== 'personalizado') {
+      params.set('filtro', filtroActivo.value)
     }
     const completadasUrl = proyectoFiltroId.value
       ? `/api/gestion/tareas/completadas?proyecto_id=${proyectoFiltroId.value}`
@@ -720,6 +785,14 @@ onUnmounted(() => { window.removeEventListener('resize', onResize) })
   font-family: var(--font-sans);
 }
 .subtarea-input::placeholder { color: var(--text-tertiary); }
+.btn-sub-cancel {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex-shrink: 0;
+  background: transparent; border: none; border-radius: var(--radius-sm);
+  color: var(--text-tertiary); cursor: pointer;
+  transition: color 80ms, background 80ms;
+}
+.btn-sub-cancel:hover { color: var(--color-error); background: var(--color-error-bg); }
 .subtarea-add-row {
   display: flex; align-items: center; gap: 6px;
   padding: 4px 16px 6px 42px;

@@ -389,14 +389,45 @@ app.get('/api/gestion/tareas', async (req, res) => {
     }
   }
 
-  // Filtros adicionales
+  // Filtros adicionales (simples)
   if (responsable)  { where.push('t.responsable = ?');   params.push(responsable) }
   if (solo_mias === '1') { where.push('t.responsable = ?'); params.push(req.usuario.email) }
-  if (categoria_id) { where.push('t.categoria_id = ?'); params.push(categoria_id) }
   if (estado)       { where.push('t.estado = ?');        params.push(estado) }
-  if (prioridad)    { where.push('t.prioridad = ?');     params.push(prioridad) }
+
+  // categoria_id: soporte simple y multi (categorias=1,2,3)
+  const categoriasRaw = req.query.categorias || categoria_id
+  if (categoriasRaw) {
+    const ids = String(categoriasRaw).split(',').map(Number).filter(Boolean)
+    if (ids.length === 1) { where.push('t.categoria_id = ?'); params.push(ids[0]) }
+    else if (ids.length > 1) { where.push(`t.categoria_id IN (${ids.map(() => '?').join(',')})`); params.push(...ids) }
+  }
+
+  // prioridad: soporte simple y multi (prioridades=Urgente,Alta)
+  const prioridadesRaw = req.query.prioridades || prioridad
+  if (prioridadesRaw) {
+    const vals = String(prioridadesRaw).split(',').map(s => s.trim()).filter(Boolean)
+    if (vals.length === 1) { where.push('t.prioridad = ?'); params.push(vals[0]) }
+    else if (vals.length > 1) { where.push(`t.prioridad IN (${vals.map(() => '?').join(',')})`); params.push(...vals) }
+  }
+
+  // proyecto_id: simple
   if (proyecto_id === 'null') { where.push('t.proyecto_id IS NULL') }
   else if (proyecto_id) { where.push('t.proyecto_id = ?'); params.push(proyecto_id) }
+
+  // Rango de fechas personalizado (filtro personalizado)
+  const { fecha_desde, fecha_hasta } = req.query
+  if (fecha_desde) { where.push('t.fecha_limite >= ?'); params.push(fecha_desde) }
+  if (fecha_hasta) { where.push('t.fecha_limite <= ?'); params.push(fecha_hasta) }
+
+  // Etiquetas múltiples (etiquetas=1,2,3)
+  const etiquetasRaw = req.query.etiquetas
+  if (etiquetasRaw) {
+    const eids = String(etiquetasRaw).split(',').map(Number).filter(Boolean)
+    if (eids.length > 0) {
+      where.push(`EXISTS (SELECT 1 FROM g_etiquetas_tareas et WHERE et.tarea_id = t.id AND et.etiqueta_id IN (${eids.map(() => '?').join(',')}))`)
+      params.push(...eids)
+    }
+  }
 
   // Por defecto excluir completadas y canceladas (se muestran en sección separada)
   if (!estado) {
