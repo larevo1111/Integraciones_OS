@@ -11,6 +11,15 @@
         <button class="btn-icon" title="Buscar">
           <SearchIcon :size="15" />
         </button>
+        <button
+          class="btn-icon"
+          :class="{ 'btn-actualizando': actualizando }"
+          :title="actualizando ? 'Actualizando datos...' : 'Actualizar datos desde Effi'"
+          :disabled="actualizando"
+          @click="lanzarActualizacion"
+        >
+          <RefreshCwIcon :size="15" :class="{ 'spin': actualizando }" />
+        </button>
         <button class="btn-icon" title="Nueva tarea" @click="$router.push('/tareas/nueva')">
           <PlusIcon :size="15" />
         </button>
@@ -96,8 +105,9 @@
 <script setup>
 import { ref } from 'vue'
 import { MENU } from 'src/data/menu.js'
+import axios from 'axios'
 import {
-  SearchIcon, PlusIcon, LayoutDashboardIcon, ChevronRightIcon,
+  SearchIcon, PlusIcon, RefreshCwIcon, LayoutDashboardIcon, ChevronRightIcon,
   PieChartIcon, BotIcon, SettingsIcon
 } from 'lucide-vue-next'
 
@@ -105,11 +115,23 @@ const menu = MENU
 
 // Expandir el primer módulo por defecto
 const expandidos = ref([MENU[0].uid])
+const actualizando = ref(false)
 
 function toggleModulo(uid) {
   const idx = expandidos.value.indexOf(uid)
   if (idx === -1) expandidos.value.push(uid)
   else expandidos.value.splice(idx, 1)
+}
+
+async function lanzarActualizacion() {
+  if (actualizando.value) return
+  actualizando.value = true
+  try {
+    await axios.post('/api/pipeline/actualizar')
+  } finally {
+    // Mantener el spinner 3s para dar feedback visual claro
+    setTimeout(() => { actualizando.value = false }, 3000)
+  }
 }
 </script>
 
@@ -344,6 +366,14 @@ function toggleModulo(uid) {
   background: var(--bg-card-hover);
   color: var(--text-primary);
 }
+
+/* ─── BOTÓN ACTUALIZAR ──────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spin { animation: spin 1s linear infinite; }
+.btn-actualizando { opacity: 0.6; cursor: default; }
 
 /* ─── TRANSICIÓN SUBMENÚS ───────────────────────────── */
 .submenu-enter-active,

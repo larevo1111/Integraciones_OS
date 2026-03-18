@@ -19,7 +19,7 @@ from telegram.ext import (
 from telegram.constants import ParseMode, ChatAction
 
 import api_ia, db, tabla as tabla_mod, whisper as whisper_mod
-from teclado import REPLY_KB, inline_ajustes, MAX_INLINE, teclado_compartir_telefono, AGENTES
+from teclado import REPLY_KB, reply_kb, inline_ajustes, MAX_INLINE, teclado_compartir_telefono, AGENTES
 
 logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
@@ -139,7 +139,7 @@ async def handle_contacto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         'Ya puedes usar el bot. Escribe tu pregunta sobre ventas, '
         'productos, clientes o cualquier dato del negocio.',
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=REPLY_KB
+        reply_markup=reply_kb(usuario['nivel'])
     )
 
 
@@ -183,12 +183,13 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     nombre = sesion.get('nombre') or _nombre(user)
+    nivel  = sesion.get('nivel', 1)
     await update.message.reply_text(
         f'¡Hola {nombre}! 👋\n\n'
         'Soy el asistente IA de Origen Silvestre. Pregúntame lo que quieras sobre ventas, '
         'productos, clientes o cualquier dato del negocio.\n\n'
         'Escribe tu pregunta directamente o usa los botones de abajo.',
-        reply_markup=REPLY_KB
+        reply_markup=reply_kb(nivel)
     )
 
 
@@ -212,7 +213,7 @@ async def cmd_ayuda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         '/limpiar — Limpiar historial\n'
         '/ayuda — Ver esta ayuda',
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=REPLY_KB
+        reply_markup=reply_kb(sesion.get('nivel', 1))
     )
 
 
@@ -230,7 +231,7 @@ async def cmd_estado(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f'🔑 Nivel de acceso: {nivel}\n\n'
         'Usa /agente para cambiar el modelo.',
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=REPLY_KB
+        reply_markup=reply_kb(nivel)
     )
 
 
@@ -259,7 +260,7 @@ async def cmd_limpiar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db.guardar_sesion(user.id, user.username or '', _nombre(user), conversacion_id=0)
     await update.message.reply_text(
         '🗑️ Historial limpiado. La próxima pregunta empieza desde cero.',
-        reply_markup=REPLY_KB
+        reply_markup=reply_kb(sesion.get('nivel', 1))
     )
 
 
@@ -276,7 +277,7 @@ async def cmd_actualizar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         '🔄 Iniciando actualización de datos desde Effi...\n'
         '_Esto tarda entre 10 y 20 minutos. Te aviso cuando termine._',
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=REPLY_KB
+        reply_markup=reply_kb(sesion.get('nivel', 1))
     )
 
     import subprocess, threading
@@ -331,6 +332,9 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=inline_ajustes(agente, nivel)
         )
         return
+    elif texto == '🔄 Actualizar datos':
+        await cmd_actualizar(update, ctx)
+        return
 
     # Actualizar sesión
     db.guardar_sesion(user.id, user.username or '', nombre)
@@ -376,7 +380,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             msg = f'⏳ Demasiadas consultas seguidas. Intenta en {retry} segundos.'
         else:
             msg = '😔 No pude obtener esa información. Intenta reformular la pregunta o pregúntame algo más.'
-        await update.message.reply_text(msg, reply_markup=REPLY_KB)
+        await update.message.reply_text(msg, reply_markup=reply_kb(nivel))
         return
 
     # Teclado inline
@@ -442,7 +446,7 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not resultado.get('ok'):
         await update.message.reply_text(
             '😔 No pude procesar la imagen. Intenta de nuevo o envíala con una instrucción.',
-            reply_markup=REPLY_KB
+            reply_markup=reply_kb(sesion.get('nivel', 1))
         )
         return
 
@@ -483,7 +487,7 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not texto:
         await update.message.reply_text(
             '😔 No pude entender el audio. Intenta de nuevo o escribe tu pregunta.',
-            reply_markup=REPLY_KB
+            reply_markup=reply_kb(sesion.get('nivel', 1))
         )
         return
 
@@ -526,7 +530,7 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not resultado.get('ok'):
         await update.message.reply_text(
             '😔 No pude obtener esa información. Intenta reformular la pregunta.',
-            reply_markup=REPLY_KB
+            reply_markup=reply_kb(sesion.get('nivel', 1))
         )
         return
 
@@ -558,7 +562,7 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if data == 'nueva_consulta':
         await query.message.reply_text(
             '¿Sobre qué quieres consultar ahora?',
-            reply_markup=REPLY_KB
+            reply_markup=reply_kb(sesion.get('nivel', 1))
         )
 
     elif data == 'limpiar_historial':

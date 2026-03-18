@@ -4,11 +4,24 @@ Constructores de teclados para el bot.
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 
 # ── Reply keyboard — siempre visible en el fondo ─────────────────────────────
+# Versión estática para contextos sin nivel (ej: pantalla de auth)
 REPLY_KB = ReplyKeyboardMarkup(
     [['📊 Ventas hoy', '📈 Este mes', '⚙️ Ajustes']],
     resize_keyboard=True,
     input_field_placeholder='Escribe tu pregunta...'
 )
+
+
+def reply_kb(nivel: int = 1) -> ReplyKeyboardMarkup:
+    """Keyboard dinámico — nivel 5+ ve el botón Actualizar datos."""
+    filas = [['📊 Ventas hoy', '📈 Este mes', '⚙️ Ajustes']]
+    if nivel >= 5:
+        filas.append(['🔄 Actualizar datos'])
+    return ReplyKeyboardMarkup(
+        filas,
+        resize_keyboard=True,
+        input_field_placeholder='Escribe tu pregunta...'
+    )
 
 MAX_INLINE = 5
 

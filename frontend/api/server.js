@@ -901,6 +901,17 @@ app.get('/api/export/:recurso', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Pipeline: forzar actualización de datos desde Effi
+app.post('/api/pipeline/actualizar', (req, res) => {
+  const { spawn } = require('child_process')
+  const proc = spawn('python3', [
+    '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/orquestador.py',
+    '--forzar'
+  ], { detached: true, stdio: 'ignore' })
+  proc.unref()
+  res.json({ ok: true, mensaje: 'Pipeline iniciado. Los datos se actualizarán en ~15 minutos.' })
+})
+
 // Health check
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
