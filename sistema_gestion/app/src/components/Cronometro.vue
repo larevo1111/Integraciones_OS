@@ -35,13 +35,18 @@ const activo   = ref(props.cronometroActivo)
 const segundos = ref(0)
 let interval   = null
 
-// Tiempo acumulado LOCAL — se actualiza inmediatamente cuando el API de detener responde,
-// sin esperar que el padre actualice el prop (evita el "reinicio" visual al reanudar).
-const tiempoAcumulado = ref(props.tiempoBase || 0)
-let skipNextSync = false  // flag: bloquea que el prop viejo del padre pise el valor recién obtenido del API
+// segundosAcumulados: acumulador LOCAL en segundos (no depende de la precisión en minutos del DB).
+// Al pausar se suman los segundos del segmento actual ANTES de resetear.
+// Al detener (stop completo) se resetea a 0.
+// Al reanudar, segundos arranca desde 0 y segundosAcumulados ya tiene el historial.
+const segundosAcumulados = ref((props.tiempoBase || 0) * 60)
+
+// Cuando el padre actualiza tiempoBase (p.ej. al recargar), sincronizamos — pero solo
+// si no estamos en medio de una operación local (skipNextSync) y el cronómetro está parado.
+let skipNextSync = false
 watch(() => props.tiempoBase, v => {
   if (skipNextSync) { skipNextSync = false; return }
-  if (!activo.value) tiempoAcumulado.value = v || 0
+  if (!activo.value) segundosAcumulados.value = (v || 0) * 60
 })
 
 function calcularSegundos() {
@@ -49,7 +54,7 @@ function calcularSegundos() {
   return Math.floor((Date.now() - new Date(props.cronometroInicio).getTime()) / 1000)
 }
 
-const totalSegundos = computed(() => tiempoAcumulado.value * 60 + segundos.value)
+const totalSegundos = computed(() => segundosAcumulados.value + segundos.value)
 
 const display = computed(() => {
   const total = totalSegundos.value
@@ -89,35 +94,47 @@ async function iniciar() {
   try {
     await api(`/api/gestion/tareas/${props.tareaId}/iniciar`, { method: 'POST' })
     activo.value   = true
-    segundos.value = 0   // nuevo segmento arranca desde 0, tiempoAcumulado ya tiene el historial
+    segundos.value = 0   // nuevo segmento arranca desde 0; segundosAcumulados ya tiene historial
     startInterval()
     emit('update', 'iniciado')
   } catch (e) { console.error(e) }
 }
 
-// Pausa: guarda el segmento, puede reanudarse (tiempoAcumulado queda con el total)
+// Pausa: guarda el segmento en DB y acumula localmente en segundos (no en minutos del DB).
 async function pausar() {
   stopInterval()
+  const segActual = segundos.value  // capturar ANTES de resetear
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
-    tiempoAcumulado.value = data.tiempo_real_min || 0
-    skipNextSync = true  // el padre va a propagar el prop con valor viejo — ignorar ese cambio
+    segundosAcumulados.value += segActual  // acumular localmente — no depende de data.tiempo_real_min
+    skipNextSync = true  // el padre propagará el prop con valor viejo (en minutos) — ignorar
     activo.value   = false
     segundos.value = 0
     emit('update', 'detenido', data.tiempo_real_min)
-  } catch (e) { console.error(e) }
+  } catch (e) {
+    // Si falla el API, restaurar el intervalo para no perder el conteo
+    segundos.value = segActual
+    startInterval()
+    console.error(e)
+  }
 }
 
+// Detener completo: resetea todo (nueva tarea o trabajo terminado)
 async function detener() {
   stopInterval()
+  const segActual = segundos.value
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
-    tiempoAcumulado.value = data.tiempo_real_min || 0
+    segundosAcumulados.value = 0  // reset total al detener
     skipNextSync = true
     activo.value   = false
     segundos.value = 0
     emit('update', 'detenido', data.tiempo_real_min)
-  } catch (e) { console.error(e) }
+  } catch (e) {
+    segundos.value = segActual
+    startInterval()
+    console.error(e)
+  }
 }
 
 defineExpose({ display, activo })
