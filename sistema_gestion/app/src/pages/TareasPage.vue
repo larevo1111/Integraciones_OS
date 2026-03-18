@@ -218,8 +218,27 @@
     <Teleport to="body">
       <Transition name="bsheet">
         <div v-if="tareaSeleccionada && isMobile" class="bsheet-overlay" @click.self="tareaSeleccionada = null">
-          <div class="bsheet-panel">
-            <div class="bsheet-handle"></div>
+          <div
+            class="bsheet-panel"
+            :class="{ 'bsheet-full': bsheetEstado === 'full' }"
+            :style="bsheetPanelDragStyle"
+          >
+            <!-- Handle arrastrable -->
+            <div
+              class="bsheet-handle-area"
+              @touchstart="bsheetTouchStart"
+              @touchmove.prevent="bsheetTouchMove"
+              @touchend="bsheetTouchEnd"
+            >
+              <div class="bsheet-handle"></div>
+              <button
+                v-if="bsheetEstado === 'full'"
+                class="bsheet-close-btn"
+                @click.stop="tareaSeleccionada = null"
+              >
+                <span class="material-icons" style="font-size:20px">close</span>
+              </button>
+            </div>
             <TareaPanel
               :tarea="tareaSeleccionada"
               :usuarios="usuarios"
@@ -285,6 +304,50 @@ const route = useRoute()
 // Detección mobile (≤768px) — controla bottom sheet vs panel lateral
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
 function onResize() { isMobile.value = window.innerWidth <= 768 }
+
+// ─── BOTTOM SHEET DRAG ───
+const bsheetEstado    = ref('half')  // 'half' | 'full'
+const bsheetDragY     = ref(0)
+const bsheetDragging  = ref(false)
+let   _bsTouchStartY  = 0
+let   _bsEstadoInicio = 'half'
+
+const bsheetPanelDragStyle = computed(() =>
+  bsheetDragging.value && bsheetDragY.value !== 0
+    ? { transform: `translateY(${bsheetDragY.value}px)`, transition: 'none' }
+    : {}
+)
+
+function bsheetTouchStart(e) {
+  _bsTouchStartY  = e.touches[0].clientY
+  _bsEstadoInicio = bsheetEstado.value
+  bsheetDragging.value = true
+  bsheetDragY.value = 0
+}
+function bsheetTouchMove(e) {
+  if (!bsheetDragging.value) return
+  const delta = e.touches[0].clientY - _bsTouchStartY
+  if (_bsEstadoInicio === 'half') {
+    // hacia arriba (negativo) = expandir, hacia abajo (positivo) = cerrar
+    bsheetDragY.value = Math.max(-window.innerHeight * 0.46, Math.min(delta, window.innerHeight))
+  } else {
+    // en full: solo se puede bajar
+    bsheetDragY.value = Math.max(0, delta)
+  }
+}
+function bsheetTouchEnd() {
+  const delta = bsheetDragY.value
+  bsheetDragging.value = false
+  bsheetDragY.value = 0
+  if (_bsEstadoInicio === 'half') {
+    if (delta < -80)  bsheetEstado.value = 'full'
+    else if (delta > 120) tareaSeleccionada.value = null
+    // else: vuelve a half (sin cambio)
+  } else {
+    if (delta > 100) bsheetEstado.value = 'half'
+    // else: vuelve a full (sin cambio)
+  }
+}
 
 // Estado principal
 const tareas            = ref([])
@@ -503,6 +566,7 @@ const conteoHoy = computed(() => tareas.value.filter(t => t.fecha_limite === hoy
 function hoyISO()    { return new Date().toISOString().slice(0,10) }
 function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10) }
 
+watch(tareaSeleccionada, (v) => { if (v) bsheetEstado.value = 'half' })
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
 watch(() => route.query.proyecto_id, () => cargarTareas())

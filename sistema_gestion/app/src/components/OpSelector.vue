@@ -317,6 +317,7 @@ watch(() => props.modelValue, async (val) => {
   flex-shrink: 0;
 }
 .op-input-wrap:hover .op-tag-acciones { opacity: 1; }
+@media (max-width: 768px) { .op-tag-acciones { opacity: 1; } }
 
 .op-tag-accion {
   background: none;

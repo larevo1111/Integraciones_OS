@@ -903,20 +903,49 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 .bsheet-panel {
   width: 100%;
-  height: 58vh;          /* mitad de pantalla fija, estilo TickTick */
+  height: 58vh;
   background: var(--bg-surface);
   border-radius: 16px 16px 0 0;
   overflow: hidden;
   display: flex; flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom, 0);
   box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+  /* transición para cambio half↔full (transform la maneja Vue Transition o inline style) */
+  transition: height 320ms cubic-bezier(0.32,0.72,0,1), border-radius 320ms ease;
+}
+.bsheet-panel.bsheet-full {
+  height: 100dvh;
+  border-radius: 0;
+}
+/* Área del handle: fila completa, toca desde el borde */
+.bsheet-handle-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px 6px;
+  position: relative;
+  flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .bsheet-handle {
   width: 36px; height: 4px; border-radius: 2px;
   background: var(--border-default);
-  margin: 10px auto 4px;
-  flex-shrink: 0;
 }
+/* Botón × en modo full */
+.bsheet-close-btn {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex; align-items: center;
+  padding: 4px; border-radius: var(--radius-sm);
+  transition: color 80ms;
+}
+.bsheet-close-btn:hover { color: var(--text-primary); }
 /* Override panel dentro del bottom sheet — visible siempre, incluso en mobile */
 .bsheet-panel .tarea-panel {
   display: flex !important;   /* cancela el display:none del media query mobile */
