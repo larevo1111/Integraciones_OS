@@ -38,9 +38,9 @@ let interval   = null
 // Tiempo acumulado LOCAL — se actualiza inmediatamente cuando el API de detener responde,
 // sin esperar que el padre actualice el prop (evita el "reinicio" visual al reanudar).
 const tiempoAcumulado = ref(props.tiempoBase || 0)
+let skipNextSync = false  // flag: bloquea que el prop viejo del padre pise el valor recién obtenido del API
 watch(() => props.tiempoBase, v => {
-  // Solo sincronizar cuando el cronómetro NO está corriendo
-  // (si corre, tiempoAcumulado ya es correcto y no debe pisarse)
+  if (skipNextSync) { skipNextSync = false; return }
   if (!activo.value) tiempoAcumulado.value = v || 0
 })
 
@@ -100,19 +100,20 @@ async function pausar() {
   stopInterval()
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
-    tiempoAcumulado.value = data.tiempo_real_min || 0   // ← actualizar local ANTES de que el padre actualice el prop
+    tiempoAcumulado.value = data.tiempo_real_min || 0
+    skipNextSync = true  // el padre va a propagar el prop con valor viejo — ignorar ese cambio
     activo.value   = false
     segundos.value = 0
     emit('update', 'detenido', data.tiempo_real_min)
   } catch (e) { console.error(e) }
 }
 
-// Stop: misma lógica que pausa — la diferencia semántica la maneja el usuario
 async function detener() {
   stopInterval()
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
     tiempoAcumulado.value = data.tiempo_real_min || 0
+    skipNextSync = true
     activo.value   = false
     segundos.value = 0
     emit('update', 'detenido', data.tiempo_real_min)

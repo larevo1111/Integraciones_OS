@@ -92,34 +92,7 @@
           @change="actualizarFechaEstimada($event.target.value)" />
       </div>
 
-      <!-- Acordeón: más campos -->
-      <div class="accordion-toggle" @click="mostrarFechas = !mostrarFechas">
-        <span class="material-icons" style="font-size:13px">{{ mostrarFechas ? 'expand_more' : 'chevron_right' }}</span>
-        <span style="font-size:10px;color:var(--text-tertiary)">Más campos</span>
-      </div>
-      <template v-if="mostrarFechas">
-        <div class="field-row">
-          <span class="field-label">Inicio estimado</span>
-          <input type="date" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).slice(0,10) : ''"
-            @change="actualizar('fecha_inicio_estimada', $event.target.value || null)" />
-        </div>
-        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
-          <span class="field-label">Inicio real</span>
-          <input type="date" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_inicio_real ? String(tarea.fecha_inicio_real).slice(0,10) : ''"
-            :disabled="!esCompletada"
-            @change="actualizar('fecha_inicio_real', $event.target.value || null)" />
-        </div>
-        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
-          <span class="field-label">Fin real</span>
-          <input type="date" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_fin_real ? String(tarea.fecha_fin_real).slice(0,10) : ''"
-            :disabled="!esCompletada"
-            @change="actualizar('fecha_fin_real', $event.target.value || null)" />
-        </div>
-      </template>
-      <div v-if="tarea.es_produccion || tarea.id_op" class="field-row">
+      <div class="field-row">
         <span class="field-label">OP Effi</span>
         <input class="input-field" style="height:28px;font-size:12px" :value="tarea.id_op" placeholder="Nro. OP" @blur="actualizarOP($event.target.value)" />
       </div>
@@ -180,6 +153,34 @@
         placeholder="Notas rápidas..."
         @blur="actualizar('notas', $event.target.value)"
       />
+
+      <!-- Acordeón: más campos (al final) -->
+      <div class="accordion-toggle" style="margin-top:12px" @click="mostrarFechas = !mostrarFechas">
+        <span class="material-icons" style="font-size:13px">{{ mostrarFechas ? 'expand_more' : 'chevron_right' }}</span>
+        <span style="font-size:10px;color:var(--text-tertiary)">Más campos</span>
+      </div>
+      <template v-if="mostrarFechas">
+        <div class="field-row">
+          <span class="field-label">Inicio estimado</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).slice(0,10) : ''"
+            @change="actualizar('fecha_inicio_estimada', $event.target.value || null)" />
+        </div>
+        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
+          <span class="field-label">Inicio real</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_inicio_real ? String(tarea.fecha_inicio_real).slice(0,10) : ''"
+            :disabled="!esCompletada"
+            @change="actualizar('fecha_inicio_real', $event.target.value || null)" />
+        </div>
+        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
+          <span class="field-label">Fin real</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_fin_real ? String(tarea.fecha_fin_real).slice(0,10) : ''"
+            :disabled="!esCompletada"
+            @change="actualizar('fecha_fin_real', $event.target.value || null)" />
+        </div>
+      </template>
     </div>
 
     <!-- Footer -->
