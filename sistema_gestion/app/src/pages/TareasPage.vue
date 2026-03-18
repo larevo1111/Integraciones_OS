@@ -471,6 +471,8 @@ async function cargarTareas() {
   cargando.value = true
   try {
     const params = new URLSearchParams()
+    // Siempre enviar fecha local del cliente para evitar desfase de zona horaria con servidor Hostinger
+    params.set('fecha_hoy', hoyISO())
     if (proyectoFiltroId.value) {
       // En vista de proyecto: mostrar TODAS las tareas del proyecto (sin filtro de fecha)
       // Solo aplicar filtro 'mias' si estaba activo
