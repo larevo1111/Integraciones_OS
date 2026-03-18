@@ -7,8 +7,9 @@
       <input
         ref="inputRef"
         class="op-input"
+        v-show="!modelValue || abierto"
         v-model="query"
-        :placeholder="modelValue ? '' : 'Buscar OP o artículo...'"
+        :placeholder="'Buscar OP o artículo...'"
         @focus="abrir"
         @input="buscar"
         @keydown.escape="cerrar"
@@ -16,7 +17,7 @@
         @keydown.up.prevent="moverFoco(-1)"
         @keydown.enter.prevent="seleccionar(resultados[focoIdx])"
       />
-      <!-- Valor seleccionado (tag) -->
+      <!-- Valor seleccionado (tag) — solo cuando hay valor y el dropdown está cerrado -->
       <div v-if="modelValue && !abierto" class="op-tag">
         <span class="op-tag-num">{{ modelValue }}</span>
         <span class="op-tag-desc">{{ articuloSeleccionado }}</span>
