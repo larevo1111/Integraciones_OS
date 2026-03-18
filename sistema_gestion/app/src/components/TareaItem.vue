@@ -4,18 +4,42 @@
     :class="{ selected: seleccionada, completada: esCompletada, 'is-subtarea': !!tarea.parent_id }"
     @click="$emit('click', tarea)"
   >
-    <!-- Columna izquierda: estado + badge subtareas centrado debajo -->
+    <!-- Columna izquierda: estado + (badge 0/N + ↳) debajo -->
     <div class="estado-col">
       <EstadoBadge :estado="tarea.estado" @click="$emit('cambiar-estado', tarea)" />
-      <button
+
+      <!-- Tarea padre CON subtareas: badge 0/N + botón ↳ -->
+      <div
         v-if="tarea.subtareas_total > 0 && !tarea.parent_id"
-        class="subtareas-badge"
-        :class="{ expandida: expandida }"
-        @click.stop="$emit('toggle-subtareas', tarea)"
-        :title="expandida ? 'Contraer subtareas' : 'Expandir subtareas'"
+        class="sub-controls"
       >
-        <span class="material-icons" style="font-size:8px">{{ expandida ? 'expand_more' : 'chevron_right' }}</span>
-        {{ tarea.subtareas_completadas }}/{{ tarea.subtareas_total }}
+        <button
+          class="subtareas-badge"
+          :class="{ expandida: expandida }"
+          @click.stop="$emit('toggle-subtareas', tarea)"
+          :title="expandida ? 'Contraer subtareas' : 'Expandir subtareas'"
+        >
+          <span class="material-icons" style="font-size:8px">{{ expandida ? 'expand_more' : 'chevron_right' }}</span>
+          {{ tarea.subtareas_completadas }}/{{ tarea.subtareas_total }}
+        </button>
+        <button
+          v-if="!esCompletada"
+          class="btn-add-sub"
+          title="Agregar subtarea"
+          @click.stop="$emit('agregar-subtarea', tarea)"
+        >
+          <span class="material-icons" style="font-size:10px">subdirectory_arrow_right</span>
+        </button>
+      </div>
+
+      <!-- Tarea padre SIN subtareas aún: solo ↳ sutil on hover -->
+      <button
+        v-else-if="!tarea.parent_id && !esCompletada"
+        class="btn-add-sub-solo"
+        title="Agregar subtarea"
+        @click.stop="$emit('agregar-subtarea', tarea)"
+      >
+        <span class="material-icons" style="font-size:10px">subdirectory_arrow_right</span>
       </button>
     </div>
 
@@ -64,16 +88,6 @@
         <span class="meta-chip-dot" :style="{ background: tarea.proyecto_color || '#888' }" />
         {{ proyNombreCorto }}
       </span>
-
-      <!-- Botón agregar subtarea ↳ — solo para tareas padre, siempre visible (sutil) -->
-      <button
-        v-if="!tarea.parent_id && !esCompletada"
-        class="btn-add-sub"
-        title="Agregar subtarea"
-        @click.stop="$emit('agregar-subtarea', tarea)"
-      >
-        <span class="material-icons" style="font-size:11px">subdirectory_arrow_right</span>
-      </button>
     </div>
   </div>
 </template>
@@ -92,7 +106,6 @@ defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas'])
 
 const esCompletada = computed(() => ['Completada','Cancelada'].includes(props.tarea.estado))
 
-// Helper: hex color + alpha → rgba string
 function hexAlpha(hex, alpha) {
   if (!hex || hex.length < 7) return `rgba(136,136,136,${alpha})`
   const r = parseInt(hex.slice(1,3), 16)
@@ -101,7 +114,6 @@ function hexAlpha(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-// Nombres truncados para chips (CSS maneja el ellipsis, JS solo para extremos)
 const catNombreCorto = computed(() => {
   const n = (props.tarea.categoria_nombre || '').replace(/_/g, ' ')
   return n.length > 14 ? n.slice(0, 13) + '…' : n
@@ -140,7 +152,6 @@ const clasesFecha = computed(() => {
   return ''
 })
 
-// Duración real display compacto
 const duracionDisplay = computed(() => {
   const min = props.tarea.tiempo_real_min || 0
   if (!min) return ''
@@ -151,7 +162,6 @@ const duracionDisplay = computed(() => {
   return `${m}m`
 })
 
-// Cronómetro en tiempo real (solo cuando cronometro_activo)
 const tiempoCronometro = ref('00:00')
 let interval = null
 
@@ -175,16 +185,25 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
 </script>
 
 <style scoped>
-/* Columna izquierda: estado + badge subtareas apilados */
+/* Columna izquierda fija en 14px (= ancho del círculo) — evita que el badge corra el contenido */
 .estado-col {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  width: 14px;
 }
 
-/* Indicador ▶ N/M de subtareas — debajo del círculo de estado */
+/* Badge 0/N + botón ↳ en la misma fila, debajo del círculo */
+.sub-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* Desborda el ancho de 14px hacia la derecha sin afectar el layout */
+}
+
+/* Badge expandir subtareas */
 .subtareas-badge {
   display: inline-flex; align-items: center; gap: 1px;
   padding: 0 3px; height: 12px;
@@ -194,27 +213,44 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
   font-size: 8px; color: var(--text-tertiary);
   cursor: pointer; flex-shrink: 0;
   transition: border-color 80ms, color 80ms;
-  white-space: nowrap;
-  line-height: 1;
+  white-space: nowrap; line-height: 1;
 }
 .subtareas-badge:hover, .subtareas-badge.expandida {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-/* Botón agregar subtarea ↳ — siempre en DOM, visible sutil */
+/* Botón ↳ junto al badge (para tareas padre con subtareas) */
 .btn-add-sub {
   display: flex; align-items: center; justify-content: center;
-  width: 14px; height: 14px; flex-shrink: 0;
+  width: 13px; height: 12px; flex-shrink: 0;
   background: transparent; border: none;
   color: var(--text-tertiary); cursor: pointer;
   opacity: 0.3; transition: opacity 100ms, color 100ms;
-  margin-left: 1px;
+  padding: 0;
 }
 .tarea-item:hover .btn-add-sub { opacity: 0.7; }
 .btn-add-sub:hover { color: var(--accent) !important; opacity: 1 !important; }
 
-/* Subtarea: indentación + fuente diferenciada */
+/* Botón ↳ solo (para tareas padre sin subtareas aún) — más sutil */
+.btn-add-sub-solo {
+  display: flex; align-items: center; justify-content: center;
+  width: 14px; height: 12px; flex-shrink: 0;
+  background: transparent; border: none;
+  color: var(--text-tertiary); cursor: pointer;
+  opacity: 0; transition: opacity 100ms, color 100ms;
+  padding: 0;
+}
+.tarea-item:hover .btn-add-sub-solo { opacity: 0.45; }
+.btn-add-sub-solo:hover { color: var(--accent) !important; opacity: 1 !important; }
+
+/* Mobile: hacer los botones de subtarea siempre mínimamente visibles (sin hover) */
+@media (max-width: 768px) {
+  .btn-add-sub       { opacity: 0.45; }
+  .btn-add-sub-solo  { opacity: 0.25; }
+}
+
+/* Subtarea: indentación */
 .is-subtarea { padding-left: 28px !important; }
 .is-subtarea .tarea-titulo { font-size: 11px; color: var(--text-secondary); }
 </style>
