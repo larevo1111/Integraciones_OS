@@ -1,13 +1,18 @@
 <template>
-  <div class="cronometro-panel">
-    <span class="material-icons" style="color:var(--text-tertiary);font-size:18px">timer</span>
-    <span class="cronometro-tiempo" :class="{ corriendo: activo }">{{ display }}</span>
-    <button v-if="!activo" class="btn btn-sm btn-secondary" @click="iniciar">
-      <span class="material-icons" style="font-size:14px">play_arrow</span> Iniciar
+  <div class="crono-inline">
+    <!-- Punto pulsante cuando activo -->
+    <span v-if="activo" class="crono-dot" />
+    <!-- Botón play / pause -->
+    <button
+      class="crono-btn"
+      :class="{ activo }"
+      @click="activo ? detener() : iniciar()"
+      :title="activo ? 'Pausar' : 'Iniciar'"
+    >
+      <span class="material-icons" style="font-size:12px">{{ activo ? 'pause' : 'play_arrow' }}</span>
     </button>
-    <button v-else class="btn btn-sm btn-secondary" @click="detener">
-      <span class="material-icons" style="font-size:14px">stop</span> Detener
-    </button>
+    <!-- Tiempo display -->
+    <span class="crono-display" :class="{ corriendo: activo }">{{ display }}</span>
   </div>
 </template>
 
@@ -16,31 +21,27 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from 'src/services/api'
 
 const props = defineProps({
-  tareaId:       { type: Number, required: true },
-  tiempoBase:    { type: Number, default: 0 },     // tiempo_real_min ya acumulado
-  cronometroActivo:  { type: Boolean, default: false },
-  cronometroInicio:  { type: String, default: null }  // ISO datetime del inicio activo
+  tareaId:          { type: Number, required: true },
+  tiempoBase:       { type: Number, default: 0 },
+  cronometroActivo: { type: Boolean, default: false },
+  cronometroInicio: { type: String, default: null }
 })
 const emit = defineEmits(['update'])
 
-const activo    = ref(props.cronometroActivo)
-const segundos  = ref(0)
-let interval    = null
+const activo   = ref(props.cronometroActivo)
+const segundos = ref(0)
+let interval   = null
 
-// Calcular segundos desde el inicio guardado en BD
 function calcularSegundos() {
   if (!props.cronometroInicio) return 0
-  const inicio = new Date(props.cronometroInicio)
-  return Math.floor((Date.now() - inicio.getTime()) / 1000)
+  return Math.floor((Date.now() - new Date(props.cronometroInicio).getTime()) / 1000)
 }
 
-const totalSegundos = computed(() => {
-  const base = (props.tiempoBase || 0) * 60
-  return base + segundos.value
-})
+const totalSegundos = computed(() => (props.tiempoBase || 0) * 60 + segundos.value)
 
 const display = computed(() => {
   const total = totalSegundos.value
+  if (!activo.value && total === 0) return '—'
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60

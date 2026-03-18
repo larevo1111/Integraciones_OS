@@ -3,8 +3,6 @@
     class="tarea-item"
     :class="{ selected: seleccionada, completada: esCompletada, 'is-subtarea': !!tarea.parent_id }"
     @click="$emit('click', tarea)"
-    @mouseenter="hover = true"
-    @mouseleave="hover = false"
   >
     <EstadoBadge :estado="tarea.estado" @click="$emit('cambiar-estado', tarea)" />
     <div class="cat-dot" :style="{ background: tarea.categoria_color }" />
@@ -24,34 +22,57 @@
     <span class="tarea-titulo">{{ tarea.titulo }}</span>
 
     <div class="tarea-meta">
-      <!-- Cronómetro activo -->
+      <!-- Cronómetro activo (corriendo en tiempo real) -->
       <span v-if="tarea.cronometro_activo" class="cronometro-activo">
         <span class="cronometro-dot" />
         {{ tiempoCronometro }}
       </span>
 
-      <!-- Categoría (nombre corto) -->
-      <span v-if="tarea.categoria_nombre" class="tarea-cat-txt" :title="tarea.categoria_nombre">
-        {{ tarea.categoria_nombre.replace(/_/g,' ') }}
+      <!-- Chip categoría: dot coloreado + nombre, fondo tinted -->
+      <span
+        v-if="tarea.categoria_nombre && !tarea.cronometro_activo"
+        class="meta-chip"
+        :style="{ background: hexAlpha(tarea.categoria_color, 0.12), color: tarea.categoria_color }"
+        :title="tarea.categoria_nombre"
+      >
+        <span class="meta-chip-dot" :style="{ background: tarea.categoria_color }" />
+        {{ catNombreCorto }}
       </span>
 
-      <!-- Duración real (si existe y no hay cronómetro activo) -->
+      <!-- Chip duración real -->
       <span
         v-if="tarea.tiempo_real_min > 0 && !tarea.cronometro_activo"
-        class="tarea-duracion"
+        class="meta-chip meta-chip-dur"
         title="Tiempo real"
       >{{ duracionDisplay }}</span>
 
-      <!-- Fecha límite -->
-      <span v-if="fechaDisplay" class="tarea-fecha" :class="clasesFecha">{{ fechaDisplay }}</span>
+      <!-- Chip fecha -->
+      <span
+        v-if="fechaDisplay"
+        class="meta-chip meta-chip-fecha"
+        :class="clasesFecha"
+      >{{ fechaDisplay }}</span>
 
-      <!-- Botón + agregar subtarea (hover, solo tareas padre) -->
+      <!-- Chip proyecto -->
+      <span
+        v-if="tarea.proyecto_nombre && !tarea.cronometro_activo"
+        class="meta-chip"
+        :style="{ background: hexAlpha(tarea.proyecto_color, 0.10), color: 'var(--text-tertiary)' }"
+        :title="tarea.proyecto_nombre"
+      >
+        <span class="meta-chip-dot" :style="{ background: tarea.proyecto_color || '#888' }" />
+        {{ proyNombreCorto }}
+      </span>
+
+      <!-- Botón agregar subtarea ↳ — solo para tareas padre, siempre visible (sutil) -->
       <button
-        v-if="hover && !tarea.parent_id && !esCompletada"
-        class="btn-add-subtarea"
+        v-if="!tarea.parent_id && !esCompletada"
+        class="btn-add-sub"
         title="Agregar subtarea"
         @click.stop="$emit('agregar-subtarea', tarea)"
-      >+</button>
+      >
+        <span class="material-icons" style="font-size:11px">subdirectory_arrow_right</span>
+      </button>
     </div>
   </div>
 </template>
@@ -68,9 +89,26 @@ const props = defineProps({
 })
 defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas'])
 
-const hover = ref(false)
-
 const esCompletada = computed(() => ['Completada','Cancelada'].includes(props.tarea.estado))
+
+// Helper: hex color + alpha → rgba string
+function hexAlpha(hex, alpha) {
+  if (!hex || hex.length < 7) return `rgba(136,136,136,${alpha})`
+  const r = parseInt(hex.slice(1,3), 16)
+  const g = parseInt(hex.slice(3,5), 16)
+  const b = parseInt(hex.slice(5,7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+// Nombres truncados para chips (CSS maneja el ellipsis, JS solo para extremos)
+const catNombreCorto = computed(() => {
+  const n = (props.tarea.categoria_nombre || '').replace(/_/g, ' ')
+  return n.length > 14 ? n.slice(0, 13) + '…' : n
+})
+const proyNombreCorto = computed(() => {
+  const n = props.tarea.proyecto_nombre || ''
+  return n.length > 14 ? n.slice(0, 13) + '…' : n
+})
 
 function isoFecha(f) {
   if (!f) return null
@@ -86,7 +124,7 @@ const fechaDisplay = computed(() => {
   const manana = new Date(hoy); manana.setDate(hoy.getDate()+1)
   const ayer   = new Date(hoy); ayer.setDate(hoy.getDate()-1)
   if (d.getTime() === hoy.getTime())    return 'Hoy'
-  if (d.getTime() === manana.getTime()) return 'Mañ'
+  if (d.getTime() === manana.getTime()) return 'Mañana'
   if (d.getTime() === ayer.getTime())   return 'Ayer'
   return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
 })
@@ -101,18 +139,18 @@ const clasesFecha = computed(() => {
   return ''
 })
 
-// Duración real display (compacto: 1h30 / 45m)
+// Duración real display compacto
 const duracionDisplay = computed(() => {
   const min = props.tarea.tiempo_real_min || 0
   if (!min) return ''
   const h = Math.floor(min / 60)
   const m = min % 60
-  if (h && m) return `${h}h${m}`
+  if (h && m) return `${h}h ${m}m`
   if (h) return `${h}h`
   return `${m}m`
 })
 
-// Cronómetro en tiempo real
+// Cronómetro en tiempo real (solo cuando cronometro_activo)
 const tiempoCronometro = ref('00:00')
 let interval = null
 
@@ -153,24 +191,19 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
   color: var(--accent);
 }
 
-/* Botón + agregar subtarea — solo visible en hover, derecha extrema */
-.btn-add-subtarea {
+/* Botón agregar subtarea ↳ — siempre en DOM, visible sutil */
+.btn-add-sub {
   display: flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; flex-shrink: 0;
+  width: 14px; height: 14px; flex-shrink: 0;
   background: transparent; border: none;
-  font-size: 14px; color: var(--text-tertiary);
-  cursor: pointer; line-height: 1;
-  transition: color 80ms;
-  margin-left: 2px;
+  color: var(--text-tertiary); cursor: pointer;
+  opacity: 0.3; transition: opacity 100ms, color 100ms;
+  margin-left: 1px;
 }
-.btn-add-subtarea:hover { color: var(--accent); }
+.tarea-item:hover .btn-add-sub { opacity: 0.7; }
+.btn-add-sub:hover { color: var(--accent) !important; opacity: 1 !important; }
 
 /* Subtarea: indentación + fuente diferenciada */
-.is-subtarea {
-  padding-left: 28px !important;
-}
-.is-subtarea .tarea-titulo {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
+.is-subtarea { padding-left: 28px !important; }
+.is-subtarea .tarea-titulo { font-size: 11px; color: var(--text-secondary); }
 </style>

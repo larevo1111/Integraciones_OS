@@ -124,8 +124,9 @@
 
       <div class="divider" />
 
-      <!-- Cronómetro + tiempos — sección compacta -->
-      <div class="tiempos-section">
+      <!-- Cronómetro inline (field-row) -->
+      <div class="field-row">
+        <span class="field-label">Cronómetro</span>
         <Cronometro
           :tarea-id="tarea.id"
           :tiempo-base="tarea.tiempo_real_min"
@@ -133,21 +134,23 @@
           :cronometro-inicio="tarea.cronometro_inicio"
           @update="onCronometroUpdate"
         />
-        <div class="tiempos-row">
-          <div class="tiempo-campo">
-            <span class="tiempo-label">Real</span>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" class="input-field tiempo-input" :value="Math.floor((tarea.tiempo_real_min||0)/60)" min="0" @change="actualizarTiempoReal('h', $event.target.value)" />h
-              <input type="number" class="input-field tiempo-input" :value="(tarea.tiempo_real_min||0)%60" min="0" max="59" @change="actualizarTiempoReal('m', $event.target.value)" />m
-            </div>
-          </div>
-          <div class="tiempo-campo">
-            <span class="tiempo-label">Estimado</span>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" class="input-field tiempo-input" :value="Math.floor((tarea.tiempo_estimado_min||0)/60)" min="0" @change="actualizarTiempoEst('h', $event.target.value)" />h
-              <input type="number" class="input-field tiempo-input" :value="(tarea.tiempo_estimado_min||0)%60" min="0" max="59" @change="actualizarTiempoEst('m', $event.target.value)" />m
-            </div>
-          </div>
+      </div>
+
+      <!-- Tiempos compactos: Real | Estimado en una sola fila -->
+      <div class="field-row">
+        <span class="field-label">Tiempo</span>
+        <div class="tiempos-compact">
+          <span class="t-lbl">Real</span>
+          <input type="number" class="input-field t-input" :value="Math.floor((tarea.tiempo_real_min||0)/60)" min="0" @change="actualizarTiempoReal('h', $event.target.value)" />
+          <span class="t-sep">h</span>
+          <input type="number" class="input-field t-input" :value="(tarea.tiempo_real_min||0)%60" min="0" max="59" @change="actualizarTiempoReal('m', $event.target.value)" />
+          <span class="t-sep">m</span>
+          <span class="t-div">|</span>
+          <span class="t-lbl">Est</span>
+          <input type="number" class="input-field t-input" :value="Math.floor((tarea.tiempo_estimado_min||0)/60)" min="0" @change="actualizarTiempoEst('h', $event.target.value)" />
+          <span class="t-sep">h</span>
+          <input type="number" class="input-field t-input" :value="(tarea.tiempo_estimado_min||0)%60" min="0" max="59" @change="actualizarTiempoEst('m', $event.target.value)" />
+          <span class="t-sep">m</span>
         </div>
       </div>
 
@@ -393,24 +396,24 @@ async function completarSin() {
 .accordion-toggle:hover { color: var(--text-secondary); }
 .field-row-disabled { opacity: 0.45; pointer-events: none; }
 
-/* Sección cronómetro + tiempos compacta */
-.tiempos-section {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 4px 0;
+/* Tiempos Real | Estimado — una sola fila compacta */
+.tiempos-compact {
+  display: flex; align-items: center; gap: 3px; flex-wrap: nowrap;
 }
-.tiempos-row {
-  display: flex; gap: 12px;
-}
-.tiempo-campo {
-  display: flex; flex-direction: column; gap: 3px;
-}
-.tiempo-label {
-  font-size: 10px; color: var(--text-tertiary); font-weight: 500;
+.t-lbl {
+  font-size: 9px; color: var(--text-tertiary);
   text-transform: uppercase; letter-spacing: 0.04em;
+  font-weight: 500; flex-shrink: 0; margin-right: 1px;
 }
-.tiempo-input {
-  width: 44px !important; height: 24px !important;
-  font-size: 11px !important; text-align: center; padding: 0 4px !important;
+.t-sep {
+  font-size: 10px; color: var(--text-tertiary); flex-shrink: 0;
+}
+.t-div {
+  font-size: 11px; color: var(--border-subtle); margin: 0 5px; flex-shrink: 0;
+}
+.t-input {
+  width: 32px !important; height: 20px !important;
+  font-size: 10px !important; text-align: center; padding: 0 2px !important;
 }
 
 /* Popover completar */
