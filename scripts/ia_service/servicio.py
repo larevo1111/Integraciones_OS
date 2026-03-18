@@ -758,8 +758,11 @@ def consultar(
         # Detección pre-router: si el bot acaba de preguntar "¿Lo guardo?" y el usuario confirma
         # → forzar conversacion para que el agente procese la confirmación y emita [GUARDAR_NEGOCIO]
         _confirmaciones = {'sí', 'si', 'dale', 'ok', 'sip', 'claro', 'correcto', 'perfecto',
-                           'guardalo', 'guárdalo', 'adelante', 'exacto', 'así', 'asi', 'yes'}
-        _pregunta_lower = pregunta.strip().lower().rstrip('.,!')
+                           'guardalo', 'guárdalo', 'adelante', 'exacto', 'así', 'asi', 'yes',
+                           'sí guárdalo', 'si guardalo', 'sí guárdalo', 'dale guárdalo',
+                           'sí dale', 'claro guárdalo', 'ok guárdalo'}
+        import re as _re
+        _pregunta_lower = _re.sub(r'[.,!¡¿?;:]+$', '', pregunta.strip().lower()).strip()
         if _pregunta_lower in _confirmaciones and historial_ctx and \
                 'lo guardo en mi memoria de negocio' in historial_ctx.lower():
             tipo = 'conversacion'
