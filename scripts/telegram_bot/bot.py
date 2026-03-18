@@ -392,19 +392,22 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pie   = f'\n\n_{icono} {agente_usado}_' if agente_usado else ''
 
     MAX_LEN = 4000
-    def truncar(t):
-        if len(t) <= MAX_LEN:
-            return t
-        return t[:MAX_LEN] + '\n\n_… respuesta recortada — abre la tabla para ver el detalle completo._'
+    texto_enviar = texto_resp + pie
+    if len(texto_enviar) > MAX_LEN:
+        if token:
+            # Hay tabla — mandar aviso corto y dejar que el usuario la abra
+            texto_enviar = f'El detalle tiene {n_filas} filas — demasiado para mostrar en el chat.\n\nAbrí la tabla para verlo completo con filtros y totales.{pie}'
+        else:
+            texto_enviar = texto_resp[:MAX_LEN] + '\n\n_… respuesta recortada._'
 
     try:
         await update.message.reply_text(
-            truncar(texto_resp + pie),
+            texto_enviar,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=kb
         )
     except Exception:
-        await update.message.reply_text(truncar(texto_resp), reply_markup=kb)
+        await update.message.reply_text(texto_enviar[:MAX_LEN], reply_markup=kb)
 
 
 # ─── Handler de fotos (visión) ───────────────────────────────────────────────
