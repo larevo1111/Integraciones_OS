@@ -6,9 +6,9 @@
 
       <!-- Header de proyecto activo (breadcrumb) -->
       <div v-if="proyectoFiltro" class="proyecto-header-bar">
-        <RouterLink to="/tareas" class="proyecto-back-link">
+        <RouterLink :to="props.soloMias ? '/tareas' : '/equipo'" class="proyecto-back-link">
           <span class="material-icons" style="font-size:15px">arrow_back</span>
-          Mis Tareas
+          {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
         </RouterLink>
         <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
         <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
@@ -32,24 +32,26 @@
           </button>
 
           <!-- Agrupar por -->
-          <div style="position:relative;margin-left:auto;flex-shrink:0">
-            <button class="chip chip-agrupar" @click="menuAgrupar = !menuAgrupar">
+          <div style="position:relative;margin-left:auto;flex-shrink:0" ref="btnAgruparWrap">
+            <button class="chip chip-agrupar" @click="toggleMenuAgrupar" ref="btnAgruparRef">
               <span class="material-icons" style="font-size:13px">sort</span>
               {{ AGRUPACIONES.find(a => a.key === agruparPor)?.label }}
               <span class="material-icons" style="font-size:13px">expand_more</span>
             </button>
-            <div v-if="menuAgrupar" class="dropdown-menu" @mouseleave="menuAgrupar=false">
-              <div
-                v-for="ag in AGRUPACIONES"
-                :key="ag.key"
-                class="dropdown-item"
-                :class="{ active: agruparPor === ag.key }"
-                @click="agruparPor = ag.key; menuAgrupar = false"
-              >
-                <span class="material-icons" style="font-size:14px">{{ agruparPor === ag.key ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
-                {{ ag.label }}
+            <Teleport to="body">
+              <div v-if="menuAgrupar" class="dropdown-menu-teleport" :style="dropdownAgruparStyle" @mouseleave="menuAgrupar=false">
+                <div
+                  v-for="ag in AGRUPACIONES"
+                  :key="ag.key"
+                  class="dropdown-item-teleport"
+                  :class="{ active: agruparPor === ag.key }"
+                  @click="agruparPor = ag.key; menuAgrupar = false"
+                >
+                  <span class="material-icons" style="font-size:14px">{{ agruparPor === ag.key ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
+                  {{ ag.label }}
+                </div>
               </div>
-            </div>
+            </Teleport>
           </div>
         </div>
       </div>
@@ -292,9 +294,26 @@ const cargando          = ref(true)
 const tareaSeleccionada = ref(null)
 const mostrarForm       = ref(false)
 const mostrarCompletadas = ref(false)
-const menuAgrupar       = ref(false)
+const menuAgrupar            = ref(false)
+const btnAgruparRef          = ref(null)
+const dropdownAgruparStyle   = ref({})
 const filtroActivo      = ref('hoy')
 const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
+
+function toggleMenuAgrupar() {
+  if (!menuAgrupar.value) {
+    const rect = btnAgruparRef.value?.getBoundingClientRect()
+    if (rect) {
+      dropdownAgruparStyle.value = {
+        position: 'fixed',
+        top:  `${rect.bottom + 4}px`,
+        right: `${window.innerWidth - rect.right}px`,
+        zIndex: 9999
+      }
+    }
+  }
+  menuAgrupar.value = !menuAgrupar.value
+}
 
 // Filtro por proyecto (desde query param)
 const proyectoFiltroId = computed(() => route.query.proyecto_id ? Number(route.query.proyecto_id) : null)
@@ -479,6 +498,7 @@ function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
 watch(() => route.query.proyecto_id, () => cargarTareas())
+watch(() => props.soloMias, () => cargarTareas())
 
 const ORDEN_PRIORIDAD    = ['Urgente','Alta','Media','Baja']
 const COLORES_PRIORIDAD  = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280', Baja: '#374151' }
@@ -724,27 +744,7 @@ onUnmounted(() => { window.removeEventListener('resize', onResize) })
   padding: 4px 0 0 26px;
 }
 
-/* Dropdown agrupar */
-.dropdown-menu {
-  position: absolute; right: 0; top: calc(100% + 4px);
-  background: var(--bg-modal);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  min-width: 160px;
-  z-index: 200;
-  overflow: hidden;
-}
-.dropdown-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 60ms;
-}
-.dropdown-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.dropdown-item.active { color: var(--accent); }
+/* Dropdown agrupar — estilos movidos a app.scss como globales (teleport) */
 
 /* Panel */
 .panel-enter-active, .panel-leave-active { transition: transform 200ms ease-out, opacity 200ms; }

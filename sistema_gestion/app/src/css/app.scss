@@ -1025,3 +1025,24 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   transition: background 80ms, border-color 80ms;
 }
 .google-btn:hover { background: var(--bg-card-hover); border-color: var(--border-focus); }
+
+/* ─── DROPDOWN AGRUPACIÓN (Teleport to body) ─── */
+.dropdown-menu-teleport {
+  background: var(--bg-modal);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  overflow: hidden;
+}
+.dropdown-item-teleport {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 60ms;
+  font-family: var(--font-sans);
+}
+.dropdown-item-teleport:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.dropdown-item-teleport.active { color: var(--accent); }
