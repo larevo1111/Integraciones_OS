@@ -208,7 +208,14 @@ async function verPdf() {
     if (!resp.ok) throw new Error('Error al generar PDF')
     const blob = await resp.blob()
     const url  = URL.createObjectURL(blob)
-    window.open(url, '_blank')
+    // Usar <a> invisible para evitar el bloqueo de popup del browser
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 30000)
   } catch (e) {
     console.error(e)
