@@ -158,7 +158,8 @@
 
 <script setup>
 import { apiFetch } from 'src/services/api'
-import { ref, onMounted } from 'vue'
+import { useAuthStore } from 'src/stores/authStore'
+import { ref, onMounted, watch } from 'vue'
 import { PlusIcon, PencilIcon, XIcon } from 'lucide-vue-next'
 
 const tipos = ref([])
@@ -234,6 +235,9 @@ async function eliminar() {
     cerrar(); await cargar()
   } catch (e) { alert('Error') }
 }
+
+const auth = useAuthStore()
+watch(() => auth.empresa_activa?.uid, () => { cargar() })
 
 onMounted(cargar)
 </script>

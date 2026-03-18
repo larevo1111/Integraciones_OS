@@ -192,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
 import { RefreshCwIcon, AlertTriangleIcon } from 'lucide-vue-next'
@@ -261,6 +261,8 @@ async function cargarLogs() {
   try { logs.value = (await api('/api/ia/logs?limit=20')).rows } catch { logs.value = [] }
   cargandoLogs.value = false
 }
+
+watch(() => authStore.empresa_activa?.uid, () => { cargar() })
 
 onMounted(() => {
   cargar()

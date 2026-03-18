@@ -391,6 +391,20 @@ app.get('/api/ia/consumo/historico', async (req, res) => {
   }
 })
 
+// ─── EMPRESA ACTIVA (2.7) ─────────────────────────────────────────
+app.get('/api/ia/empresa-activa', requireAuth, (req, res) => {
+  const u = req.usuario
+  res.json({
+    empresa_uid:    u.empresa_activa || null,
+    empresa_nombre: u.empresa_nombre || null,
+    empresa_siglas: u.empresa_siglas || null,
+    rol_empresa:    u.rol_empresa    || u.rol || null,
+    usuario_id:     u.id             || null,
+    usuario_nombre: u.nombre         || null,
+    email:          u.email          || null
+  })
+})
+
 // ─── LOGS ─────────────────────────────────────────────────────────
 app.get('/api/ia/logs', async (req, res) => {
   try {

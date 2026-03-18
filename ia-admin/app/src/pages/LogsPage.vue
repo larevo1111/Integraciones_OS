@@ -139,7 +139,8 @@
 
 <script setup>
 import { apiFetch } from 'src/services/api'
-import { ref, onMounted } from 'vue'
+import { useAuthStore } from 'src/stores/authStore'
+import { ref, onMounted, watch } from 'vue'
 import { SearchIcon, XIcon } from 'lucide-vue-next'
 
 const logs = ref([])
@@ -197,6 +198,9 @@ function fechaCompleta(ts) {
   if (!ts) return '—'
   return new Date(ts).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'medium' })
 }
+
+const auth = useAuthStore()
+watch(() => auth.empresa_activa?.uid, () => { cargar() })
 
 onMounted(() => { cargarFiltros(); cargar() })
 </script>
