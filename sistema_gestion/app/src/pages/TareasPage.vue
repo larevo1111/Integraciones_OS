@@ -513,6 +513,47 @@ watch(() => props.soloMias, (val) => {
 
 const ORDEN_PRIORIDAD    = ['Urgente','Alta','Media','Baja']
 const COLORES_PRIORIDAD  = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280', Baja: '#374151' }
+const PRIORIDAD_IDX      = { Urgente: 0, Alta: 1, Media: 2, Baja: 3 }
+
+// Comparadores atómicos
+const cmpPrioridad  = (a, b) => (PRIORIDAD_IDX[a.prioridad] ?? 2) - (PRIORIDAD_IDX[b.prioridad] ?? 2)
+const cmpFecha      = (a, b) => (a.fecha_limite || '9999-12-31').localeCompare(b.fecha_limite || '9999-12-31')
+const cmpCategoria  = (a, b) => (a.categoria_nombre || '').localeCompare(b.categoria_nombre || '')
+const cmpProyecto   = (a, b) => (a.proyecto_nombre || 'zzz').localeCompare(b.proyecto_nombre || 'zzz')
+const cmpResponsable = (a, b) => (a.responsable_nombre || a.responsable || '').localeCompare(b.responsable_nombre || b.responsable || '')
+
+function sortWithin(lista, ...cmps) {
+  return [...lista].sort((a, b) => {
+    for (const fn of cmps) {
+      const r = fn(a, b)
+      if (r !== 0) return r
+    }
+    return 0
+  })
+}
+
+// Orden secundario según agrupación activa y vista
+function ordenSecundario(lista) {
+  if (!props.soloMias) {
+    // Vista Equipo
+    switch (agruparPor.value) {
+      case 'responsable': return sortWithin(lista, cmpCategoria, cmpProyecto)
+      case 'categoria':   return sortWithin(lista, cmpResponsable, cmpProyecto)
+      case 'proyecto':    return sortWithin(lista, cmpResponsable, cmpCategoria)
+      case 'prioridad':   return sortWithin(lista, cmpResponsable, cmpCategoria)
+      case 'fecha':       return sortWithin(lista, cmpResponsable, cmpCategoria)
+    }
+  } else {
+    // Vista Mis Tareas
+    switch (agruparPor.value) {
+      case 'categoria': return sortWithin(lista, cmpPrioridad, cmpFecha)
+      case 'prioridad': return sortWithin(lista, cmpFecha, cmpCategoria)
+      case 'fecha':     return sortWithin(lista, cmpPrioridad, cmpCategoria)
+      case 'proyecto':  return sortWithin(lista, cmpPrioridad, cmpFecha)
+    }
+  }
+  return lista
+}
 
 const grupos = computed(() => {
   if (!tareas.value.length) return []
@@ -523,7 +564,7 @@ const grupos = computed(() => {
       if (!map[k]) map[k] = { key: k, nombre: t.categoria_nombre, color: t.categoria_color, tareas: [] }
       map[k].tareas.push(t)
     })
-    return Object.values(map)
+    return Object.values(map).map(g => ({ ...g, tareas: ordenSecundario(g.tareas) }))
   }
   if (agruparPor.value === 'prioridad') {
     const map = {}
@@ -532,7 +573,7 @@ const grupos = computed(() => {
       if (!map[p]) map[p] = { key: p, nombre: p, color: COLORES_PRIORIDAD[p], tareas: [] }
       map[p].tareas.push(t)
     })
-    return ORDEN_PRIORIDAD.filter(p => map[p]).map(p => map[p])
+    return ORDEN_PRIORIDAD.filter(p => map[p]).map(p => ({ ...map[p], tareas: ordenSecundario(map[p].tareas) }))
   }
   if (agruparPor.value === 'fecha') {
     const map = {}
@@ -541,11 +582,13 @@ const grupos = computed(() => {
       if (!map[f]) map[f] = { key: f, nombre: formatGrupoFecha(f), color: '#6b7280', tareas: [] }
       map[f].tareas.push(t)
     })
-    return Object.values(map).sort((a, b) => {
-      if (a.key === 'Sin fecha') return 1
-      if (b.key === 'Sin fecha') return -1
-      return a.key.localeCompare(b.key)
-    })
+    return Object.values(map)
+      .sort((a, b) => {
+        if (a.key === 'Sin fecha') return 1
+        if (b.key === 'Sin fecha') return -1
+        return a.key.localeCompare(b.key)
+      })
+      .map(g => ({ ...g, tareas: ordenSecundario(g.tareas) }))
   }
   if (agruparPor.value === 'proyecto') {
     const map = {}
@@ -556,7 +599,8 @@ const grupos = computed(() => {
     })
     const sinProy = map['sin-proyecto']
     const conProy = Object.values(map).filter(g => g.key !== 'sin-proyecto').sort((a, b) => a.nombre.localeCompare(b.nombre))
-    return sinProy ? [...conProy, sinProy] : conProy
+    const all = sinProy ? [...conProy, sinProy] : conProy
+    return all.map(g => ({ ...g, tareas: ordenSecundario(g.tareas) }))
   }
   if (agruparPor.value === 'responsable') {
     const map = {}
@@ -568,7 +612,8 @@ const grupos = computed(() => {
     })
     const sinAsig = map['sin-asignar']
     const conAsig = Object.values(map).filter(g => g.key !== 'sin-asignar').sort((a, b) => a.nombre.localeCompare(b.nombre))
-    return sinAsig ? [...conAsig, sinAsig] : conAsig
+    const all = sinAsig ? [...conAsig, sinAsig] : conAsig
+    return all.map(g => ({ ...g, tareas: ordenSecundario(g.tareas) }))
   }
   return []
 })
