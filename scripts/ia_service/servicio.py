@@ -1179,6 +1179,16 @@ def consultar(
                 # Red de seguridad: clasificacion mal enrutada puede contener una enseñanza
                 _procesar_bloque_aprendizaje(res['texto'], empresa)
 
+            elif paso == 'buscar_web':
+                pasos_ejecutados.append('buscar_web')
+                from .proveedores import tavily as tavily_mod
+                resultado_busqueda = tavily_mod.buscar(pregunta)
+                if resultado_busqueda['ok']:
+                    datos_crudos = tavily_mod.formatear_para_llm(resultado_busqueda)
+                else:
+                    # Búsqueda falló — convertir a conversacion para responder igual
+                    datos_crudos = f"[No se pudo buscar en internet: {resultado_busqueda['error']}. Responde indicándole al usuario que no hay resultados disponibles en este momento.]"
+
             elif paso == 'generar_imagen':
                 pasos_ejecutados.append('generar_imagen')
                 msgs = mensajes_base + [{'role': 'user', 'content': pregunta}]
@@ -1290,7 +1300,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
 
     tipo_default = 'conversacion'
     tema_default = 'general'
-    tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen',
+    tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen', 'busqueda_web',
                      'generacion_documento', 'generacion_imagen', 'conversacion',
                      'aprendizaje', 'enrutamiento'}
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
@@ -1409,6 +1419,13 @@ def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generad
         return f"Por favor resume el siguiente texto:\n\n{pregunta}"
 
     if datos_crudos is not None:
+        # datos_crudos puede ser lista (SQL) o string (búsqueda web)
+        if isinstance(datos_crudos, str):
+            return (
+                f"Pregunta del usuario: {pregunta}\n\n"
+                f"{datos_crudos}\n\n"
+                f"Responde la pregunta usando la información anterior."
+            )
         filas_texto = json.dumps(datos_crudos[:50], ensure_ascii=False, default=str)
         return (
             f"Pregunta del usuario: {pregunta}\n\n"

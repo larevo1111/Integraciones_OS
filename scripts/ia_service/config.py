@@ -17,6 +17,9 @@ DB_USER     = os.getenv('DB_USER', 'osadmin')
 DB_PASS     = os.getenv('DB_PASS', 'Epist2487.')
 DB_IA       = 'ia_service_os'
 
+# ── Tavily (búsqueda web) ─────────────────────────────────────────────
+TAVILY_API_KEY = os.getenv('TAVILY_API_KEY', '')
+
 # ── BD Hostinger (para ejecutar SQL analítico) ────────────────────────
 HOSTINGER_HOST = os.getenv('HOSTINGER_HOST', '109.106.250.195')
 HOSTINGER_PORT = int(os.getenv('HOSTINGER_PORT', 3306))

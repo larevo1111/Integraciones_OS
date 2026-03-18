@@ -305,6 +305,25 @@ async def cmd_mes(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await handle_mensaje(update, ctx)
 
 
+# ─── Detección de búsqueda web (para mensaje intermedio) ─────────────────────
+
+_WEB_KEYWORDS = [
+    'precio del dólar', 'precio del euro', 'precio del dolar', 'tasa de cambio',
+    'cotización de', 'cotizacion de', 'precio de la', 'precio del ',
+    'en bolsa', 'bolsa de valores', 'precio de referencia',
+    'noticias de', 'noticias del', 'qué pasó con', 'que paso con',
+    'regulación', 'regulacion', 'normativa', 'ley de', 'decreto ',
+    'requisitos invima', 'requisitos ica', 'certificación', 'certificacion',
+    'clima en', 'temperatura en', 'pronóstico del tiempo',
+    'tendencias de', 'mercado de', 'quién es ', 'quien es ',
+    'cuánto vale el dólar', 'cuanto vale el dolar',
+]
+
+def _es_busqueda_web(texto: str) -> bool:
+    t = texto.lower()
+    return any(kw in t for kw in _WEB_KEYWORDS)
+
+
 # ─── Handler principal de mensajes ───────────────────────────────────────────
 
 async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -338,6 +357,11 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # Actualizar sesión
     db.guardar_sesion(user.id, user.username or '', nombre)
+
+    # Mensaje intermedio si parece búsqueda web
+    msg_intermedio = None
+    if _es_busqueda_web(texto):
+        msg_intermedio = await update.message.reply_text('🔍 Buscando en internet...')
 
     # Indicador de escritura
     await update.effective_chat.send_action(ChatAction.TYPING)
@@ -401,11 +425,22 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             texto_enviar = texto_resp[:MAX_LEN] + '\n\n_… respuesta recortada._'
 
     try:
-        await update.message.reply_text(
-            texto_enviar,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb
-        )
+        if msg_intermedio:
+            # Editar el mensaje "Buscando..." con la respuesta final
+            try:
+                await msg_intermedio.edit_text(
+                    texto_enviar,
+                    parse_mode=ParseMode.MARKDOWN,
+                    reply_markup=kb
+                )
+            except Exception:
+                await msg_intermedio.edit_text(texto_enviar[:MAX_LEN], reply_markup=kb)
+        else:
+            await update.message.reply_text(
+                texto_enviar,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=kb
+            )
     except Exception:
         await update.message.reply_text(texto_enviar[:MAX_LEN], reply_markup=kb)
 
