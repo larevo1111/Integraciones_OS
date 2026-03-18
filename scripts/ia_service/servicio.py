@@ -754,6 +754,18 @@ def consultar(
         historial_ctx = contexto.obtener_mensajes_recientes_formateados(conv)
         contexto_enrutador = (f'Resumen de la conversación:\n{resumen_anterior}\n\n{historial_ctx}'
                               if resumen_anterior else historial_ctx)
+
+        # Detección pre-router: si el bot acaba de preguntar "¿Lo guardo?" y el usuario confirma
+        # → forzar conversacion para que el agente procese la confirmación y emita [GUARDAR_NEGOCIO]
+        _confirmaciones = {'sí', 'si', 'dale', 'ok', 'sip', 'claro', 'correcto', 'perfecto',
+                           'guardalo', 'guárdalo', 'adelante', 'exacto', 'así', 'asi', 'yes'}
+        _pregunta_lower = pregunta.strip().lower().rstrip('.,!')
+        if _pregunta_lower in _confirmaciones and historial_ctx and \
+                'lo guardo en mi memoria de negocio' in historial_ctx.lower():
+            tipo = 'conversacion'
+            tema = tema or 'general'
+            requiere_sql = False
+
         tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
         if not tipo:
             tipo = tipo_enrutado
