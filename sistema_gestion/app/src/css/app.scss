@@ -604,6 +604,42 @@ body {
   color: var(--text-primary);
 }
 
+/* ─── DETALLE OP (panel de tarea) ─── */
+.op-detail-card {
+  margin: 0 0 4px 98px;  /* alineado con el contenido (label 90px + gap 8px) */
+  padding: 8px 10px;
+  background: var(--bg-row-hover);
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.op-detail-titulo {
+  font-size: 11px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin: 0 0 4px;
+}
+.op-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.op-detail-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.op-detail-badge.generada   { background: rgba(0,200,83,0.12); color: #00C853; }
+.op-detail-badge.en-proceso { background: rgba(255,152,0,0.12); color: #FF9800; }
+.op-detail-badge.anulada    { background: var(--bg-row-hover); color: var(--text-tertiary); }
+.op-detail-fecha, .op-detail-encargado {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
 /* ─── CRONÓMETRO INLINE (panel de tarea) ─── */
 .crono-inline {
   display: flex;
