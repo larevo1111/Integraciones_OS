@@ -525,6 +525,14 @@ body {
   letter-spacing: 0.04em;
   font-size: 8px;
 }
+/* Bandera prioridad */
+.meta-flag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 1;
+  opacity: 0.85;
+}
 .cronometro-activo {
   display: flex;
   align-items: center;

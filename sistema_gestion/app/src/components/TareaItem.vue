@@ -64,6 +64,14 @@
         {{ catNombreCorto }}
       </span>
 
+      <!-- Bandera prioridad (2do elemento, solo Urgente/Alta/Media visibles; Baja omitida) -->
+      <span
+        v-if="colorPrioridad && !tarea.cronometro_activo"
+        class="meta-flag"
+        :title="tarea.prioridad"
+        :style="{ color: colorPrioridad }"
+      ><span class="material-icons" style="font-size:11px">flag</span></span>
+
       <!-- Chip duración real -->
       <span
         v-if="tarea.tiempo_real_min > 0 && !tarea.cronometro_activo"
@@ -124,6 +132,9 @@ const responsableIniciales = computed(() => {
 defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas'])
 
 const esCompletada = computed(() => ['Completada','Cancelada'].includes(props.tarea.estado))
+
+const _COLORES_PRIO = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280' }
+const colorPrioridad = computed(() => _COLORES_PRIO[props.tarea.prioridad] || null)
 
 function hexAlpha(hex, alpha) {
   if (!hex || hex.length < 7) return `rgba(136,136,136,${alpha})`
