@@ -312,11 +312,16 @@ _WEB_KEYWORDS = [
     'cotización de', 'cotizacion de', 'precio de la', 'precio del ',
     'en bolsa', 'bolsa de valores', 'precio de referencia',
     'noticias de', 'noticias del', 'qué pasó con', 'que paso con',
+    'novedades sobre', 'qué está pasando', 'que esta pasando',
     'regulación', 'regulacion', 'normativa', 'ley de', 'decreto ',
     'requisitos invima', 'requisitos ica', 'certificación', 'certificacion',
     'clima en', 'temperatura en', 'pronóstico del tiempo',
     'tendencias de', 'mercado de', 'quién es ', 'quien es ',
     'cuánto vale el dólar', 'cuanto vale el dolar',
+    'trm de hoy', 'trm hoy', 'cuál es el trm', 'cual es el trm',
+    'guerra de', 'conflicto en', 'crisis en',
+    'busca en internet', 'consulta en internet', 'buscar en internet',
+    'competidores de', 'competencia de',
 ]
 
 def _es_busqueda_web(texto: str) -> bool:
@@ -545,6 +550,11 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.effective_chat.send_action(ChatAction.TYPING)
     db.guardar_sesion(user.id, user.username or '', nombre)
 
+    # Mensaje intermedio si parece búsqueda web
+    msg_intermedio_voz = None
+    if _es_busqueda_web(texto):
+        msg_intermedio_voz = await update.message.reply_text('🔍 Buscando en internet...')
+
     agente_sesion = sesion.get('agente_preferido')
     nivel         = sesion.get('nivel', 1)
     agente_slug   = None
@@ -591,11 +601,19 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             texto_enviar = texto_resp[:MAX_LEN] + '\n\n_… respuesta recortada._'
 
     try:
-        await update.message.reply_text(
-            texto_enviar,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=kb
-        )
+        if msg_intermedio_voz:
+            try:
+                await msg_intermedio_voz.edit_text(
+                    texto_enviar, parse_mode=ParseMode.MARKDOWN, reply_markup=kb
+                )
+            except Exception:
+                await msg_intermedio_voz.edit_text(texto_enviar[:MAX_LEN], reply_markup=kb)
+        else:
+            await update.message.reply_text(
+                texto_enviar,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=kb
+            )
     except Exception:
         await update.message.reply_text(texto_enviar[:MAX_LEN], reply_markup=kb)
 

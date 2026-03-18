@@ -1334,8 +1334,9 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
 
         # Fallback: buscar tipo en texto plano
         texto_lower = texto.lower()
-        for slug_t in ('aprendizaje', 'analisis_datos', 'redaccion', 'clasificacion',
-                       'resumen', 'generacion_documento', 'generacion_imagen', 'conversacion'):
+        for slug_t in ('aprendizaje', 'busqueda_web', 'analisis_datos', 'redaccion',
+                       'clasificacion', 'resumen', 'generacion_documento',
+                       'generacion_imagen', 'conversacion'):
             if slug_t in texto_lower:
                 return (slug_t, tema_default, slug_t == 'analisis_datos')
 
