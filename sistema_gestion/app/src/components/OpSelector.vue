@@ -25,7 +25,7 @@
         <div class="op-tag-acciones">
           <a
             class="op-tag-accion"
-            href="https://effi.com.co/app/orden_produccion"
+            :href="`https://effi.com.co/app/orden_produccion?id=${modelValue}`"
             target="_blank"
             rel="noopener"
             title="Ver en Effi"
