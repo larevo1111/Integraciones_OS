@@ -1,15 +1,18 @@
 <template>
   <div class="crono-inline">
-    <!-- Punto pulsante cuando activo -->
-    <span v-if="activo" class="crono-dot" />
-    <!-- Botón play / pause -->
-    <button
-      class="crono-btn"
-      :class="{ activo }"
-      @click="activo ? detener() : iniciar()"
-      :title="activo ? 'Pausar' : 'Iniciar'"
-    >
-      <span class="material-icons" style="font-size:12px">{{ activo ? 'pause' : 'play_arrow' }}</span>
+    <!-- Cuando corriendo: dot pulsante + botón pause + botón stop -->
+    <template v-if="activo">
+      <span class="crono-dot" />
+      <button class="crono-btn activo" @click="pausar" title="Pausar (guarda segmento)">
+        <span class="material-icons" style="font-size:12px">pause</span>
+      </button>
+      <button class="crono-btn crono-btn-stop" @click="detener" title="Detener">
+        <span class="material-icons" style="font-size:11px">stop</span>
+      </button>
+    </template>
+    <!-- Cuando parado: botón play -->
+    <button v-else class="crono-btn" @click="iniciar" title="Iniciar">
+      <span class="material-icons" style="font-size:12px">play_arrow</span>
     </button>
     <!-- Tiempo display -->
     <span class="crono-display" :class="{ corriendo: activo }">{{ display }}</span>
@@ -83,6 +86,17 @@ async function iniciar() {
   } catch (e) { console.error(e) }
 }
 
+// Pausa: guarda el segmento, permite reiniciar después
+async function pausar() {
+  stopInterval()
+  try {
+    const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
+    activo.value = false
+    emit('update', 'detenido', data.tiempo_real_min)
+  } catch (e) { console.error(e) }
+}
+
+// Stop: guarda segmento (mismo endpoint, diferente intención semántica)
 async function detener() {
   stopInterval()
   try {

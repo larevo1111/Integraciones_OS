@@ -136,17 +136,20 @@
         />
       </div>
 
-      <!-- Tiempos compactos: Real | Estimado en una sola fila -->
+      <!-- Tiempo real -->
       <div class="field-row">
-        <span class="field-label">Tiempo</span>
+        <span class="field-label">T. real</span>
         <div class="tiempos-compact">
-          <span class="t-lbl">Real</span>
           <input type="number" class="input-field t-input" :value="Math.floor((tarea.tiempo_real_min||0)/60)" min="0" @change="actualizarTiempoReal('h', $event.target.value)" />
           <span class="t-sep">h</span>
           <input type="number" class="input-field t-input" :value="(tarea.tiempo_real_min||0)%60" min="0" max="59" @change="actualizarTiempoReal('m', $event.target.value)" />
           <span class="t-sep">m</span>
-          <span class="t-div">|</span>
-          <span class="t-lbl">Est</span>
+        </div>
+      </div>
+      <!-- Tiempo estimado -->
+      <div class="field-row">
+        <span class="field-label">T. estimado</span>
+        <div class="tiempos-compact">
           <input type="number" class="input-field t-input" :value="Math.floor((tarea.tiempo_estimado_min||0)/60)" min="0" @change="actualizarTiempoEst('h', $event.target.value)" />
           <span class="t-sep">h</span>
           <input type="number" class="input-field t-input" :value="(tarea.tiempo_estimado_min||0)%60" min="0" max="59" @change="actualizarTiempoEst('m', $event.target.value)" />

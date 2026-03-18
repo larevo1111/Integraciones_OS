@@ -4,21 +4,22 @@
     :class="{ selected: seleccionada, completada: esCompletada, 'is-subtarea': !!tarea.parent_id }"
     @click="$emit('click', tarea)"
   >
-    <EstadoBadge :estado="tarea.estado" @click="$emit('cambiar-estado', tarea)" />
+    <!-- Columna izquierda: estado + badge subtareas centrado debajo -->
+    <div class="estado-col">
+      <EstadoBadge :estado="tarea.estado" @click="$emit('cambiar-estado', tarea)" />
+      <button
+        v-if="tarea.subtareas_total > 0 && !tarea.parent_id"
+        class="subtareas-badge"
+        :class="{ expandida: expandida }"
+        @click.stop="$emit('toggle-subtareas', tarea)"
+        :title="expandida ? 'Contraer subtareas' : 'Expandir subtareas'"
+      >
+        <span class="material-icons" style="font-size:8px">{{ expandida ? 'expand_more' : 'chevron_right' }}</span>
+        {{ tarea.subtareas_completadas }}/{{ tarea.subtareas_total }}
+      </button>
+    </div>
+
     <div class="cat-dot" :style="{ background: tarea.categoria_color }" />
-
-    <!-- Indicador subtareas expandibles (solo tareas padre) -->
-    <button
-      v-if="tarea.subtareas_total > 0 && !tarea.parent_id"
-      class="subtareas-badge"
-      :class="{ expandida: expandida }"
-      @click.stop="$emit('toggle-subtareas', tarea)"
-      :title="expandida ? 'Contraer subtareas' : 'Expandir subtareas'"
-    >
-      <span class="material-icons" style="font-size:10px">{{ expandida ? 'expand_more' : 'chevron_right' }}</span>
-      {{ tarea.subtareas_completadas }}/{{ tarea.subtareas_total }}
-    </button>
-
     <span class="tarea-titulo">{{ tarea.titulo }}</span>
 
     <div class="tarea-meta">
@@ -174,17 +175,27 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
 </script>
 
 <style scoped>
-/* Indicador ▶ N/M de subtareas */
+/* Columna izquierda: estado + badge subtareas apilados */
+.estado-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Indicador ▶ N/M de subtareas — debajo del círculo de estado */
 .subtareas-badge {
   display: inline-flex; align-items: center; gap: 1px;
-  padding: 0 4px; height: 15px;
+  padding: 0 3px; height: 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  font-size: 9px; color: var(--text-tertiary);
+  font-size: 8px; color: var(--text-tertiary);
   cursor: pointer; flex-shrink: 0;
   transition: border-color 80ms, color 80ms;
   white-space: nowrap;
+  line-height: 1;
 }
 .subtareas-badge:hover, .subtareas-badge.expandida {
   border-color: var(--accent);

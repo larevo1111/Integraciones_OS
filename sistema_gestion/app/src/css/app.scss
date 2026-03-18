@@ -634,6 +634,16 @@ body {
   letter-spacing: 0.03em;
 }
 .crono-display.corriendo { color: var(--accent); font-weight: 500; }
+/* Botón stop — tono rojo sutil */
+.crono-btn-stop {
+  border-color: rgba(239,68,68,0.25) !important;
+  color: rgba(239,68,68,0.7) !important;
+}
+.crono-btn-stop:hover {
+  background: rgba(239,68,68,0.08) !important;
+  border-color: var(--color-error) !important;
+  color: var(--color-error) !important;
+}
 
 /* ─── BOTONES ─── */
 .btn {
@@ -713,6 +723,14 @@ body {
 .input-field:focus { border-color: var(--border-focus); }
 .input-field::placeholder { color: var(--text-tertiary); }
 textarea.input-field { height: auto; padding: 8px 10px; resize: vertical; }
+
+/* Number inputs — ocultar spinners nativos (se puede escribir directo, diseño más limpio) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] { -moz-appearance: textfield; }
 
 /* Icono del calendario (y otros picker nativos) — visible en dark mode */
 input[type="date"]::-webkit-calendar-picker-indicator,
