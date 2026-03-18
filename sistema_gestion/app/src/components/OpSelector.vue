@@ -201,7 +201,7 @@ async function verPdf() {
   if (descargandoPdf.value || !props.modelValue) return
   descargandoPdf.value = true
   try {
-    const token = localStorage.getItem('gestion_token')
+    const token = localStorage.getItem('gestion_jwt')
     const resp  = await fetch(`/api/gestion/op/${encodeURIComponent(props.modelValue)}/pdf`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
