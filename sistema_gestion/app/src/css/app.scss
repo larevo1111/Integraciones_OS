@@ -517,6 +517,14 @@ body {
 }
 .meta-chip-fecha.vencida { color: var(--color-error); }
 .meta-chip-fecha.hoy     { color: var(--text-secondary); }
+/* Badge responsable (vista Equipo) */
+.meta-chip-responsable {
+  background: var(--bg-row-hover);
+  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 8px;
+}
 .cronometro-activo {
   display: flex;
   align-items: center;

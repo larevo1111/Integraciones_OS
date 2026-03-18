@@ -88,6 +88,13 @@
         <span class="meta-chip-dot" :style="{ background: tarea.proyecto_color || '#888' }" />
         {{ proyNombreCorto }}
       </span>
+
+      <!-- Badge responsable (solo vista Equipo) -->
+      <span
+        v-if="mostrarResponsable && responsableIniciales"
+        class="meta-chip meta-chip-responsable"
+        :title="tarea.responsable_nombre || tarea.responsable"
+      >{{ responsableIniciales }}</span>
     </div>
   </div>
 </template>
@@ -97,10 +104,22 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
 
 const props = defineProps({
-  tarea:         { type: Object, required: true },
-  seleccionada:  { type: Boolean, default: false },
-  usuarioActual: { type: String, default: '' },
-  expandida:     { type: Boolean, default: false }
+  tarea:              { type: Object, required: true },
+  seleccionada:       { type: Boolean, default: false },
+  usuarioActual:      { type: String, default: '' },
+  expandida:          { type: Boolean, default: false },
+  mostrarResponsable: { type: Boolean, default: false }
+})
+
+const responsableIniciales = computed(() => {
+  if (!props.tarea.responsable) return null
+  const nombre = props.tarea.responsable_nombre || ''
+  if (nombre) {
+    // Primer nombre, 3 primeras letras en mayúscula
+    return nombre.split(' ')[0].slice(0, 3).toUpperCase()
+  }
+  // Fallback: parte antes del @ en el email
+  return props.tarea.responsable.split('@')[0].slice(0, 3).toUpperCase()
 })
 defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas'])
 

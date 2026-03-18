@@ -129,6 +129,7 @@
               :seleccionada="tareaSeleccionada?.id === t.id"
               :usuario-actual="auth.usuario?.email"
               :expandida="!!subtareasExpandidas[t.id]"
+              :mostrar-responsable="!props.soloMias"
               @click="seleccionar"
               @cambiar-estado="cambiarEstado"
               @agregar-subtarea="iniciarSubtarea"
@@ -142,6 +143,7 @@
                 :tarea="sub"
                 :seleccionada="tareaSeleccionada?.id === sub.id"
                 :usuario-actual="auth.usuario?.email"
+                :mostrar-responsable="!props.soloMias"
                 @click="seleccionar"
                 @cambiar-estado="cambiarEstado"
               />
@@ -178,6 +180,7 @@
               :tarea="t"
               :seleccionada="tareaSeleccionada?.id === t.id"
               :usuario-actual="auth.usuario?.email"
+              :mostrar-responsable="!props.soloMias"
               @click="seleccionar"
               @cambiar-estado="cambiarEstado"
             />
@@ -484,11 +487,16 @@ function onCerrarFiltroPopup() {
   mostrarFiltroPopup.value = false
   if (!filtroPersonalizado.value) filtroActivo.value = 'hoy'
 }
-const AGRUPACIONES = [
-  { key: 'categoria', label: 'Categoría' },
-  { key: 'prioridad', label: 'Prioridad' },
-  { key: 'fecha',     label: 'Fecha' }
-]
+const AGRUPACIONES = computed(() => {
+  const base = [
+    { key: 'categoria',   label: 'Categoría' },
+    { key: 'prioridad',   label: 'Prioridad' },
+    { key: 'fecha',       label: 'Fecha' },
+    { key: 'proyecto',    label: 'Proyecto' }
+  ]
+  if (!props.soloMias) base.push({ key: 'responsable', label: 'Responsable' })
+  return base
+})
 
 const conteoHoy = computed(() => tareas.value.filter(t => t.fecha_limite === hoyISO()).length)
 
@@ -498,7 +506,10 @@ function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
 watch(() => route.query.proyecto_id, () => cargarTareas())
-watch(() => props.soloMias, () => cargarTareas())
+watch(() => props.soloMias, (val) => {
+  if (val && agruparPor.value === 'responsable') agruparPor.value = 'categoria'
+  cargarTareas()
+})
 
 const ORDEN_PRIORIDAD    = ['Urgente','Alta','Media','Baja']
 const COLORES_PRIORIDAD  = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b7280', Baja: '#374151' }
@@ -535,6 +546,29 @@ const grupos = computed(() => {
       if (b.key === 'Sin fecha') return -1
       return a.key.localeCompare(b.key)
     })
+  }
+  if (agruparPor.value === 'proyecto') {
+    const map = {}
+    tareas.value.forEach(t => {
+      const k = t.proyecto_id || 'sin-proyecto'
+      if (!map[k]) map[k] = { key: k, nombre: t.proyecto_nombre || 'Sin proyecto', color: t.proyecto_color || '#607D8B', tareas: [] }
+      map[k].tareas.push(t)
+    })
+    const sinProy = map['sin-proyecto']
+    const conProy = Object.values(map).filter(g => g.key !== 'sin-proyecto').sort((a, b) => a.nombre.localeCompare(b.nombre))
+    return sinProy ? [...conProy, sinProy] : conProy
+  }
+  if (agruparPor.value === 'responsable') {
+    const map = {}
+    tareas.value.forEach(t => {
+      const k = t.responsable || 'sin-asignar'
+      const nombre = t.responsable_nombre || t.responsable || 'Sin asignar'
+      if (!map[k]) map[k] = { key: k, nombre, color: '#607D8B', tareas: [] }
+      map[k].tareas.push(t)
+    })
+    const sinAsig = map['sin-asignar']
+    const conAsig = Object.values(map).filter(g => g.key !== 'sin-asignar').sort((a, b) => a.nombre.localeCompare(b.nombre))
+    return sinAsig ? [...conAsig, sinAsig] : conAsig
   }
   return []
 })
