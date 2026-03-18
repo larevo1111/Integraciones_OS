@@ -193,6 +193,8 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
   gap: 2px;
   flex-shrink: 0;
   width: 14px;
+  align-self: flex-start;
+  padding-top: 3px; /* alinea el círculo con el texto de la fila */
 }
 
 /* Badge 0/N + botón ↳ en la misma fila, debajo del círculo */
