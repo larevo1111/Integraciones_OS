@@ -206,6 +206,7 @@ async def cmd_ayuda(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         '*Comandos disponibles:*\n'
         '/ventas — Ventas del día de hoy\n'
         '/mes — Resumen del mes en curso\n'
+        '/actualizar — Forzar actualización de datos desde Effi\n'
         '/estado — Ver agente activo\n'
         '/agente — Cambiar modelo de IA\n'
         '/limpiar — Limpiar historial\n'
@@ -260,6 +261,36 @@ async def cmd_limpiar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         '🗑️ Historial limpiado. La próxima pregunta empieza desde cero.',
         reply_markup=REPLY_KB
     )
+
+
+async def cmd_actualizar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    sesion = await _verificar_acceso(update)
+    if not sesion:
+        return
+
+    if sesion.get('nivel', 1) < 5:
+        await update.message.reply_text('❌ No tienes permiso para ejecutar esta acción.')
+        return
+
+    await update.message.reply_text(
+        '🔄 Iniciando actualización de datos desde Effi...\n'
+        '_Esto tarda entre 10 y 20 minutos. Te aviso cuando termine._',
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=REPLY_KB
+    )
+
+    import subprocess, threading
+
+    def _lanzar():
+        subprocess.Popen(
+            ['python3', '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/orquestador.py', '--forzar'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+
+    threading.Thread(target=_lanzar, daemon=True).start()
+    log.info(f'Orquestador forzado por {update.effective_user.id} (nivel {sesion.get("nivel")})')
 
 
 async def cmd_ventas(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -566,14 +597,15 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler('start',   cmd_start))
-    app.add_handler(CommandHandler('ayuda',   cmd_ayuda))
-    app.add_handler(CommandHandler('help',    cmd_ayuda))
-    app.add_handler(CommandHandler('estado',  cmd_estado))
-    app.add_handler(CommandHandler('agente',  cmd_agente))
-    app.add_handler(CommandHandler('limpiar', cmd_limpiar))
-    app.add_handler(CommandHandler('ventas',  cmd_ventas))
-    app.add_handler(CommandHandler('mes',     cmd_mes))
+    app.add_handler(CommandHandler('start',      cmd_start))
+    app.add_handler(CommandHandler('ayuda',      cmd_ayuda))
+    app.add_handler(CommandHandler('help',       cmd_ayuda))
+    app.add_handler(CommandHandler('estado',     cmd_estado))
+    app.add_handler(CommandHandler('agente',     cmd_agente))
+    app.add_handler(CommandHandler('limpiar',    cmd_limpiar))
+    app.add_handler(CommandHandler('actualizar', cmd_actualizar))
+    app.add_handler(CommandHandler('ventas',     cmd_ventas))
+    app.add_handler(CommandHandler('mes',        cmd_mes))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contacto))
     app.add_handler(MessageHandler(filters.PHOTO, handle_foto))
