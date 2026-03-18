@@ -1145,6 +1145,8 @@ def consultar(
                 respuesta_final = parsed['respuesta']
                 # Resumen generado por Groq en lugar del agente principal
                 resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
+                # Red de seguridad: si el agente generó [GUARDAR_NEGOCIO] (conversacion con regla de negocio)
+                _procesar_bloque_aprendizaje(res['texto'], empresa)
 
             elif paso == 'analizar':
                 pasos_ejecutados.append('analizar')
