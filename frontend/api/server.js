@@ -901,6 +901,35 @@ app.get('/api/export/:recurso', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// Bot tabla: leer token de bot_tablas_temp (ia_service_os local)
+app.get('/api/bot/tabla', async (req, res) => {
+  const { token } = req.query
+  if (!token) return res.status(400).json({ ok: false, error: 'Token requerido' })
+  const mysql2 = require('mysql2/promise')
+  let conn
+  try {
+    conn = await mysql2.createConnection({
+      host: 'localhost', user: 'osadmin', password: 'Epist2487.', database: 'ia_service_os'
+    })
+    const [rows] = await conn.execute(
+      'SELECT pregunta, columnas, filas FROM bot_tablas_temp WHERE token = ? AND created_at > NOW() - INTERVAL 24 HOUR',
+      [token]
+    )
+    if (!rows.length) return res.status(404).json({ ok: false, error: 'Token no encontrado o expirado' })
+    const row = rows[0]
+    res.json({
+      ok: true,
+      pregunta: row.pregunta,
+      columnas: typeof row.columnas === 'string' ? JSON.parse(row.columnas) : row.columnas,
+      filas: typeof row.filas === 'string' ? JSON.parse(row.filas) : row.filas
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message })
+  } finally {
+    if (conn) conn.end()
+  }
+})
+
 // Pipeline: forzar actualización de datos desde Effi
 app.post('/api/pipeline/actualizar', (req, res) => {
   const { spawn } = require('child_process')

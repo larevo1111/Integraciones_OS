@@ -1,6 +1,11 @@
 import MainLayout from 'layouts/MainLayout.vue'
 
 const routes = [
+  // Mini App Telegram — sin layout, sin auth
+  {
+    path: '/bot/tabla',
+    component: () => import('pages/BotTablaPage.vue')
+  },
   {
     path: '/',
     component: MainLayout,

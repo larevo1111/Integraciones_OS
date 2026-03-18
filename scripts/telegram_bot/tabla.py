@@ -7,7 +7,7 @@ import uuid, json
 from db import guardar_tabla_temp
 
 TABLA_BASE_URL = 'https://menu.oscomunidad.com/bot/tabla'
-MAX_FILAS_INLINE = 5
+MAX_FILAS_INLINE = 2
 
 
 def _formatear_valor(v) -> str:

@@ -1,7 +1,7 @@
 """
 Constructores de teclados para el bot.
 """
-from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 # ── Reply keyboard — siempre visible en el fondo ─────────────────────────────
 # Versión estática para contextos sin nivel (ej: pantalla de auth)
@@ -59,8 +59,8 @@ def inline_respuesta(token: str = None, n_filas: int = 0) -> InlineKeyboardMarku
     if token and n_filas > MAX_INLINE:
         botones.append(
             InlineKeyboardButton(
-                f'📋 Ver tabla completa ({n_filas} filas)',
-                url=f'https://menu.oscomunidad.com/bot/tabla?token={token}'
+                f'📋 Ver tabla ({n_filas} filas)',
+                web_app=WebAppInfo(url=f'https://menu.oscomunidad.com/bot/tabla?token={token}')
             )
         )
     botones.append(InlineKeyboardButton('↩ Nueva consulta', callback_data='nueva_consulta'))
