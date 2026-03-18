@@ -246,7 +246,17 @@ def enviar_telegram(env, mensaje):
 
 def main():
     forzar = '--forzar' in sys.argv
+    # --chat-id XXXX permite notificar a un chat específico (ej: quien lo lanzó desde el bot)
+    chat_id_override = None
+    if '--chat-id' in sys.argv:
+        idx = sys.argv.index('--chat-id')
+        if idx + 1 < len(sys.argv):
+            chat_id_override = sys.argv[idx + 1]
+
     env    = cargar_env()
+    if chat_id_override:
+        env['TELEGRAM_NOTIF_CHAT_ID'] = chat_id_override
+        env['TELEGRAM_CHAT_ID']       = chat_id_override
     ahora  = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     operable, motivo = es_horario_operativo()

@@ -283,7 +283,8 @@ async def cmd_actualizar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     def _lanzar():
         subprocess.Popen(
-            ['python3', '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/orquestador.py', '--forzar'],
+            ['python3', '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/orquestador.py',
+             '--forzar', '--chat-id', str(update.effective_user.id)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
