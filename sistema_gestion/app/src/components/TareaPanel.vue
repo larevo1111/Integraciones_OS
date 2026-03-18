@@ -92,9 +92,9 @@
           @change="actualizarFechaEstimada($event.target.value)" />
       </div>
 
-      <div v-if="esProduccion" class="field-row">
-        <span class="field-label">OP Effi</span>
-        <input class="input-field" style="height:28px;font-size:12px" :value="tarea.id_op" placeholder="Nro. OP" @blur="actualizarOP($event.target.value)" />
+      <div v-if="esProduccion" class="field-row" style="align-items:flex-start">
+        <span class="field-label" style="padding-top:8px">OP Effi</span>
+        <OpSelector :modelValue="tarea.id_op || ''" @update:modelValue="val => actualizar('id_op', val)" />
       </div>
 
       <div class="divider" />
@@ -218,6 +218,7 @@ import ProyectoSelector     from './ProyectoSelector.vue'
 import CategoriaSelector    from './CategoriaSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
+import OpSelector           from './OpSelector.vue'
 
 const ESTADOS = [
   { key: 'Pendiente',   label: 'Pendiente',   color: '#6b7280' },
@@ -306,9 +307,6 @@ function ciclarEstado() {
   actualizar('estado', ciclo[props.tarea.estado] || 'Pendiente')
 }
 
-async function actualizarOP(val) {
-  if (val !== props.tarea.id_op) actualizar('id_op', val)
-}
 
 async function actualizarEtiquetas(ids) {
   if (!props.tarea) return

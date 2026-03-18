@@ -26,9 +26,10 @@
       </div>
     </div>
 
-    <!-- Dropdown -->
+    <!-- Dropdown (Teleport para no ser recortado por overflow del contenedor) -->
+    <Teleport to="body">
     <Transition name="opdrop">
-      <div v-if="abierto" class="op-dropdown">
+      <div v-if="abierto" class="op-dropdown" :style="dropdownStyle">
 
         <!-- Estado: cargando -->
         <div v-if="cargando" class="op-estado">
@@ -65,6 +66,7 @@
         </template>
       </div>
     </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -85,10 +87,29 @@ const cargando   = ref(false)
 const resultados = ref([])
 const focoIdx    = ref(0)
 const articuloSeleccionado = ref('')
+const dropdownStyle = ref({})
 
 let debounceTimer = null
 
+function calcularPosicion() {
+  if (!wrapRef.value) return
+  const rect = wrapRef.value.getBoundingClientRect()
+  const spaceBelow = window.innerHeight - rect.bottom
+  const spaceAbove = rect.top
+  const goUp = spaceAbove > spaceBelow && spaceBelow < 300
+  dropdownStyle.value = {
+    position: 'fixed',
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    zIndex: 9999,
+    ...(goUp
+      ? { bottom: `${window.innerHeight - rect.top + 4}px`, maxHeight: `${Math.min(spaceAbove - 8, 280)}px` }
+      : { top: `${rect.bottom + 4}px`, maxHeight: `${Math.min(spaceBelow - 8, 280)}px` })
+  }
+}
+
 function abrir() {
+  calcularPosicion()
   abierto.value = true
   if (!resultados.value.length) cargar('')
 }
@@ -248,18 +269,13 @@ watch(() => props.modelValue, async (val) => {
 }
 .op-tag-clear:hover { color: var(--text-primary); }
 
-/* Dropdown */
+/* Dropdown (posición calculada via Teleport — fixed en body) */
 .op-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0; right: 0;
   background: var(--bg-modal);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  z-index: 100;
   overflow: hidden;
-  max-height: 280px;
   overflow-y: auto;
 }
 
