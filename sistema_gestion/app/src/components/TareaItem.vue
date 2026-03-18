@@ -30,15 +30,10 @@
         {{ tiempoCronometro }}
       </span>
 
-      <PrioridadIcon :prioridad="tarea.prioridad" />
-
-      <!-- Avatar responsable (solo si no es el usuario actual) -->
-      <img
-        v-if="tarea.responsable && tarea.responsable !== usuarioActual"
-        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(tarea.responsable_nombre || tarea.responsable)}&size=16&background=1e1e1e&color=888&rounded=true`"
-        class="avatar-mini"
-        :title="tarea.responsable_nombre || tarea.responsable"
-      />
+      <!-- Categoría (nombre corto) -->
+      <span v-if="tarea.categoria_nombre" class="tarea-cat-txt" :title="tarea.categoria_nombre">
+        {{ tarea.categoria_nombre.replace(/_/g,' ') }}
+      </span>
 
       <!-- Duración real (si existe y no hay cronómetro activo) -->
       <span
@@ -47,7 +42,8 @@
         title="Tiempo real"
       >{{ duracionDisplay }}</span>
 
-      <span class="tarea-fecha" :class="clasesFecha">{{ fechaDisplay }}</span>
+      <!-- Fecha límite -->
+      <span v-if="fechaDisplay" class="tarea-fecha" :class="clasesFecha">{{ fechaDisplay }}</span>
 
       <!-- Botón + agregar subtarea (hover, solo tareas padre) -->
       <button
@@ -62,8 +58,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import EstadoBadge   from './EstadoBadge.vue'
-import PrioridadIcon from './PrioridadIcon.vue'
+import EstadoBadge from './EstadoBadge.vue'
 
 const props = defineProps({
   tarea:         { type: Object, required: true },

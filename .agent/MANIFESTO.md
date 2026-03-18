@@ -223,18 +223,27 @@ No se puede construir sin entender qué quiere Santi. No se debe generar código
 
 ### ⚠️ REGLA ABSOLUTA: NINGUNA TAREA SIN PLAN
 
+**Por qué existe esta regla:** El contexto del chat se pierde. Si no hay un plan escrito en el repo, cuando el contexto se llena la tarea queda a medias — nadie puede saber qué faltó. Un plan en MD es la garantía de continuidad entre sesiones.
+
 **Antes de iniciar CUALQUIER tarea no trivial (más de 1 archivo o 1 endpoint):**
 
 1. Crear un archivo de plan en `.agent/planes/actuales/<NOMBRE_PLAN>.md` con:
    - Objetivo y decisiones de diseño
-   - Checklist numerado de pasos (`- [ ] 1.1 ...`)
+   - Checklist numerado de pasos (`- [ ] 1. ...`)
    - Schema SQL si aplica
-   - Notas y consideraciones
+   - Sección "Tareas para Antigravity" (QA visual)
 2. Mostrar el plan a Santi y esperar confirmación
 3. Solo entonces ejecutar — ir tildando `[x]` a medida que se completa cada paso
 4. Al terminar: mover el archivo a `.agent/planes/` (fuera de `actuales/`) y actualizar `CONTEXTO_ACTIVO.md`
 
+**Consecuencias si no se cumple:**
+- Tareas quedan a medias sin registro de qué faltó
+- En la siguiente sesión no hay forma de saber el estado real
+- Santi debe repetir el contexto completo desde cero (pérdida de tiempo)
+
 **Esta regla aplica a todos los agentes**: Claude Code, subagentes Claude, y cualquier otro. Ningún agente puede iniciar implementación sin que exista un plan aprobado en `.agent/planes/actuales/`.
+
+**Al iniciar sesión:** leer `.agent/planes/actuales/` — si existe un plan, continuar desde donde quedó antes de hacer cualquier otra cosa.
 
 **Antes de cualquier tarea:**
 1. Leer manifiesto y contexto activo
