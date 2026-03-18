@@ -972,6 +972,72 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 .bsheet-enter-from .bsheet-panel,
 .bsheet-leave-to .bsheet-panel { transform: translateY(100%); }
 
+/* ─── MINI-MODAL TIEMPO AL COMPLETAR ─── */
+.tiempo-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.tiempo-modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  width: 100%; max-width: 320px;
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+}
+.tiempo-modal-titulo {
+  font-size: 13px; font-weight: 600;
+  color: var(--text-primary); margin: 0;
+}
+.tiempo-modal-subtitulo {
+  font-size: 11px; color: var(--text-tertiary); margin: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tiempo-modal-input-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.tiempo-modal-input {
+  width: 80px; padding: 6px 10px;
+  background: var(--bg-input, var(--bg-row));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px; font-family: var(--font-mono);
+  text-align: center;
+  outline: none;
+  &:focus { border-color: var(--accent); }
+  /* ocultar flechas spinner */
+  -moz-appearance: textfield;
+  &::-webkit-outer-spin-button, &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+}
+.tiempo-modal-unidad {
+  font-size: 12px; color: var(--text-secondary);
+}
+.tiempo-modal-acciones {
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;
+}
+.tiempo-modal-btn-omitir {
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid var(--border-default);
+  color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  &:hover { border-color: var(--border-hover); color: var(--text-primary); }
+}
+.tiempo-modal-btn-ok {
+  padding: 5px 14px; border-radius: var(--radius-sm);
+  background: var(--accent); border: none;
+  color: #fff; font-size: 12px; font-weight: 600; cursor: pointer;
+  &:disabled { opacity: 0.4; cursor: default; }
+  &:not(:disabled):hover { opacity: 0.88; }
+}
+/* Transición */
+.tiempo-modal-enter-active { transition: opacity 150ms ease, transform 150ms ease; }
+.tiempo-modal-leave-active { transition: opacity 120ms ease, transform 120ms ease; }
+.tiempo-modal-enter-from, .tiempo-modal-leave-to { opacity: 0; transform: scale(0.95); }
+
 /* ─── DRAWER MOBILE (Teleport → body, CSS global requerido) ─── */
 .drawer-overlay {
   position: fixed; inset: 0;

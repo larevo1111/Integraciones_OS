@@ -330,9 +330,9 @@ def _es_busqueda_web(texto: str) -> bool:
 
 # ─── Handler principal de mensajes ───────────────────────────────────────────
 
-async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_override: str = None):
     user  = update.effective_user
-    texto = update.message.text.strip()
+    texto = (texto_override or update.message.text or '').strip()
 
     sesion = await _verificar_acceso(update)
     if not sesion:
@@ -542,8 +542,7 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
     # Procesar exactamente igual que un mensaje de texto
-    update.message.text = texto
-    await handle_mensaje(update, ctx)
+    await handle_mensaje(update, ctx, texto_override=texto)
 
 
 # ─── Handler de callbacks (botones inline) ───────────────────────────────────

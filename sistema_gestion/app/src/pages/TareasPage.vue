@@ -229,6 +229,7 @@
               @touchstart="bsheetTouchStart"
               @touchmove.prevent="bsheetTouchMove"
               @touchend="bsheetTouchEnd"
+              @touchcancel="bsheetTouchEnd"
             >
               <div class="bsheet-handle"></div>
               <button
@@ -278,6 +279,40 @@
       :usuarios="usuarios"
       @guardada="onTareaGuardada"
     />
+
+    <!-- Mini-modal: tiempo al completar tarea -->
+    <Teleport to="body">
+      <Transition name="tiempo-modal">
+        <div v-if="tiempoModal" class="tiempo-modal-overlay" @click.self="cancelarTiempoModal">
+          <div class="tiempo-modal-card">
+            <p class="tiempo-modal-titulo">¿Cuánto tiempo tomó?</p>
+            <p class="tiempo-modal-subtitulo">{{ tiempoModal.tarea.titulo }}</p>
+            <div class="tiempo-modal-input-row">
+              <input
+                ref="tiempoInputRef"
+                v-model="tiempoInput"
+                type="number"
+                min="1"
+                max="9999"
+                placeholder="min"
+                class="tiempo-modal-input"
+                @keyup.enter="confirmarTiempoModal"
+                @keyup.escape="cancelarTiempoModal"
+              />
+              <span class="tiempo-modal-unidad">minutos</span>
+            </div>
+            <div class="tiempo-modal-acciones">
+              <button class="tiempo-modal-btn-omitir" @click="omitirTiempoModal">Omitir</button>
+              <button
+                class="tiempo-modal-btn-ok"
+                :disabled="!tiempoInput"
+                @click="confirmarTiempoModal"
+              >Guardar</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -566,7 +601,7 @@ const conteoHoy = computed(() => tareas.value.filter(t => t.fecha_limite === hoy
 function hoyISO()    { return new Date().toISOString().slice(0,10) }
 function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10) }
 
-watch(tareaSeleccionada, (v) => { if (v) bsheetEstado.value = 'half' })
+watch(tareaSeleccionada, (v, old) => { if (v && (!old || v.id !== old.id)) bsheetEstado.value = 'half' })
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
 watch(() => route.query.proyecto_id, () => cargarTareas())
@@ -743,14 +778,50 @@ function seleccionar(tarea) {
   tareaSeleccionada.value = tareaSeleccionada.value?.id === tarea.id ? null : tarea
 }
 
+// ─── MINI-MODAL TIEMPO AL COMPLETAR ───────────────────────────
+const tiempoModal     = ref(null)   // { tarea } cuando está abierto
+const tiempoInput     = ref('')     // minutos ingresados por el usuario
+const tiempoInputRef  = ref(null)   // ref para hacer focus
+
 async function cambiarEstado(tarea) {
   // Ciclo del check: Pendiente→EnProgreso→Completada→Pendiente
   // Cancelada: el check no la reactiva (se gestiona desde el panel de estado)
   const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente' }
+  const nextEstado = CICLO[tarea.estado] || 'Pendiente'
+  // Al completar: abrir mini-modal de tiempo
+  if (nextEstado === 'Completada') {
+    tiempoModal.value = { tarea }
+    tiempoInput.value = ''
+    nextTick(() => tiempoInputRef.value?.focus())
+    return
+  }
+  await _aplicarEstado(tarea, nextEstado, null)
+}
+
+async function _aplicarEstado(tarea, estado, tiempo_real_min) {
+  const body = { estado }
+  if (tiempo_real_min) body.tiempo_real_min = tiempo_real_min
   try {
-    const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify({ estado: CICLO[tarea.estado] || 'Pendiente' }) })
+    const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify(body) })
     onTareaActualizada(data.tarea)
   } catch (e) { console.error(e) }
+}
+
+async function confirmarTiempoModal() {
+  const { tarea } = tiempoModal.value
+  const min = parseInt(tiempoInput.value) || null
+  tiempoModal.value = null
+  await _aplicarEstado(tarea, 'Completada', min)
+}
+
+function omitirTiempoModal() {
+  const { tarea } = tiempoModal.value
+  tiempoModal.value = null
+  _aplicarEstado(tarea, 'Completada', null)
+}
+
+function cancelarTiempoModal() {
+  tiempoModal.value = null
 }
 
 function onTareaActualizada(t) {
