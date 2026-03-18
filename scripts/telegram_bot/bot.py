@@ -515,21 +515,17 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─── Handler de voz (Whisper) ────────────────────────────────────────────────
 
 async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    user   = update.effective_user
     sesion = await _verificar_acceso(update)
     if not sesion:
         return
 
-    nombre = sesion.get('nombre') or _nombre(user)
     await update.effective_chat.send_action(ChatAction.TYPING)
 
-    # Descargar audio de Telegram
+    # Descargar y transcribir audio
     voz     = update.message.voice or update.message.audio
     archivo = await voz.get_file()
     buf     = io.BytesIO()
     await archivo.download_to_memory(buf)
-
-    # Transcribir con Groq Whisper
     texto = whisper_mod.transcribir(buf.getvalue(), 'audio.ogg')
 
     if not texto:
@@ -539,82 +535,15 @@ async def handle_voz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Mostrar transcripción al usuario
+    # Mostrar transcripción
     await update.message.reply_text(
         f'🎙️ _Escuché:_ "{_escape(texto)}"',
         parse_mode=ParseMode.MARKDOWN_V2
     )
 
-    # Procesar como mensaje de texto normal
-    await update.effective_chat.send_action(ChatAction.TYPING)
-    db.guardar_sesion(user.id, user.username or '', nombre)
-
-    # Mensaje intermedio si parece búsqueda web
-    msg_intermedio_voz = None
-    if _es_busqueda_web(texto):
-        msg_intermedio_voz = await update.message.reply_text('🔍 Buscando en internet...')
-
-    agente_sesion = sesion.get('agente_preferido')
-    nivel         = sesion.get('nivel', 1)
-    agente_slug   = None
-    if agente_sesion:
-        nivel_min_agente = next((n for _, d, n in AGENTES if agente_sesion in d), 1)
-        agente_slug = agente_sesion if nivel >= nivel_min_agente else None
-
-    resultado = api_ia.consultar(
-        pregunta        = texto,
-        usuario_id      = str(user.id),
-        nombre_usuario  = nombre,
-        agente          = agente_slug,
-        empresa         = sesion.get('empresa', 'ori_sil_2'),
-        conversacion_id = sesion.get('conversacion_id'),
-        canal           = 'telegram'
-    )
-
-    if resultado.get('conversacion_id'):
-        db.guardar_sesion(user.id, user.username or '', nombre,
-                          conversacion_id=resultado['conversacion_id'])
-
-    info       = tabla_mod.procesar_tabla(resultado, texto, sesion.get('empresa', 'ori_sil_2'))
-    texto_resp = info['texto']
-    token      = info['token']
-    n_filas    = info['n_filas']
-
-    if not resultado.get('ok'):
-        await update.message.reply_text(
-            '😔 No pude obtener esa información. Intenta reformular la pregunta.',
-            reply_markup=reply_kb(sesion.get('nivel', 1))
-        )
-        return
-
-    kb           = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
-    agente_usado = resultado.get('agente', '')
-    pie          = f'\n\n_{ICONOS_AGENTES.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
-
-    MAX_LEN = 4000
-    texto_enviar = texto_resp + pie
-    if len(texto_enviar) > MAX_LEN:
-        if token:
-            texto_enviar = f'El detalle tiene {n_filas} filas — demasiado para mostrar en el chat.\n\nAbrí la tabla para verlo completo con filtros y totales.{pie}'
-        else:
-            texto_enviar = texto_resp[:MAX_LEN] + '\n\n_… respuesta recortada._'
-
-    try:
-        if msg_intermedio_voz:
-            try:
-                await msg_intermedio_voz.edit_text(
-                    texto_enviar, parse_mode=ParseMode.MARKDOWN, reply_markup=kb
-                )
-            except Exception:
-                await msg_intermedio_voz.edit_text(texto_enviar[:MAX_LEN], reply_markup=kb)
-        else:
-            await update.message.reply_text(
-                texto_enviar,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=kb
-            )
-    except Exception:
-        await update.message.reply_text(texto_enviar[:MAX_LEN], reply_markup=kb)
+    # Procesar exactamente igual que un mensaje de texto
+    update.message.text = texto
+    await handle_mensaje(update, ctx)
 
 
 # ─── Handler de callbacks (botones inline) ───────────────────────────────────
