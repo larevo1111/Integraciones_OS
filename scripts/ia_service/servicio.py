@@ -274,7 +274,8 @@ def _resolver_agente_disponible(nivel_usr: int, agente_bloqueado: str, empresa: 
     except Exception:
         return None
 
-def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) -> str | None:
+def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str,
+                          empresa: str = 'ori_sil_2') -> str | None:
     """
     Genera el resumen actualizado de conversación usando Groq (rápido, gratis).
     El agente principal ya no necesita incluir el resumen en su respuesta.
@@ -305,6 +306,7 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) 
         {'role': 'user',   'content': prompt},
     ]
     res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
+    _log_aux(agente_cfg, res, 'resumen', '(resumen conversación)', empresa)
     if res['ok'] and res.get('texto'):
         return res['texto'].strip()
     return None
@@ -359,6 +361,7 @@ def _depurar_logica_negocio(empresa: str):
             {'role': 'user',   'content': prompt},
         ]
         res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
+        _log_aux(agente_cfg, res, 'depurador', '(depurar lógica negocio)', empresa)
         if not res['ok'] or not res.get('texto'):
             # Suplente si el primero falló
             for slug_dep in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
@@ -367,6 +370,7 @@ def _depurar_logica_negocio(empresa: str):
                 cand = _cargar_agente(slug_dep)
                 if cand and cand.get('api_key'):
                     res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=900)
+                    _log_aux(cand, res, 'depurador', '(depurar lógica negocio — suplente)', empresa)
                     if res['ok'] and res.get('texto'):
                         agente_cfg = cand
                         break
@@ -1260,7 +1264,7 @@ def consultar(
                     raise Exception(f"Error en modo aprendizaje: {res['error']}")
 
                 respuesta_final = res['texto'].strip()
-                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
+                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final, empresa)
 
                 # Detectar bloque [GUARDAR_NEGOCIO] en la respuesta
                 _procesar_bloque_aprendizaje(respuesta_final, empresa)
@@ -1299,7 +1303,7 @@ def consultar(
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
                 # Resumen generado por Groq en lugar del agente principal
-                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
+                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final, empresa)
                 # Red de seguridad: solo en conversacion — analisis_datos NUNCA debe guardar lógica de negocio
                 if tipo == 'conversacion':
                     _procesar_bloque_aprendizaje(res['texto'], empresa)
@@ -1317,7 +1321,7 @@ def consultar(
 
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
-                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final)
+                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final, empresa)
                 # Red de seguridad: clasificacion mal enrutada puede contener una enseñanza
                 _procesar_bloque_aprendizaje(res['texto'], empresa)
 
@@ -1454,6 +1458,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
             continue
 
         res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=80)
+        _log_aux(cand, res, 'router', pregunta, empresa)  # loguear siempre — ok o error
         if not res['ok']:
             continue  # Fallo (rate limit, timeout, etc.) → intentar siguiente agente
 
@@ -1587,6 +1592,40 @@ def _calcular_costo(agente: dict, tokens_in: int, tokens_out: int) -> float:
     costo_in  = float(agente.get('costo_input')  or 0)
     costo_out = float(agente.get('costo_output') or 0)
     return round((tokens_in * costo_in + tokens_out * costo_out) / 1_000_000, 6)
+
+
+def _log_aux(agente_cfg: dict, res: dict, tipo: str, pregunta_breve: str,
+             empresa: str = 'ori_sil_2', latencia_ms: int = 0):
+    """
+    Loguea llamadas auxiliares (router, resumen, depurador) en ia_logs.
+    Sin esta función, los costos reales de Gemini son invisibles en el dashboard interno.
+    Falla silenciosamente para no interrumpir el flujo principal.
+    """
+    try:
+        if not agente_cfg:
+            return
+        costo = _calcular_costo(agente_cfg, res.get('tokens_in', 0) or 0, res.get('tokens_out', 0) or 0)
+        _guardar_log(
+            conversacion_id=None,
+            agente_slug=agente_cfg.get('slug', ''),
+            tipo_consulta=tipo,
+            canal='interno',
+            pregunta=pregunta_breve[:300],
+            sql_generado=None,
+            datos_crudos=None,
+            respuesta=None,
+            formato='texto',
+            tokens_in=res.get('tokens_in', 0) or 0,
+            tokens_out=res.get('tokens_out', 0) or 0,
+            costo_usd=costo,
+            latencia_ms=latencia_ms,
+            pasos_ejecutados=[tipo],
+            error=res.get('error') if not res.get('ok') else None,
+        )
+        if costo > 0:
+            _verificar_gasto_y_notificar(empresa, costo)
+    except Exception:
+        pass
 
 
 def _guardar_log(**kwargs) -> int | None:
