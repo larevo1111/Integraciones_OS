@@ -385,9 +385,15 @@ function actualizarTiempoEst(parte, val) {
   actualizar('tiempo_estimado_min', h*60+m)
 }
 
-function onCronometroUpdate(evento, tiempoMin) {
-  if (evento === 'detenido') actualizar('tiempo_real_min', tiempoMin)
-  emit('actualizada', { ...props.tarea, cronometro_activo: evento === 'iniciado' ? 1 : 0 })
+async function onCronometroUpdate(evento, tiempoMin) {
+  if (evento === 'detenido') {
+    // Actualizar UI inmediatamente con tiempo correcto + cronómetro detenido
+    emit('actualizada', { ...props.tarea, cronometro_activo: 0, tiempo_real_min: tiempoMin })
+    // Persistir en DB (emitirá de nuevo con tarea fresca del servidor)
+    await actualizar('tiempo_real_min', tiempoMin)
+  } else {
+    emit('actualizada', { ...props.tarea, cronometro_activo: 1 })
+  }
 }
 
 function actualizarTiempoReal(parte, val) {
