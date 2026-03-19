@@ -58,42 +58,6 @@ def v(val):
     return s if s else None
 
 
-# Sufijos que indican persona jurídica (empresa)
-_SUFIJOS_EMPRESA = {
-    'sas', 's.a.s', 's.a.s.', 'sa', 's.a', 's.a.', 'ltda', 'ltda.',
-    'eu', 'e.u', 'e.u.', 'srl', 'sl', 'inc', 'corp', 'cia', 'cia.',
-    'spa', 'bv', 'nv', 'ag', 'gmbh', 'llc',
-}
-
-
-def split_nombre(nombre, tipo_persona=None):
-    """
-    Divide nombre en first_name / last_name.
-    - Empresas (tipo Jurídica o con sufijo SAS/LTDA/etc.) → todo en first_name, last_name=''
-    - Personas naturales → últimas palabra = apellido, resto = nombre
-    - ≤ 1 palabra → todo en first_name
-    """
-    if not nombre:
-        return '', ''
-    nombre = nombre.strip()
-    partes = nombre.split()
-
-    # Detectar empresa por tipo_persona
-    es_empresa = tipo_persona and 'ur' in tipo_persona.lower()  # 'Jurídica'
-    # Detectar empresa por sufijo al final del nombre
-    if not es_empresa and partes:
-        if partes[-1].lower().rstrip('.') in _SUFIJOS_EMPRESA:
-            es_empresa = True
-        # También checar penúltima palabra (ej: "... S.A.S.")
-        elif len(partes) >= 2 and partes[-1].lower() in {'.', '.'} :
-            if partes[-2].lower().rstrip('.') in _SUFIJOS_EMPRESA:
-                es_empresa = True
-
-    if es_empresa or len(partes) <= 1:
-        return nombre, ''
-
-    # Persona natural: última palabra como apellido
-    return ' '.join(partes[:-1]), partes[-1]
 
 
 def cargar_usuarios_espo(cur_espo):
@@ -332,7 +296,8 @@ def main():
                 skip += 1
                 continue
 
-            first, last = split_nombre(v(c['nombre']) or '', v(c['tipo_de_persona']))
+            first = (v(c['nombre']) or '').strip()
+            last  = ''
             vendedor_id = resolver_vendedor(v(c['vendedor']), usuarios_map)
 
             # Resolver ciudad al formato "Ciudad - Departamento"
