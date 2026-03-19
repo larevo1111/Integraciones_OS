@@ -799,12 +799,6 @@ def consultar(
     if isinstance(pasos_del_tipo, str):
         pasos_del_tipo = json.loads(pasos_del_tipo)
 
-    # Si el enrutador determinó que no se necesita SQL nuevo, saltar generar_sql y ejecutar.
-    # La respuesta se construye con los datos ya presentes en el contexto conversacional.
-    if tipo == 'analisis_datos' and not requiere_sql:
-        pasos_del_tipo = ['redactar']
-        pasos_ejecutados.append('sin_sql')  # trazabilidad en logs
-
     temperatura = float(tipo_cfg.get('temperatura', 0.3))
 
     # ── 4. Resolver agente ────────────────────────────────────────────
