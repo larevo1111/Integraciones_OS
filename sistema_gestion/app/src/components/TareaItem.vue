@@ -44,7 +44,22 @@
     </div>
 
     <div class="cat-dot" :style="{ background: tarea.categoria_color }" />
-    <span class="tarea-titulo">{{ tarea.titulo }}</span>
+    <input
+      v-if="editandoTitulo"
+      ref="inputTituloRef"
+      class="tarea-titulo-input"
+      v-model="tituloEditando"
+      @blur="confirmarEdicion"
+      @keydown.enter.prevent="confirmarEdicion"
+      @keydown.escape.prevent="cancelarEdicion"
+      @click.stop
+    />
+    <span
+      v-else
+      class="tarea-titulo"
+      :class="{ 'titulo-editable': !compacto }"
+      @click.stop="activarEdicion"
+    >{{ tarea.titulo }}</span>
 
     <div class="tarea-meta">
       <!-- Cronómetro activo (corriendo en tiempo real) -->
@@ -108,7 +123,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
 
 const props = defineProps({
@@ -130,7 +145,36 @@ const responsableIniciales = computed(() => {
   // Fallback: parte antes del @ en el email
   return props.tarea.responsable.split('@')[0].slice(0, 3).toUpperCase()
 })
-defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas'])
+const emit = defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas', 'editar-titulo'])
+
+// ── Edición inline del título (solo desktop) ──────────────────
+const editandoTitulo  = ref(false)
+const tituloEditando  = ref('')
+const inputTituloRef  = ref(null)
+
+function activarEdicion(e) {
+  if (props.compacto) return          // móvil: no editar inline
+  e.stopPropagation()
+  tituloEditando.value  = props.tarea.titulo
+  editandoTitulo.value  = true
+  nextTick(() => {
+    inputTituloRef.value?.focus()
+    inputTituloRef.value?.select()
+  })
+  emit('click', props.tarea)          // también abrir panel
+}
+
+function confirmarEdicion() {
+  const nuevo = tituloEditando.value.trim()
+  editandoTitulo.value = false
+  if (nuevo && nuevo !== props.tarea.titulo) {
+    emit('editar-titulo', { tarea: props.tarea, titulo: nuevo })
+  }
+}
+
+function cancelarEdicion() {
+  editandoTitulo.value = false
+}
 
 const esCompletada = computed(() => ['Completada','Cancelada'].includes(props.tarea.estado))
 
@@ -283,6 +327,24 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
 @media (max-width: 768px) {
   .btn-add-sub       { opacity: 0.45; }
   .btn-add-sub-solo  { opacity: 0.25; }
+}
+
+/* Título editable en desktop */
+.titulo-editable { cursor: text; }
+
+/* Input inline de edición de título */
+.tarea-titulo-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  padding: 0 0 1px;
+  min-width: 0;
+  line-height: inherit;
 }
 
 /* Subtarea: indentación */

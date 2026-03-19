@@ -135,6 +135,7 @@
               @cambiar-estado="cambiarEstado"
               @agregar-subtarea="iniciarSubtarea"
               @toggle-subtareas="toggleSubtareas"
+              @editar-titulo="editarTituloInline"
             />
             <!-- Subtareas expandidas -->
             <template v-if="subtareasExpandidas[t.id]">
@@ -148,6 +149,7 @@
                 :compacto="isMobile"
                 @click="seleccionar"
                 @cambiar-estado="cambiarEstado"
+                @editar-titulo="editarTituloInline"
               />
               <!-- Inline quickadd para nueva subtarea — Enter guarda, blur guarda, × cancela -->
               <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
@@ -186,6 +188,7 @@
               :compacto="isMobile"
               @click="seleccionar"
               @cambiar-estado="cambiarEstado"
+              @editar-titulo="editarTituloInline"
             />
           </template>
         </template>
@@ -851,6 +854,13 @@ async function abrirPadre(parentId) {
 function onTareaGuardada(tarea) {
   tareas.value.push(tarea)
   tareaSeleccionada.value = tarea
+}
+
+async function editarTituloInline({ tarea, titulo }) {
+  try {
+    const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify({ titulo }) })
+    onTareaActualizada(data.tarea)
+  } catch (e) { console.error(e) }
 }
 
 async function eliminar(tarea) {
