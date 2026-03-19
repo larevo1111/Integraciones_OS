@@ -16,6 +16,7 @@ Ejecutar manualmente:
   python3 scripts/sync_espocrm_contactos.py
 """
 
+import re
 import secrets
 import sys
 import unicodedata
@@ -57,22 +58,42 @@ def v(val):
     return s if s else None
 
 
-def split_nombre(nombre):
+# Sufijos que indican persona jurídica (empresa)
+_SUFIJOS_EMPRESA = {
+    'sas', 's.a.s', 's.a.s.', 'sa', 's.a', 's.a.', 'ltda', 'ltda.',
+    'eu', 'e.u', 'e.u.', 'srl', 'sl', 'inc', 'corp', 'cia', 'cia.',
+    'spa', 'bv', 'nv', 'ag', 'gmbh', 'llc',
+}
+
+
+def split_nombre(nombre, tipo_persona=None):
     """
-    Divide nombre completo en first_name / last_name.
-    Para clientes Effi: el 50% son nombres de empresa o persona única.
-    Estrategia: últimas 2 palabras = apellidos, resto = nombres.
-    Si hay ≤ 2 palabras → todo en first_name, last_name=''.
+    Divide nombre en first_name / last_name.
+    - Empresas (tipo Jurídica o con sufijo SAS/LTDA/etc.) → todo en first_name, last_name=''
+    - Personas naturales → últimas palabra = apellido, resto = nombre
+    - ≤ 1 palabra → todo en first_name
     """
     if not nombre:
         return '', ''
-    partes = nombre.strip().split()
-    if len(partes) <= 2:
-        return nombre.strip(), ''
-    # Últimas 2 palabras como apellidos
-    last  = ' '.join(partes[-2:])
-    first = ' '.join(partes[:-2])
-    return first, last
+    nombre = nombre.strip()
+    partes = nombre.split()
+
+    # Detectar empresa por tipo_persona
+    es_empresa = tipo_persona and 'ur' in tipo_persona.lower()  # 'Jurídica'
+    # Detectar empresa por sufijo al final del nombre
+    if not es_empresa and partes:
+        if partes[-1].lower().rstrip('.') in _SUFIJOS_EMPRESA:
+            es_empresa = True
+        # También checar penúltima palabra (ej: "... S.A.S.")
+        elif len(partes) >= 2 and partes[-1].lower() in {'.', '.'} :
+            if partes[-2].lower().rstrip('.') in _SUFIJOS_EMPRESA:
+                es_empresa = True
+
+    if es_empresa or len(partes) <= 1:
+        return nombre, ''
+
+    # Persona natural: última palabra como apellido
+    return ' '.join(partes[:-1]), partes[-1]
 
 
 def cargar_usuarios_espo(cur_espo):
@@ -216,11 +237,33 @@ def upsert_email(cur, contact_id, email_raw, now):
         )
 
 
+def _solo_digitos(phone):
+    """Retorna solo los dígitos del número (para comparación normalizada)."""
+    return re.sub(r'\D', '', phone or '')
+
+
 def upsert_phone(cur, contact_id, phone_raw, phone_type, is_primary, now):
     if not phone_raw:
         return
     phone = phone_raw.strip()
+    if not phone:
+        return
+    digits = _solo_digitos(phone)
 
+    # Si ya hay un teléfono activo vinculado al contacto con los mismos dígitos
+    # (aunque el formato sea distinto, ej: "+57 322..." vs "573226..."), no hacer nada.
+    if digits:
+        cur.execute(
+            "SELECT epn.id FROM entity_phone_number epn "
+            "JOIN phone_number pn ON pn.id = epn.phone_number_id "
+            "WHERE epn.entity_id=%s AND epn.entity_type='Contact' "
+            "AND epn.deleted=0 AND REGEXP_REPLACE(pn.name,'[^0-9]','')=%s",
+            (contact_id, digits)
+        )
+        if cur.fetchone():
+            return  # Ya existe — no duplicar
+
+    # Buscar o crear el registro en phone_number
     cur.execute("SELECT id FROM phone_number WHERE name=%s AND deleted=0", (phone,))
     row = cur.fetchone()
     if row:
@@ -289,7 +332,7 @@ def main():
                 skip += 1
                 continue
 
-            first, last = split_nombre(v(c['nombre']) or '')
+            first, last = split_nombre(v(c['nombre']) or '', v(c['tipo_de_persona']))
             vendedor_id = resolver_vendedor(v(c['vendedor']), usuarios_map)
 
             # Resolver ciudad al formato "Ciudad - Departamento"
