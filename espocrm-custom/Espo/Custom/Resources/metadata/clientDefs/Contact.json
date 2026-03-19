@@ -10,6 +10,17 @@
                     "style": "default"
                 }
             ]
+        },
+        "detail": {
+            "buttons": [
+                {
+                    "label": "Abrir en Effi",
+                    "action": "abrirEnEffi",
+                    "handler": "custom:handlers/abrir-en-effi",
+                    "iconClass": "fas fa-external-link-alt",
+                    "style": "default"
+                }
+            ]
         }
     }
 }
