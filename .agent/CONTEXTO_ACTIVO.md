@@ -323,7 +323,7 @@ Tablas clave: `ia_agentes`, `ia_tipos_consulta`, `ia_temas`, `ia_conversaciones`
 | `claude-sonnet` | claude-sonnet-4-6 | ✅ Activo — documentos premium | $3.00 |
 | `gemini-image` | gemini-2.5-flash-image | ✅ Activo — generación de imágenes | $52.00 |
 
-**Estado del servicio (2026-03-16):** ✅ Activo — sistema de fallback + notificaciones Telegram activos
+**Estado del servicio (2026-03-18):** ✅ Activo — circuit breaker con fallback automático + logging completo de todas las llamadas API
 **Módulo RAG:** `scripts/ia_service/rag.py` — fragmentación + búsqueda FULLTEXT por empresa+tema
 **Temas seeded:** 7 temas para ori_sil_2 (comercial, finanzas, produccion, administracion, marketing, estrategia, general)
 **⚠️ `ia_rag_colecciones` fue eliminada** — reemplazada por `ia_temas` (con empresa, schema_tablas, system_prompt)
@@ -346,6 +346,36 @@ resultado = consultar(
 )
 # Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id, tema, empresa
 ```
+
+## Completado 2026-03-18 — Circuit breaker fallback + SQL retry real + Logging completo
+
+### 1. Circuit breaker con fallback automático
+- **Antes:** cuando un agente era bloqueado (RPD o circuit breaker) → error directo al usuario
+- **Ahora:** `verificar_limites()` retorna `capa` (1=budget global, 2=RPD agente, 3=circuit breaker)
+  - Capa 1 → bloqueo total (sin alternativa — presupuesto global agotado)
+  - Capa 2 o 3 → `_resolver_agente_disponible(nivel_usr, agente_bloqueado, empresa)` busca el siguiente agente disponible por orden de prioridad respetando el nivel del usuario
+  - Si hay alternativa: fallback silencioso con notificación "🔄 Fallback automático: X → Y"
+  - Si todos bloqueados: error "Todos los agentes bloqueados"
+
+### 2. SQL retry con columnas reales (sqlglot + DESCRIBE)
+- **Antes:** retry usaba el mismo prompt sin info de columnas → LLM repetía el mismo error
+- **Ahora:** `_obtener_columnas_reales(sql)` extrae tablas del SQL fallido con sqlglot, hace DESCRIBE contra Hostinger y retorna las columnas exactas
+- El prompt de retry incluye "Columnas REALES de las tablas usadas:\n  tabla1: col1, col2, ..."
+- LLM ya no puede inventar nombres de columna en el segundo intento
+
+### 3. Logging completo — todas las llamadas API
+- **Problema detectado:** costos internos eran 4–12× menores que facturación Google real
+- **Causa:** router (`_enrutar`), resumen (`_generar_resumen_groq`), depurador (`_depurar_logica_negocio`) hacían llamadas API sin loguear
+- **Fix:** nueva función `_log_aux(agente_cfg, res, tipo, pregunta_breve, empresa, latencia_ms)` — registra en `ia_logs` con tipo_consulta = `'router'` / `'resumen'` / `'depurador'`
+- `_generar_resumen_groq()` recibe nuevo parámetro `empresa` (default `'ori_sil_2'`) para pasarlo a `_log_aux`
+- Los 3 callers de `_generar_resumen_groq` en `consultar()` fueron actualizados para pasar `empresa`
+
+### 4. Manual actualizado a v2.7
+- Archivo: `.agent/manuales/ia_service_manual.md`
+- Nuevas secciones: retry columnas reales, router por principios, caché SQL, audio bot, logging completo
+- Secciones actualizadas: circuit breaker, aprendizaje (restricción tipo conversacion), mensajes recientes
+
+---
 
 ## Próximos Pasos (2026-03-18)
 1. **Búsqueda web** — integrar Tavily API (gratis 1000 búsquedas/mes). Nuevo tipo `busqueda_web`, router detecta consultas externas al negocio.

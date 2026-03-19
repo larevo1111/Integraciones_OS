@@ -1,6 +1,6 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.6 — 2026-03-17
+**Versión**: 2.7 — 2026-03-18
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
 **Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 9 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos, Lógica de negocio, Bot Telegram. Auth Google OAuth + JWT 2 pasos.
 
@@ -811,13 +811,11 @@ ALTER TABLE ia_ejemplos_sql ADD COLUMN embedding LONGTEXT NULL;
 
 ---
 
-## 11. Retry inteligente — resultado vacío {#retry}
+## 11. Retry inteligente — resultado vacío y columnas reales {#retry}
 
-### El problema
+### Retry por resultado vacío
 
 Antes, si el SQL ejecutaba sin error pero devolvía 0 filas, la IA respondía "no hay datos". Muchas veces era un filtro de fecha demasiado estricto o un estado mal escrito, no que los datos no existan.
-
-### Solución: retry con contexto de fecha máxima
 
 ```
 SQL ejecuta → 0 filas
@@ -830,13 +828,30 @@ SQL ejecuta → 0 filas
   → Si sigue vacío al 3er intento: "No encontré datos para ese criterio"
 ```
 
-### Casos que resuelve
+Casos resueltos: fechas futuras por error del modelo, filtros de estado mal escritos, lunes sin ventas.
 
-- "Ventas del lunes" cuando el lunes no tuvo facturas → reformula hacia el día más reciente
-- Filtros de estado mal escritos ("Pendiente" vs "Pendiente de facturar")
-- Fechas futuras por error de razonamiento del modelo
+### Retry por columnas SQL inválidas — con columnas reales (2026-03-18)
 
-**Impacto en velocidad**: solo agrega +1 LLM call cuando hay 0 filas. En consultas normales: sin cambio.
+**El problema anterior**: cuando el modelo generaba SQL con un nombre de columna incorrecto (ej. `d.descripcion_articulo` que no existe), el retry le enviaba el error y le pedía "revisa los nombres de columna en el esquema". El modelo frecuentemente repetía el mismo error porque tenía que adivinar.
+
+**Solución**: `_obtener_columnas_reales(sql)` usa **sqlglot** para extraer las tablas del SQL fallido, luego hace **DESCRIBE** en Hostinger para obtener las columnas reales, e inyecta esa información concreta en el prompt de retry.
+
+```python
+# servicio.py — en el paso 'ejecutar', si SQL falla:
+columnas_reales = _obtener_columnas_reales(sql_generado)
+# devuelve: "Columnas REALES de las tablas usadas:
+#   zeffi_facturas_venta_detalles: _pk, sucursal, cantidad, precio_unitario, ...
+#   zeffi_facturas_venta_encabezados: _pk, numero_factura, id_cliente, ..."
+prompt_retry = (
+    f"El SQL falló: {error_sql}\n\n"
+    f"{columnas_reales}"
+    "Genera un SQL corregido usando SOLO las columnas listadas."
+)
+```
+
+El modelo tiene información concreta en el 2° intento y lo corrige correctamente.
+
+**Impacto en velocidad**: el retry de error (`_obtener_columnas_reales`) solo ocurre cuando el SQL falla. Agrega 1 query DESCRIBE local (~5ms) + 1 LLM call adicional. En consultas normales sin error: sin cambio.
 
 ---
 
@@ -860,16 +875,26 @@ El enrutador devuelve un JSON:
 Este campo es la optimización más importante del enrutador:
 
 - `requiere_sql: true` → flujo SQL completo (hasta 4 llamadas LLM)
-- `requiere_sql: false` → directo al agente analítico (1 llamada LLM)
+- `requiere_sql: false` → usa caché SQL real si existe, o responde con RAG/contexto
 
-**Ejemplos de requiere_sql: false:**
-- "¿Cuál es la meta de ventas anual?" (estrategia — responde con RAG)
-- "¿Y cuánto fue el mes pasado?" (si ya se habló de ventas — responde desde contexto)
-- "Explícame qué es el margen de utilidad" (conceptual — no necesita BD)
+**PRINCIPIO FUNDAMENTAL del router (2026-03-18 — reescrito):**
+
+> ¿La respuesta REQUIERE consultar registros de la BD para ser correcta?
+> - **SÍ** → `analisis_datos` con `requiere_sql: true`
+> - **NO** → `conversacion` (responde con conocimiento general del negocio o contexto previo)
+
+El router NO usa listas de palabras clave para clasificar. Razona por principio. Si hay cualquier filtro nuevo (fecha, producto, cliente distinto) → `requiere_sql: true`. Solo cuando la respuesta es un seguimiento directo de datos YA mostrados ("¿y el margen de eso?", "¿cuál es el mayor?") → puede ser `requiere_sql: false`.
+
+**Caché SQL para seguimientos (ver Sección 14):** cuando `requiere_sql: false`, el sistema inyecta en el router el resumen del último resultado SQL (columnas, número de filas, muestra de 3 filas). El router puede razonar si la pregunta puede responderse con esos datos o necesita una consulta nueva.
+
+**Ejemplos de requiere_sql: false (solo si hay caché disponible):**
+- "¿Y cuál fue el segundo?" (después de haber pedido el top)
+- "¿Cuál tiene el mayor margen?" (referencia a datos ya mostrados)
 
 **Ejemplos de requiere_sql: true:**
 - "¿Cuánto vendimos ayer?" (necesita datos reales de la BD)
 - "Top 5 productos del mes" (necesita consultar facturas)
+- "Dame las ventas de frutos secos" (aunque se habló de ventas antes — filtro nuevo)
 
 ### Flujo completo con tiempos medidos
 
@@ -958,6 +983,21 @@ Estado en BD (2026-03-15):
 - `ia_temas.agente_preferido` para `finanzas`, `comercial`, `estrategia` → `gemini-pro`
 - `ia_temas.agente_preferido` para `general`, `marketing`, `administracion`, `produccion` → `gemini-flash-lite`
 - `ia_tipos_consulta.agente_preferido` para `conversacion` → `gemini-flash-lite`
+
+### Detección pre-router de búsqueda web (2026-03-18)
+
+Antes de llamar al router, `consultar()` detecta si el usuario pide **explícitamente** buscar en internet. Si lo detecta, fuerza `tipo='busqueda_web'` sin pasar por el router (que a veces lo clasificaba como conversación).
+
+```python
+# Frases que activan la detección pre-router:
+_intento_internet = [
+    'busca en internet', 'buscar en internet', 'consulta en internet',
+    'consultes en internet', 'búscalo en internet', 'busca en la web',
+    'consulta en la web', 'busca en google', 'googlealo', 'búscalo online', ...
+]
+```
+
+**Principio**: no es una lista de temas (no "busca TRM", "busca precio bitcoin"). Es detección de INTENCIÓN explícita del usuario de salir a internet. El sistema es autónomo — decide por principio qué buscar.
 
 ### Distinción crítica: analisis_datos vs conversacion
 
@@ -1119,14 +1159,39 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) 
     ...
 ```
 
+### Caché SQL para seguimientos inteligentes (2026-03-18)
+
+Cada vez que se ejecuta un SQL exitoso, el resultado se guarda en `ia_conversaciones.metadata`:
+
+```python
+# contexto.py
+guardar_cache_sql(conversacion_id, pregunta, columnas, datos)
+# guarda: {pregunta_origen, columnas, datos[:500 filas], n_filas}
+```
+
+El router recibe un **resumen del caché** en su contexto (pregunta origen, columnas, n° filas, 3 filas de muestra). Con eso puede decidir inteligentemente si `requiere_sql: false` (seguimiento de los mismos datos) o `requiere_sql: true` (filtro nuevo).
+
+Cuando el router dice `requiere_sql: false`:
+- Si hay caché con datos reales → usa esos datos (nunca inventa)
+- Si no hay caché → fuerza `requiere_sql: true` (no permite respuesta sin datos)
+
+El caché se limpia automáticamente con `/limpiar`.
+
+```python
+# Funciones en contexto.py:
+guardar_cache_sql(conversacion_id, pregunta, columnas, datos)
+leer_cache_sql(conv)      # retorna dict o None
+# El campo ia_conversaciones.metadata (JSON) almacena el caché
+```
+
 ### Limpiar contexto de un usuario
 
 ```bash
 # Desde el bot: /limpiar
 # O directamente en BD:
-mysql -u osadmin -pEpist2487. ia_service_os -e \
-  "UPDATE ia_conversaciones SET resumen=NULL, mensajes_recientes='[]',
-   mensajes_count=0 WHERE usuario_id='TELEGRAM_ID' AND canal='telegram';" 2>/dev/null
+mysql --user=osadmin --password='Epist2487.' ia_service_os -e \
+  "UPDATE ia_conversaciones SET resumen=NULL, mensajes_recientes='[]', metadata=NULL
+   WHERE usuario_id='TELEGRAM_ID' AND canal='telegram';" 2>/dev/null
 ```
 
 ---
@@ -1165,6 +1230,32 @@ scripts/telegram_bot/
   db.py       — sesiones + auth (verificar_por_telefono, vincular_telegram_id)
   tabla.py    — procesar tablas de datos para el bot
   teclado.py  — teclados reply e inline (inline_ajustes filtra por nivel)
+```
+
+### Mensajes de voz — mismo flujo que texto (2026-03-18)
+
+**El bot acepta mensajes de voz** y los procesa con el mismo flujo que texto, incluyendo SQL, búsqueda web y modo aprendizaje.
+
+Flujo:
+```
+Usuario envía audio
+  → handle_voz() transcribe con Whisper (OpenAI API vía Groq)
+  → delega a handle_mensaje(texto_override=texto_transcrito)
+  → flujo idéntico a mensaje de texto (enrutar → SQL/web/chat → responder)
+```
+
+**Gotcha crítico (python-telegram-bot v20)**: los objetos `Message` son inmutables. Es imposible hacer `update.message.text = texto`. Por eso se usa `texto_override` — un parámetro adicional que `handle_mensaje` recibe y usa en lugar de `update.message.text`. Esta solución garantiza que audio y texto siguen exactamente el mismo código.
+
+```python
+# bot.py — handle_voz()
+async def handle_voz(update, context):
+    texto = transcribir_audio(...)  # Whisper via Groq
+    await handle_mensaje(update, context, texto_override=texto)
+
+# bot.py — handle_mensaje()
+async def handle_mensaje(update, context, texto_override=None):
+    texto = texto_override or update.message.text
+    # ...resto del flujo idéntico para texto y audio
 ```
 
 ### Capacidad de visión — fotos y documentos
@@ -1267,9 +1358,27 @@ rate_usuario_rpm   = 15  (max 15 requests/minuto)
 rate_usuario_rp10s = 3   (max 3 requests en 10 segundos)
 ```
 
-### Circuit breaker por agente
+### Circuit breaker por agente — con fallback automático (2026-03-18)
 
-Si un agente acumula `circuit_breaker_errores` (5) errores en `circuit_breaker_ventana_min` (10 min), se suspende temporalmente y se usa el fallback del tipo.
+Si un agente acumula `circuit_breaker_errores` (5) errores en `circuit_breaker_ventana_min` (10 min), se suspende. **El sistema NO bloquea al usuario — busca automáticamente otro agente disponible.**
+
+`verificar_limites()` retorna la capa que bloqueó:
+- **Capa 1** (presupuesto global agotado) → bloqueo total, no hay alternativa
+- **Capa 2** (RPD del agente superado) → `_resolver_agente_disponible()` busca alternativa
+- **Capa 3** (circuit breaker por errores) → `_resolver_agente_disponible()` busca alternativa
+
+`_resolver_agente_disponible(nivel_usr, agente_bloqueado, empresa)`:
+- Recorre `ia_agentes` por orden de prioridad (`orden ASC`)
+- Respeta el nivel del usuario (no asigna gemini-pro a nivel 1-5)
+- Verifica que cada candidato pase sus propios límites antes de asignarlo
+- Si TODOS los agentes están suspendidos → error al usuario
+- Notifica por Telegram del cambio automático
+
+```python
+# Ejemplo: gemini-flash bloqueado (capa 3), usuario nivel 5
+# → busca alternativa: gemini-pro (nivel 6 — NO), gpt-oss-120b (nivel 1 — SÍ)
+# → usa gpt-oss-120b transparentemente, usuario ni se entera
+```
 
 ### Límite de costo diario
 
@@ -1377,6 +1486,21 @@ explicacion: Explicación detallada de la lógica de negocio...
 
 El servicio (`servicio.py._procesar_bloque_aprendizaje()`) detecta este bloque, lo extrae, guarda en `ia_logica_negocio`, y elimina el bloque de la respuesta que ve el usuario.
 
+### Restricción crítica: solo en tipo conversacion (2026-03-18)
+
+`_procesar_bloque_aprendizaje()` **solo se ejecuta cuando `tipo == 'conversacion'`**.
+
+Antes se ejecutaba también en `analisis_datos` y `clasificacion`. Esto causaba que el agente guardara "lógica de negocio" falsa cuando respondía preguntas de datos (ej. guardó como lógica "el bot analiza ventas y genera SQL" — descripción del sistema, no del negocio).
+
+```python
+# servicio.py — paso 'redactar'
+if tipo == 'conversacion':
+    _procesar_bloque_aprendizaje(res['texto'], empresa)
+# analisis_datos NUNCA guarda lógica de negocio desde respuestas de datos
+```
+
+El modo aprendizaje puro (`tipo == 'aprendizaje'`, paso `conversar`) sí puede guardar — ese es su propósito.
+
 ### Depurador automático
 
 Cuando el total de palabras en `ia_logica_negocio` supera ~800, el servicio corre `_depurar_logica_negocio()` que:
@@ -1447,6 +1571,31 @@ La URL base del endpoint se configura en `proveedores/openai_compat.py` según e
 ---
 
 ## 19. Monitoreo del consumo {#monitoreo}
+
+### Logging completo de TODAS las llamadas a la API (2026-03-18)
+
+**Problema anterior**: solo se logueaban las llamadas principales en `consultar()`. Las llamadas del router, generación de resúmenes y depurador eran invisibles — el costo interno era 4-12x menor que lo que Google realmente cobraba.
+
+**Solución**: función `_log_aux()` loguea cada llamada auxiliar en `ia_logs` con el `tipo_consulta` correspondiente:
+
+| `tipo_consulta` | Función que lo genera | Agente típico |
+|---|---|---|
+| `analisis_datos` | flujo principal `consultar()` | gemini-flash/pro |
+| `conversacion` | flujo principal `consultar()` | gemini-flash-lite |
+| `router` | `_enrutar()` — 1 call por consulta | groq-llama |
+| `resumen` | `_generar_resumen_groq()` — 1 call por consulta | groq-llama |
+| `depurador` | `_depurar_logica_negocio()` — ocasional | groq-llama |
+
+Ahora el costo interno refleja la realidad. Para ver el costo real por tipo:
+
+```sql
+-- Consumo real completo (todos los tipos)
+SELECT tipo_consulta, agente_slug, COUNT(*) AS llamadas,
+       ROUND(SUM(costo_usd),4) AS costo_usd
+FROM ia_logs
+WHERE DATE(created_at) = CURDATE()
+GROUP BY tipo_consulta, agente_slug ORDER BY costo_usd DESC;
+```
 
 ### Endpoints del servicio
 
@@ -1635,4 +1784,4 @@ UPDATE ia_tipos_consulta SET agente_sql='gemini-flash-lite' WHERE slug='analisis
 
 ---
 
-*Última actualización: 2026-03-15*
+*Última actualización: 2026-03-18 — v2.7: caché SQL, router por principios, fallback circuit breaker, retry columnas reales, fix audio bot, logging completo*
