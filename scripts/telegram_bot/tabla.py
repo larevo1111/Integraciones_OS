@@ -1,13 +1,14 @@
 """
 Formateador de tablas para Telegram.
-- Modo texto (≤5 filas): tabla monoespaciada inline.
-- Modo mini app (>5 filas): genera token y devuelve URL.
+- Modo inline (≤8 filas y ≤4 cols): tabla ASCII monoespaciada en el chat.
+- Modo mini app (>8 filas o >4 cols): genera token y devuelve URL.
 """
 import uuid, json
 from db import guardar_tabla_temp
 
 TABLA_BASE_URL = 'https://menu.oscomunidad.com/bot/tabla'
-MAX_FILAS_INLINE = 2
+MAX_FILAS_INLINE = 8   # hasta 8 filas se muestran inline
+MAX_COLS_INLINE  = 4   # hasta 4 columnas se muestran inline (>4 es muy ancho en mobile)
 
 
 def _formatear_valor(v) -> str:
@@ -84,8 +85,9 @@ def _filas_validas(filas: list) -> list:
 def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -> dict:
     """
     Siempre usa resultado['respuesta'] como texto principal.
-    Si hay tabla con datos reales: genera token para Mini App o muestra inline.
-    Nunca reemplaza el texto de la IA con código de tabla.
+    Si hay tabla con datos reales:
+    - ≤MAX_FILAS_INLINE filas Y ≤MAX_COLS_INLINE cols → tabla ASCII inline (appended al texto)
+    - Caso contrario → genera token para Mini App
     """
     tabla   = resultado.get('tabla')
     texto   = (resultado.get('respuesta') or '').strip()
@@ -96,10 +98,22 @@ def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -
         columnas = tabla.get('columnas', [])
         filas    = _filas_validas(tabla.get('filas', []))
         n_filas  = len(filas)
+        n_cols   = len(columnas)
 
-        if n_filas > MAX_FILAS_INLINE:
-            token = str(uuid.uuid4())
-            guardar_tabla_temp(token, pregunta, columnas, filas, empresa)
+        if n_filas > 0:
+            # Si el LLM ya incluyó una tabla (bloque de código con pipes), no duplicar
+            _llm_ya_tiene_tabla = '```' in texto and '|' in texto
+
+            if n_filas <= MAX_FILAS_INLINE and n_cols <= MAX_COLS_INLINE:
+                if not _llm_ya_tiene_tabla:
+                    # Tabla pequeña que el LLM no incluyó → mostrar inline
+                    tabla_str = _tabla_texto(columnas, filas)
+                    texto = f"{texto}\n\n{tabla_str}" if texto else tabla_str
+                # Si el LLM ya tiene tabla: no hacer nada extra (ya está bien formateada)
+            else:
+                # Tabla grande → mini app
+                token = str(uuid.uuid4())
+                guardar_tabla_temp(token, pregunta, columnas, filas, empresa)
 
     return {
         'texto':       texto,
