@@ -315,7 +315,7 @@ def main():
 
             campos = {
                 'first_name':           first[:100] if first else '',
-                'last_name':            last[:100]  if last  else '',
+                'last_name':            '',
                 'direccion':            (v(c['direccion']) or '')[:255],
                 'description':          v(c['observacia_n']),
                 # campos custom
