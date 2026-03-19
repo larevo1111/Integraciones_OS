@@ -164,7 +164,8 @@ def _get_config(conn, clave: str, default):
 def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
     """
     Verifica 3 capas de protección antes de llamar a la API externa.
-    Devuelve None si todo OK, o dict {error: str} si hay que bloquear.
+    Devuelve None si todo OK, o dict {error, capa} si hay que bloquear.
+    capa=1: presupuesto global (sin salida). capa=2: RPD agente. capa=3: circuit breaker.
     """
     conn = get_local_conn()
     try:
@@ -185,6 +186,7 @@ def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
                 costo_hoy = float(cur.fetchone()['total'])
                 if costo_hoy >= limite_costo:
                     return {
+                        'capa': 1,
                         'error': (
                             f"⛔ Límite de gasto diario alcanzado "
                             f"(${costo_hoy:.4f} / ${limite_costo:.2f} USD). "
@@ -208,6 +210,7 @@ def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
                 llamadas_hoy = cur.fetchone()['n']
                 if llamadas_hoy >= rpd:
                     return {
+                        'capa': 2,
                         'error': (
                             f"⛔ Agente '{agente_slug}' alcanzó su límite diario "
                             f"({llamadas_hoy}/{rpd} llamadas). "
@@ -226,6 +229,7 @@ def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
             errores_recientes = cur.fetchone()['n']
             if errores_recientes >= cb_errores:
                 return {
+                    'capa': 3,
                     'error': (
                         f"⛔ Agente '{agente_slug}' suspendido automáticamente "
                         f"({errores_recientes} errores en los últimos {cb_ventana} min). "
@@ -240,6 +244,35 @@ def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
         return None
     finally:
         conn.close()
+
+
+def _resolver_agente_disponible(nivel_usr: int, agente_bloqueado: str, empresa: str) -> dict | None:
+    """
+    Busca el siguiente agente disponible cuando el preferido está bloqueado (capa 2 o 3).
+    Respeta nivel del usuario y orden de prioridad.
+    Retorna dict del agente si encuentra uno, o None si todos están bloqueados.
+    """
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT slug FROM ia_agentes "
+                "WHERE activo=1 AND api_key != '' AND nivel_minimo <= %s AND slug != %s "
+                "ORDER BY orden ASC",
+                (nivel_usr, agente_bloqueado)
+            )
+            candidatos = cur.fetchall()
+        conn.close()
+
+        for cand in candidatos:
+            bloqueo = verificar_limites(cand['slug'], empresa)
+            if bloqueo is None:
+                agente_cfg = _cargar_agente(cand['slug'])
+                if agente_cfg:
+                    return agente_cfg
+        return None
+    except Exception:
+        return None
 
 def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str) -> str | None:
     """
@@ -613,6 +646,47 @@ def _obtener_cobertura_tablas(empresa: str = 'ori_sil_2') -> str:
     return texto
 
 
+def _obtener_columnas_reales(sql: str) -> str:
+    """
+    Dado un SQL fallido, extrae las tablas con sqlglot y hace DESCRIBE
+    contra la BD real (Hostinger) para obtener columnas reales.
+    Retorna texto con las columnas de cada tabla, o '' si falla.
+    """
+    try:
+        import sqlglot
+        import sqlglot.expressions as exp
+        stmts = sqlglot.parse(sql, dialect='mysql')
+        tablas = set()
+        for stmt in stmts:
+            if stmt is None:
+                continue
+            for node in stmt.walk():
+                if isinstance(node, exp.Table) and node.name:
+                    tablas.add(node.name)
+        if not tablas:
+            return ''
+
+        from .config import get_hostinger_conn
+        conn = get_hostinger_conn()
+        partes = []
+        with conn.cursor() as cur:
+            for tabla in sorted(tablas):
+                try:
+                    cur.execute(f"DESCRIBE {tabla}")
+                    cols = cur.fetchall()
+                    nombres = [c['Field'] for c in cols]
+                    partes.append(f"  {tabla}: {', '.join(nombres)}")
+                except Exception:
+                    pass  # tabla no existe — ignorar
+        conn.close()
+
+        if not partes:
+            return ''
+        return 'Columnas REALES de las tablas usadas:\n' + '\n'.join(partes) + '\n\n'
+    except Exception:
+        return ''
+
+
 def _obtener_fecha_maxima(sql: str) -> str:
     """
     Dado un SQL, detecta las tablas consultadas y obtiene la fecha máxima
@@ -867,17 +941,44 @@ def consultar(
     else:
         agente_cfg_sql = agente_cfg
 
-    # ── 4c. Verificar límites de seguridad ────────────────────────────
+    # ── 4c. Verificar límites de seguridad (con fallback automático) ──
     bloqueo = verificar_limites(agente_slug, empresa)
     if bloqueo:
-        return {
-            'ok': False, 'conversacion_id': conv_id,
-            'respuesta': bloqueo['error'],
-            'formato': 'texto', 'tabla': None, 'sql_generado': None,
-            'agente': agente_slug, 'tema': tema,
-            'tokens': {'in': 0, 'out': 0}, 'costo_usd': 0.0,
-            'pasos': [], 'log_id': None, 'error': bloqueo['error'],
-        }
+        capa = bloqueo.get('capa', 1)
+        if capa == 1:
+            # Presupuesto global agotado — no hay alternativa
+            return {
+                'ok': False, 'conversacion_id': conv_id,
+                'respuesta': bloqueo['error'],
+                'formato': 'texto', 'tabla': None, 'sql_generado': None,
+                'agente': agente_slug, 'tema': tema,
+                'tokens': {'in': 0, 'out': 0}, 'costo_usd': 0.0,
+                'pasos': [], 'log_id': None, 'error': bloqueo['error'],
+            }
+        # Capa 2 (RPD) o 3 (circuit breaker) — intentar otro agente
+        agente_alt = _resolver_agente_disponible(nivel_usr, agente_slug, empresa)
+        if agente_alt:
+            _notificar(
+                f"🔄 <b>Fallback automático</b>\n"
+                f"Agente <code>{agente_slug}</code> bloqueado (capa {capa})\n"
+                f"Alternativa: <code>{agente_alt['slug']}</code>"
+            )
+            agente_slug = agente_alt['slug']
+            agente_cfg  = agente_alt
+            # Si el agente SQL era el mismo que el bloqueado, actualizar también
+            if agente_cfg_sql.get('slug') == agente_slug:
+                agente_cfg_sql = agente_alt
+        else:
+            # Todos los agentes bloqueados — error al usuario
+            return {
+                'ok': False, 'conversacion_id': conv_id,
+                'respuesta': '⛔ Todos los agentes están temporalmente suspendidos. Intenta en unos minutos.',
+                'formato': 'texto', 'tabla': None, 'sql_generado': None,
+                'agente': agente_slug, 'tema': tema,
+                'tokens': {'in': 0, 'out': 0}, 'costo_usd': 0.0,
+                'pasos': [], 'log_id': None,
+                'error': 'Todos los agentes bloqueados',
+            }
 
     # ── 5. Construir contexto de sistema (6 capas) ───────────────────
     # CAPA 0: Fecha actual — siempre inyectada.
@@ -1082,13 +1183,15 @@ def consultar(
 
                 res_sql = ejecutor_sql.ejecutar(sql_generado)
                 if not res_sql['ok']:
-                    # Reintento: devolver el error al LLM para que corrija el SQL
+                    # Reintento: obtener columnas REALES de las tablas usadas y enviar al LLM
                     error_sql = res_sql['error']
+                    columnas_reales = _obtener_columnas_reales(sql_generado)
                     prompt_retry = (
                         f"El SQL que generaste falló con este error:\n{error_sql}\n\n"
                         f"SQL fallido:\n{sql_generado}\n\n"
-                        "Genera un SQL corregido. Revisa los nombres de columnas en el esquema. "
-                        "Solo responde con el SQL corregido, sin explicaciones."
+                        f"{columnas_reales}"
+                        "Genera un SQL corregido usando SOLO las columnas listadas arriba. "
+                        "Solo responde con el SQL corregido en un bloque ```sql```, sin explicaciones."
                     )
                     msgs_retry = mensajes_base + [{'role': 'user', 'content': prompt_retry}]
                     res_retry = _llamar_agente(agente_cfg_sql, msgs_retry, temperatura=0.1)
