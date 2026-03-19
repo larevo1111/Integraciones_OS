@@ -130,6 +130,7 @@
               :usuario-actual="auth.usuario?.email"
               :expandida="!!subtareasExpandidas[t.id]"
               :mostrar-responsable="!props.soloMias"
+              :compacto="isMobile"
               @click="seleccionar"
               @cambiar-estado="cambiarEstado"
               @agregar-subtarea="iniciarSubtarea"
@@ -144,6 +145,7 @@
                 :seleccionada="tareaSeleccionada?.id === sub.id"
                 :usuario-actual="auth.usuario?.email"
                 :mostrar-responsable="!props.soloMias"
+                :compacto="isMobile"
                 @click="seleccionar"
                 @cambiar-estado="cambiarEstado"
               />
@@ -181,6 +183,7 @@
               :seleccionada="tareaSeleccionada?.id === t.id"
               :usuario-actual="auth.usuario?.email"
               :mostrar-responsable="!props.soloMias"
+              :compacto="isMobile"
               @click="seleccionar"
               @cambiar-estado="cambiarEstado"
             />

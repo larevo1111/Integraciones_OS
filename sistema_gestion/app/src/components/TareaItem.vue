@@ -116,7 +116,8 @@ const props = defineProps({
   seleccionada:       { type: Boolean, default: false },
   usuarioActual:      { type: String, default: '' },
   expandida:          { type: Boolean, default: false },
-  mostrarResponsable: { type: Boolean, default: false }
+  mostrarResponsable: { type: Boolean, default: false },
+  compacto:           { type: Boolean, default: false }   // modo móvil: chips y fecha cortos
 })
 
 const responsableIniciales = computed(() => {
@@ -146,11 +147,13 @@ function hexAlpha(hex, alpha) {
 
 const catNombreCorto = computed(() => {
   const n = (props.tarea.categoria_nombre || '').replace(/_/g, ' ')
-  return n.length > 14 ? n.slice(0, 13) + '…' : n
+  const max = props.compacto ? 4 : 14
+  return n.length > max ? n.slice(0, max) : n
 })
 const proyNombreCorto = computed(() => {
   const n = props.tarea.proyecto_nombre || ''
-  return n.length > 14 ? n.slice(0, 13) + '…' : n
+  const max = props.compacto ? 4 : 14
+  return n.length > max ? n.slice(0, max) : n
 })
 
 function isoFecha(f) {
@@ -167,8 +170,9 @@ const fechaDisplay = computed(() => {
   const manana = new Date(hoy); manana.setDate(hoy.getDate()+1)
   const ayer   = new Date(hoy); ayer.setDate(hoy.getDate()-1)
   if (d.getTime() === hoy.getTime())    return 'Hoy'
-  if (d.getTime() === manana.getTime()) return 'Mañana'
-  if (d.getTime() === ayer.getTime())   return 'Ayer'
+  if (d.getTime() === manana.getTime()) return props.compacto ? 'Mañ' : 'Mañana'
+  if (d.getTime() === ayer.getTime())   return props.compacto ? 'Ayr' : 'Ayer'
+  // Para fechas específicas: "5 jun" en desktop, "5j" sería raro, dejamos igual
   return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
 })
 

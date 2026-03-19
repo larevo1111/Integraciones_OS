@@ -9,7 +9,13 @@
       </div>
       <div style="display:flex;align-items:flex-start;gap:8px">
         <EstadoBadge :estado="tarea.estado" @click="ciclarEstado" style="margin-top:2px;flex-shrink:0" />
-        <p class="tarea-panel-titulo">{{ tarea.titulo }}</p>
+        <textarea
+          class="tarea-panel-titulo"
+          :value="tarea.titulo"
+          rows="1"
+          @blur="e => e.target.value.trim() && e.target.value !== tarea.titulo && actualizar('titulo', e.target.value.trim())"
+          @keydown.enter.prevent="e => { e.target.blur() }"
+        />
         <button class="btn-icon" @click="$emit('cerrar')"><span class="material-icons" style="font-size:18px">close</span></button>
       </div>
     </div>

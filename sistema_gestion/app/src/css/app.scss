@@ -588,6 +588,24 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.4;
+  /* Cuando es textarea: sin bordes, se ve como texto editable */
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  cursor: text;
+  &:focus {
+    background: var(--bg-row-hover);
+    border-radius: var(--radius-sm);
+    padding: 2px 4px;
+    margin: -2px -4px;
+  }
 }
 .tarea-panel-body {
   flex: 1;
@@ -1068,8 +1086,31 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   .topbar { padding: 0 12px; }
   .filtros-bar { padding: 8px 12px; }
   .lista-tareas { padding: 4px 0; }
-  .tarea-item { padding: 0 10px; }
   .grupo-header { padding: 6px 10px 2px; }
+
+  /* Fila de tarea: altura automática para permitir 2 líneas de título */
+  .tarea-item {
+    padding: 6px 10px;
+    height: auto;
+    min-height: 34px;
+    align-items: flex-start;
+  }
+  /* Círculo: pequeño padding-top para alinear con la primera línea del texto */
+  .tarea-item .estado-col { padding-top: 1px; }
+  .tarea-item .cat-dot    { margin-top: 5px; flex-shrink: 0; }
+
+  /* Título: hasta 2 líneas, luego corta */
+  .tarea-titulo {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.35;
+  }
+
+  /* Meta chips: reducir gap en móvil */
+  .tarea-meta { gap: 3px; padding-top: 2px; }
 }
 
 /* ─── BOTTOM NAV MOBILE ─── */
