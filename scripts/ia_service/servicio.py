@@ -853,8 +853,12 @@ def consultar(
                            'sí dale', 'claro guárdalo', 'ok guárdalo'}
         import re as _re
         _pregunta_lower = _re.sub(r'[.,!¡¿?;:]+$', '', pregunta.strip().lower()).strip()
+        _frases_guarda = (
+            'lo guardo en mi memoria de negocio', '¿lo guardo así', '¿quieres que lo guarde',
+            'quieres que guarde esto', 'guárdalo', '¿lo guardo', 'lo guardo así',
+        )
         if _pregunta_lower in _confirmaciones and historial_ctx and \
-                'lo guardo en mi memoria de negocio' in historial_ctx.lower():
+                any(f in historial_ctx.lower() for f in _frases_guarda):
             tipo = 'conversacion'
             tema = tema or 'general'
             requiere_sql = False
@@ -873,6 +877,21 @@ def consultar(
             tipo = 'busqueda_web'
             tema = 'general'
             requiere_sql = False
+
+        # Detección pre-router: si el bot indicó que está en sesión de aprendizaje activa
+        # (dijo "listo para aprender" o similar en el historial) → continuar en aprendizaje
+        # Evita que el router confunda la instrucción del usuario como analisis_datos
+        if not tipo and historial_ctx:
+            _hctx_lower = historial_ctx.lower()
+            _frases_modo_aprendizaje = (
+                'estoy listo para aprender', 'cuéntame qué quieres enseñarme',
+                'qué quieres enseñarme', 'modo aprendizaje', 'cuéntame sobre el concepto',
+                'what do you want to teach me',  # por si viene en inglés
+            )
+            if any(f in _hctx_lower for f in _frases_modo_aprendizaje):
+                tipo = 'aprendizaje'
+                tema = tema or 'general'
+                requiere_sql = False
 
         if not tipo:
             tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
@@ -1172,11 +1191,12 @@ def consultar(
                 sql_generado = formateador.extraer_sql(res['texto'])
                 if not sql_generado:
                     # El agente respondió en texto plano sin SQL → info no existe en BD
-                    # Agregar oferta de aprendizaje al final de la respuesta
+                    # Agregar oferta de aprendizaje con mensaje claro de acción
                     texto_base = res['texto'].strip()
                     respuesta_final = (
                         texto_base + "\n\n"
-                        "💡 ¿Quieres enseñarme cómo funciona esto para que pueda responder mejor en el futuro?"
+                        "💡 ¿Quieres que guarde esto en mi memoria de negocio? "
+                        "Responde **'sí, guárdalo'** y lo registraré para futuras consultas."
                     )
                     break  # Salir del loop de pasos — no hay SQL que ejecutar
 
