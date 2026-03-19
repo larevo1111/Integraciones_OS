@@ -755,6 +755,18 @@ def consultar(
         contexto_enrutador = (f'Resumen de la conversación:\n{resumen_anterior}\n\n{historial_ctx}'
                               if resumen_anterior else historial_ctx)
 
+        # Agregar resumen del caché SQL para que el router razone si hay datos suficientes
+        _cache_sql = contexto.leer_cache_sql(conv)
+        if _cache_sql:
+            _muestra = _cache_sql['datos'][:3] if _cache_sql.get('datos') else []
+            contexto_enrutador += (
+                f"\n\nÚltimo resultado SQL disponible (caché):"
+                f"\nConsulta origen: \"{_cache_sql.get('pregunta','')}\""
+                f"\nColumnas: {', '.join(_cache_sql.get('columnas', []))}"
+                f"\nFilas totales: {_cache_sql.get('n_filas', 0)}"
+                f"\nMuestra (primeras 3): {json.dumps(_muestra, ensure_ascii=False, default=str)}"
+            )
+
         # Detección pre-router: si el bot acaba de preguntar "¿Lo guardo?" y el usuario confirma
         # → forzar conversacion para que el agente procese la confirmación y emita [GUARDAR_NEGOCIO]
         _confirmaciones = {'sí', 'si', 'dale', 'ok', 'sip', 'claro', 'correcto', 'perfecto',
@@ -798,6 +810,17 @@ def consultar(
     pasos_del_tipo = tipo_cfg.get('pasos') or ['redactar']
     if isinstance(pasos_del_tipo, str):
         pasos_del_tipo = json.loads(pasos_del_tipo)
+
+    # Si el router decidió que no se necesita SQL nuevo, usar el caché SQL real.
+    # Si no hay caché disponible, forzar SQL para no inventar datos.
+    cache_sin_sql = None
+    if tipo == 'analisis_datos' and not requiere_sql:
+        cache_sin_sql = contexto.leer_cache_sql(conv)
+        if cache_sin_sql and cache_sin_sql.get('datos'):
+            pasos_del_tipo = ['redactar']
+            pasos_ejecutados.append('sin_sql')
+        else:
+            requiere_sql = True  # sin caché → SQL obligatorio
 
     temperatura = float(tipo_cfg.get('temperatura', 0.3))
 
@@ -986,8 +1009,10 @@ def consultar(
 
     # ── 6. Ejecutar pasos ─────────────────────────────────────────────
     sql_generado    = None
-    datos_crudos    = None
-    tabla_resultado = None
+    # Si es sin_sql, inyectar datos reales del caché (nunca inventa datos)
+    datos_crudos    = cache_sin_sql['datos']    if cache_sin_sql else None
+    tabla_resultado = formateador.filas_a_tabla(cache_sin_sql['datos'], cache_sin_sql['columnas']) \
+                      if cache_sin_sql else None
     imagen_b64      = None
     imagen_mime     = None
     respuesta_final  = ''
@@ -1084,6 +1109,8 @@ def consultar(
 
                 datos_crudos = res_sql['filas']
                 tabla_resultado = formateador.filas_a_tabla(res_sql['filas'], res_sql['columnas'])
+                # Guardar caché SQL para posibles seguimientos sin re-ejecutar
+                contexto.guardar_cache_sql(conv_id, pregunta, res_sql['columnas'], datos_crudos)
 
                 # Retry inteligente: si 0 filas, reenviar al LLM con contexto de fecha máxima
                 # (máx 2 reintentos). Corrige filtros demasiado estrictos, fechas erróneas, etc.

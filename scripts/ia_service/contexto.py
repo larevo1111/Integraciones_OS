@@ -80,17 +80,60 @@ def cambiar_agente(conversacion_id: int, agente_slug: str):
 
 
 def resetear(conversacion_id: int):
-    """Borra el resumen y los mensajes recientes — reinicia la conversación."""
+    """Borra el resumen, mensajes recientes y caché SQL — reinicia la conversación."""
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE ia_conversaciones SET resumen = NULL, mensajes_recientes = '[]' "
+                "UPDATE ia_conversaciones SET resumen = NULL, mensajes_recientes = '[]', metadata = NULL "
                 "WHERE id = %s",
                 (conversacion_id,)
             )
     finally:
         conn.close()
+
+
+def guardar_cache_sql(conversacion_id: int, pregunta: str, columnas: list, datos: list):
+    """
+    Guarda el último resultado SQL exitoso en metadata.
+    El router lo usa para decidir si la siguiente pregunta necesita SQL nuevo.
+    """
+    import json as _json
+    MAX_FILAS = 500  # suficiente para seguimientos; evita metadata gigante
+    cache = {
+        'ultimo_sql': {
+            'pregunta': pregunta[:300],
+            'columnas': columnas,
+            'datos':    datos[:MAX_FILAS],
+            'n_filas':  len(datos),
+        }
+    }
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ia_conversaciones SET metadata = %s WHERE id = %s",
+                (_json.dumps(cache, ensure_ascii=False, default=str), conversacion_id)
+            )
+            conn.commit()
+    finally:
+        conn.close()
+
+
+def leer_cache_sql(conv: dict) -> dict | None:
+    """
+    Lee el caché SQL de la conversación.
+    Retorna dict con {pregunta, columnas, datos, n_filas} o None si no hay.
+    """
+    import json as _json
+    raw = conv.get('metadata')
+    if not raw:
+        return None
+    try:
+        meta = _json.loads(raw) if isinstance(raw, str) else raw
+        return meta.get('ultimo_sql')
+    except Exception:
+        return None
 
 
 def guardar_mensajes_recientes(conversacion_id: int, pregunta: str, respuesta: str, max_pares: int = 5):
