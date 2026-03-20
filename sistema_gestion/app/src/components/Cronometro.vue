@@ -49,7 +49,7 @@ function startInterval() {
   stopInterval()
   interval = setInterval(() => {
     segundos.value++
-    emit('tick', totalMinutos.value)
+    emit('tick', totalSegundos.value)
   }, 1000)
 }
 function stopInterval() {
@@ -61,7 +61,7 @@ onMounted(() => {
     segundos.value = calcularSegundos()
     startInterval()
   }
-  emit('tick', totalMinutos.value)
+  emit('tick', totalSegundos.value)
 })
 
 watch(() => props.cronometroActivo, val => {
@@ -96,7 +96,7 @@ async function pausar() {
     skipNextSync = true
     activo.value   = false
     segundos.value = 0
-    emit('tick', totalMinutos.value)
+    emit('tick', totalSegundos.value)
     emit('update', 'detenido', data.tiempo_real_min)
   } catch (e) {
     segundos.value = segActual
@@ -118,7 +118,7 @@ async function reiniciar() {
     skipNextSync = true
     activo.value = false
     emit('tick', 0)
-    emit('update', 'detenido', 0)
+  emit('update', 'detenido', 0)
   } catch (e) {
     if (estabaActivo) startInterval()
     console.error(e)

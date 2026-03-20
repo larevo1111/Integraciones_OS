@@ -128,20 +128,21 @@
             :cronometro-activo="!!tarea.cronometro_activo"
             :cronometro-inicio="tarea.cronometro_inicio"
             @update="onCronometroUpdate"
-            @tick="min => tiempoVivo = min"
+            @tick="secs => segsVivo = secs"
           />
           <input type="number" class="input-field t-input" style="margin-left:4px"
-            :value="Math.floor((tiempoVivo || 0) / 60)"
+            :value="Math.floor(segsVivo / 3600)"
             :disabled="!!tarea.cronometro_activo"
             min="0"
             @change="actualizarTiempoReal('h', $event.target.value)" />
           <span class="t-sep">h</span>
           <input type="number" class="input-field t-input"
-            :value="(tiempoVivo || 0) % 60"
+            :value="Math.floor((segsVivo % 3600) / 60)"
             :disabled="!!tarea.cronometro_activo"
             min="0" max="59"
             @change="actualizarTiempoReal('m', $event.target.value)" />
           <span class="t-sep">m</span>
+          <span v-if="tarea.cronometro_activo" class="crono-seg">:{{ String(segsVivo % 60).padStart(2, '0') }}s</span>
         </div>
       </div>
       <!-- Tiempo estimado -->
@@ -322,13 +323,13 @@ const LABELS_CAMPO = {
   tiempo_estimado_min: 'T. estimado', tiempo_real_min: 'T. real'
 }
 
-// Cronómetro integrado en T. real
+// Cronómetro integrado en T. real (segsVivo en segundos para mostrar :ss en vivo)
 const cronometroRef = ref(null)
-const tiempoVivo    = ref(props.tarea?.tiempo_real_min || 0)
+const segsVivo      = ref((props.tarea?.tiempo_real_min || 0) * 60)
 
-// Sincronizar tiempoVivo con props cuando no está corriendo
+// Sincronizar segsVivo con props cuando no está corriendo
 watch(() => props.tarea?.tiempo_real_min, v => {
-  if (!props.tarea?.cronometro_activo) tiempoVivo.value = v || 0
+  if (!props.tarea?.cronometro_activo) segsVivo.value = (v || 0) * 60
 })
 
 // Auto-start cuando estado cambia a "En Progreso"
@@ -499,6 +500,10 @@ async function completarSin() {
 }
 .t-sep {
   font-size: 10px; color: var(--text-tertiary); flex-shrink: 0;
+}
+.crono-seg {
+  font-size: 10px; color: var(--accent); font-variant-numeric: tabular-nums;
+  flex-shrink: 0; margin-left: 2px;
 }
 .t-div {
   font-size: 11px; color: var(--border-subtle); margin: 0 5px; flex-shrink: 0;
