@@ -410,10 +410,15 @@ resultado = consultar(
 - ✅ **Nuevos endpoints** en ia-admin/api/server.js: CRUD Ejemplos SQL + CRUD Conversaciones
 - ✅ **Fix**: `requiere_estructura AS requiere_bd` en GET `/api/ia/tipos-admin`
 
+## Completado 2026-03-19 — Tabla inline en bot Telegram
+
+- **tabla.py**: `MAX_FILAS_INLINE=8, MAX_COLS_INLINE=4` — tablas pequeñas se muestran directamente en chat en vez de solo link mini app
+- Si el LLM ya incluyó tabla (``` + |) en su respuesta → no duplicar
+- System prompts de `analisis_datos` + `conversacion`: instruir al LLM a usar bloques de código con formato tabla cuando lista 3+ ítems comparables
+
 ## Próximos Pasos (2026-03-20)
 1. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
-2. **Tabla en bot cuando >2 datos** — mejorar bot Telegram para poner tabla automáticamente cuando la respuesta tiene más de 2 datos clave
-3. **Auto-conocimiento del sistema IA** — cambiar de `siempre_presente=1` a por keyword (ahorra 269 palabras por consulta), y actualizar contenido (falta aprendizaje, busqueda_web, cerebras-llama como router)
+2. **Auto-conocimiento del sistema IA** — cambiar de `siempre_presente=1` a por keyword (ahorra 269 palabras por consulta), y actualizar contenido (falta aprendizaje, busqueda_web, cerebras-llama como router)
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
 6. **Búsqueda web** — integrar Tavily API (gratis 1000 búsquedas/mes). Nuevo tipo `busqueda_web`.
