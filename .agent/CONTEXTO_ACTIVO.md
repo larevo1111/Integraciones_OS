@@ -416,9 +416,16 @@ resultado = consultar(
 - Si el LLM ya incluyó tabla (``` + |) en su respuesta → no duplicar
 - System prompts de `analisis_datos` + `conversacion`: instruir al LLM a usar bloques de código con formato tabla cuando lista 3+ ítems comparables
 
+## Completado 2026-03-20 — Auto-conocimiento por keyword
+
+- `Auto-conocimiento del sistema IA` (id=1): cambiado de `siempre_presente=1` a `siempre_presente=0`
+- Ahorra 319 palabras en cada consulta donde el usuario NO pregunta por el sistema
+- Contenido actualizado: cerebras-llama como router suplente, tipos `aprendizaje` y `busqueda_web`, roles configurables
+- Keywords exhaustivos: 43 términos que cubren todas las formas de preguntar por el bot/sistema/agentes
+
 ## Próximos Pasos (2026-03-20)
-1. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
-2. **Auto-conocimiento del sistema IA** — cambiar de `siempre_presente=1` a por keyword (ahorra 269 palabras por consulta), y actualizar contenido (falta aprendizaje, busqueda_web, cerebras-llama como router)
+1. Definir con Santi qué documentos de OS subir al RAG (si aplica)
+2. Sistema de Gestión: continuar módulos (panel tarea, equipo, cronómetro real)
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
 6. **Búsqueda web** — integrar Tavily API (gratis 1000 búsquedas/mes). Nuevo tipo `busqueda_web`.
