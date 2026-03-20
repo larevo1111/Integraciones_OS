@@ -227,7 +227,6 @@
         <button class="btn btn-danger btn-sm" @click="$emit('eliminar', tarea)">Eliminar</button>
         <div style="flex:1" />
         <button class="btn btn-secondary btn-sm" @click="$emit('cerrar')">Cerrar</button>
-        <button class="btn btn-accent btn-sm" @click="completar">✓ Completar</button>
       </div>
     </div>
   </aside>

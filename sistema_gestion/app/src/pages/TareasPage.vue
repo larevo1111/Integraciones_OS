@@ -308,12 +308,12 @@
               <span class="tiempo-modal-unidad">minutos</span>
             </div>
             <div class="tiempo-modal-acciones">
-              <button class="tiempo-modal-btn-omitir" @click="omitirTiempoModal">Omitir</button>
+              <button class="tiempo-modal-btn-omitir" @click="cancelarTiempoModal">Cancelar</button>
               <button
                 class="tiempo-modal-btn-ok"
                 :disabled="tiempoInput === ''"
                 @click="confirmarTiempoModal"
-              >Guardar</button>
+              >Confirmar</button>
             </div>
           </div>
         </div>
