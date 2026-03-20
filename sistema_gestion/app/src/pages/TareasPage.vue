@@ -311,7 +311,7 @@
               <button class="tiempo-modal-btn-omitir" @click="omitirTiempoModal">Omitir</button>
               <button
                 class="tiempo-modal-btn-ok"
-                :disabled="!tiempoInput"
+                :disabled="tiempoInput === ''"
                 @click="confirmarTiempoModal"
               >Guardar</button>
             </div>
@@ -789,16 +789,31 @@ const tiempoModal     = ref(null)   // { tarea } cuando está abierto
 const tiempoInput     = ref('')     // minutos ingresados por el usuario
 const tiempoInputRef  = ref(null)   // ref para hacer focus
 
+function _parseColombia(str) {
+  if (!str) return null
+  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
+  return new Date(str.replace(' ', 'T') + '-05:00')
+}
+
+function _minutosActuales(tarea) {
+  let min = tarea.tiempo_real_min || 0
+  if (tarea.cronometro_activo && tarea.cronometro_inicio) {
+    const ini = _parseColombia(tarea.cronometro_inicio)
+    if (ini) min += Math.max(0, Math.floor((Date.now() - ini.getTime()) / 60000))
+  }
+  return min
+}
+
 async function cambiarEstado(tarea) {
   // Ciclo del check: Pendiente→EnProgreso→Completada→Pendiente
   // Cancelada: el check no la reactiva (se gestiona desde el panel de estado)
   const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente' }
   const nextEstado = CICLO[tarea.estado] || 'Pendiente'
-  // Al completar: abrir mini-modal de tiempo
+  // Al completar: abrir mini-modal con tiempo actual pre-llenado
   if (nextEstado === 'Completada') {
     tiempoModal.value = { tarea }
-    tiempoInput.value = ''
-    nextTick(() => tiempoInputRef.value?.focus())
+    tiempoInput.value = _minutosActuales(tarea) || ''
+    nextTick(() => { tiempoInputRef.value?.focus(); tiempoInputRef.value?.select() })
     return
   }
   await _aplicarEstado(tarea, nextEstado, null)

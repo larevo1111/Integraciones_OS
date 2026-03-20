@@ -70,7 +70,7 @@
 
       <!-- Chip categoría: dot coloreado + nombre, fondo tinted -->
       <span
-        v-if="tarea.categoria_nombre && !tarea.cronometro_activo"
+        v-if="tarea.categoria_nombre"
         class="meta-chip"
         :style="{ background: hexAlpha(tarea.categoria_color, 0.12), color: tarea.categoria_color }"
         :title="tarea.categoria_nombre"
@@ -81,7 +81,7 @@
 
       <!-- Bandera prioridad (2do elemento, solo Urgente/Alta/Media visibles; Baja omitida) -->
       <span
-        v-if="colorPrioridad && !tarea.cronometro_activo"
+        v-if="colorPrioridad"
         class="meta-flag"
         :title="tarea.prioridad"
         :style="{ color: colorPrioridad }"
@@ -103,7 +103,7 @@
 
       <!-- Chip proyecto -->
       <span
-        v-if="tarea.proyecto_nombre && !tarea.cronometro_activo"
+        v-if="tarea.proyecto_nombre"
         class="meta-chip"
         :style="{ background: hexAlpha(tarea.proyecto_color, 0.10), color: 'var(--text-tertiary)' }"
         :title="tarea.proyecto_nombre"
@@ -158,8 +158,10 @@ function activarEdicion(e) {
   tituloEditando.value  = props.tarea.titulo
   editandoTitulo.value  = true
   nextTick(() => {
-    inputTituloRef.value?.focus()
-    inputTituloRef.value?.select()
+    const el = inputTituloRef.value
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
   })
   emit('click', props.tarea)          // también abrir panel
 }
