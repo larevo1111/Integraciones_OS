@@ -506,7 +506,7 @@ app.get('/api/ia/tipos-admin', async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT slug, nombre, descripcion, agente_preferido, system_prompt,
-              requiere_estructura, requiere_ejecucion, formato_salida, temperatura, activo
+              requiere_estructura AS requiere_bd, requiere_ejecucion, formato_salida, temperatura, activo
        FROM ia_tipos_consulta ORDER BY slug`
     )
     res.json(rows)
@@ -1137,6 +1137,96 @@ app.put('/api/ia/config/:clave', requireAdmin, async (req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message })
   }
+})
+
+// ─── Ejemplos SQL ─────────────────────────────────────────────────
+app.get('/api/ia/ejemplos-sql', requireAdmin, async (req, res) => {
+  try {
+    const empresa = req.empresa || 'ori_sil_2'
+    const [rows] = await db.query(
+      `SELECT id, pregunta, sql_generado, tablas_usadas, palabras_clave, veces_usado, ultima_vez, creado_en
+       FROM ia_ejemplos_sql WHERE empresa=? ORDER BY veces_usado DESC, ultima_vez DESC`, [empresa])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.post('/api/ia/ejemplos-sql', requireAdmin, async (req, res) => {
+  const { pregunta, sql_generado, tablas_usadas, palabras_clave } = req.body
+  if (!pregunta || !sql_generado) return res.status(400).json({ error: 'pregunta y sql_generado requeridos' })
+  const empresa = req.empresa || 'ori_sil_2'
+  try {
+    const [r] = await db.query(
+      `INSERT INTO ia_ejemplos_sql (empresa, pregunta, sql_generado, tablas_usadas, palabras_clave) VALUES (?,?,?,?,?)`,
+      [empresa, pregunta, sql_generado, tablas_usadas || null, palabras_clave || null])
+    res.json({ ok: true, id: r.insertId })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.put('/api/ia/ejemplos-sql/:id', requireAdmin, async (req, res) => {
+  const { pregunta, sql_generado, tablas_usadas, palabras_clave } = req.body
+  try {
+    await db.query(
+      `UPDATE ia_ejemplos_sql SET pregunta=?, sql_generado=?, tablas_usadas=?, palabras_clave=? WHERE id=?`,
+      [pregunta, sql_generado, tablas_usadas || null, palabras_clave || null, req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.delete('/api/ia/ejemplos-sql/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.query('DELETE FROM ia_ejemplos_sql WHERE id=?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── Conversaciones ───────────────────────────────────────────────
+app.get('/api/ia/conversaciones', requireAdmin, async (req, res) => {
+  try {
+    const empresa = req.empresa || 'ori_sil_2'
+    const [rows] = await db.query(
+      `SELECT id, usuario_id, canal, nombre_usuario, agente_activo,
+              LENGTH(resumen) AS largo_resumen,
+              JSON_LENGTH(mensajes_recientes) AS n_mensajes,
+              metadata IS NOT NULL AS tiene_cache_sql,
+              updated_at, created_at
+       FROM ia_conversaciones WHERE empresa=? ORDER BY updated_at DESC LIMIT 100`, [empresa])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.get('/api/ia/conversaciones/:id', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, usuario_id, canal, nombre_usuario, agente_activo,
+              resumen, mensajes_recientes, metadata, updated_at, created_at
+       FROM ia_conversaciones WHERE id=?`, [req.params.id])
+    if (!rows.length) return res.status(404).json({ error: 'No encontrada' })
+    const c = rows[0]
+    try { c.mensajes_recientes = JSON.parse(c.mensajes_recientes || '[]') } catch { c.mensajes_recientes = [] }
+    try { c.metadata = c.metadata ? JSON.parse(c.metadata) : null } catch { c.metadata = null }
+    res.json(c)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.delete('/api/ia/conversaciones/:id/resumen', requireAdmin, async (req, res) => {
+  try {
+    await db.query('UPDATE ia_conversaciones SET resumen=NULL, mensajes_recientes=\'[]\' WHERE id=?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.delete('/api/ia/conversaciones/:id/cache', requireAdmin, async (req, res) => {
+  try {
+    await db.query('UPDATE ia_conversaciones SET metadata=NULL WHERE id=?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.delete('/api/ia/conversaciones/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.query('DELETE FROM ia_conversaciones WHERE id=?', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 // ─── Frontend estático ────────────────────────────────────────────

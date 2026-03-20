@@ -22,6 +22,9 @@ const routes = [
       { path: 'config',          component: () => import('pages/ConfigPage.vue') },
       { path: 'logica-negocio',  component: () => import('pages/LogicaNegocioPage.vue') },
       { path: 'bot-sesiones',    component: () => import('pages/BotSesionesPage.vue') },
+      { path: 'esquemas',        component: () => import('pages/EsquemasPage.vue') },
+      { path: 'ejemplos-sql',    component: () => import('pages/EjemplosSqlPage.vue') },
+      { path: 'conversaciones',  component: () => import('pages/ConversacionesPage.vue') },
     ]
   },
   { path: '/:catchAll(.*)*', redirect: '/dashboard' }

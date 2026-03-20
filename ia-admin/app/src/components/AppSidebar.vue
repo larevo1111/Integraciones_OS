@@ -16,12 +16,31 @@
           <LayoutDashboardIcon :size="15" class="nav-icon" />
           <span>Dashboard</span>
         </router-link>
+        <router-link to="/playground" class="nav-item" active-class="active">
+          <PlayIcon :size="15" class="nav-icon" />
+          <span>Playground</span>
+        </router-link>
       </div>
 
       <div class="nav-divider" />
+      <div class="nav-group-label">Conocimiento</div>
+      <div class="nav-section">
+        <router-link v-if="nivel >= 7" to="/logica-negocio" class="nav-item" active-class="active">
+          <BookOpenIcon :size="15" class="nav-icon" />
+          <span>Lógica de negocio</span>
+        </router-link>
+        <router-link v-if="nivel >= 5" to="/contextos" class="nav-item" active-class="active">
+          <FileTextIcon :size="15" class="nav-icon" />
+          <span>Documentos RAG</span>
+        </router-link>
+        <router-link v-if="nivel >= 7" to="/ejemplos-sql" class="nav-item" active-class="active">
+          <CodeIcon :size="15" class="nav-icon" />
+          <span>Ejemplos SQL</span>
+        </router-link>
+      </div>
 
-      <div class="nav-group-label">Configuración</div>
-
+      <div class="nav-divider" />
+      <div class="nav-group-label">Comportamiento</div>
       <div class="nav-section">
         <router-link v-if="nivel >= 7" to="/agentes" class="nav-item" active-class="active">
           <BotIcon :size="15" class="nav-icon" />
@@ -31,44 +50,48 @@
           <SettingsIcon :size="15" class="nav-icon" />
           <span>Tipos de consulta</span>
         </router-link>
-        <router-link v-if="nivel >= 7" to="/usuarios" class="nav-item" active-class="active">
-          <UsersIcon :size="15" class="nav-icon" />
-          <span>Usuarios</span>
-        </router-link>
-        <router-link v-if="nivel >= 5" to="/contextos" class="nav-item" active-class="active">
+      </div>
+
+      <div class="nav-divider" />
+      <div class="nav-group-label">Base de Datos</div>
+      <div class="nav-section">
+        <router-link v-if="nivel >= 7" to="/esquemas" class="nav-item" active-class="active">
           <DatabaseIcon :size="15" class="nav-icon" />
-          <span>Contextos</span>
+          <span>Esquemas BD</span>
         </router-link>
         <router-link v-if="nivel >= 7" to="/conexiones" class="nav-item" active-class="active">
           <LinkIcon :size="15" class="nav-icon" />
           <span>Conexiones BD</span>
         </router-link>
-        <router-link v-if="nivel >= 7" to="/logica-negocio" class="nav-item" active-class="active">
-          <BookOpenIcon :size="15" class="nav-icon" />
-          <span>Lógica de negocio</span>
+      </div>
+
+      <div class="nav-divider" />
+      <div class="nav-group-label">Usuarios & Sesiones</div>
+      <div class="nav-section">
+        <router-link v-if="nivel >= 7" to="/usuarios" class="nav-item" active-class="active">
+          <UsersIcon :size="15" class="nav-icon" />
+          <span>Usuarios</span>
         </router-link>
-        <router-link v-if="nivel >= 7" to="/config" class="nav-item" active-class="active">
-          <SlidersHorizontalIcon :size="15" class="nav-icon" />
-          <span>Configuración</span>
+        <router-link v-if="nivel >= 7" to="/conversaciones" class="nav-item" active-class="active">
+          <MessageSquareIcon :size="15" class="nav-icon" />
+          <span>Conversaciones</span>
+        </router-link>
+        <router-link v-if="nivel >= 7" to="/bot-sesiones" class="nav-item" active-class="active">
+          <SmartphoneIcon :size="15" class="nav-icon" />
+          <span>Bot Telegram</span>
         </router-link>
       </div>
 
       <div class="nav-divider" />
-
-      <div class="nav-group-label">Monitoreo</div>
-
+      <div class="nav-group-label">Sistema</div>
       <div class="nav-section">
-        <router-link v-if="nivel >= 7" to="/bot-sesiones" class="nav-item" active-class="active">
-          <MessageSquareIcon :size="15" class="nav-icon" />
-          <span>Bot Telegram</span>
+        <router-link v-if="nivel >= 7" to="/config" class="nav-item" active-class="active">
+          <SlidersHorizontalIcon :size="15" class="nav-icon" />
+          <span>Configuración</span>
         </router-link>
         <router-link v-if="nivel >= 3" to="/logs" class="nav-item" active-class="active">
           <ScrollIcon :size="15" class="nav-icon" />
           <span>Logs</span>
-        </router-link>
-        <router-link to="/playground" class="nav-item" active-class="active">
-          <PlayIcon :size="15" class="nav-icon" />
-          <span>Playground</span>
         </router-link>
       </div>
     </nav>
@@ -96,7 +119,8 @@ import { computed } from 'vue'
 import {
   LayoutDashboardIcon, BotIcon, SettingsIcon, UsersIcon,
   ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon, LinkIcon,
-  SlidersHorizontalIcon, BookOpenIcon, MessageSquareIcon
+  SlidersHorizontalIcon, BookOpenIcon, MessageSquareIcon,
+  FileTextIcon, CodeIcon, SmartphoneIcon
 } from 'lucide-vue-next'
 import { useAuthStore } from 'stores/authStore'
 
