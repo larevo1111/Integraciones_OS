@@ -243,11 +243,11 @@ const duracionDisplay = computed(() => {
 const tiempoCronometro = ref('00:00')
 let interval = null
 
-// Parsear cronometro_inicio como UTC (Hostinger MySQL devuelve sin 'Z')
+// Parsear cronometro_inicio como Colombia UTC-5 (mysql2 timezone:'local' guarda en hora Colombia)
 function parseInicio(str) {
   if (!str) return null
-  const s = str.includes('Z') || str.includes('+') ? str : str.replace(' ', 'T') + 'Z'
-  return new Date(s)
+  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
+  return new Date(str.replace(' ', 'T') + '-05:00')
 }
 
 function calcularTiempo() {

@@ -33,11 +33,11 @@ const segundosAcumulados = ref((props.tiempoBase || 0) * 60)
 let skipNextSync    = false   // evita que el watcher de tiempoBase sobreescriba tras pausar
 let skipWatchActivo = false   // evita doble-start cuando iniciar() ya manejó el intervalo
 
-// Parsear cronometro_inicio como UTC (Hostinger MySQL es UTC, sin 'Z' en el string)
+// Parsear cronometro_inicio como Colombia UTC-5 (mysql2 timezone:'local' guarda en hora Colombia)
 function parseInicio(str) {
   if (!str) return null
-  const s = str.includes('Z') || str.includes('+') ? str : str.replace(' ', 'T') + 'Z'
-  return new Date(s)
+  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
+  return new Date(str.replace(' ', 'T') + '-05:00')
 }
 
 watch(() => props.tiempoBase, v => {
@@ -90,7 +90,7 @@ async function iniciar() {
     activo.value   = true
     segundos.value = 0
     startInterval()
-    // Emitir timestamp actual como cronometro_inicio (Hostinger es UTC)
+    // Emitir timestamp actual — parseInicio lo interpreta correctamente
     emit('update', 'iniciado', new Date().toISOString())
   } catch (e) { console.error(e) }
 }

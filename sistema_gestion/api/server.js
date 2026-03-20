@@ -765,17 +765,18 @@ app.post('/api/gestion/tareas/:id/iniciar', async (req, res) => {
     )
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
 
-    // Cerrar cualquier cronómetro abierto (seguridad)
+    // Cerrar cualquier cronómetro abierto (seguridad) — new Date() → Colombia time vía timezone:'local'
+    const ahoraIniciar = new Date()
     await db.gestion.query(`
       UPDATE g_tarea_tiempo
-      SET fin = NOW(), duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, NOW()) / 60)
+      SET fin = ?, duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
       WHERE tarea_id = ? AND fin IS NULL
-    `, [tareaId])
+    `, [ahoraIniciar, ahoraIniciar, tareaId])
 
     // Iniciar nuevo registro
     const [result] = await db.gestion.query(
-      'INSERT INTO g_tarea_tiempo (tarea_id, usuario, inicio) VALUES (?, ?, NOW())',
-      [tareaId, req.usuario.email]
+      'INSERT INTO g_tarea_tiempo (tarea_id, usuario, inicio) VALUES (?, ?, ?)',
+      [tareaId, req.usuario.email, ahoraIniciar]
     )
 
     // Actualizar estado a En Progreso
@@ -797,12 +798,13 @@ app.post('/api/gestion/tareas/:id/iniciar', async (req, res) => {
 app.post('/api/gestion/tareas/:id/detener', async (req, res) => {
   const tareaId = req.params.id
   try {
-    // Cerrar registro abierto
+    // Cerrar registro abierto — new Date() → Colombia time vía timezone:'local'
+    const ahoraDetener = new Date()
     await db.gestion.query(`
       UPDATE g_tarea_tiempo
-      SET fin = NOW(), duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, NOW()) / 60)
+      SET fin = ?, duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
       WHERE tarea_id = ? AND fin IS NULL
-    `, [tareaId])
+    `, [ahoraDetener, ahoraDetener, tareaId])
 
     // Recalcular tiempo_real_min total
     const [[{ total }]] = await db.gestion.query(
@@ -831,7 +833,7 @@ app.post('/api/gestion/tareas/:id/reiniciar-tiempo', async (req, res) => {
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
     // Cerrar timer abierto si existe
     await db.gestion.query(
-      'UPDATE g_tarea_tiempo SET fin = NOW() WHERE tarea_id = ? AND fin IS NULL', [tareaId]
+      'UPDATE g_tarea_tiempo SET fin = ? WHERE tarea_id = ? AND fin IS NULL', [new Date(), tareaId]
     )
     // Eliminar todos los registros de tiempo de esta tarea
     await db.gestion.query('DELETE FROM g_tarea_tiempo WHERE tarea_id = ?', [tareaId])
@@ -854,11 +856,12 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
 
   try {
     // Cerrar cronómetro si estaba corriendo
+    const ahoraCompletar = new Date()
     await db.gestion.query(`
       UPDATE g_tarea_tiempo
-      SET fin = NOW(), duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, NOW()) / 60)
+      SET fin = ?, duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
       WHERE tarea_id = ? AND fin IS NULL
-    `, [tareaId])
+    `, [ahoraCompletar, ahoraCompletar, tareaId])
 
     // Calcular tiempo total (o usar el manual si se proveyó)
     let tiempoFinal = tiempoManual
