@@ -1,8 +1,12 @@
 <template>
   <div
     class="tarea-item"
-    :class="{ selected: seleccionada, completada: esCompletada, 'is-subtarea': !!tarea.parent_id }"
-    @click="$emit('click', tarea)"
+    :class="{ selected: seleccionada, completada: esCompletada, 'is-subtarea': !!tarea.parent_id, 'multi-sel': seleccionadaMulti }"
+    @click="onItemClick"
+    @touchstart.passive="onTouchStart"
+    @touchend="onTouchEnd"
+    @touchmove.passive="onTouchMove"
+    @touchcancel="onTouchEnd"
   >
     <!-- Columna izquierda: estado + (badge 0/N + ↳) debajo -->
     <div class="estado-col">
@@ -129,6 +133,7 @@ import EstadoBadge from './EstadoBadge.vue'
 const props = defineProps({
   tarea:              { type: Object, required: true },
   seleccionada:       { type: Boolean, default: false },
+  seleccionadaMulti:  { type: Boolean, default: false },
   usuarioActual:      { type: String, default: '' },
   expandida:          { type: Boolean, default: false },
   mostrarResponsable: { type: Boolean, default: false },
@@ -145,14 +150,38 @@ const responsableIniciales = computed(() => {
   // Fallback: parte antes del @ en el email
   return props.tarea.responsable.split('@')[0].slice(0, 3).toUpperCase()
 })
-const emit = defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas', 'editar-titulo'])
+const emit = defineEmits(['click', 'cambiar-estado', 'agregar-subtarea', 'toggle-subtareas', 'editar-titulo', 'seleccionar-multi'])
 
 // ── Edición inline del título (solo desktop) ──────────────────
 const editandoTitulo  = ref(false)
 const tituloEditando  = ref('')
 const inputTituloRef  = ref(null)
 
+// Ctrl+click o long-press → multi-select
+function onItemClick(e) {
+  if (e.ctrlKey || e.metaKey) {
+    e.stopPropagation()
+    emit('seleccionar-multi', props.tarea)
+    return
+  }
+  emit('click', props.tarea)
+}
+
+let longPressTimer = null
+function onTouchStart() {
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null
+    emit('seleccionar-multi', props.tarea)
+  }, 500)
+}
+function onTouchEnd()  { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } }
+function onTouchMove() { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } }
+
 function activarEdicion(e) {
+  if (e.ctrlKey || e.metaKey) {    // Ctrl+click en el título → multi-select
+    emit('seleccionar-multi', props.tarea)
+    return
+  }
   if (props.compacto) return          // móvil: no editar inline
   e.stopPropagation()
   tituloEditando.value  = props.tarea.titulo
@@ -284,7 +313,10 @@ watch(() => props.tarea.cronometro_activo, (val) => {
   else     detenerInterval()
 })
 
-onUnmounted(() => { if (interval) clearInterval(interval) })
+onUnmounted(() => {
+  if (interval) clearInterval(interval)
+  if (longPressTimer) clearTimeout(longPressTimer)
+})
 </script>
 
 <style scoped>
@@ -375,4 +407,11 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
 /* Subtarea: indentación */
 .is-subtarea { padding-left: 28px !important; }
 .is-subtarea .tarea-titulo { font-size: 11px; color: var(--text-secondary); }
+
+/* Multi-selección */
+.tarea-item.multi-sel {
+  background: rgba(59, 130, 246, 0.07) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.3);
+  outline-offset: -1px;
+}
 </style>

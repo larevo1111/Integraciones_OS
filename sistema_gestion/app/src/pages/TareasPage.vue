@@ -127,6 +127,7 @@
             <TareaItem
               :tarea="t"
               :seleccionada="tareaSeleccionada?.id === t.id"
+              :seleccionada-multi="seleccionMultiIds.includes(t.id)"
               :usuario-actual="auth.usuario?.email"
               :expandida="!!subtareasExpandidas[t.id]"
               :mostrar-responsable="!props.soloMias"
@@ -136,6 +137,7 @@
               @agregar-subtarea="iniciarSubtarea"
               @toggle-subtareas="toggleSubtareas"
               @editar-titulo="editarTituloInline"
+              @seleccionar-multi="onSeleccionarMulti"
             />
             <!-- Subtareas expandidas -->
             <template v-if="subtareasExpandidas[t.id]">
@@ -144,12 +146,14 @@
                 :key="sub.id"
                 :tarea="sub"
                 :seleccionada="tareaSeleccionada?.id === sub.id"
+                :seleccionada-multi="seleccionMultiIds.includes(sub.id)"
                 :usuario-actual="auth.usuario?.email"
                 :mostrar-responsable="!props.soloMias"
                 :compacto="isMobile"
                 @click="seleccionar"
                 @cambiar-estado="cambiarEstado"
                 @editar-titulo="editarTituloInline"
+                @seleccionar-multi="onSeleccionarMulti"
               />
               <!-- Inline quickadd para nueva subtarea — Enter guarda, blur guarda, × cancela -->
               <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
@@ -183,12 +187,14 @@
               :key="t.id"
               :tarea="t"
               :seleccionada="tareaSeleccionada?.id === t.id"
+              :seleccionada-multi="seleccionMultiIds.includes(t.id)"
               :usuario-actual="auth.usuario?.email"
               :mostrar-responsable="!props.soloMias"
               :compacto="isMobile"
               @click="seleccionar"
               @cambiar-estado="cambiarEstado"
               @editar-titulo="editarTituloInline"
+              @seleccionar-multi="onSeleccionarMulti"
             />
           </template>
         </template>
@@ -285,6 +291,45 @@
       :usuarios="usuarios"
       @guardada="onTareaGuardada"
     />
+
+    <!-- Barra flotante multi-selección -->
+    <Teleport to="body">
+      <Transition name="multi-bar">
+        <div v-if="seleccionMultiIds.length" class="multi-bar">
+          <button class="multi-bar-close" @click="seleccionMultiIds = []" title="Cancelar selección">
+            <span class="material-icons" style="font-size:15px">close</span>
+          </button>
+          <span class="multi-bar-count">{{ seleccionMultiIds.length }} seleccionada{{ seleccionMultiIds.length !== 1 ? 's' : '' }}</span>
+          <div class="multi-bar-divider" />
+
+          <!-- Fecha -->
+          <div style="position:relative">
+            <button class="multi-bar-btn" @click="multiMenuEstado = false; multiMenuFecha = !multiMenuFecha">
+              <span class="material-icons" style="font-size:14px">event</span> Fecha
+            </button>
+            <div v-if="multiMenuFecha" class="multi-bar-menu">
+              <input type="date" class="multi-date-input" @change="aplicarFechaMulti($event.target.value)" />
+              <div class="multi-menu-item" @click="aplicarFechaMulti(null)">Sin fecha</div>
+            </div>
+          </div>
+
+          <!-- Estado -->
+          <div style="position:relative">
+            <button class="multi-bar-btn" @click="multiMenuFecha = false; multiMenuEstado = !multiMenuEstado">
+              <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
+            </button>
+            <div v-if="multiMenuEstado" class="multi-bar-menu">
+              <div v-for="e in ['Pendiente','En Progreso','Completada','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
+            </div>
+          </div>
+
+          <!-- Eliminar -->
+          <button class="multi-bar-btn multi-bar-btn-danger" @click="eliminarMulti">
+            <span class="material-icons" style="font-size:14px">delete</span> Eliminar
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- Mini-modal: tiempo al completar tarea -->
     <Teleport to="body">
@@ -401,6 +446,11 @@ const cargando          = ref(true)
 const tareaSeleccionada = ref(null)
 const mostrarForm       = ref(false)
 const mostrarCompletadas = ref(false)
+
+// Multi-selección
+const seleccionMultiIds = ref([])   // array de IDs seleccionados
+const multiMenuFecha    = ref(false)
+const multiMenuEstado   = ref(false)
 const menuAgrupar            = ref(false)
 const btnAgruparRef          = ref(null)
 const dropdownAgruparStyle   = ref({})
@@ -781,7 +831,62 @@ async function cargarCatalogos() {
 }
 
 function seleccionar(tarea) {
+  // En modo multi: click normal también toglea
+  if (seleccionMultiIds.value.length > 0) { onSeleccionarMulti(tarea); return }
   tareaSeleccionada.value = tareaSeleccionada.value?.id === tarea.id ? null : tarea
+}
+
+function onSeleccionarMulti(tarea) {
+  const idx = seleccionMultiIds.value.indexOf(tarea.id)
+  if (idx === -1) {
+    seleccionMultiIds.value.push(tarea.id)
+    tareaSeleccionada.value = null   // cerrar panel al entrar en multi-mode
+  } else {
+    seleccionMultiIds.value.splice(idx, 1)
+  }
+}
+
+async function aplicarFechaMulti(fecha) {
+  multiMenuFecha.value = false
+  const ids = [...seleccionMultiIds.value]
+  await Promise.all(ids.map(id =>
+    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ fecha_limite: fecha || null }) })
+      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
+  ))
+  seleccionMultiIds.value = []
+}
+
+async function aplicarEstadoMulti(estado) {
+  multiMenuEstado.value = false
+  const ids = [...seleccionMultiIds.value]
+  await Promise.all(ids.map(id =>
+    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ estado }) })
+      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
+  ))
+  seleccionMultiIds.value = []
+}
+
+async function eliminarMulti() {
+  const n = seleccionMultiIds.value.length
+  if (!confirm(`¿Eliminar ${n} tarea${n !== 1 ? 's' : ''}?`)) return
+  const ids = [...seleccionMultiIds.value]
+  await Promise.all(ids.map(id =>
+    api(`/api/gestion/tareas/${id}`, { method: 'DELETE' })
+      .then(() => {
+        tareas.value     = tareas.value.filter(t => t.id !== id)
+        completadas.value = completadas.value.filter(t => t.id !== id)
+        if (tareaSeleccionada.value?.id === id) tareaSeleccionada.value = null
+      }).catch(console.error)
+  ))
+  seleccionMultiIds.value = []
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' && seleccionMultiIds.value.length > 0) {
+    seleccionMultiIds.value = []
+    multiMenuFecha.value    = false
+    multiMenuEstado.value   = false
+  }
 }
 
 // ─── MINI-MODAL TIEMPO AL COMPLETAR ───────────────────────────
@@ -889,9 +994,13 @@ async function eliminar(tarea) {
 
 onMounted(async () => {
   window.addEventListener('resize', onResize)
+  window.addEventListener('keydown', onKeyDown)
   await Promise.all([cargarTareas(), cargarCatalogos()])
 })
-onUnmounted(() => { window.removeEventListener('resize', onResize) })
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  window.removeEventListener('keydown', onKeyDown)
+})
 </script>
 
 <style scoped>
@@ -1051,4 +1160,94 @@ onUnmounted(() => { window.removeEventListener('resize', onResize) })
   cursor: pointer; transition: color 80ms;
 }
 .subtarea-add-row:hover { color: var(--accent); }
+
+/* ── Barra flotante multi-selección ── */
+.multi-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-elevated, #1c1c1c);
+  border: 1px solid var(--border-subtle, #333);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  z-index: 500;
+  white-space: nowrap;
+  user-select: none;
+}
+.multi-bar-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 0 4px;
+}
+.multi-bar-divider {
+  width: 1px; height: 16px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+  margin: 0 4px;
+}
+.multi-bar-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 80ms;
+  flex-shrink: 0;
+}
+.multi-bar-close:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.multi-bar-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px;
+  border: none; border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px; cursor: pointer;
+  transition: background 80ms, color 80ms;
+}
+.multi-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.multi-bar-btn-danger:hover { color: #ef4444; }
+.multi-bar-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elevated, #1c1c1c);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  overflow: hidden;
+  min-width: 140px;
+  z-index: 10;
+}
+.multi-date-input {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.multi-menu-item {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 80ms;
+}
+.multi-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Animación entrada/salida */
+.multi-bar-enter-active, .multi-bar-leave-active { transition: all 180ms ease; }
+.multi-bar-enter-from, .multi-bar-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
 </style>
