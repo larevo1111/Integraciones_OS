@@ -46,6 +46,10 @@
           <BotIcon :size="15" class="nav-icon" />
           <span>Agentes</span>
         </router-link>
+        <router-link v-if="nivel >= 7" to="/roles" class="nav-item" active-class="active">
+          <ShieldIcon :size="15" class="nav-icon" />
+          <span>Roles de agentes</span>
+        </router-link>
         <router-link v-if="nivel >= 7" to="/tipos" class="nav-item" active-class="active">
           <SettingsIcon :size="15" class="nav-icon" />
           <span>Tipos de consulta</span>
@@ -120,7 +124,7 @@ import {
   LayoutDashboardIcon, BotIcon, SettingsIcon, UsersIcon,
   ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon, LinkIcon,
   SlidersHorizontalIcon, BookOpenIcon, MessageSquareIcon,
-  FileTextIcon, CodeIcon, SmartphoneIcon
+  FileTextIcon, CodeIcon, SmartphoneIcon, ShieldIcon
 } from 'lucide-vue-next'
 import { useAuthStore } from 'stores/authStore'
 

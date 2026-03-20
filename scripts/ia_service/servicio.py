@@ -161,6 +161,25 @@ def _get_config(conn, clave: str, default):
     return row['valor'] if row else default
 
 
+def _get_config_simple(clave: str, default: str) -> str:
+    """Lee un valor de ia_config sin necesitar conexión externa."""
+    try:
+        with _db() as conn:
+            return _get_config(conn, clave, default)
+    except Exception:
+        return default
+
+
+def _slugs_router() -> list[str]:
+    """Devuelve la cadena de agentes router en orden, desde ia_config."""
+    return [
+        _get_config_simple('rol_router_principal',  'groq-llama'),
+        _get_config_simple('rol_router_suplente_1', 'cerebras-llama'),
+        _get_config_simple('rol_router_suplente_2', 'gemini-flash-lite'),
+        _get_config_simple('rol_router_suplente_3', 'gemini-flash'),
+    ]
+
+
 def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
     """
     Verifica 3 capas de protección antes de llamar a la API externa.
@@ -282,7 +301,9 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str,
     Retorna el nuevo resumen como texto plano, o None si falla.
     """
     agente_cfg = None
-    for slug in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite'):
+    slug_resumen = _get_config_simple('rol_resumen_agente', 'groq-llama')
+    cadena_resumen = [slug_resumen] + [s for s in _slugs_router() if s != slug_resumen]
+    for slug in cadena_resumen:
         cand = _cargar_agente(slug)
         if cand and cand.get('api_key'):
             agente_cfg = cand
@@ -335,9 +356,11 @@ def _depurar_logica_negocio(empresa: str):
         if total_palabras <= 800:
             return  # No necesita depuración
 
-        # Buscar agente para comprimir — Groq primero, suplentes si falla
+        # Buscar agente para comprimir — desde ia_config, suplentes si falla
         agente_cfg = None
-        for slug_dep in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
+        slug_dep_cfg = _get_config_simple('rol_depurador_agente', 'groq-llama')
+        cadena_dep = [slug_dep_cfg] + [s for s in _slugs_router() if s != slug_dep_cfg]
+        for slug_dep in cadena_dep:
             cand = _cargar_agente(slug_dep)
             if cand and cand.get('api_key'):
                 agente_cfg = cand
@@ -1472,7 +1495,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
     # Intentar cada agente candidato hasta obtener respuesta válida
-    for slug in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
+    for slug in _slugs_router():
         cand = _cargar_agente(slug)
         if not (cand and cand.get('api_key')):
             continue

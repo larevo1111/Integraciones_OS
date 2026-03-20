@@ -25,6 +25,7 @@ const routes = [
       { path: 'esquemas',        component: () => import('pages/EsquemasPage.vue') },
       { path: 'ejemplos-sql',    component: () => import('pages/EjemplosSqlPage.vue') },
       { path: 'conversaciones',  component: () => import('pages/ConversacionesPage.vue') },
+      { path: 'roles',           component: () => import('pages/RolesPage.vue') },
     ]
   },
   { path: '/:catchAll(.*)*', redirect: '/dashboard' }
