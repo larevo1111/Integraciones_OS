@@ -888,51 +888,56 @@ function seleccionar(tarea) {
 function onSeleccionarMulti(tarea) {
   const idx = seleccionMultiIds.value.indexOf(tarea.id)
   if (idx === -1) {
+    // Si es la primera selección y hay panel abierto → incluir esa tarea también
+    if (seleccionMultiIds.value.length === 0 && tareaSeleccionada.value && tareaSeleccionada.value.id !== tarea.id) {
+      seleccionMultiIds.value.push(tareaSeleccionada.value.id)
+    }
     seleccionMultiIds.value.push(tarea.id)
-    tareaSeleccionada.value = null   // cerrar panel al entrar en multi-mode
+    tareaSeleccionada.value = null
   } else {
     seleccionMultiIds.value.splice(idx, 1)
   }
 }
 
-async function aplicarFechaMulti(fecha) {
-  multiMenuFecha.value = false
-  const ids = [...seleccionMultiIds.value]
+async function _bulkPut(ids, body) {
   await Promise.all(ids.map(id =>
-    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ fecha_limite: fecha || null }) })
-      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
+    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify(body) }).catch(console.error)
   ))
+}
+
+async function _postBulk(ids) {
+  // Si la tarea abierta estaba en el set, cerrar panel
+  if (tareaSeleccionada.value && ids.includes(tareaSeleccionada.value.id)) tareaSeleccionada.value = null
   seleccionMultiIds.value = []
+  await cargarTareas()   // recarga con el filtro actual → vistas siempre correctas
+}
+
+async function aplicarFechaMulti(fecha) {
+  cerrarMenusMulti(null)
+  const ids = [...seleccionMultiIds.value]
+  await _bulkPut(ids, { fecha_limite: fecha || null })
+  await _postBulk(ids)
 }
 
 async function aplicarEstadoMulti(estado) {
-  multiMenuEstado.value = false
+  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
-  await Promise.all(ids.map(id =>
-    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ estado }) })
-      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
-  ))
-  seleccionMultiIds.value = []
+  await _bulkPut(ids, { estado })
+  await _postBulk(ids)
 }
 
 async function aplicarCategoriaMulti(categoriaId) {
-  multiMenuCategoria.value = false
+  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
-  await Promise.all(ids.map(id =>
-    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ categoria_id: categoriaId }) })
-      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
-  ))
-  seleccionMultiIds.value = []
+  await _bulkPut(ids, { categoria_id: categoriaId })
+  await _postBulk(ids)
 }
 
 async function aplicarProyectoMulti(proyectoId) {
-  multiMenuProyecto.value = false
+  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
-  await Promise.all(ids.map(id =>
-    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ proyecto_id: proyectoId }) })
-      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
-  ))
-  seleccionMultiIds.value = []
+  await _bulkPut(ids, { proyecto_id: proyectoId })
+  await _postBulk(ids)
 }
 
 async function eliminarMulti() {
@@ -940,19 +945,23 @@ async function eliminarMulti() {
   if (!confirm(`¿Eliminar ${n} tarea${n !== 1 ? 's' : ''}?`)) return
   const ids = [...seleccionMultiIds.value]
   await Promise.all(ids.map(id =>
-    api(`/api/gestion/tareas/${id}`, { method: 'DELETE' })
-      .then(() => {
-        tareas.value     = tareas.value.filter(t => t.id !== id)
-        completadas.value = completadas.value.filter(t => t.id !== id)
-        if (tareaSeleccionada.value?.id === id) tareaSeleccionada.value = null
-      }).catch(console.error)
+    api(`/api/gestion/tareas/${id}`, { method: 'DELETE' }).catch(console.error)
   ))
-  seleccionMultiIds.value = []
+  await _postBulk(ids)
 }
 
 function onKeyDown(e) {
   if (e.key === 'Escape' && seleccionMultiIds.value.length > 0) {
-    seleccionMultiIds.value  = []
+    seleccionMultiIds.value = []
+    cerrarMenusMulti(null)
+  }
+}
+
+function onDocumentClick(e) {
+  if (!seleccionMultiIds.value.length) return
+  // Limpiar si el click no fue sobre una tarea ni sobre la barra flotante
+  if (!e.target.closest('.tarea-item') && !e.target.closest('.multi-bar')) {
+    seleccionMultiIds.value = []
     cerrarMenusMulti(null)
   }
 }
@@ -1063,11 +1072,13 @@ async function eliminar(tarea) {
 onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeyDown)
+  document.addEventListener('click', onDocumentClick, true)
   await Promise.all([cargarTareas(), cargarCatalogos()])
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('click', onDocumentClick, true)
 })
 </script>
 
