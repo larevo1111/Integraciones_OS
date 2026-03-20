@@ -587,6 +587,10 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
 - ✅ **Sidebar colapsado** — 64px con solo botón chevron centrado (rotado 180° como expand). nav-items muestran solo icono.
 - ✅ **UX TickTick (2026-03-17)** — badge 0/N abajo del círculo (sin chip, solo texto), botón ↳ al lado del badge, quick insert subtarea (× + Enter/blur), spinner inputs ocultos, cronómetro con ⏸+■, T.real/T.estimado en filas separadas
 - ✅ **Filtro Personalizado** — popup `FiltroPersonalizado.vue` (Teleport body), multi-select prioridad/categoría/etiqueta, rango fechas, proyecto. Backend soporta params multi-valor (comma-separated). Chip "Mis tareas" eliminado. QA verificado.
+- ✅ **Multi-selección (2026-03-20)** — Ctrl+click desktop + long press 500ms mobile → floating action bar (Teleport body). Acciones: Fecha (Hoy/Mañana/Pasado mañana/Sin fecha/personalizada), Estado (4 opciones), Categoría (con dots), Proyecto (con dots + Sin proyecto), Eliminar. Click fuera desactiva. Tarea del panel se auto-incluye en primera selección. Refrescar vistas vía `cargarTareas()`.
+- ✅ **Cascada de estados (2026-03-20)** — Completar tarea padre → subtareas Pendiente/En Progreso → Completada. Cancelar padre → subtareas → Cancelada. Revertir a Pendiente → subtareas no-Canceladas → Pendiente. Lógica en backend (server.js): PUT `/tareas/:id` + POST `/tareas/:id/completar`.
+- ✅ **Popup completar con tiempo pre-llenado (2026-03-20)** — mini-modal al completar muestra `tiempo_real_min` actual (incluyendo cronómetro en vivo). Botón "Cancelar" cierra sin completar. "Confirmar" guarda y completa. Botón "Completar" eliminado del footer del TareaPanel.
+- ✅ **Auto-start cronómetro desde check (2026-03-20)** — al hacer check a "En Progreso" desde la lista (sin panel abierto), se llama automáticamente `POST /tareas/:id/iniciar` en `cambiarEstado()`. Guarda en la lista con `cronometro_activo=1` + `cronometro_inicio`. Guard: solo si panel NO tiene esa tarea abierta (evita double-start con el watcher de TareaPanel).
 
 ### Rutas y servicios
 - **URL**: gestion.oscomunidad.com

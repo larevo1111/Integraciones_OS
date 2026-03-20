@@ -92,10 +92,15 @@ GET  /api/gestion/categorias       — 13 categorías {id, nombre, color, icono,
 
 ### Tareas
 ```
-GET  /api/gestion/tareas           — lista con filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=&proyecto_id=
-POST /api/gestion/tareas           — crear tarea (acepta proyecto_id, etiquetas:[])
-PUT  /api/gestion/tareas/:id       — actualizar tarea (acepta proyecto_id, etiquetas:[]) → retorna etiquetas en response
-POST /api/gestion/tareas/:id/completar — completa tarea con tiempo_real_min opcional
+GET  /api/gestion/tareas               — lista con filtros: ?filtro=hoy|manana|semana|mis&estado=&categoria_id=&proyecto_id=
+POST /api/gestion/tareas               — crear tarea (acepta proyecto_id, etiquetas:[])
+PUT  /api/gestion/tareas/:id           — actualizar tarea (acepta proyecto_id, etiquetas:[]) → retorna etiquetas en response
+                                         ↳ Cascada: si estado=Completada → subtareas Pendiente/En Progreso → Completada
+                                         ↳ si estado=Cancelada → subtareas Pendiente/En Progreso → Cancelada
+                                         ↳ si estado=Pendiente → subtareas no-Canceladas → Pendiente
+POST /api/gestion/tareas/:id/completar — completa con tiempo_real_min opcional → cascada subtareas igual
+POST /api/gestion/tareas/:id/iniciar   — inicia cronómetro. Cierra sesiones abiertas, inserta g_tarea_tiempo, estado→'En Progreso'
+POST /api/gestion/tareas/:id/detener   — detiene cronómetro, calcula duración y acumula tiempo_real_min
 ```
 
 ### Proyectos
@@ -297,3 +302,62 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); opa
 - Empresa activa OS: `'Ori_Sil_2'` (con mayúsculas, igual que sys_empresa.uid)
 - JWT secret: en `.env` como `JWT_SECRET` — nunca en código
 - FCM: aún no implementado (Fase 4)
+
+---
+
+## 11. Multi-selección — patrón implementado
+
+**Activación**: Ctrl+click (desktop) o long press 500ms (mobile) en cualquier TareaItem.
+- Emite `'seleccionar-multi'` al padre (TareasPage)
+- Si había tarea abierta en panel → se auto-incluye en la primera selección
+- Estilos: `.tarea-item.multi-sel { background: rgba(59,130,246,0.07); outline: 1px solid rgba(59,130,246,0.3) }`
+
+**Floating bar**: Teleport to body, posición fixed bottom. Solo visible cuando `seleccionMultiIds.length > 0`.
+- X → desmarcar todo
+- Fecha: Hoy / Mañana / Pasado mañana / Sin fecha / Personalizada (date input)
+- Estado: Pendiente / En Progreso / Completada / Cancelada
+- Categoría: lista con dot de color de cada categoría
+- Proyecto: lista con dot + "Sin proyecto"
+- Eliminar: DELETE con confirmación
+
+**Refresh después de bulk**: SIEMPRE usar `cargarTareas()` (no `onTareaActualizada`). El motivo: las vistas filtradas (hoy/mañana/semana) no se actualizan si solo se hace push en array local.
+
+**Deselección**: listener `document.addEventListener('click', fn, true)` en capture phase. Si click fuera de `.tarea-item` y `.multi-bar` → `seleccionMultiIds.value = []`.
+
+---
+
+## 12. Cascada de estados (backend server.js)
+
+Cuando se actualiza el estado de una tarea padre via PUT o POST /completar:
+- `Completada` → `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(...,NOW()) WHERE parent_id=? AND estado NOT IN ('Completada','Cancelada')`
+- `Cancelada` → `UPDATE g_tareas SET estado='Cancelada' WHERE parent_id=? AND estado NOT IN ('Completada','Cancelada')`
+- `Pendiente` → `UPDATE g_tareas SET estado='Pendiente', fecha_fin_real=NULL WHERE parent_id=? AND estado NOT IN ('Cancelada')`
+
+---
+
+## 13. Cronómetro — flujo completo
+
+**Auto-start desde check** (TareasPage.cambiarEstado):
+```js
+// En cambiarEstado(), después de _aplicarEstado(tarea, 'En Progreso', null):
+if (nextEstado === 'En Progreso' && !tarea.cronometro_activo && tareaSeleccionada.value?.id !== tarea.id) {
+  const data = await api(`/api/gestion/tareas/${tarea.id}/iniciar`, { method: 'POST' })
+  if (data?.tiempo?.inicio) {
+    const idx = tareas.value.findIndex(t => t.id === tarea.id)
+    if (idx !== -1) tareas.value[idx] = { ...tareas.value[idx], cronometro_activo: 1, cronometro_inicio: data.tiempo.inicio }
+  }
+}
+```
+- Guard `tareaSeleccionada.value?.id !== tarea.id`: evita double-start cuando el panel ya tiene la tarea y su watcher también llamaría a `iniciar`.
+- Guard `!tarea.cronometro_activo`: no re-iniciar si ya estaba corriendo.
+
+**Auto-start desde watcher** (TareaPanel.vue):
+- `watch(() => props.tarea?.estado)` → si pasa a 'En Progreso' → `cronometroRef.value?.iniciar()`
+- Solo se ejecuta si el panel ESTÁ montado (tarea abierta).
+
+**Timezone**: Colombia UTC-5. `_parseColombia(str)` en TareasPage trata strings sin zona como `-05:00`. El servidor guarda con `timezone: 'local'` en mysql2 (Colombia).
+
+**Popup al completar**:
+- Pre-filled con `_minutosActuales(tarea)` = tiempo_real_min acumulado + minutos del cronómetro en vivo si activo
+- "Cancelar" → cierra modal sin completar (tarea queda en estado anterior)
+- "Confirmar" → guarda tiempo + marca Completada

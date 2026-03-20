@@ -999,6 +999,16 @@ async function cambiarEstado(tarea) {
     return
   }
   await _aplicarEstado(tarea, nextEstado, null)
+  // Auto-iniciar cronómetro al poner En Progreso (si panel no está abierto con esta tarea)
+  if (nextEstado === 'En Progreso' && !tarea.cronometro_activo && tareaSeleccionada.value?.id !== tarea.id) {
+    try {
+      const data = await api(`/api/gestion/tareas/${tarea.id}/iniciar`, { method: 'POST' })
+      if (data?.tiempo?.inicio) {
+        const idx = tareas.value.findIndex(t => t.id === tarea.id)
+        if (idx !== -1) tareas.value[idx] = { ...tareas.value[idx], cronometro_activo: 1, cronometro_inicio: data.tiempo.inicio }
+      }
+    } catch (e) { console.error(e) }
+  }
 }
 
 async function _aplicarEstado(tarea, estado, tiempo_real_min) {
