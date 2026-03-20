@@ -123,7 +123,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue'
+import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
 
 const props = defineProps({
@@ -243,22 +243,45 @@ const duracionDisplay = computed(() => {
 const tiempoCronometro = ref('00:00')
 let interval = null
 
+// Parsear cronometro_inicio como UTC (Hostinger MySQL devuelve sin 'Z')
+function parseInicio(str) {
+  if (!str) return null
+  const s = str.includes('Z') || str.includes('+') ? str : str.replace(' ', 'T') + 'Z'
+  return new Date(s)
+}
+
 function calcularTiempo() {
   if (!props.tarea.cronometro_activo || !props.tarea.cronometro_inicio) return
+  const ini   = parseInicio(props.tarea.cronometro_inicio)
+  if (!ini) return
   const base  = (props.tarea.tiempo_real_min || 0) * 60
-  const extra = Math.floor((Date.now() - new Date(props.tarea.cronometro_inicio).getTime()) / 1000)
+  const extra = Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
   const total = base + extra
   const m = Math.floor(total / 60)
   const s = total % 60
   tiempoCronometro.value = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 }
 
+function iniciarInterval() {
+  if (interval) clearInterval(interval)
+  calcularTiempo()
+  interval = setInterval(calcularTiempo, 1000)
+}
+function detenerInterval() {
+  if (interval) { clearInterval(interval); interval = null }
+  tiempoCronometro.value = '00:00'
+}
+
 onMounted(() => {
-  if (props.tarea.cronometro_activo) {
-    calcularTiempo()
-    interval = setInterval(calcularTiempo, 1000)
-  }
+  if (props.tarea.cronometro_activo) iniciarInterval()
 })
+
+// Reaccionar a cambios de cronometro_activo después del mount
+watch(() => props.tarea.cronometro_activo, (val) => {
+  if (val) iniciarInterval()
+  else     detenerInterval()
+})
+
 onUnmounted(() => { if (interval) clearInterval(interval) })
 </script>
 

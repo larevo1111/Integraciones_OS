@@ -30,7 +30,15 @@ const segundos = ref(0)
 let interval   = null
 
 const segundosAcumulados = ref((props.tiempoBase || 0) * 60)
-let skipNextSync = false
+let skipNextSync    = false   // evita que el watcher de tiempoBase sobreescriba tras pausar
+let skipWatchActivo = false   // evita doble-start cuando iniciar() ya manejó el intervalo
+
+// Parsear cronometro_inicio como UTC (Hostinger MySQL es UTC, sin 'Z' en el string)
+function parseInicio(str) {
+  if (!str) return null
+  const s = str.includes('Z') || str.includes('+') ? str : str.replace(' ', 'T') + 'Z'
+  return new Date(s)
+}
 
 watch(() => props.tiempoBase, v => {
   if (skipNextSync) { skipNextSync = false; return }
@@ -38,8 +46,9 @@ watch(() => props.tiempoBase, v => {
 })
 
 function calcularSegundos() {
-  if (!props.cronometroInicio) return 0
-  return Math.floor((Date.now() - new Date(props.cronometroInicio).getTime()) / 1000)
+  const ini = parseInicio(props.cronometroInicio)
+  if (!ini) return 0
+  return Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
 }
 
 const totalSegundos = computed(() => segundosAcumulados.value + segundos.value)
@@ -64,7 +73,9 @@ onMounted(() => {
   emit('tick', totalSegundos.value)
 })
 
+// Watch solo para cambios externos (ej: otra sesión, recarga) — no cuando iniciar() lo maneja
 watch(() => props.cronometroActivo, val => {
+  if (skipWatchActivo) { skipWatchActivo = false; return }
   activo.value = val
   if (val) { segundos.value = calcularSegundos(); startInterval() }
   else     { stopInterval(); segundos.value = 0 }
@@ -75,10 +86,12 @@ onUnmounted(() => stopInterval())
 async function iniciar() {
   try {
     await api(`/api/gestion/tareas/${props.tareaId}/iniciar`, { method: 'POST' })
+    skipWatchActivo = true      // el watcher de cronometroActivo no debe re-iniciar
     activo.value   = true
     segundos.value = 0
     startInterval()
-    emit('update', 'iniciado')
+    // Emitir timestamp actual como cronometro_inicio (Hostinger es UTC)
+    emit('update', 'iniciado', new Date().toISOString())
   } catch (e) { console.error(e) }
 }
 
@@ -118,7 +131,7 @@ async function reiniciar() {
     skipNextSync = true
     activo.value = false
     emit('tick', 0)
-  emit('update', 'detenido', 0)
+    emit('update', 'detenido', 0)
   } catch (e) {
     if (estabaActivo) startInterval()
     console.error(e)

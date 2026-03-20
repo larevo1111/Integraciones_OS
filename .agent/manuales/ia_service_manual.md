@@ -1,8 +1,8 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.7 — 2026-03-18
+**Versión**: 2.8 — 2026-03-20
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
-**Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con 9 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos, Lógica de negocio, Bot Telegram. Auth Google OAuth + JWT 2 pasos.
+**Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con **15 páginas en 6 grupos semánticos**: Dashboard, Playground, Lógica de negocio, Documentos RAG, Ejemplos SQL, Agentes, Roles de agentes, Tipos de consulta, Esquemas BD, Conexiones BD, Usuarios, Conversaciones, Bot Telegram, Configuración, Logs. Auth Google OAuth + JWT 2 pasos.
 
 > **REGLA DE SEGURIDAD ABSOLUTA**: Las API keys van SOLO en la BD (`ia_agentes.api_key`) y en `scripts/.env`. NUNCA en archivos .md, código commiteado, comentarios ni mensajes de commit.
 
@@ -13,7 +13,7 @@
 1. [Filosofía del sistema — por qué importa](#filosofia)
 2. [Arquitectura completa](#arquitectura)
 3. [Base de datos — tablas completas](#bd)
-4. [System prompt — 6 capas](#system-prompt)
+4. [System prompt — 8 capas](#system-prompt)
 5. [Tipos de consulta](#tipos)
 6. [Agentes disponibles](#agentes)
 7. [Arquitectura de dos capas — mecánica vs analítica](#dos-capas)
@@ -33,6 +33,8 @@
 20. [Operación diaria — comandos útiles](#operacion)
 21. [Troubleshooting](#troubleshooting)
 22. [Referencia: modelos y costos](#referencia)
+23. [Roles de agentes — configuración en ia_config](#roles-agentes)
+24. [Gestor admin — páginas y funciones](#gestor-admin)
 
 ---
 
@@ -394,33 +396,54 @@ Para el bot de Telegram. `bot_sesiones` guarda el agente preferido por `telegram
 
 ---
 
-## 4. System prompt — 6 capas {#system-prompt}
+## 4. System prompt — 8 capas {#system-prompt}
 
-El system prompt que recibe el LLM se construye en 6 capas dinámicas:
+El system prompt que recibe el LLM se construye en 8 capas dinámicas (en este orden):
 
 ```
 CAPA 0 — Fecha y hora actual (siempre)
-  "Fecha y hora actuales: 2026-03-14 15:30 (Sábado, 14 de marzo de 2026)"
+  "Fecha y hora actuales: 2026-03-20 15:30 (Viernes, 20 de marzo de 2026)"
 
-CAPA 1 — System prompt base (desde ia_tipos_consulta)
+CAPA 1 — Lógica de negocio (ia_logica_negocio)
+  Fragmentos siempre_presente=1 se inyectan siempre
+  Fragmentos por keyword se filtran según palabras en la pregunta
+  "<logica_negocio>...</logica_negocio>"
+
+CAPA 2 — System prompt base del tipo (desde ia_tipos_consulta)
   Para analisis_datos: XML completo con rol, precisión, catálogo tablas,
   diccionario campos, reglas SQL, ejemplos Q→SQL
 
-CAPA 2 — RAG (solo si hay fragmentos relevantes)
+CAPA 3 — RAG (solo si hay fragmentos relevantes)
   Fragmentos de documentos de negocio que coinciden con el tema de la pregunta
   "<documentos_negocio>...</documentos_negocio>"
 
-CAPA 3 — DDL del esquema (solo para analisis_datos)
+CAPA 4 — DDL del esquema (solo para analisis_datos)
   CREATE TABLE de las tablas de Hostinger — para que el modelo vea estructura real
   "<esquema_base_datos>...</esquema_base_datos>"
 
-CAPA 4 — Resumen de conversación (si hay contexto previo)
-  El resumen comprimido del historial (máx 1,000 palabras)
+CAPA 5 — Resumen de conversación (si hay contexto previo)
+  El resumen comprimido del historial (máx 600 palabras)
   "<contexto_conversacion>...</contexto_conversacion>"
 
-CAPA 5 — Mensajes recientes (últimos 10 mensajes)
-  Los mensajes literales más recientes con sus preguntas y respuestas
+CAPA 6 — Mensajes recientes (últimos 5 mensajes)
+  Los mensajes literales más recientes con sus preguntas y respuestas exactas
+
+CAPA 7 — Caché SQL (si hay resultado previo en sesión)
+  Resultado de la última consulta SQL — evita re-ejecutar la misma pregunta
+  "<cache_sql>pregunta, columnas, n_filas, muestra_datos</cache_sql>"
+
+CAPA 8 — Ejemplos SQL (few-shot por embeddings)
+  Pares pregunta→SQL similares de ia_ejemplos_sql (cosine similarity con text-embedding-004)
+  "<ejemplos_similares>...</ejemplos_similares>"
 ```
+
+**Todas las capas se pueden gestionar desde ia.oscomunidad.com:**
+- Capas 1: Lógica de negocio → página `/logica-negocio`
+- Capa 2: System prompt base → página `/tipos` (editor)
+- Capa 3: RAG → página `/contextos`
+- Capa 4: DDL → página `/esquemas`
+- Capas 5–7: Conversaciones → página `/conversaciones`
+- Capa 8: Ejemplos SQL → página `/ejemplos-sql`
 
 **¿Por qué XML en CAPA 1?** Anthropic documenta que el modelo parsea las secciones con más precisión cuando están delimitadas con tags XML nombrados (+30% en tareas analíticas complejas).
 
@@ -1781,6 +1804,105 @@ UPDATE ia_tipos_consulta SET agente_sql='gemini-flash-lite' WHERE slug='analisis
 | Google | `proveedores/google.py` | Gemini + Gemma + imagen (autodetecta por modelo_id) |
 | Groq / DeepSeek | `proveedores/openai_compat.py` | API compatible OpenAI |
 | Anthropic | `proveedores/anthropic_prov.py` | Header `anthropic-version: 2023-06-01` requerido |
+
+---
+
+## 23. Roles de agentes — configuración en ia_config {#roles-agentes}
+
+Los agentes tienen **roles especializados** dentro del sistema. Desde 2026-03-20 todos los roles configurables se gestionan en `ia_config` (antes eran hardcoded en `servicio.py`).
+
+### Tipos de roles
+
+| Rol | Descripción | Configurable |
+|---|---|---|
+| **Router** | Clasifica cada consulta (tipo, tema, requiere_sql) | ✅ Sí (4 slots) |
+| **Analítico** | Redacta la respuesta final | En `ia_tipos_consulta.agente_preferido` |
+| **SQL** | Genera el SQL para analisis_datos | En `ia_tipos_consulta.agente_sql` |
+| **Resumen** | Comprime el historial de conversación | ✅ Sí (1 slot) |
+| **Depurador** | Consolida la lógica de negocio cuando supera 800 palabras | ✅ Sí (1 slot) |
+| **Visión** | Procesa imágenes (selección automática por `capacidad=vision`) | Auto — no configurable |
+
+### Claves en ia_config (2026-03-20)
+
+```sql
+SELECT clave, valor FROM ia_config WHERE clave LIKE 'rol_%';
+```
+
+| Clave | Valor por defecto | Descripción |
+|---|---|---|
+| `rol_router_principal` | `groq-llama` | Router 1ª opción |
+| `rol_router_suplente_1` | `cerebras-llama` | Router 2ª opción |
+| `rol_router_suplente_2` | `gemini-flash-lite` | Router 3ª opción |
+| `rol_router_suplente_3` | `gemini-flash` | Router 4ª opción (último fallback) |
+| `rol_resumen_agente` | `groq-llama` | Agente que comprime historial |
+| `rol_depurador_agente` | `groq-llama` | Agente que consolida lógica de negocio |
+
+### Funciones en servicio.py
+
+```python
+def _get_config_simple(clave: str, default: str) -> str:
+    """Lee un valor de ia_config sin necesitar conexión externa."""
+    try:
+        with _db() as conn:
+            return _get_config(conn, clave, default)
+    except Exception:
+        return default
+
+def _slugs_router() -> list[str]:
+    """Devuelve la cadena de agentes router en orden, desde ia_config."""
+    return [
+        _get_config_simple('rol_router_principal',  'groq-llama'),
+        _get_config_simple('rol_router_suplente_1', 'cerebras-llama'),
+        _get_config_simple('rol_router_suplente_2', 'gemini-flash-lite'),
+        _get_config_simple('rol_router_suplente_3', 'gemini-flash'),
+    ]
+```
+
+### Cambiar un rol (ejemplo: router principal → cerebras)
+
+```sql
+UPDATE ia_config SET valor='cerebras-llama' WHERE clave='rol_router_principal';
+```
+También desde **ia.oscomunidad.com → Roles de agentes**.
+
+### ⚠️ Advertencias de costo por rol
+
+- **Router**: usar SOLO modelos rápidos y gratuitos (groq-llama, cerebras-llama, gemini-flash-lite). Cada consulta hace 1 llamada al router.
+- **Resumen/Depurador**: también modelos gratuitos. Se llaman con menor frecuencia.
+- **NUNCA usar gemini-pro, claude-sonnet, deepseek-reasoner como router** — son costosos y lentos para una tarea de clasificación simple.
+
+---
+
+## 24. Gestor admin — páginas y funciones {#gestor-admin}
+
+**URL**: ia.oscomunidad.com | **Puerto**: 9200 | **Servicio**: `os-ia-admin.service`
+
+### Sidebar — 6 grupos semánticos
+
+| Grupo | Páginas | Nivel mínimo |
+|---|---|---|
+| (top) | Dashboard, Playground | 1 |
+| Conocimiento | Lógica de negocio, Documentos RAG, Ejemplos SQL | 5+ |
+| Comportamiento | Agentes, Roles de agentes, Tipos de consulta | 7 |
+| Base de Datos | Esquemas BD, Conexiones BD | 7 |
+| Usuarios & Sesiones | Usuarios, Conversaciones, Bot Telegram | 7 |
+| Sistema | Configuración, Logs | 3+ |
+
+### Páginas nuevas (2026-03-20)
+
+**Esquemas BD** (`/esquemas`): Ver el DDL que se inyecta en el system prompt por tema. Permite editar qué tablas incluir y agregar notas manuales. Botón "Sincronizar DDL" que llama `POST /api/ia/esquemas/:tema_id/sync`.
+
+**Ejemplos SQL** (`/ejemplos-sql`): Lista 303 pares pregunta→SQL aprendidos. Búsqueda por texto. CRUD completo (crear, editar, eliminar). Columnas: pregunta, tablas_usadas, veces_usado, ultima_vez.
+
+**Conversaciones** (`/conversaciones`): Lista sesiones activas con resumen (tamaño en caracteres), mensajes recientes, y caché SQL. Panel lateral muestra resumen completo, últimos 5 mensajes (user/bot), y datos de la caché SQL. Acciones: limpiar resumen, limpiar caché SQL, eliminar sesión completa.
+
+**Roles de agentes** (`/roles`): 4 secciones:
+1. **Enrutamiento** — 4 RolCards configurables (principal + 3 suplentes)
+2. **Analítico por tipo** — tabla read-only con agente_preferido + agente_fallback de cada tipo
+3. **Auxiliares** — RolCards para resumen y depurador
+4. **Visión** — listado de agentes con capacidad=vision (auto-seleccionados)
+
+Advertencia visual si se selecciona agente costoso (gemini-pro, claude-sonnet, deepseek-reasoner, deepseek-chat).
 
 ---
 

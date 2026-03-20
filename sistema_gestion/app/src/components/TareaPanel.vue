@@ -402,12 +402,13 @@ function actualizarTiempoEst(parte, val) {
   actualizar('tiempo_estimado_min', h*60+m)
 }
 
-function onCronometroUpdate(evento, tiempoMin) {
+function onCronometroUpdate(evento, dato) {
   if (evento === 'detenido') {
-    // /detener ya guardó en DB — solo actualizar el padre
-    emit('actualizada', { ...props.tarea, cronometro_activo: 0, tiempo_real_min: tiempoMin })
+    // dato = tiempo_real_min (número) — /detener ya guardó en DB
+    emit('actualizada', { ...props.tarea, cronometro_activo: 0, tiempo_real_min: dato })
   } else {
-    emit('actualizada', { ...props.tarea, cronometro_activo: 1 })
+    // dato = cronometro_inicio ISO string (para que TareaItem muestre bien el tiempo)
+    emit('actualizada', { ...props.tarea, cronometro_activo: 1, cronometro_inicio: dato })
   }
 }
 

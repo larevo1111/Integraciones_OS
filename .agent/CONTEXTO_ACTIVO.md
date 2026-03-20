@@ -213,11 +213,19 @@ ConsignacionPage — tab Por producto
 - Tooltips: carga `/api/tooltips` automáticamente (caché global, no necesita prop)
 - Formato: `fin_/cto_/car_` → `$COP`, `_pct/_margen` → `%` (×100), resto → número con `.` miles
 
-## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-18)
+## Servicio Central de IA — `ia_service_os` (actualizado 2026-03-20)
 
 > **SCOPE**: Este servicio NO es exclusivo de Integraciones_OS. Es el servicio de IA de TODA la empresa OS.
 > Sirve a bot de Telegram, ERP, futuras apps, cualquier proyecto OS.
-> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. 7 páginas: Dashboard, Agentes, Tipos, Logs, Playground, Usuarios, Contextos. Auth Google OAuth + JWT propio (2 pasos: Google → selección empresa → JWT final con `empresa_activa`).
+> **Admin panel**: `ia-admin/` — app Vue+Quasar activa en puerto 9200, `os-ia-admin.service`. **15 páginas en 6 grupos**:
+> - **Dashboard + Playground**
+> - **Conocimiento**: Lógica de negocio, Documentos RAG, Ejemplos SQL
+> - **Comportamiento**: Agentes, Roles de agentes, Tipos de consulta
+> - **Base de Datos**: Esquemas BD, Conexiones BD
+> - **Usuarios & Sesiones**: Usuarios, Conversaciones, Bot Telegram
+> - **Sistema**: Configuración, Logs
+>
+> Auth Google OAuth + JWT propio (2 pasos: Google → selección empresa → JWT final con `empresa_activa`).
 
 ### Multi-empresa (multi-tenant) — IMPLEMENTADO 2026-03-13
 
@@ -255,7 +263,11 @@ ConsignacionPage — tab Por producto
 | claude-sonnet | claude-sonnet-4-6 | Documentos premium | **6** | ✅ Anthropic |
 | deepseek-reasoner | deepseek-reasoner | Admin only | 7 | ✅ DeepSeek |
 
-**Router fallback** (código `_enrutar()`): groq → cerebras → gemini-flash-lite → gemini-flash
+**Router fallback**: groq → cerebras → gemini-flash-lite → gemini-flash
+**⚠️ Roles en ia_config** (2026-03-20): router/resumen/depurador ya NO son hardcoded — se leen de `ia_config`:
+- `rol_router_principal` = groq-llama, `rol_router_suplente_1` = cerebras-llama, `rol_router_suplente_2` = gemini-flash-lite, `rol_router_suplente_3` = gemini-flash
+- `rol_resumen_agente` = groq-llama, `rol_depurador_agente` = groq-llama
+- Cambiables desde **Roles de agentes** en ia.oscomunidad.com
 
 ### Tipos de consulta — agentes por defecto
 
@@ -285,7 +297,8 @@ ConsignacionPage — tab Por producto
 - Nivel 1–5: gemini-flash ★ (default), gpt-oss-120b, deepseek-chat
 - Nivel 6–7: + gemini-pro, claude-sonnet
 
-**Capa 0 — Lógica de negocio (ia_logica_negocio):** 8 fragmentos seed insertados. siempre_presente=1 se inyecta en toda consulta; resto filtra por keywords. Depurador automático si supera 800 palabras (Groq → Cerebras → Gemini).
+**Lógica de negocio (ia_logica_negocio):** 16 fragmentos. `siempre_presente=1` se inyecta en toda consulta; resto filtra por keywords. Depurador automático si supera 800 palabras.
+**Fragmentos activos (2026-03-20):** 13 activados — todos los relevantes al negocio. Inactivos a propósito: 'Lógica de negocio consolidada' (455 palabras, es superset de todos, se mantiene inactiva para no duplicar), 'Tarifa Miembros OS' (incluida en 'Tarifas de precio'), 'Prioridad de costo' (duplicado de 'Manejo de costos').
 
 **Protocolo de aprendizaje:** IA aprende lógica de negocio en tiempo real. Activado por variaciones de "enseñar/aprender/memorizar" O automáticamente cuando no puede responder. Flujo Sócrates: IA pregunta → usuario explica → IA confirma → guarda en ia_logica_negocio + notifica Telegram.
 
@@ -296,15 +309,19 @@ ConsignacionPage — tab Por producto
 - **Admin:** Express puerto 9200, `os-ia-admin.service`, sirve frontend Quasar compilado
 - **Uso:** cualquier proyecto llama `POST http://localhost:5100/ia/consultar`
 
-### Stack de Contexto en 6 Capas (IMPLEMENTADO 2026-03-13)
+### Stack de Contexto en 8 Capas (actualizado 2026-03-20)
 ```
-CAPA 1 — System prompt base del tipo        → ia_tipos_consulta.system_prompt
-CAPA 2 — RAG (fragmentos relevantes)        → ia_rag_fragmentos (FULLTEXT search) ← NUEVO
-CAPA 3 — Schema BD (DDL tablas analíticas)  → esquema.py caché 1h desde Hostinger
-CAPA 4 — Resumen conversación comprimido    → ia_conversaciones.resumen (≤1000 palabras)
-CAPA 5 — Últimos 5 mensajes verbatim        → ia_conversaciones.mensajes_recientes ← NUEVO
-CAPA 6 — Pregunta actual del usuario        → input directo
+CAPA 0 — Fecha/hora actual                  → inyectada siempre al inicio del prompt
+CAPA 1 — Lógica de negocio                  → ia_logica_negocio (siempre_presente=1 + por keywords)
+CAPA 2 — System prompt base del tipo        → ia_tipos_consulta.system_prompt
+CAPA 3 — RAG (fragmentos relevantes)        → ia_rag_fragmentos (FULLTEXT search)
+CAPA 4 — Schema BD (DDL tablas analíticas)  → esquema.py caché 1h desde Hostinger
+CAPA 5 — Resumen conversación comprimido    → ia_conversaciones.resumen (≤600 palabras)
+CAPA 6 — Últimos 5 mensajes verbatim        → ia_conversaciones.mensajes_recientes
+CAPA 7 — Caché SQL                          → ia_conversaciones.metadata.cache_sql (último resultado)
+CAPA 8 — Ejemplos SQL (few-shot)            → ia_ejemplos_sql (embeddings cosine similarity)
 ```
+**Todas las capas visibles y gestionables desde ia.oscomunidad.com**
 
 ### 17 tablas + 1 vista en `ia_service_os`
 Ver manual completo: `.agent/manuales/ia_service_manual.md`
@@ -377,12 +394,29 @@ resultado = consultar(
 
 ---
 
-## Próximos Pasos (2026-03-18)
-1. **Búsqueda web** — integrar Tavily API (gratis 1000 búsquedas/mes). Nuevo tipo `busqueda_web`, router detecta consultas externas al negocio.
-2. **Perfil/preferencias de usuario** — campos en el bot (idioma, agente preferido, apodo, etc.). Probablemente en `ia_usuarios`.
-3. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
+## Completado 2026-03-20 — Gestor IA completo + Roles en ia_config + Lógica de negocio activada
+
+### Cambios implementados
+- ✅ **Sidebar reorganizado** en ia.oscomunidad.com — 6 grupos semánticos (antes era lista plana)
+- ✅ **Nueva página: Esquemas BD** — ver DDL por tema, editar tablas incluidas y notas manuales
+- ✅ **Nueva página: Ejemplos SQL** — lista 303 ejemplos, búsqueda, CRUD completo
+- ✅ **Nueva página: Conversaciones** — lista sesiones activas, ver/limpiar resumen/caché/historial
+- ✅ **Nueva página: Roles de agentes** — 4 slots router + 2 auxiliares configurables desde UI, advertencias si se elige agente costoso
+- ✅ **Router/resumen/depurador desde ia_config** — antes hardcodeados en servicio.py, ahora en BD (`rol_router_principal`, etc.) y gestionables desde la UI
+- ✅ **Funciones `_get_config_simple` y `_slugs_router`** añadidas a servicio.py
+- ✅ **Lógica de negocio activada** — 13 de 16 fragmentos activos (3 inactivos por redundancia)
+- ✅ **Sistema de 8 capas documentado** correctamente (antes se decía 6)
+- ✅ **7 pruebas del servicio** — todas ok (SQL, conversación, web, aprendizaje, router por config, costo, health)
+- ✅ **Nuevos endpoints** en ia-admin/api/server.js: CRUD Ejemplos SQL + CRUD Conversaciones
+- ✅ **Fix**: `requiere_estructura AS requiere_bd` en GET `/api/ia/tipos-admin`
+
+## Próximos Pasos (2026-03-20)
+1. **Subir archivos de raíz a RAG** — 6 archivos (docx, pdf, pptx) → Administración en ia.oscomunidad.com
+2. **Tabla en bot cuando >2 datos** — mejorar bot Telegram para poner tabla automáticamente cuando la respuesta tiene más de 2 datos clave
+3. **Auto-conocimiento del sistema IA** — cambiar de `siempre_presente=1` a por keyword (ahorra 269 palabras por consulta), y actualizar contenido (falta aprendizaje, busqueda_web, cerebras-llama como router)
 4. **Continuar app temporal** (menu.oscomunidad.com): páginas de Remisiones, módulo Clientes, módulo Productos.
 5. **Limpiar contactos TEST**: `UPDATE contact SET deleted=1 WHERE description='TEST_PIPELINE_DELETE';` en BD `espocrm` + borrar en Effi manual
+6. **Búsqueda web** — integrar Tavily API (gratis 1000 búsquedas/mes). Nuevo tipo `busqueda_web`.
 
 ## Completado 2026-03-15 — QA exhaustivo ia_service + 5 bugs críticos corregidos
 
