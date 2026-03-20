@@ -710,6 +710,21 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
         `UPDATE g_tareas SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`,
         params
       )
+
+      // Cascada a subtareas cuando cambia estado del padre
+      if (estado === 'Completada') {
+        await db.gestion.query(
+          `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
+           WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+          [req.usuario.email, req.params.id, req.empresa]
+        )
+      } else if (estado === 'Pendiente') {
+        await db.gestion.query(
+          `UPDATE g_tareas SET estado='Pendiente', fecha_fin_real=NULL, usuario_ult_modificacion=?
+           WHERE parent_id=? AND empresa=? AND estado NOT IN ('Cancelada')`,
+          [req.usuario.email, req.params.id, req.empresa]
+        )
+      }
     }
 
     // Actualizar etiquetas (si se pasó el array — reemplaza todas)
@@ -881,6 +896,13 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
           usuario_ult_modificacion = ?
       WHERE id = ? AND empresa = ?
     `, [tiempoFinal, req.usuario.email, tareaId, req.empresa])
+
+    // Cascada: completar subtareas pendientes/en progreso
+    await db.gestion.query(
+      `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
+       WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+      [req.usuario.email, tareaId, req.empresa]
+    )
 
     const [[tarea]] = await db.gestion.query(
       'SELECT t.*, c.nombre AS categoria_nombre FROM g_tareas t JOIN g_categorias c ON c.id = t.categoria_id WHERE t.id = ?',
