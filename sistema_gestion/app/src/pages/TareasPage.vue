@@ -304,10 +304,14 @@
 
           <!-- Fecha -->
           <div style="position:relative">
-            <button class="multi-bar-btn" @click="multiMenuEstado = false; multiMenuFecha = !multiMenuFecha">
+            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuFecha }" @click="cerrarMenusMulti('fecha')">
               <span class="material-icons" style="font-size:14px">event</span> Fecha
             </button>
             <div v-if="multiMenuFecha" class="multi-bar-menu">
+              <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(0))">Hoy</div>
+              <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(1))">Mañana</div>
+              <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(2))">Pasado mañana</div>
+              <div class="multi-menu-sep" />
               <input type="date" class="multi-date-input" @change="aplicarFechaMulti($event.target.value)" />
               <div class="multi-menu-item" @click="aplicarFechaMulti(null)">Sin fecha</div>
             </div>
@@ -315,13 +319,43 @@
 
           <!-- Estado -->
           <div style="position:relative">
-            <button class="multi-bar-btn" @click="multiMenuFecha = false; multiMenuEstado = !multiMenuEstado">
+            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuEstado }" @click="cerrarMenusMulti('estado')">
               <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
             </button>
             <div v-if="multiMenuEstado" class="multi-bar-menu">
               <div v-for="e in ['Pendiente','En Progreso','Completada','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
             </div>
           </div>
+
+          <!-- Categoría -->
+          <div style="position:relative">
+            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuCategoria }" @click="cerrarMenusMulti('categoria')">
+              <span class="material-icons" style="font-size:14px">label</span> Categoría
+            </button>
+            <div v-if="multiMenuCategoria" class="multi-bar-menu multi-bar-menu-scroll">
+              <div v-for="c in categorias" :key="c.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarCategoriaMulti(c.id)">
+                <span class="multi-dot" :style="{ background: c.color }" />
+                {{ c.nombre.replace(/_/g, ' ') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Proyecto -->
+          <div style="position:relative">
+            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuProyecto }" @click="cerrarMenusMulti('proyecto')">
+              <span class="material-icons" style="font-size:14px">folder</span> Proyecto
+            </button>
+            <div v-if="multiMenuProyecto" class="multi-bar-menu multi-bar-menu-scroll">
+              <div v-for="p in proyectos" :key="p.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarProyectoMulti(p.id)">
+                <span class="multi-dot" :style="{ background: p.color || '#607D8B' }" />
+                {{ p.nombre }}
+              </div>
+              <div class="multi-menu-sep" />
+              <div class="multi-menu-item" @click="aplicarProyectoMulti(null)">Sin proyecto</div>
+            </div>
+          </div>
+
+          <div class="multi-bar-divider" />
 
           <!-- Eliminar -->
           <button class="multi-bar-btn multi-bar-btn-danger" @click="eliminarMulti">
@@ -449,8 +483,23 @@ const mostrarCompletadas = ref(false)
 
 // Multi-selección
 const seleccionMultiIds = ref([])   // array de IDs seleccionados
-const multiMenuFecha    = ref(false)
-const multiMenuEstado   = ref(false)
+const multiMenuFecha     = ref(false)
+const multiMenuEstado    = ref(false)
+const multiMenuCategoria = ref(false)
+const multiMenuProyecto  = ref(false)
+
+function cerrarMenusMulti(abrir) {
+  multiMenuFecha.value     = abrir === 'fecha'
+  multiMenuEstado.value    = abrir === 'estado'
+  multiMenuCategoria.value = abrir === 'categoria'
+  multiMenuProyecto.value  = abrir === 'proyecto'
+}
+
+function isoRelativo(dias) {
+  const d = new Date()
+  d.setDate(d.getDate() + dias)
+  return d.toISOString().slice(0, 10)
+}
 const menuAgrupar            = ref(false)
 const btnAgruparRef          = ref(null)
 const dropdownAgruparStyle   = ref({})
@@ -866,6 +915,26 @@ async function aplicarEstadoMulti(estado) {
   seleccionMultiIds.value = []
 }
 
+async function aplicarCategoriaMulti(categoriaId) {
+  multiMenuCategoria.value = false
+  const ids = [...seleccionMultiIds.value]
+  await Promise.all(ids.map(id =>
+    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ categoria_id: categoriaId }) })
+      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
+  ))
+  seleccionMultiIds.value = []
+}
+
+async function aplicarProyectoMulti(proyectoId) {
+  multiMenuProyecto.value = false
+  const ids = [...seleccionMultiIds.value]
+  await Promise.all(ids.map(id =>
+    api(`/api/gestion/tareas/${id}`, { method: 'PUT', body: JSON.stringify({ proyecto_id: proyectoId }) })
+      .then(d => onTareaActualizada(d.tarea)).catch(console.error)
+  ))
+  seleccionMultiIds.value = []
+}
+
 async function eliminarMulti() {
   const n = seleccionMultiIds.value.length
   if (!confirm(`¿Eliminar ${n} tarea${n !== 1 ? 's' : ''}?`)) return
@@ -883,9 +952,8 @@ async function eliminarMulti() {
 
 function onKeyDown(e) {
   if (e.key === 'Escape' && seleccionMultiIds.value.length > 0) {
-    seleccionMultiIds.value = []
-    multiMenuFecha.value    = false
-    multiMenuEstado.value   = false
+    seleccionMultiIds.value  = []
+    cerrarMenusMulti(null)
   }
 }
 
@@ -1212,6 +1280,7 @@ onUnmounted(() => {
   transition: background 80ms, color 80ms;
 }
 .multi-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.multi-bar-btn-active { background: var(--bg-hover); color: var(--text-primary); }
 .multi-bar-btn-danger:hover { color: #ef4444; }
 .multi-bar-menu {
   position: absolute;
@@ -1246,6 +1315,10 @@ onUnmounted(() => {
   transition: background 80ms;
 }
 .multi-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.multi-menu-item-dot { display: flex; align-items: center; gap: 6px; }
+.multi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.multi-menu-sep { height: 1px; background: var(--border-subtle); margin: 3px 0; }
+.multi-bar-menu-scroll { max-height: 200px; overflow-y: auto; }
 
 /* Animación entrada/salida */
 .multi-bar-enter-active, .multi-bar-leave-active { transition: all 180ms ease; }
