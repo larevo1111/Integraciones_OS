@@ -117,25 +117,30 @@
 
       <div class="divider" />
 
-      <!-- Cronómetro inline (field-row) -->
-      <div class="field-row">
-        <span class="field-label">Cronómetro</span>
-        <Cronometro
-          :tarea-id="tarea.id"
-          :tiempo-base="tarea.tiempo_real_min"
-          :cronometro-activo="!!tarea.cronometro_activo"
-          :cronometro-inicio="tarea.cronometro_inicio"
-          @update="onCronometroUpdate"
-        />
-      </div>
-
-      <!-- Tiempo real -->
+      <!-- T. real con cronómetro integrado -->
       <div class="field-row">
         <span class="field-label">T. real</span>
         <div class="tiempos-compact">
-          <input type="number" class="input-field t-input" :value="Math.floor((tarea.tiempo_real_min||0)/60)" min="0" @change="actualizarTiempoReal('h', $event.target.value)" />
+          <Cronometro
+            ref="cronometroRef"
+            :tarea-id="tarea.id"
+            :tiempo-base="tarea.tiempo_real_min"
+            :cronometro-activo="!!tarea.cronometro_activo"
+            :cronometro-inicio="tarea.cronometro_inicio"
+            @update="onCronometroUpdate"
+            @tick="min => tiempoVivo = min"
+          />
+          <input type="number" class="input-field t-input" style="margin-left:4px"
+            :value="Math.floor((tiempoVivo || 0) / 60)"
+            :disabled="!!tarea.cronometro_activo"
+            min="0"
+            @change="actualizarTiempoReal('h', $event.target.value)" />
           <span class="t-sep">h</span>
-          <input type="number" class="input-field t-input" :value="(tarea.tiempo_real_min||0)%60" min="0" max="59" @change="actualizarTiempoReal('m', $event.target.value)" />
+          <input type="number" class="input-field t-input"
+            :value="(tiempoVivo || 0) % 60"
+            :disabled="!!tarea.cronometro_activo"
+            min="0" max="59"
+            @change="actualizarTiempoReal('m', $event.target.value)" />
           <span class="t-sep">m</span>
         </div>
       </div>
@@ -314,8 +319,24 @@ const LABELS_CAMPO = {
   estado: 'Estado', prioridad: 'Prioridad', categoria_id: 'Categoría',
   proyecto_id: 'Proyecto', responsable: 'Responsable', fecha_limite: 'Fecha',
   id_op: 'OP Effi', descripcion: 'Descripción', notas: 'Notas',
-  tiempo_estimado_min: 'T. estimado'
+  tiempo_estimado_min: 'T. estimado', tiempo_real_min: 'T. real'
 }
+
+// Cronómetro integrado en T. real
+const cronometroRef = ref(null)
+const tiempoVivo    = ref(props.tarea?.tiempo_real_min || 0)
+
+// Sincronizar tiempoVivo con props cuando no está corriendo
+watch(() => props.tarea?.tiempo_real_min, v => {
+  if (!props.tarea?.cronometro_activo) tiempoVivo.value = v || 0
+})
+
+// Auto-start cuando estado cambia a "En Progreso"
+watch(() => props.tarea?.estado, (nuevo, viejo) => {
+  if (nuevo === 'En Progreso' && viejo !== 'En Progreso' && !props.tarea?.cronometro_activo) {
+    cronometroRef.value?.iniciar()
+  }
+})
 
 // Popover completar
 const popoverTiempo   = ref(false)
@@ -335,11 +356,6 @@ async function actualizarFechaEstimada(valor) {
     emit('actualizada', data.tarea)
   } catch (e) { console.error(e) }
 }
-
-const tiempoRegistradoDisplay = computed(() => {
-  const min = props.tarea?.tiempo_real_min || 0
-  return `${Math.floor(min/60)}h ${min%60}min`
-})
 
 async function actualizar(campo, valor) {
   if (!props.tarea) return
@@ -385,12 +401,10 @@ function actualizarTiempoEst(parte, val) {
   actualizar('tiempo_estimado_min', h*60+m)
 }
 
-async function onCronometroUpdate(evento, tiempoMin) {
+function onCronometroUpdate(evento, tiempoMin) {
   if (evento === 'detenido') {
-    // Actualizar UI inmediatamente con tiempo correcto + cronómetro detenido
+    // /detener ya guardó en DB — solo actualizar el padre
     emit('actualizada', { ...props.tarea, cronometro_activo: 0, tiempo_real_min: tiempoMin })
-    // Persistir en DB (emitirá de nuevo con tarea fresca del servidor)
-    await actualizar('tiempo_real_min', tiempoMin)
   } else {
     emit('actualizada', { ...props.tarea, cronometro_activo: 1 })
   }

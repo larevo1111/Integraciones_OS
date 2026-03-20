@@ -821,6 +821,31 @@ app.post('/api/gestion/tareas/:id/detener', async (req, res) => {
   }
 })
 
+// POST /api/gestion/tareas/:id/reiniciar-tiempo
+app.post('/api/gestion/tareas/:id/reiniciar-tiempo', async (req, res) => {
+  const tareaId = req.params.id
+  try {
+    const [[tarea]] = await db.gestion.query(
+      'SELECT id FROM g_tareas WHERE id = ? AND empresa = ?', [tareaId, req.empresa]
+    )
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    // Cerrar timer abierto si existe
+    await db.gestion.query(
+      'UPDATE g_tarea_tiempo SET fin = NOW() WHERE tarea_id = ? AND fin IS NULL', [tareaId]
+    )
+    // Eliminar todos los registros de tiempo de esta tarea
+    await db.gestion.query('DELETE FROM g_tarea_tiempo WHERE tarea_id = ?', [tareaId])
+    // Resetear tiempo_real_min a 0
+    await db.gestion.query(
+      'UPDATE g_tareas SET tiempo_real_min = 0, usuario_ult_modificacion = ? WHERE id = ?',
+      [req.usuario.email, tareaId]
+    )
+    res.json({ ok: true, tiempo_real_min: 0 })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // POST /api/gestion/tareas/:id/completar
 // Body opcional: { tiempo_real_min } — si el usuario corrige el tiempo manualmente
 app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
