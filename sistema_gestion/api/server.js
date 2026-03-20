@@ -718,6 +718,12 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
            WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
           [req.usuario.email, req.params.id, req.empresa]
         )
+      } else if (estado === 'Cancelada') {
+        await db.gestion.query(
+          `UPDATE g_tareas SET estado='Cancelada', usuario_ult_modificacion=?
+           WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+          [req.usuario.email, req.params.id, req.empresa]
+        )
       } else if (estado === 'Pendiente') {
         await db.gestion.query(
           `UPDATE g_tareas SET estado='Pendiente', fecha_fin_real=NULL, usuario_ult_modificacion=?
