@@ -498,7 +498,7 @@ function cerrarMenusMulti(abrir) {
 function isoRelativo(dias) {
   const d = new Date()
   d.setDate(d.getDate() + dias)
-  return d.toISOString().slice(0, 10)
+  return _localISO(d)
 }
 const menuAgrupar            = ref(false)
 const btnAgruparRef          = ref(null)
@@ -703,8 +703,10 @@ const AGRUPACIONES = computed(() => {
 
 const conteoHoy = computed(() => tareas.value.filter(t => t.fecha_limite === hoyISO()).length)
 
-function hoyISO()    { return new Date().toISOString().slice(0,10) }
-function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10) }
+// Usar fecha local (no UTC) para evitar desfase en noches Colombia (UTC-5)
+function _localISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+function hoyISO()    { return _localISO(new Date()) }
+function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return _localISO(d) }
 
 watch(tareaSeleccionada, (v, old) => { if (v && (!old || v.id !== old.id)) bsheetEstado.value = 'half' })
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
@@ -998,7 +1000,9 @@ async function cambiarEstado(tarea) {
     nextTick(() => { tiempoInputRef.value?.focus(); tiempoInputRef.value?.select() })
     return
   }
-  await _aplicarEstado(tarea, nextEstado, null)
+  // Al revertir Completada→Pendiente, resetear tiempo_real_min acumulado
+  const tiempoReset = (tarea.estado === 'Completada' && nextEstado === 'Pendiente') ? 0 : null
+  await _aplicarEstado(tarea, nextEstado, tiempoReset)
   // Auto-iniciar cronómetro al poner En Progreso (si panel no está abierto con esta tarea)
   if (nextEstado === 'En Progreso' && !tarea.cronometro_activo && tareaSeleccionada.value?.id !== tarea.id) {
     try {
@@ -1013,7 +1017,7 @@ async function cambiarEstado(tarea) {
 
 async function _aplicarEstado(tarea, estado, tiempo_real_min) {
   const body = { estado }
-  if (tiempo_real_min) body.tiempo_real_min = tiempo_real_min
+  if (tiempo_real_min != null) body.tiempo_real_min = tiempo_real_min
   try {
     const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify(body) })
     onTareaActualizada(data.tarea)

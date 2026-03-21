@@ -730,6 +730,10 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
            WHERE parent_id=? AND empresa=? AND estado NOT IN ('Cancelada')`,
           [req.usuario.email, req.params.id, req.empresa]
         )
+        // Si se resetea tiempo_real_min a 0 (revertir Completada→Pendiente), limpiar sesiones de cronómetro
+        if (tiempo_real_min === 0) {
+          await db.gestion.query('DELETE FROM g_tarea_tiempo WHERE tarea_id = ?', [req.params.id])
+        }
       }
     }
 
