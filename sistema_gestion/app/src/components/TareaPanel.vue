@@ -115,6 +115,28 @@
         </div>
       </div>
 
+      <!-- Remisión (solo Empaque) -->
+      <div v-if="esEmpaque" class="field-row" style="align-items:flex-start">
+        <span class="field-label" style="padding-top:8px">Remisión</span>
+        <div style="flex:1;min-width:0">
+          <RemisionSelector
+            :modelValue="tarea.id_remision || ''"
+            @update:modelValue="val => actualizar('id_remision', val)"
+          />
+        </div>
+      </div>
+
+      <!-- Pedido (solo Empaque) -->
+      <div v-if="esEmpaque" class="field-row" style="align-items:flex-start">
+        <span class="field-label" style="padding-top:8px">Pedido</span>
+        <div style="flex:1;min-width:0">
+          <PedidoSelector
+            :modelValue="tarea.id_pedido || ''"
+            @update:modelValue="val => actualizar('id_pedido', val)"
+          />
+        </div>
+      </div>
+
       <div class="divider" />
 
       <!-- T. real con cronómetro integrado -->
@@ -245,6 +267,8 @@ import CategoriaSelector    from './CategoriaSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import OpSelector           from './OpSelector.vue'
+import RemisionSelector     from './RemisionSelector.vue'
+import PedidoSelector       from './PedidoSelector.vue'
 import ToastUndo            from './ToastUndo.vue'
 
 const ESTADOS = [
@@ -291,7 +315,14 @@ const esCompletada = computed(() =>
 const esProduccion = computed(() => {
   if (!props.tarea?.categoria_id) return false
   const cat = props.categorias.find(c => c.id === props.tarea.categoria_id)
-  return cat?.nombre?.toLowerCase().includes('produccion') || false
+  return cat?.es_produccion || cat?.nombre?.toLowerCase().includes('produccion') || false
+})
+
+// Mostrar Remisión/Pedido solo si la categoría es Empaque
+const esEmpaque = computed(() => {
+  if (!props.tarea?.categoria_id) return false
+  const cat = props.categorias.find(c => c.id === props.tarea.categoria_id)
+  return cat?.es_empaque || false
 })
 
 // Detalle OP
@@ -318,7 +349,7 @@ const toastRef = ref(null)
 const LABELS_CAMPO = {
   estado: 'Estado', prioridad: 'Prioridad', categoria_id: 'Categoría',
   proyecto_id: 'Proyecto', responsable: 'Responsable', fecha_limite: 'Fecha',
-  id_op: 'OP Effi', descripcion: 'Descripción', notas: 'Notas',
+  id_op: 'OP Effi', id_remision: 'Remisión', id_pedido: 'Pedido', descripcion: 'Descripción', notas: 'Notas',
   tiempo_estimado_min: 'T. estimado', tiempo_real_min: 'T. real'
 }
 

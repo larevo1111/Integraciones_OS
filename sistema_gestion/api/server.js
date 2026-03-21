@@ -296,7 +296,7 @@ app.get('/api/gestion/categorias', async (req, res) => {
     if (perfil) {
       // Filtrar categorías del perfil del usuario
       ;[rows] = await db.gestion.query(`
-        SELECT c.id, c.nombre, c.color, c.icono, c.es_produccion, c.orden
+        SELECT c.id, c.nombre, c.color, c.icono, c.es_produccion, c.es_empaque, c.orden
         FROM g_categorias c
         JOIN g_categorias_perfiles cp ON cp.categoria_id = c.id
         JOIN g_perfiles p ON p.id = cp.perfil_id
@@ -306,7 +306,7 @@ app.get('/api/gestion/categorias', async (req, res) => {
     } else {
       // Sin perfil → todas
       ;[rows] = await db.gestion.query(
-        'SELECT id, nombre, color, icono, es_produccion, orden FROM g_categorias WHERE activa = 1 ORDER BY orden'
+        'SELECT id, nombre, color, icono, es_produccion, es_empaque, orden FROM g_categorias WHERE activa = 1 ORDER BY orden'
       )
     }
 
@@ -456,7 +456,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
         p.nombre AS proyecto_nombre, p.color AS proyecto_color,
         t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
         t.fecha_inicio_real, t.fecha_fin_real,
-        t.id_op, t.tiempo_real_min, t.tiempo_estimado_min, t.notas,
+        t.id_op, t.id_remision, t.id_pedido, t.tiempo_real_min, t.tiempo_estimado_min, t.notas,
         t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
         -- ¿Hay cronómetro corriendo?
         (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
@@ -541,7 +541,7 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
   try {
     const [[tarea]] = await db.gestion.query(`
       SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
-             c.icono AS categoria_icono, c.es_produccion,
+             c.icono AS categoria_icono, c.es_produccion, c.es_empaque,
              p.nombre AS proyecto_nombre, p.color AS proyecto_color
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
@@ -612,7 +612,7 @@ app.post('/api/gestion/tareas', async (req, res) => {
   const {
     titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-    tiempo_estimado_min, id_op, notas, etiquetas, parent_id
+    tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas, parent_id
   } = req.body
 
   if (!titulo || !categoria_id) return res.status(400).json({ error: 'Faltan titulo y categoria_id' })
@@ -622,8 +622,8 @@ app.post('/api/gestion/tareas', async (req, res) => {
       INSERT INTO g_tareas
         (empresa, parent_id, titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
          fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-         tiempo_estimado_min, id_op, notas, usuario_creador, usuario_ult_modificacion)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         tiempo_estimado_min, id_op, id_remision, id_pedido, notas, usuario_creador, usuario_ult_modificacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       req.empresa, parent_id || null,
       titulo, descripcion || null, categoria_id,
@@ -634,7 +634,7 @@ app.post('/api/gestion/tareas', async (req, res) => {
       fecha_inicio_estimada || fecha_limite || null,
       fecha_fin_estimada    || fecha_limite || null,
       tiempo_estimado_min || null,
-      id_op || null, notas || null,
+      id_op || null, id_remision || null, id_pedido || null, notas || null,
       req.usuario.email, req.usuario.email
     ])
 
@@ -667,7 +667,7 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     titulo, descripcion, categoria_id, proyecto_id, estado, prioridad, responsable,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
     fecha_inicio_real, fecha_fin_real,
-    tiempo_real_min, tiempo_estimado_min, id_op, notas, etiquetas
+    tiempo_real_min, tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas
   } = req.body
 
   try {
@@ -699,6 +699,8 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     if (tiempo_real_min       !== undefined) { sets.push('tiempo_real_min = ?');       params.push(tiempo_real_min) }
     if (tiempo_estimado_min   !== undefined) { sets.push('tiempo_estimado_min = ?');   params.push(tiempo_estimado_min) }
     if (id_op            !== undefined) { sets.push('id_op = ?');              params.push(id_op) }
+    if (id_remision      !== undefined) { sets.push('id_remision = ?');        params.push(id_remision) }
+    if (id_pedido        !== undefined) { sets.push('id_pedido = ?');          params.push(id_pedido) }
     if (notas            !== undefined) { sets.push('notas = ?');              params.push(notas) }
 
     if (sets.length) {
@@ -991,6 +993,104 @@ app.get('/api/gestion/op/:id_op/pdf', requireAuth, (req, res) => {
     const stream = fs.createReadStream(tmpPdf)
     stream.pipe(res)
     stream.on('close', () => fs.unlink(tmpPdf, () => {}))  // limpiar tmp
+  })
+})
+
+// ─── REMISIONES ───────────────────────────────────────────────────
+
+// GET /api/gestion/remisiones — remisiones de venta (búsqueda)
+app.get('/api/gestion/remisiones', async (req, res) => {
+  const q = (req.query.q || '').trim()
+  try {
+    const [rows] = await db.integracion.query(`
+      SELECT id_remision, cliente
+      FROM zeffi_remisiones_venta_encabezados
+      WHERE 1=1
+        ${q ? "AND (id_remision LIKE ? OR cliente LIKE ?)" : ''}
+      ORDER BY CAST(id_remision AS UNSIGNED) DESC
+      LIMIT 30
+    `, q ? [`%${q}%`, `%${q}%`] : [])
+    res.json({ ok: true, remisiones: rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/remision/:id — detalle de una remisión
+app.get('/api/gestion/remision/:id', async (req, res) => {
+  try {
+    const [[row]] = await db.integracion.query(
+      'SELECT id_remision, cliente FROM zeffi_remisiones_venta_encabezados WHERE id_remision = ? LIMIT 1',
+      [req.params.id]
+    )
+    if (!row) return res.status(404).json({ error: 'Remisión no encontrada' })
+    res.json({ ok: true, remision: row })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/remision/:id/pdf — PDF remisión via Playwright
+app.get('/api/gestion/remision/:id/pdf', requireAuth, (req, res) => {
+  const idRem = req.params.id.replace(/[^0-9]/g, '')
+  if (!idRem) return res.status(400).json({ error: 'ID inválido' })
+  const tmpPdf = `/tmp/remision_${idRem}_${Date.now()}.pdf`
+  const script = '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/get_remision_pdf.js'
+  res.setTimeout(90000)
+  execFile(process.execPath, [script, idRem, tmpPdf], { timeout: 85000 }, (err) => {
+    if (err || !fs.existsSync(tmpPdf)) {
+      return res.status(500).json({ error: 'No se pudo generar el PDF', detalle: err?.message })
+    }
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="Remision_${idRem}.pdf"`)
+    const stream = fs.createReadStream(tmpPdf)
+    stream.pipe(res)
+    stream.on('close', () => fs.unlink(tmpPdf, () => {}))
+  })
+})
+
+// ─── PEDIDOS (COTIZACIONES) ────────────────────────────────────────
+
+// GET /api/gestion/pedidos — cotizaciones de venta (búsqueda)
+app.get('/api/gestion/pedidos', async (req, res) => {
+  const q = (req.query.q || '').trim()
+  try {
+    const [rows] = await db.integracion.query(`
+      SELECT id_cotizacion, cliente
+      FROM zeffi_cotizaciones_ventas_encabezados
+      WHERE 1=1
+        ${q ? "AND (id_cotizacion LIKE ? OR cliente LIKE ?)" : ''}
+      ORDER BY CAST(id_cotizacion AS UNSIGNED) DESC
+      LIMIT 30
+    `, q ? [`%${q}%`, `%${q}%`] : [])
+    res.json({ ok: true, pedidos: rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/pedido/:id — detalle de un pedido/cotización
+app.get('/api/gestion/pedido/:id', async (req, res) => {
+  try {
+    const [[row]] = await db.integracion.query(
+      'SELECT id_cotizacion, cliente FROM zeffi_cotizaciones_ventas_encabezados WHERE id_cotizacion = ? LIMIT 1',
+      [req.params.id]
+    )
+    if (!row) return res.status(404).json({ error: 'Pedido no encontrado' })
+    res.json({ ok: true, pedido: row })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/pedido/:id/pdf — PDF cotización via Playwright
+app.get('/api/gestion/pedido/:id/pdf', requireAuth, (req, res) => {
+  const idPed = req.params.id.replace(/[^0-9]/g, '')
+  if (!idPed) return res.status(400).json({ error: 'ID inválido' })
+  const tmpPdf = `/tmp/pedido_${idPed}_${Date.now()}.pdf`
+  const script = '/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/get_pedido_pdf.js'
+  res.setTimeout(90000)
+  execFile(process.execPath, [script, idPed, tmpPdf], { timeout: 85000 }, (err) => {
+    if (err || !fs.existsSync(tmpPdf)) {
+      return res.status(500).json({ error: 'No se pudo generar el PDF', detalle: err?.message })
+    }
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `inline; filename="Pedido_${idPed}.pdf"`)
+    const stream = fs.createReadStream(tmpPdf)
+    stream.pipe(res)
+    stream.on('close', () => fs.unlink(tmpPdf, () => {}))
   })
 })
 

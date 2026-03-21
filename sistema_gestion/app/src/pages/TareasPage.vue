@@ -108,6 +108,12 @@
         <div v-if="qaActivo && qaCatEsProduccion" class="quickadd-op">
           <OpSelector v-model="qaOp" style="max-width:360px" />
         </div>
+        <div v-if="qaActivo && qaCatEsEmpaque" class="quickadd-op">
+          <div style="display:flex;flex-direction:column;gap:6px;max-width:360px">
+            <RemisionSelector v-model="qaRemision" />
+            <PedidoSelector   v-model="qaPedido" />
+          </div>
+        </div>
       </div>
 
       <!-- Lista de tareas -->
@@ -414,6 +420,8 @@ import TareaItem            from 'src/components/TareaItem.vue'
 import TareaPanel           from 'src/components/TareaPanel.vue'
 import TareaForm            from 'src/components/TareaForm.vue'
 import OpSelector           from 'src/components/OpSelector.vue'
+import RemisionSelector     from 'src/components/RemisionSelector.vue'
+import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
 import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
@@ -604,6 +612,8 @@ const qaActivo      = ref(false)
 const qaTitulo      = ref('')
 const qaCatId       = ref(null)
 const qaOp          = ref('')
+const qaRemision    = ref('')
+const qaPedido      = ref('')
 const qaProyectoId  = ref(null)
 const qaGuardando   = ref(false)
 const qaInputRef    = ref(null)
@@ -612,11 +622,16 @@ const qaEtiquetas   = ref([])
 const qaCatEsProduccion = computed(() =>
   categorias.value.find(c => c.id === qaCatId.value)?.es_produccion
 )
+const qaCatEsEmpaque = computed(() =>
+  categorias.value.find(c => c.id === qaCatId.value)?.es_empaque
+)
 
 function qaCancelar() {
   qaActivo.value    = false
   qaTitulo.value    = ''
   qaOp.value        = ''
+  qaRemision.value  = ''
+  qaPedido.value    = ''
   qaProyectoId.value = null
   qaEtiquetas.value  = []
 }
@@ -629,7 +644,9 @@ async function qaAgregar() {
       titulo:       qaTitulo.value,
       categoria_id: qaCatId.value || categorias.value[0]?.id,
       proyecto_id:  qaProyectoId.value ?? proyectoFiltroId.value ?? null,
-      id_op:        qaOp.value || null,
+      id_op:        qaOp.value      || null,
+      id_remision:  qaRemision.value || null,
+      id_pedido:    qaPedido.value   || null,
       etiquetas:    qaEtiquetas.value,
       fecha_limite: filtroActivo.value === 'hoy'    ? hoyISO() :
                     filtroActivo.value === 'manana'  ? mananaISO() : null
@@ -638,6 +655,8 @@ async function qaAgregar() {
     onTareaGuardada(data.tarea)
     qaTitulo.value     = ''
     qaOp.value         = ''
+    qaRemision.value   = ''
+    qaPedido.value     = ''
     qaProyectoId.value = null
     qaEtiquetas.value  = []
     qaActivo.value     = false
