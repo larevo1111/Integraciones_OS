@@ -239,6 +239,85 @@ LIMIT 30
 **Causa**: El modificador correcto para tecla flecha abajo es `.down`, no `.arrow-down`.
 **Solución**: Usar `@keydown.down`, `@keydown.up`, `@keydown.enter`, `@keydown.escape`.
 
+### E12 — Filtro "Hoy" muestra tareas de ayer después de las 7 PM (timezone)
+**Causa**: `new Date().toISOString().slice(0,10)` devuelve fecha en UTC. A las 7 PM Colombia (UTC-5 = medianoche UTC) ya devuelve la fecha del día siguiente, rompiendo el filtro.
+**Síntoma**: Tareas de "hoy" aparecen en la vista "Ayer". Vista "Hoy" vacía.
+**Solución**: Usar fecha local del navegador:
+```js
+function _localISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+function hoyISO()    { return _localISO(new Date()) }
+function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return _localISO(d) }
+function isoRelativo(dias) { const d = new Date(); d.setDate(d.getDate() + dias); return _localISO(d) }
+```
+**Regla**: NUNCA usar `.toISOString()` para fechas de filtro. SIEMPRE usar `_localISO()`.
+
+### E13 — Círculo de estado desalineado (aparece arriba del centro)
+**Causa**: El botón `.btn-add-sub-solo` (↳ "Agregar subtarea") en TareaItem.vue estaba en el flujo de columna del `.estado-col`. Aunque invisible (`opacity: 0`), añadía 12px de altura al `estado-col`, haciendo que el círculo (14px) quedara encima del centro en lugar de alineado con el título.
+**Cálculo**: `estado-col` = 14px círculo + 12px botón = 26px. Centrado en 32px row → top 3px. Círculo center = 10px. Texto center = 16px. Desplazamiento = 6px arriba.
+**Solución**: Hacer `.btn-add-sub-solo` `position: absolute` (igual que `.sub-controls`):
+```css
+.btn-add-sub-solo {
+  position: absolute;
+  top: 100%; left: 50%; transform: translateX(-50%);
+  /* resto de propiedades igual */
+}
+```
+**Regla**: TODO elemento dentro de `.estado-col` que no sea el círculo principal DEBE ser `position: absolute` para no afectar el flujo. Si se agregan más controles debajo del círculo en el futuro, hacerlos absolutos.
+**¿Por qué reaparece?**: `.btn-add-sub-solo` fue añadido en un commit POSTERIOR al fix de alineación original (`c5d2074`). Cada vez que se agrega contenido al `estado-col` sin hacer `position:absolute`, el bug reaparece.
+
+### E14 — Cronómetro salta a 1 minuto al iniciar (ROUND vs FLOOR)
+**Causa**: Los 3 endpoints que cierran sesiones de cronómetro usaban `ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)`. Una sesión de 30-59 segundos se redondeaba a 1 minuto. En la siguiente sesión, `tiempo_real_min = 1`, y la fila del cronómetro arrancaba mostrando "01:00".
+**Afectado**: `/iniciar`, `/detener`, `/completar` — todos en server.js.
+**Solución**: Cambiar `ROUND` por `FLOOR` en los 3 queries:
+```sql
+SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
+```
+Así, sesiones < 60 segundos acumulan 0 minutos. El tiempo se pierde para el acumulado pero el display MM:SS en vivo es siempre correcto.
+
+### E15 — Multi-selección no incluía tarea activa en el panel al Ctrl+click
+**Causa**: Al hacer Ctrl+click en una tarea diferente de la que estaba abierta en el panel, solo se seleccionaba la nueva tarea. La tarea del panel quedaba fuera aunque visualmente el usuario esperaría que "entrar en modo multi" la incluyera.
+**Solución**: En `onSeleccionarMulti()` de TareasPage, cuando `seleccionMultiIds.length === 0` (primera selección) y hay un panel abierto con una tarea diferente, auto-incluir la tarea del panel:
+```js
+function onSeleccionarMulti(tarea) {
+  const idx = seleccionMultiIds.value.indexOf(tarea.id)
+  if (idx === -1) {
+    if (seleccionMultiIds.value.length === 0 && tareaSeleccionada.value && tareaSeleccionada.value.id !== tarea.id) {
+      seleccionMultiIds.value.push(tareaSeleccionada.value.id)  // incluir la del panel
+    }
+    seleccionMultiIds.value.push(tarea.id)
+    tareaSeleccionada.value = null  // cerrar panel al entrar en modo multi
+  } else {
+    seleccionMultiIds.value.splice(idx, 1)
+  }
+}
+```
+
+### E16 — Vista no actualiza tras bulk actions
+**Causa**: Las bulk actions llamaban `onTareaActualizada()` para cada tarea. Esta función solo mueve tareas entre arrays locales (`tareas` y `completadas`). Las vistas filtradas (hoy/mañana/semana) dependen de `fecha_limite`, por lo que mover tareas entre arrays sin recargar no refleja el cambio en el filtro activo.
+**Solución**: Después de cualquier bulk action, llamar `cargarTareas()` (recarga completa desde servidor con el filtro activo):
+```js
+async function _postBulk(ids) {
+  if (tareaSeleccionada.value && ids.includes(tareaSeleccionada.value.id)) tareaSeleccionada.value = null
+  seleccionMultiIds.value = []
+  await cargarTareas()
+}
+```
+
+### E17 — Click fuera no desactivaba multi-selección
+**Causa**: No había listener para clicks fuera del área de tareas.
+**Solución**: `document.addEventListener('click', onDocumentClick, true)` en capture phase. Registrar en `onMounted`, remover en `onUnmounted`. Si click fuera de `.tarea-item` y `.multi-bar` → `seleccionMultiIds.value = []`.
+**Importante**: usar capture phase (`true`) para interceptar antes de que otros handlers paren la propagación.
+
+### E18 — tiempo_real_min no se resetea al revertir Completada → Pendiente
+**Causa**: Doble falla:
+1. Frontend: `if (tiempo_real_min)` era falsy para `0` → nunca enviaba el 0 al backend
+2. Backend: no borraba las sesiones `g_tarea_tiempo` — al próximo `/detener` sumaba las sesiones viejas
+**Solución**: 3 cambios coordinados:
+1. `_aplicarEstado`: cambiar `if (tiempo_real_min)` → `if (tiempo_real_min != null)` — permite enviar 0
+2. `cambiarEstado`: cuando `tarea.estado === 'Completada' && nextEstado === 'Pendiente'` → `tiempoReset = 0`
+3. `server.js` PUT: cuando `estado === 'Pendiente' && tiempo_real_min === 0` → `DELETE FROM g_tarea_tiempo WHERE tarea_id = ?`
+**Regla**: Si en el futuro hay otro campo booleano/numérico que puede ser `0` o `false`, usar `!= null` como guard, nunca `if(valor)`.
+
 ---
 
 ## 9. Patrones de diseño TickTick
@@ -305,59 +384,213 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); opa
 
 ---
 
-## 11. Multi-selección — patrón implementado
+## 11. Multi-selección — patrón completo
 
-**Activación**: Ctrl+click (desktop) o long press 500ms (mobile) en cualquier TareaItem.
-- Emite `'seleccionar-multi'` al padre (TareasPage)
-- Si había tarea abierta en panel → se auto-incluye en la primera selección
-- Estilos: `.tarea-item.multi-sel { background: rgba(59,130,246,0.07); outline: 1px solid rgba(59,130,246,0.3) }`
+### Activación
+- **Desktop**: Ctrl+click (o Meta+click en Mac) en cualquier TareaItem
+- **Mobile**: Long press 500ms en cualquier TareaItem
+- Ambos emiten `'seleccionar-multi'` al padre (TareasPage)
 
-**Floating bar**: Teleport to body, posición fixed bottom. Solo visible cuando `seleccionMultiIds.length > 0`.
-- X → desmarcar todo
-- Fecha: Hoy / Mañana / Pasado mañana / Sin fecha / Personalizada (date input)
-- Estado: Pendiente / En Progreso / Completada / Cancelada
-- Categoría: lista con dot de color de cada categoría
-- Proyecto: lista con dot + "Sin proyecto"
-- Eliminar: DELETE con confirmación
+### Lógica de selección (TareasPage.onSeleccionarMulti)
+```js
+function onSeleccionarMulti(tarea) {
+  const idx = seleccionMultiIds.value.indexOf(tarea.id)
+  if (idx === -1) {
+    // REGLA: si es la primera selección y hay panel abierto con otra tarea → auto-incluir la del panel
+    if (seleccionMultiIds.value.length === 0 && tareaSeleccionada.value && tareaSeleccionada.value.id !== tarea.id) {
+      seleccionMultiIds.value.push(tareaSeleccionada.value.id)
+    }
+    seleccionMultiIds.value.push(tarea.id)
+    tareaSeleccionada.value = null  // cerrar panel al entrar en modo multi
+  } else {
+    seleccionMultiIds.value.splice(idx, 1)  // toggle: desmarcar si ya estaba
+  }
+}
+```
+**Por qué auto-incluir**: Si el usuario tiene la tarea A abierta en el panel y hace Ctrl+click en tarea B, la intención es seleccionar AMBAS. Sin esto, A queda huérfana.
 
-**Refresh después de bulk**: SIEMPRE usar `cargarTareas()` (no `onTareaActualizada`). El motivo: las vistas filtradas (hoy/mañana/semana) no se actualizan si solo se hace push en array local.
+### Implementación en TareaItem.vue
+```js
+// Ctrl+click → emit seleccionar-multi
+function onItemClick(e) {
+  if (e.ctrlKey || e.metaKey) { e.stopPropagation(); emit('seleccionar-multi', props.tarea); return }
+  emit('click', props.tarea)
+}
+// Long press 500ms → emit seleccionar-multi
+let longPressTimer = null
+function onTouchStart() {
+  longPressTimer = setTimeout(() => { longPressTimer = null; emit('seleccionar-multi', props.tarea) }, 500)
+}
+function onTouchEnd()  { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } }
+function onTouchMove() { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } }
+```
+Template root div requiere: `@click="onItemClick" @touchstart.passive="onTouchStart" @touchend="onTouchEnd" @touchmove.passive="onTouchMove" @touchcancel="onTouchEnd"`
 
-**Deselección**: listener `document.addEventListener('click', fn, true)` en capture phase. Si click fuera de `.tarea-item` y `.multi-bar` → `seleccionMultiIds.value = []`.
+### Estilos de selección
+```css
+.tarea-item.multi-sel {
+  background: rgba(59, 130, 246, 0.07) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.3);
+  outline-offset: -1px;
+}
+```
+Prop en TareaItem: `:seleccionada-multi="seleccionMultiIds.includes(t.id)"`
+Clase en template: `:class="{ ..., 'multi-sel': seleccionadaMulti }"`
+
+### Floating action bar
+Teleport to body, `position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%)`. Visible solo cuando `seleccionMultiIds.length > 0`.
+- **X** → limpiar selección (`seleccionMultiIds.value = []`)
+- **Fecha**: Hoy / Mañana / Pasado mañana / Sin fecha / input date personalizado
+- **Estado**: Pendiente / En Progreso / Completada / Cancelada
+- **Categoría**: lista con dot de color de cada categoría
+- **Proyecto**: lista con dot de color + "Sin proyecto" (null)
+- **Eliminar**: DELETE bulk con confirmación
+
+### Refresh después de bulk actions
+**SIEMPRE** llamar `cargarTareas()` (NO `onTareaActualizada`):
+```js
+async function _postBulk(ids) {
+  if (tareaSeleccionada.value && ids.includes(tareaSeleccionada.value.id)) tareaSeleccionada.value = null
+  seleccionMultiIds.value = []
+  await cargarTareas()  // recarga con filtro activo — sin esto las vistas filtradas no se actualizan
+}
+```
+
+### Deselección al click fuera
+```js
+// onMounted:
+document.addEventListener('click', onDocumentClick, true)   // capture phase
+// onUnmounted:
+document.removeEventListener('click', onDocumentClick, true)
+
+function onDocumentClick(e) {
+  if (!seleccionMultiIds.value.length) return
+  if (!e.target.closest('.tarea-item') && !e.target.closest('.multi-bar')) {
+    seleccionMultiIds.value = []; cerrarMenusMulti(null)
+  }
+}
+```
+**Capture phase es obligatorio** — algunos elementos usan `@click.stop` que impediría el evento en bubble phase.
+
+### Click en tarea cuando modo multi activo
+```js
+function seleccionar(tarea) {
+  if (seleccionMultiIds.value.length > 0) { onSeleccionarMulti(tarea); return }  // toggle en vez de abrir panel
+  tareaSeleccionada.value = tareaSeleccionada.value?.id === tarea.id ? null : tarea
+}
+```
 
 ---
 
 ## 12. Cascada de estados (backend server.js)
 
-Cuando se actualiza el estado de una tarea padre via PUT o POST /completar:
-- `Completada` → `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(...,NOW()) WHERE parent_id=? AND estado NOT IN ('Completada','Cancelada')`
-- `Cancelada` → `UPDATE g_tareas SET estado='Cancelada' WHERE parent_id=? AND estado NOT IN ('Completada','Cancelada')`
-- `Pendiente` → `UPDATE g_tareas SET estado='Pendiente', fecha_fin_real=NULL WHERE parent_id=? AND estado NOT IN ('Cancelada')`
+Cuando se actualiza el estado de una tarea padre via PUT o POST /completar, el backend ejecuta un UPDATE adicional en subtareas:
+```js
+// Después del UPDATE principal de la tarea padre:
+if (estado === 'Completada') {
+  await db.gestion.query(
+    `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
+     WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+    [req.usuario.email, req.params.id, req.empresa]
+  )
+} else if (estado === 'Cancelada') {
+  await db.gestion.query(
+    `UPDATE g_tareas SET estado='Cancelada', usuario_ult_modificacion=?
+     WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+    [req.usuario.email, req.params.id, req.empresa]
+  )
+} else if (estado === 'Pendiente') {
+  await db.gestion.query(
+    `UPDATE g_tareas SET estado='Pendiente', fecha_fin_real=NULL, usuario_ult_modificacion=?
+     WHERE parent_id=? AND empresa=? AND estado NOT IN ('Cancelada')`,
+    [req.usuario.email, req.params.id, req.empresa]
+  )
+}
+```
+**Regla cascada**: Completada/Cancelada → subtareas que NO están ya en ese estado. Pendiente → subtareas que NO están Canceladas (las canceladas quedan canceladas).
+**Aplica en**: PUT `/tareas/:id` (por estado) Y POST `/tareas/:id/completar`.
 
 ---
 
-## 13. Cronómetro — flujo completo
+## 13. Cronómetro — flujo completo y gotchas críticos
 
-**Auto-start desde check** (TareasPage.cambiarEstado):
+### Arquitectura
+- **g_tarea_tiempo**: tabla de sesiones (tarea_id, usuario, inicio DATETIME, fin DATETIME, duracion_min INT)
+- **g_tareas.cronometro_activo**: calculado en SELECT (`COUNT(*) WHERE fin IS NULL`)
+- **g_tareas.cronometro_inicio**: calculado en SELECT (subquery `SELECT inicio WHERE fin IS NULL`)
+- **g_tareas.tiempo_real_min**: columna persistente, acumulado de todas las sesiones cerradas
+
+### Endpoints cronómetro (server.js)
+```
+POST /iniciar   → cierra sesión abierta (si hay), inserta nueva sesión, estado→'En Progreso'
+POST /detener   → cierra sesión abierta con FLOOR(segundos/60), recalcula tiempo_real_min, estado→'Pendiente'
+POST /completar → cierra sesión abierta, usa tiempo_real_min del body si viene, marca estado='Completada'
+```
+**⚠️ CRÍTICO — usar FLOOR no ROUND**:
+```sql
+SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
+```
+`ROUND` redondea sesiones de 30+ segundos a 1 minuto, causando que el cronómetro arranque en "01:00" en la siguiente sesión. `FLOOR` solo cuenta minutos completos.
+
+### Display en TareaItem.vue (chip en lista)
 ```js
-// En cambiarEstado(), después de _aplicarEstado(tarea, 'En Progreso', null):
-if (nextEstado === 'En Progreso' && !tarea.cronometro_activo && tareaSeleccionada.value?.id !== tarea.id) {
-  const data = await api(`/api/gestion/tareas/${tarea.id}/iniciar`, { method: 'POST' })
-  if (data?.tiempo?.inicio) {
-    const idx = tareas.value.findIndex(t => t.id === tarea.id)
-    if (idx !== -1) tareas.value[idx] = { ...tareas.value[idx], cronometro_activo: 1, cronometro_inicio: data.tiempo.inicio }
-  }
+// Calcula MM:SS total = (tiempo_real_min acumulado + segundos actuales)
+function calcularTiempo() {
+  const ini   = parseInicio(props.tarea.cronometro_inicio)
+  const base  = (props.tarea.tiempo_real_min || 0) * 60  // minutos acumulados → segundos
+  const extra = Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))  // segundos sesión actual
+  const total = base + extra
+  const m = Math.floor(total / 60); const s = total % 60
+  tiempoCronometro.value = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+}
+// Parsear cronometro_inicio respetando timezone Colombia
+function parseInicio(str) {
+  if (!str) return null
+  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
+  return new Date(str.replace(' ', 'T') + '-05:00')  // MySQL datetime sin zona → Colombia UTC-5
 }
 ```
-- Guard `tareaSeleccionada.value?.id !== tarea.id`: evita double-start cuando el panel ya tiene la tarea y su watcher también llamaría a `iniciar`.
-- Guard `!tarea.cronometro_activo`: no re-iniciar si ya estaba corriendo.
+**Comportamiento**: el chip muestra TIEMPO TOTAL acumulado (sesiones previas + sesión actual). Si la tarea tiene 5 minutos acumulados, arranca el cronómetro en "05:00" — esto ES correcto por diseño.
 
-**Auto-start desde watcher** (TareaPanel.vue):
-- `watch(() => props.tarea?.estado)` → si pasa a 'En Progreso' → `cronometroRef.value?.iniciar()`
-- Solo se ejecuta si el panel ESTÁ montado (tarea abierta).
+### Timezone — regla fundamental
+- **Servidor**: mysql2 con `timezone: 'local'` (Colombia UTC-5). `new Date()` en Node → MySQL lo guarda en hora Colombia.
+- **Retorno API**: mysql2 serializa DATETIME → JavaScript Date → JSON → ISO string con 'Z' (UTC).
+- **Cliente**: `parseInicio` detecta 'Z' → `new Date(str)` (UTC correcto). Si es string sin zona (viejo dato) → añade `-05:00`.
+- **Filtros de fecha**: NUNCA `toISOString()`. Siempre `_localISO(new Date())` para obtener fecha local Colombia.
 
-**Timezone**: Colombia UTC-5. `_parseColombia(str)` en TareasPage trata strings sin zona como `-05:00`. El servidor guarda con `timezone: 'local'` en mysql2 (Colombia).
+### Auto-start desde check (TareasPage.cambiarEstado)
+```js
+await _aplicarEstado(tarea, 'En Progreso', null)
+// Guard 1: solo si panel NO tiene esta tarea (evita double-start con watcher de TareaPanel)
+// Guard 2: solo si cronómetro no está ya corriendo
+if (nextEstado === 'En Progreso' && !tarea.cronometro_activo && tareaSeleccionada.value?.id !== tarea.id) {
+  try {
+    const data = await api(`/api/gestion/tareas/${tarea.id}/iniciar`, { method: 'POST' })
+    if (data?.tiempo?.inicio) {
+      const idx = tareas.value.findIndex(t => t.id === tarea.id)
+      if (idx !== -1) tareas.value[idx] = { ...tareas.value[idx], cronometro_activo: 1, cronometro_inicio: data.tiempo.inicio }
+    }
+  } catch (e) { console.error(e) }
+}
+```
 
-**Popup al completar**:
-- Pre-filled con `_minutosActuales(tarea)` = tiempo_real_min acumulado + minutos del cronómetro en vivo si activo
-- "Cancelar" → cierra modal sin completar (tarea queda en estado anterior)
-- "Confirmar" → guarda tiempo + marca Completada
+### Auto-start desde watcher (TareaPanel.vue)
+```js
+watch(() => props.tarea?.estado, (nuevo, viejo) => {
+  if (nuevo === 'En Progreso' && viejo !== 'En Progreso') cronometroRef.value?.iniciar()
+})
+```
+Solo activo mientras el panel ESTÁ montado. Si el panel no está abierto, no dispara.
+
+### Popup al completar (TareasPage)
+```js
+function _minutosActuales(tarea) {
+  let min = tarea.tiempo_real_min || 0
+  if (tarea.cronometro_activo && tarea.cronometro_inicio) {
+    const ini = _parseColombia(tarea.cronometro_inicio)
+    if (ini) min += Math.max(0, Math.floor((Date.now() - ini.getTime()) / 60000))
+  }
+  return min
+}
+```
+Pre-llena el modal con `_minutosActuales(tarea)`. "Cancelar" cierra sin completar. "Confirmar" guarda tiempo y marca Completada.
