@@ -27,11 +27,12 @@ MAX_INLINE = 5
 
 # Todos los agentes seleccionables: (label, callback_data, nivel_minimo)
 AGENTES = [
-    ('⚡ Gemini Flash ★ recomendado', 'agente:gemini-flash',  1),
-    ('🧪 GPT-OSS 120B (análisis)',    'agente:gpt-oss-120b',  1),
-    ('💡 DeepSeek Chat (económico)',  'agente:deepseek-chat', 1),
-    ('🧠 Gemini Pro (premium)',       'agente:gemini-pro',    6),
-    ('🤖 Claude Sonnet (premium)',    'agente:claude-sonnet', 6),
+    ('⚡ Cerebras Llama ★ recomendado', 'agente:cerebras-llama', 1),
+    ('✨ Gemini Flash',                 'agente:gemini-flash',   1),
+    ('🧪 GPT-OSS 120B (análisis)',      'agente:gpt-oss-120b',   1),
+    ('💡 DeepSeek Chat (económico)',    'agente:deepseek-chat',  1),
+    ('🧠 Gemini Pro (premium)',         'agente:gemini-pro',     6),
+    ('🤖 Claude Sonnet (premium)',      'agente:claude-sonnet',  6),
 ]
 
 
