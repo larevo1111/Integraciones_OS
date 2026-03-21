@@ -16,27 +16,18 @@ if (!idPed || !rutaSalida) {
   const { browser, page } = await getPage();
 
   try {
-    await page.goto('https://effi.com.co/app/cotizacion');
+    // Navegar directamente con el ID como filtro (igual que la URL del screenshot)
+    await page.goto(`https://effi.com.co/app/cotizacion?id=${idPed}&id=${idPed}`);
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(800);
 
-    // Abrir filtros de búsqueda
-    const btnFiltros = page.locator('text=Filtros de búsqueda');
-    if (await btnFiltros.isVisible()) {
-      await btnFiltros.click();
-      await page.waitForTimeout(400);
+    // Hacer clic en el botón de opciones (▼) de la primera fila
+    const btnOpciones = page.locator('button:has-text("Opciones"), .btn-opciones, [title="Opciones"]').first();
+    if (await btnOpciones.isVisible()) {
+      await btnOpciones.click();
+    } else {
+      await page.locator('table tbody tr:first-child .btn-group button').first().click();
     }
-
-    // Llenar el campo ID cotización
-    const inputId = page.locator('input[placeholder="ID cotización"]');
-    await inputId.fill(String(idPed));
-
-    // Aplicar filtros
-    await page.locator('text=Aplicar filtros').click();
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(600);
-
-    // Abrir menú opciones de la primera fila
-    await page.locator('table tbody tr:first-child .btn-group button').first().click();
     await page.waitForTimeout(300);
 
     // Hacer clic en "Ver PDF"
