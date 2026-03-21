@@ -790,7 +790,7 @@ app.post('/api/gestion/tareas/:id/iniciar', async (req, res) => {
     const ahoraIniciar = new Date()
     await db.gestion.query(`
       UPDATE g_tarea_tiempo
-      SET fin = ?, duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
+      SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
       WHERE tarea_id = ? AND fin IS NULL
     `, [ahoraIniciar, ahoraIniciar, tareaId])
 
@@ -823,7 +823,7 @@ app.post('/api/gestion/tareas/:id/detener', async (req, res) => {
     const ahoraDetener = new Date()
     await db.gestion.query(`
       UPDATE g_tarea_tiempo
-      SET fin = ?, duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
+      SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
       WHERE tarea_id = ? AND fin IS NULL
     `, [ahoraDetener, ahoraDetener, tareaId])
 
@@ -880,7 +880,7 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
     const ahoraCompletar = new Date()
     await db.gestion.query(`
       UPDATE g_tarea_tiempo
-      SET fin = ?, duracion_min = ROUND(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
+      SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
       WHERE tarea_id = ? AND fin IS NULL
     `, [ahoraCompletar, ahoraCompletar, tareaId])
 

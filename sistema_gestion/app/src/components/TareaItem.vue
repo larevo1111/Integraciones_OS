@@ -368,8 +368,10 @@ onUnmounted(() => {
 .tarea-item:hover .btn-add-sub { opacity: 0.7; }
 .btn-add-sub:hover { color: var(--accent) !important; opacity: 1 !important; }
 
-/* Botón ↳ solo (para tareas padre sin subtareas aún) — más sutil */
+/* Botón ↳ solo (para tareas padre sin subtareas aún) — absoluto para no afectar altura del círculo */
 .btn-add-sub-solo {
+  position: absolute;
+  top: 100%; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; justify-content: center;
   width: 14px; height: 12px; flex-shrink: 0;
   background: transparent; border: none;
