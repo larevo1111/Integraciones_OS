@@ -147,7 +147,8 @@ Cuando la IA falla en una consulta:
 
 **Para tareas del Servicio IA (`scripts/ia_service/` o `scripts/telegram_bot/`):**
 - Cargar skill `/ia-service` — contexto completo con BD, agentes, flujos, latencias, troubleshooting
-- Manual detallado: `.agent/manuales/ia_service_manual.md` (22 secciones)
+- Manual detallado: `.agent/manuales/ia_service_manual.md` (24 secciones, v2.8)
+- Benchmark de agentes: `.agent/docs/COMPARACION_AGENTES_IA.md` — decisión documentada de qué agente va en cada rol y por qué (re-ejecutar con `scripts/benchmark_agentes.py`)
 
 **Regla de conexiones a BD:**
 Las instrucciones de conexión están documentadas como skills. Si no existe la skill, Claude Code puede explorar — pero tiene la **obligación de documentar lo aprendido como skill nueva** antes de dar la tarea por terminada. El conocimiento no queda en el chat: se institucionaliza.

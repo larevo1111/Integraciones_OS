@@ -1,6 +1,6 @@
 # Manual del Servicio Central de IA — ia_service_os
 
-**Versión**: 2.8 — 2026-03-20
+**Versión**: 2.9 — 2026-03-20
 **Scope**: Servicio de IA centralizado de Origen Silvestre. Corre en el servidor OS (puerto 5100) y sirve a TODOS los proyectos: bot de Telegram, apps, integraciones, ERP.
 **Admin panel**: app separada `ia.oscomunidad.com` — ✅ Activa (puerto 9200, `os-ia-admin.service`). Vue+Quasar con **15 páginas en 6 grupos semánticos**: Dashboard, Playground, Lógica de negocio, Documentos RAG, Ejemplos SQL, Agentes, Roles de agentes, Tipos de consulta, Esquemas BD, Conexiones BD, Usuarios, Conversaciones, Bot Telegram, Configuración, Logs. Auth Google OAuth + JWT 2 pasos.
 
@@ -464,16 +464,20 @@ Cada consulta se clasifica en un tipo por el enrutador. El tipo define:
 - Qué agente genera el SQL (capa mecánica)
 - Qué agente redacta la respuesta (capa analítica)
 
-| slug | Descripción | Pasos | agente_sql | agente_preferido |
-|---|---|---|---|---|
-| `analisis_datos` | Preguntas sobre datos históricos de ventas, compras, inventario, etc. | enrutar → generar_sql → ejecutar → redactar | gemini-flash | gemini-pro (override por tema) |
-| `conversacion` | Preguntas de estrategia, planes, metas — respuesta con RAG o contexto | enrutar → redactar | — | gemini-flash-lite |
-| `enrutamiento` | Solo para el enrutador (no tiene steps de respuesta) | — | — | groq-llama |
-| `redaccion` | Redactar texto, email, documento | redactar | — | gemini-flash |
-| `clasificacion` | Clasificar o etiquetar información | clasificar | — | groq-llama |
-| `generacion_imagen` | Crear imagen con IA | generar_imagen | — | gemini-image |
-| `resumen` | Resumir un texto o conjunto de datos | resumir | — | gemini-flash |
-| `generacion_documento` | Generar documentos completos (informes, reportes) | generar_doc | — | claude-sonnet |
+| slug | Descripción | Pasos | agente_sql | agente_preferido | agente_fallback |
+|---|---|---|---|---|---|
+| `analisis_datos` | Preguntas sobre datos históricos de ventas, compras, inventario, etc. | enrutar → generar_sql → ejecutar → redactar | gemini-flash | **cerebras-llama** | gemini-flash-lite |
+| `conversacion` | Preguntas de estrategia, planes, metas — respuesta con RAG o contexto | enrutar → redactar | — | **cerebras-llama** | gemini-flash-lite |
+| `enrutamiento` | Solo para el enrutador (no tiene steps de respuesta) | — | — | groq-llama | cerebras-llama |
+| `redaccion` | Redactar texto, email, documento | redactar | — | **cerebras-llama** | gemini-flash-lite |
+| `clasificacion` | Clasificar o etiquetar información | clasificar | — | groq-llama | — |
+| `generacion_imagen` | Crear imagen con IA | generar_imagen | — | gemini-image | — |
+| `resumen` | Resumir un texto o conjunto de datos | resumir | — | **cerebras-llama** | gemini-flash-lite |
+| `generacion_documento` | Generar documentos completos (informes, reportes) | generar_doc | — | **cerebras-llama** | gemini-flash-lite |
+| `aprendizaje` | Explicaciones, tutoriales, respuestas educativas | enrutar → redactar | — | **cerebras-llama** | gemini-flash-lite |
+| `busqueda_web` | Consultas que requieren información externa o actualizada | enrutar → redactar | — | **cerebras-llama** | gemini-flash-lite |
+
+> **Cambio 2026-03-20**: cerebras-llama reemplaza a gemini-flash como agente analítico principal en todos los tipos de respuesta. gemini-flash-lite reemplaza a deepseek como fallback universal. Ver benchmark: `.agent/docs/COMPARACION_AGENTES_IA.md`
 
 ### Cómo actualizar el system prompt de un tipo
 
@@ -505,20 +509,22 @@ mariadb -u osadmin -pEpist2487. ia_service_os -e \
 
 | slug | modelo_id | tiene_key | RPD | nivel_min | Rol principal | Capacidades |
 |---|---|---|---|---|---|---|
-| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | **Default analítico** — sql, visión | vision, sql, codigo, documentos |
-| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | Alto volumen, router fallback 2 | vision, enrutamiento |
-| `gpt-oss-120b` | `openai/gpt-oss-120b` | ✅ (key Groq) | 1,000 | 1 | Analítico alternativo — 500 t/s, razonamiento variable | sql, codigo, razonamiento |
-| `groq-llama` | `llama-3.3-70b-versatile` | ✅ | 14,400 | 1 | **Enrutador principal** (NUNCA agente final) | enrutamiento |
-| `cerebras-llama` | `llama3.1-8b` | ✅ | 1M TPD | 1 | **Router suplente** — 2,200 t/s, gratis | enrutamiento |
-| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Fallback analítico | sql, codigo, razonamiento |
+| `cerebras-llama` | `llama3.1-8b` | ✅ | 1M TPD | 1 | **Default analítico** — 2,200 t/s, 100% éxito respuesta | sql, codigo, documentos |
+| `gemini-flash` | `gemini-2.5-flash` | ✅ | 10,000 | 1 | **Generador SQL principal** — 93% éxito, 13s | vision, sql, codigo, documentos |
+| `gemini-flash-lite` | `gemini-2.5-flash-lite` | ✅ | 150,000 | 1 | **Fallback analítico** — alto volumen, router fallback 2 | vision, enrutamiento |
+| `gpt-oss-120b` | `openai/gpt-oss-120b` | ✅ (key Groq) | 1,000 | 1 | Analítico alternativo — 500 t/s, 100% éxito | sql, codigo, razonamiento |
+| `groq-llama` | `llama-3.3-70b-versatile` | ✅ | 14,400 | 1 | **Enrutador principal** — 300ms, gratis (NUNCA agente final) | enrutamiento |
+| `deepseek-chat` | `deepseek-chat` | ✅ | — | 1 | Analítico secundario (disponible en bot) | sql, codigo, razonamiento |
 | `gemini-image` | `gemini-2.5-flash-image` | ✅ | 70 | 1 | Generación de imágenes | imagen_generacion |
 | `gemma-router` | `gemma-3-27b-it` | ❌ (inactivo) | 14,400 | 1 | Router fallback (inactivo) | enrutamiento |
 | `gemini-pro` | `gemini-2.5-pro` | ✅ | 1,000 | **6** | SQL complejo + premium (nivel 6+) | vision, sql, codigo, razonamiento |
 | `deepseek-reasoner` | `deepseek-reasoner` | ✅ | — | 7 | Razonamiento complejo (solo admin) | razonamiento |
 | `claude-sonnet` | `claude-sonnet-4-6` | ✅ | — | **6** | Documentos premium (nivel 6+) | vision, sql, codigo, documentos |
 
+> **Cambio 2026-03-20**: cerebras-llama promovido a Default analítico (100% éxito en 22 pruebas). gemini-flash pasa a Generador SQL principal. gemini-flash-lite = fallback universal.
+
 **Restricción de nivel en bot Telegram:**
-- **Nivel 1–5**: gemini-flash, gpt-oss-120b, deepseek-chat
+- **Nivel 1–5**: cerebras-llama ★, gemini-flash, gpt-oss-120b, deepseek-chat
 - **Nivel 6–7**: + gemini-pro, claude-sonnet
 
 **Fallback del router** (hardcodeado en `_enrutar()`):

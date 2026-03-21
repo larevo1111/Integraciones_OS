@@ -39,6 +39,8 @@ Guías de referencia para humanos y agentes. Más extensos que las skills — co
 |--------|---------|-----------|
 | **Estilos Frontend** | `frontend/design-system/MANUAL_ESTILOS.md` | Fuente de verdad única del diseño visual: colores, tipografía, espaciado, componentes, CSS variables. **Leer obligatoriamente antes de cualquier tarea de UI.** |
 | **Testing y QA** | `.agent/INSTRUCCIONES_TESTING.md` | Política completa de QA: roles, herramientas, protocolo de screenshots, ciclo de vida de bugs, checklist por módulo. **Leer antes de cualquier sesión de QA.** |
+| **Servicio IA — Manual completo** | `.agent/manuales/ia_service_manual.md` | 24 secciones: arquitectura, 8 capas de contexto, tipos, agentes, RAG, roles, gestor admin. v2.8. |
+| **Comparación de Agentes IA** | `.agent/docs/COMPARACION_AGENTES_IA.md` | Benchmark 3 rondas (105 llamadas) comparando 5 agentes en rol SQL y respuesta. Incluye decisión aplicada y cómo re-ejecutar. |
 
 ---
 

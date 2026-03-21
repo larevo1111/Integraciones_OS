@@ -1,0 +1,1956 @@
+{
+  "fecha": "2026-03-20T18:36:58.256240",
+  "agentes_sql_testados": [
+    "gemini-flash",
+    "gemini-flash-lite",
+    "groq-llama",
+    "gpt-oss-120b",
+    "cerebras-llama"
+  ],
+  "agentes_respuesta_testados": [
+    "gemini-flash",
+    "gemini-flash-lite",
+    "groq-llama",
+    "gpt-oss-120b",
+    "cerebras-llama"
+  ],
+  "fase1_sql": [
+    {
+      "fase": "SQL",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva AS ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';",
+      "n_filas": 2,
+      "latencia_ms": 12655,
+      "tokens": {
+        "in": 74525,
+        "out": 285
+      },
+      "costo_usd": 0.005675,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el resumen de las ventas de marzo de 2026.\n\nLas ventas netas sin IVA para marzo fueron de **$8,667,799.00**. Hubo devoluciones por un valor de **$1,894,618.00**, lo que resultó"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COALESCE(NULLIF(canal, ''), 'Sin clasificar') AS canal_de_venta,\n  fin_ventas_netas_sin_iva AS ventas_netas_sin_iva\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\n  AND canal IS NOT NULL\n  AND canal != ''\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;",
+      "n_filas": 2,
+      "latencia_ms": 14786,
+      "tokens": {
+        "in": 80847,
+        "out": 299
+      },
+      "costo_usd": 0.006153,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te muestro el top 3 de canales de venta en febrero de 2026 por valor neto sin IVA:\n\n```\nCanal de Venta                                            | Ventas Netas sin IVA\n--------------"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;",
+      "n_filas": 2,
+      "latencia_ms": 12498,
+      "tokens": {
+        "in": 77418,
+        "out": 154
+      },
+      "costo_usd": 0.005853,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato del producto más vendido en unidades durante 2025.\n\nEl producto más vendido en unidades durante 2025 fue la **Tableta Chocolate 73p 50 grs CPM** con **563.00 unidades**"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;",
+      "n_filas": 2,
+      "latencia_ms": 19088,
+      "tokens": {
+        "in": 76049,
+        "out": 323
+      },
+      "costo_usd": 0.005801,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy la información sobre la cartera vencida.\n\nNo tengo el dato del valor total de la cartera vencida en este momento. Sin embargo, sí te puedo mostrar los 5 clientes con la mayor d"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 11225,
+      "tokens": {
+        "in": 53007,
+        "out": 125
+      },
+      "costo_usd": 0.004013,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato del stock actual de productos terminados.\n\nActualmente, tenemos un stock total de **1,098 unidades** de productos terminados."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 10887,
+      "tokens": {
+        "in": 53156,
+        "out": 208
+      },
+      "costo_usd": 0.004049,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el estado de las órdenes de producción vigentes.\n\nActualmente, tenemos **1,089 órdenes de producción vigentes** en el sistema. El valor total de estas órdenes vigentes asciende"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-07",
+      "descripcion": "Remisiones pendientes",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_remision) AS numero_remisiones_pendientes,\n  SUM(CAST(subtotal AS DECIMAL(15,2))) AS valor_pendiente_sin_iva\nFROM zeffi_remisiones_venta_encabezados\nWHERE estado_remision = 'Pendiente de facturar'\n  AND fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 14698,
+      "tokens": {
+        "in": 76121,
+        "out": 215
+      },
+      "costo_usd": 0.005774,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de las remisiones pendientes de facturar.\n\nActualmente, tenemos **1,040 remisiones** que están pendientes de facturar, y su valor total sin IVA es de **$54,129,961.00**"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-08",
+      "descripcion": "Consignación activa",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(subtotal AS DECIMAL(15,2))) AS valor_consignacion_activa\nFROM zeffi_ordenes_venta_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 10597,
+      "tokens": {
+        "in": 76977,
+        "out": 164
+      },
+      "costo_usd": 0.005822,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el valor de la mercancía que tenemos en consignación activa.\n\nActualmente, el valor en consignación activa (es decir, mercancía que está en poder de nuestros clientes pero que "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-09",
+      "descripcion": "Comparativo año anterior",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CASE WHEN mes BETWEEN '2026-01' AND '2026-03' THEN fin_ventas_netas_sin_iva ELSE 0 END) AS ventas_netas_sin_iva_2026,\n  SUM(CASE WHEN mes BETWEEN '2025-01' AND '2025-03' THEN fin_ventas_netas_sin_iva ELSE 0 END) AS ventas_netas_sin_iva_2025,\n  (SUM(CASE WHEN mes BETWEEN '2026-01' AND '2026-03' THEN fin_ventas_netas_sin_iva ELSE 0 END) - SUM(CASE WHEN mes BETWEEN '2025-01' AND '2025-03' THEN fin_ventas_netas_sin_iva ELSE 0 END)) / NULLIF(SUM(CASE WHEN mes BETWEEN '2025-01' AND '2025-",
+      "n_filas": 2,
+      "latencia_ms": 26436,
+      "tokens": {
+        "in": 76269,
+        "out": 1198
+      },
+      "costo_usd": 0.00608,
+      "error": null,
+      "respuesta_breve": "¡Hola! Qué buena pregunta, es clave ver la evolución. Aquí te comparto cómo nos fue en ventas de enero a marzo de 2026 en comparación con el mismo período del año anterior (2025):\n\n```\nMétrica        "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-10",
+      "descripcion": "Margen por canal",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COALESCE(NULLIF(canal, ''), 'Sin clasificar') AS canal_de_venta,\n  ROUND(SUM(cto_utilidad_bruta) / NULLIF(SUM(fin_ventas_netas_sin_iva), 0) * 100, 1) AS margen_promedio_pct\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 2 MONTH), '%Y-%m')\nGROUP BY canal_de_venta\nORDER BY margen_promedio_pct DESC;",
+      "n_filas": 2,
+      "latencia_ms": 15969,
+      "tokens": {
+        "in": 58838,
+        "out": 679
+      },
+      "costo_usd": 0.004617,
+      "error": null,
+      "respuesta_breve": "¡Hola! Claro que sí, es muy importante tener visibilidad sobre la rentabilidad de cada canal. Aquí te muestro el margen promedio de cada canal de venta durante los últimos 3 meses:\n\n```\nCanal de Venta"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-11",
+      "descripcion": "Clientes nuevos",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "NO_SQL",
+      "sql_generado": "",
+      "n_filas": 2,
+      "latencia_ms": 6067,
+      "tokens": {
+        "in": 39560,
+        "out": 39
+      },
+      "costo_usd": 0.002979,
+      "error": null,
+      "respuesta_breve": "No tengo ese dato disponible en la información que me acabas de proporcionar. La tabla que me enviaste contiene el margen promedio por canal de venta, pero no incluye información sobre clientes nuevos"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-12",
+      "descripcion": "Compras materia prima",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(fcd.precio_bruto_total AS DECIMAL(15,2)) - CAST(fcd.descuento_total AS DECIMAL(15,2))) AS total_comprado_materia_prima_sin_iva\nFROM zeffi_facturas_compra_detalle fcd\nJOIN zeffi_facturas_compra_encabezados fce\n  ON fcd.id_factura = fce.id_numeracion\nJOIN zeffi_inventario zi\n  ON fcd.cod_articulo = zi.cod_barras\nJOIN zeffi_categorias_articulos zca\n  ON zi.categoria = zca.nombre\nWHERE DATE_FORMAT(fce.fecha_de_creacion, '%Y') = '2026'\n  AND fce.fecha_de_anulacion IS NULL\n  AND zca.",
+      "n_filas": 2,
+      "latencia_ms": 26341,
+      "tokens": {
+        "in": 120856,
+        "out": 506
+      },
+      "costo_usd": 0.009216,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de las compras de materia prima.\n\nSegún los datos disponibles, no tengo un valor registrado para las compras de materia prima en lo que va del 2026. El campo `total_com"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva AS ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';",
+      "n_filas": 2,
+      "latencia_ms": 14299,
+      "tokens": {
+        "in": 74555,
+        "out": 205
+      },
+      "costo_usd": 0.005653,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nPara el mes de **marzo de 2026**, nuestras ventas totales fueron las siguientes:\n\n*   **Ventas Netas sin IVA:** $8,667,799.00\n*   **Devoluciones:** $1,894,618.00\n*   **Ingresos Netos:** $6,773"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  canal,\n  SUM(fin_ventas_netas_sin_iva) AS valor_neto\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nGROUP BY canal\nORDER BY valor_neto DESC\nLIMIT 3;",
+      "n_filas": 2,
+      "latencia_ms": 13294,
+      "tokens": {
+        "in": 81123,
+        "out": 248
+      },
+      "costo_usd": 0.006159,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nClaro, aquí tienes el top 3 de canales de venta en **febrero de 2026** por valor neto:\n\n```\nCanal                                               | Ventas Netas sin IVA\n-------------------------"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;",
+      "n_filas": 2,
+      "latencia_ms": 11437,
+      "tokens": {
+        "in": 77042,
+        "out": 178
+      },
+      "costo_usd": 0.005832,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nEl producto más vendido en unidades durante el **2025** fue:\n\n```\nProducto                         | Unidades Vendidas\n---------------------------------|------------------\nTableta Chocolate 73"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;",
+      "n_filas": 2,
+      "latencia_ms": 9302,
+      "tokens": {
+        "in": 56867,
+        "out": 346
+      },
+      "costo_usd": 0.004369,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nRevisé la información disponible sobre la cartera vencida. No tengo el valor total de la cartera vencida en este momento, pero sí puedo decirte cuáles son los 5 clientes con la mayor deuda en "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "NO_SQL",
+      "sql_generado": "",
+      "n_filas": 2,
+      "latencia_ms": 4658,
+      "tokens": {
+        "in": 26463,
+        "out": 68
+      },
+      "costo_usd": 0.002005,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nRevisé los datos que tengo disponibles, y con la información actual **no tengo el dato del stock total de productos terminados**. Los datos que me proporcionaste son sobre la cartera vencida d"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 12333,
+      "tokens": {
+        "in": 52858,
+        "out": 139
+      },
+      "costo_usd": 0.004006,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nActualmente tenemos **1,089 órdenes de producción vigentes**, con un valor total de **$3,706,220,397.00**.\n\nEs un volumen considerable de producción en curso, lo que es una buena señal de acti"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-07",
+      "descripcion": "Remisiones pendientes",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_remision) AS numero_remisiones_pendientes,\n  SUM(CAST(subtotal AS DECIMAL(15,2))) AS valor_pendiente_sin_iva\nFROM zeffi_remisiones_venta_encabezados\nWHERE estado_remision = 'Pendiente de facturar'\n  AND fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 9631,
+      "tokens": {
+        "in": 75845,
+        "out": 158
+      },
+      "costo_usd": 0.005736,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nActualmente tenemos **1,040 remisiones pendientes de facturar**, con un valor total de **$54,129,961.00** sin IVA.\n\nEs importante que hagamos seguimiento a estas remisiones para convertirlas e"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-08",
+      "descripcion": "Consignación activa",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(*) AS num_ordenes_consignacion,\n  SUM(CAST(total_neto AS DECIMAL(15,2))) AS valor_neto_consignacion,\n  SUM(CAST(total_bruto AS DECIMAL(15,2))) AS valor_bruto_consignacion\nFROM zeffi_ordenes_venta_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 28373,
+      "tokens": {
+        "in": 77315,
+        "out": 240
+      },
+      "costo_usd": 0.005871,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nActualmente tenemos **13 órdenes de venta vigentes**, lo que representa la mercancía que está en consignación activa en poder de nuestros clientes.\n\nEl valor total de esta mercancía es:\n\n*   *"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-09",
+      "descripcion": "Comparativo año anterior",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva AS ventas_netas_2026,\n  year_ant_ventas_netas AS ventas_netas_2025,\n  year_ant_var_ventas_pct AS variacion_pct\nFROM resumen_ventas_facturas_mes\nWHERE mes IN ('2026-01', '2026-02', '2026-03')\nORDER BY mes;",
+      "n_filas": 2,
+      "latencia_ms": 13462,
+      "tokens": {
+        "in": 75959,
+        "out": 573
+      },
+      "costo_usd": 0.005869,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nClaro, revisé el desempeño de nuestras ventas netas sin IVA para el primer trimestre de 2026 en comparación con el mismo período de 2025.\n\nEn total, de **enero a marzo de 2026**, nuestras vent"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-10",
+      "descripcion": "Margen por canal",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  canal,\n  ROUND(AVG(cto_margen_utilidad_pct) * 100, 2) AS margen_promedio_pct\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH), '%Y-%m')\nGROUP BY canal\nORDER BY margen_promedio_pct DESC;",
+      "n_filas": 2,
+      "latencia_ms": 10380,
+      "tokens": {
+        "in": 78250,
+        "out": 475
+      },
+      "costo_usd": 0.006011,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nClaro, aquí tienes el margen promedio de cada canal de venta durante los últimos 3 meses:\n\n```\nCanal de Venta                                         | Margen Promedio (%)\n--------------------"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-11",
+      "descripcion": "Clientes nuevos",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "NO_SQL",
+      "sql_generado": "",
+      "n_filas": 2,
+      "latencia_ms": 7187,
+      "tokens": {
+        "in": 39225,
+        "out": 77
+      },
+      "costo_usd": 0.002965,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nCon los datos que tengo disponibles en este momento, que son los márgenes promedio por canal de venta, no puedo decirte cuántos clientes nuevos compraron por primera vez en lo que va del 2026."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-12",
+      "descripcion": "Compras materia prima",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(fc.subtotal AS DECIMAL(15, 2))) AS total_compras_materia_prima_sin_iva\nFROM zeffi_facturas_compra_encabezados fc\nJOIN zeffi_facturas_compra_detalle fcd\n  ON fc.id_numeracion = fcd.id_factura\nWHERE\n  DATE_FORMAT(fc.fecha_de_creacion, '%Y') = '2026' AND fc.fecha_de_anulacion IS NULL\n  AND (\n    fcd.id_tipo_de_egreso LIKE 'T01%' OR fcd.id_tipo_de_egreso LIKE 'T01.03%' OR fcd.id_tipo_de_egreso LIKE 'T01.04%' OR fcd.id_tipo_de_egreso LIKE 'T01.05%' OR fcd.id_tipo_de_egreso LIKE 'T01",
+      "n_filas": 2,
+      "latencia_ms": 14073,
+      "tokens": {
+        "in": 83215,
+        "out": 826
+      },
+      "costo_usd": 0.006489,
+      "error": null,
+      "respuesta_breve": "¡Hola!\n\nRevisando la información, **no tengo datos disponibles** sobre el total de compras en materia prima en lo que va del 2026. El sistema me indica que no hay un valor registrado para ese período."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva AS ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';",
+      "n_filas": 2,
+      "latencia_ms": 20614,
+      "tokens": {
+        "in": 74953,
+        "out": 186
+      },
+      "costo_usd": 0.005677,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el resumen de las ventas de marzo de 2026 hasta el momento.\n\nLas **ventas netas sin IVA** en lo que va de marzo de 2026 ascienden a **$8,667,799.00**.\n\nConsiderando las **devol"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  canal,\n  fin_ventas_netas_sin_iva AS valor_neto_sin_iva,\n  fin_pct_del_mes AS participacion_pct\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;",
+      "n_filas": 2,
+      "latencia_ms": 26067,
+      "tokens": {
+        "in": 81345,
+        "out": 334
+      },
+      "costo_usd": 0.006201,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el top 3 de canales de venta en febrero de 2026 por valor neto sin IVA.\n\nAquí tienes los canales que más vendieron ese mes:\n\n```\nCanal                                          "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;",
+      "n_filas": 2,
+      "latencia_ms": 17683,
+      "tokens": {
+        "in": 78504,
+        "out": 148
+      },
+      "costo_usd": 0.005932,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te digo cuál fue el producto más vendido en unidades durante 2025.\n\nEl producto más vendido en unidades durante 2025 fue la **Tableta Chocolate 73p 50 grs CPM**, con un total de **563"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;",
+      "n_filas": 2,
+      "latencia_ms": 15307,
+      "tokens": {
+        "in": 57887,
+        "out": 328
+      },
+      "costo_usd": 0.00444,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy la información sobre la cartera vencida.\n\nActualmente, la cartera vencida asciende a un total de **$2,418,321.00**.\n\nAquí tienes los 5 clientes con la mayor deuda en mora:\n\n```"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 13229,
+      "tokens": {
+        "in": 52736,
+        "out": 122
+      },
+      "costo_usd": 0.003992,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el stock actual de productos terminados.\n\nActualmente, tenemos un total de **1,098 unidades** de productos terminados en stock."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 12979,
+      "tokens": {
+        "in": 53093,
+        "out": 132
+      },
+      "costo_usd": 0.004022,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el estado actual de las órdenes de producción.\n\nActualmente, tenemos **1,089 órdenes de producción vigentes**, con un valor total que asciende a **$3,706,220,397.00**."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-07",
+      "descripcion": "Remisiones pendientes",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_remision) AS numero_remisiones_pendientes,\n  SUM(CAST(subtotal AS DECIMAL(15,2))) AS valor_pendiente_sin_iva\nFROM zeffi_remisiones_venta_encabezados\nWHERE estado_remision = 'Pendiente de facturar'\n  AND fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 16342,
+      "tokens": {
+        "in": 75702,
+        "out": 148
+      },
+      "costo_usd": 0.005722,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy la información sobre las remisiones pendientes de facturar.\n\nActualmente, tenemos **1,040 remisiones pendientes de facturar**, que representan un valor total de **$54,129,961.0"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-08",
+      "descripcion": "Consignación activa",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(*) AS num_ordenes,\n  SUM(CAST(total_neto AS DECIMAL(15,2))) AS valor_total_neto,\n  SUM(CAST(total_bruto AS DECIMAL(15,2))) AS valor_total_bruto\nFROM zeffi_ordenes_venta_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 24040,
+      "tokens": {
+        "in": 76373,
+        "out": 202
+      },
+      "costo_usd": 0.005789,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el valor de la mercancía que tenemos actualmente en consignación activa.\n\nEn este momento, contamos con **13 órdenes de venta vigentes** que representan mercancía en consignaci"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-09",
+      "descripcion": "Comparativo año anterior",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    mes,\n    fin_ventas_netas_sin_iva AS ventas_netas_sin_iva,\n    fin_devoluciones,\n    fin_ingresos_netos,\n    cto_costo_total,\n    cto_utilidad_bruta,\n    ROUND(cto_margen_utilidad_pct * 100, 2) AS margen_pct,\n    vol_num_facturas,\n    cli_clientes_activos\nFROM resumen_ventas_facturas_mes\nWHERE mes IN ('2025-01', '2025-02', '2025-03', '2026-01', '2026-02', '2026-03')\nORDER BY mes DESC;",
+      "n_filas": 2,
+      "latencia_ms": 25255,
+      "tokens": {
+        "in": 76343,
+        "out": 954
+      },
+      "costo_usd": 0.006012,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el panorama de las ventas de enero a marzo de 2026 en comparación con el mismo período de 2025.\n\nEs muy interesante ver cómo hemos evolucionado. En general, hemos tenido un cre"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-10",
+      "descripcion": "Margen por canal",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    canal,\n    ROUND(AVG(cto_margen_utilidad_pct) * 100, 2) AS margen_promedio_pct,\n    COUNT(*) AS meses_con_datos,\n    SUM(fin_ventas_netas_sin_iva) AS ventas_totales_sin_iva,\n    SUM(cto_costo_total) AS costo_total,\n    SUM(cto_utilidad_bruta) AS utilidad_total\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH), '%Y-%m')\n    AND mes <= DATE_FORMAT(CURDATE(), '%Y-%m')\n    AND fin_ventas_netas_sin_iva > 0\nGROUP BY canal\nORDER BY margen_p",
+      "n_filas": 2,
+      "latencia_ms": 24140,
+      "tokens": {
+        "in": 79340,
+        "out": 1174
+      },
+      "costo_usd": 0.006303,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te comparto el margen promedio de cada canal de venta, calculado con los datos disponibles para los últimos meses. Es importante notar que el número de meses considerado para el cálcu"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-11",
+      "descripcion": "Clientes nuevos",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT COUNT(DISTINCT id_cliente) AS clientes_nuevos_2026\nFROM zeffi_facturas_venta_encabezados\nWHERE YEAR(fecha_de_creacion) = 2026\n  AND fecha_de_anulacion IS NULL\n  AND id_cliente NOT IN (\n    SELECT DISTINCT id_cliente\n    FROM zeffi_facturas_venta_encabezados\n    WHERE YEAR(fecha_de_creacion) < 2026\n      AND fecha_de_anulacion IS NULL\n  );",
+      "n_filas": 2,
+      "latencia_ms": 17644,
+      "tokens": {
+        "in": 78708,
+        "out": 204
+      },
+      "costo_usd": 0.005964,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de los clientes nuevos que nos han elegido por primera vez en lo que va del 2026.\n\nHasta la fecha, hemos captado **21 clientes nuevos** que realizaron su primera compra"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-12",
+      "descripcion": "Compras materia prima",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    SUM(CAST(fc.total_neto AS DECIMAL(15,2))) AS total_compras_neto,\n    SUM(CAST(fc.subtotal AS DECIMAL(15,2))) AS total_compras_sin_iva,\n    COUNT(*) AS num_facturas_compra\nFROM zeffi_facturas_compra_encabezados fc\nWHERE YEAR(fc.fecha_de_creacion) = 2026\n    AND fc.fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 14714,
+      "tokens": {
+        "in": 61569,
+        "out": 220
+      },
+      "costo_usd": 0.004684,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con base en los datos disponibles, te comento que **no se han registrado compras de materia prima en lo que va del 2026**.\n\nLos datos muestran que:\n*   **Número de facturas de compra:** 0\n*   *"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva AS ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';",
+      "n_filas": 2,
+      "latencia_ms": 16072,
+      "tokens": {
+        "in": 74479,
+        "out": 189
+      },
+      "costo_usd": 0.005643,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el resumen de ventas de marzo de 2026 hasta el día de hoy.\n\nLas **ventas netas sin IVA** de marzo ascienden a **$8,667,799**. Sin embargo, hemos tenido **$1,894,618** en devolu"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    canal,\n    fin_ventas_netas_sin_iva AS valor_neto_sin_iva,\n    fin_pct_del_mes AS porcentaje_del_total,\n    vol_num_facturas AS numero_facturas,\n    cli_clientes_activos AS clientes_activos\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\n    AND fin_ventas_netas_sin_iva > 0\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;",
+      "n_filas": 2,
+      "latencia_ms": 17993,
+      "tokens": {
+        "in": 80905,
+        "out": 421
+      },
+      "costo_usd": 0.006194,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te muestro el top 3 de canales de venta por valor neto sin IVA para febrero de 2026.\n\nEs claro que los canales de **Mercados, agropecuarias, Fruvers, graneros, plazas merc** y **Merca"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;",
+      "n_filas": 2,
+      "latencia_ms": 15917,
+      "tokens": {
+        "in": 77132,
+        "out": 199
+      },
+      "costo_usd": 0.005845,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te confirmo cuál fue el producto más vendido en unidades durante 2025.\n\nEl producto que lideró las ventas en unidades durante 2025 fue:\n\n| Producto                          | Unidades"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;",
+      "n_filas": 2,
+      "latencia_ms": 14752,
+      "tokens": {
+        "in": 56736,
+        "out": 319
+      },
+      "costo_usd": 0.004351,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy la información de la cartera vencida.\n\nNo tengo el dato del total de la cartera vencida actualmente, pero sí puedo mostrarte los 5 clientes con la mayor deuda en mora, según lo"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 12821,
+      "tokens": {
+        "in": 52654,
+        "out": 124
+      },
+      "costo_usd": 0.003986,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato del stock actual de productos terminados.\n\nActualmente, tenemos un total de **1,098 unidades** de productos terminados en stock."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 12496,
+      "tokens": {
+        "in": 52898,
+        "out": 139
+      },
+      "costo_usd": 0.004009,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el estado de las órdenes de producción vigentes.\n\nActualmente, tenemos **1,089 órdenes de producción activas**.\n\nEl valor total de estas órdenes de producción vigentes asciende"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-07",
+      "descripcion": "Remisiones pendientes",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_remision) AS numero_remisiones_pendientes,\n  SUM(CAST(subtotal AS DECIMAL(15,2))) AS valor_pendiente_sin_iva\nFROM zeffi_remisiones_venta_encabezados\nWHERE estado_remision = 'Pendiente de facturar'\n  AND fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 16209,
+      "tokens": {
+        "in": 75507,
+        "out": 176
+      },
+      "costo_usd": 0.005716,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy la información sobre las remisiones pendientes de facturar.\n\nActualmente, tenemos **1,040 remisiones pendientes de facturar**.\n\nEl valor total de estas remisiones pendientes, s"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-08",
+      "descripcion": "Consignación activa",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    COUNT(*) AS num_ordenes,\n    SUM(CAST(total_neto AS DECIMAL(15,2))) AS valor_total_neto,\n    SUM(CAST(total_bruto AS DECIMAL(15,2))) AS valor_total_bruto\nFROM zeffi_ordenes_venta_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 24473,
+      "tokens": {
+        "in": 76351,
+        "out": 207
+      },
+      "costo_usd": 0.005788,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy la información sobre el valor en consignación activa.\n\nActualmente, tenemos **13 órdenes de venta vigentes**, que representan la mercancía en consignación en poder de nuestros "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-09",
+      "descripcion": "Comparativo año anterior",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    '2025' AS periodo,\n    SUM(fin_ventas_netas_sin_iva) AS ventas_netas_sin_iva,\n    SUM(fin_devoluciones) AS devoluciones,\n    SUM(fin_ingresos_netos) AS ingresos_netos,\n    SUM(vol_num_facturas) AS num_facturas,\n    SUM(cli_clientes_activos) AS clientes_activos,\n    ROUND(AVG(cto_margen_utilidad_pct) * 100, 2) AS margen_promedio_pct\nFROM resumen_ventas_facturas_mes\nWHERE mes IN ('2025-01', '2025-02', '2025-03')\nUNION ALL\nSELECT\n    '2026' AS periodo,\n    SUM(fin_ventas_netas_sin_iva) A",
+      "n_filas": 2,
+      "latencia_ms": 24532,
+      "tokens": {
+        "in": 75461,
+        "out": 1074
+      },
+      "costo_usd": 0.005982,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el comparativo de ventas para el primer trimestre (enero-marzo) de 2026 versus el mismo período de 2025.\n\nAquí tienes un resumen de cómo nos fue:\n\n```\nMétrica                  "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-10",
+      "descripcion": "Margen por canal",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    canal,\n    ROUND(AVG(cto_margen_utilidad_pct) * 100, 2) AS margen_promedio_pct,\n    SUM(fin_ventas_netas_sin_iva) AS ventas_netas_sin_iva,\n    SUM(vol_num_facturas) AS numero_facturas,\n    SUM(cli_clientes_activos) AS clientes_activos\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH), '%Y-%m')\n    AND mes <= DATE_FORMAT(CURDATE(), '%Y-%m')\n    AND fin_ventas_netas_sin_iva > 0\nGROUP BY canal\nORDER BY margen_promedio_pct DESC;",
+      "n_filas": 2,
+      "latencia_ms": 29148,
+      "tokens": {
+        "in": 78925,
+        "out": 1128
+      },
+      "costo_usd": 0.006258,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te muestro el margen promedio de cada canal de venta durante los últimos 3 meses, ordenado de mayor a menor margen.\n\nAquí tienes el detalle:\n\n```\nCanal                                "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-11",
+      "descripcion": "Clientes nuevos",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT COUNT(DISTINCT id_cliente) AS clientes_nuevos_2026\nFROM zeffi_facturas_venta_encabezados\nWHERE YEAR(fecha_de_creacion) = 2026\n  AND fecha_de_anulacion IS NULL\n  AND id_cliente NOT IN (\n    SELECT DISTINCT id_cliente\n    FROM zeffi_facturas_venta_encabezados\n    WHERE YEAR(fecha_de_creacion) < 2026\n      AND fecha_de_anulacion IS NULL\n  );",
+      "n_filas": 2,
+      "latencia_ms": 17981,
+      "tokens": {
+        "in": 78406,
+        "out": 220
+      },
+      "costo_usd": 0.005946,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de los clientes nuevos que nos compraron por primera vez en lo que va del 2026.\n\nEn el período de enero a marzo de 2026, hemos tenido **21 clientes nuevos** que realiza"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-12",
+      "descripcion": "Compras materia prima",
+      "agente": "gpt-oss-120b",
+      "ok": false,
+      "calidad_sql": "ERROR",
+      "sql_generado": "SELECT\n    SUM(CAST(fc.total_neto AS DECIMAL(15,2))) AS total_compras_neto,\n    SUM(CAST(fc.subtotal AS DECIMAL(15,2))) AS total_compras_sin_iva,\n    COUNT(*) AS num_facturas_compra\nFROM zeffi_facturas_compra_encabezados fc\nWHERE YEAR(fc.fecha_de_creacion) = 2026\n    AND fc.fecha_de_anulacion IS NULL\n    AND fc.id_numeracion IN (\n        SELECT DISTINCT fcd.id_factura\n        FROM zeffi_facturas_compra_detalle fcd\n        JOIN zeffi_categorias_articulos ca ON fcd.categoria_articulo = ca.nombre\n ",
+      "n_filas": 0,
+      "latencia_ms": 14700,
+      "tokens": {
+        "in": 29127,
+        "out": 192
+      },
+      "costo_usd": 0.002242,
+      "error": "Error ejecutando SQL: (1054, \"Unknown column 'fcd.categoria_articulo' in 'ON'\")",
+      "respuesta_breve": "Lo siento, ocurrió un error procesando tu consulta: Error ejecutando SQL: (1054, \"Unknown column 'fcd.categoria_articulo' in 'ON'\")"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva AS ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';",
+      "n_filas": 2,
+      "latencia_ms": 16098,
+      "tokens": {
+        "in": 70968,
+        "out": 209
+      },
+      "costo_usd": 0.005385,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el resumen de ventas para marzo de 2026.\n\nLas ventas netas sin IVA hasta ahora en marzo de 2026 son de **$8,667,799.00**.\nHemos tenido **$1,894,618.00** en devoluciones, lo que"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    canal,\n    fin_ventas_netas_sin_iva AS valor_neto_sin_iva,\n    fin_pct_del_mes AS porcentaje_del_mes,\n    vol_num_facturas AS numero_facturas,\n    cli_clientes_activos AS clientes_activos\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\n    AND fin_ventas_netas_sin_iva > 0\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;",
+      "n_filas": 2,
+      "latencia_ms": 18747,
+      "tokens": {
+        "in": 77920,
+        "out": 419
+      },
+      "costo_usd": 0.00597,
+      "error": null,
+      "respuesta_breve": "¡Claro! Aquí tienes el top 3 de canales de venta por valor neto sin IVA para febrero de 2026:\n\n```\nCanal                                         | Ventas Netas (sin IVA) | % del Mes | Facturas | Clien"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;",
+      "n_filas": 2,
+      "latencia_ms": 14553,
+      "tokens": {
+        "in": 51007,
+        "out": 151
+      },
+      "costo_usd": 0.003871,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato del producto más vendido en unidades durante 2025.\n\nEl producto más vendido en unidades durante 2025 fue la **Tableta Chocolate 73p 50 grs CPM**, con un total de **563."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;",
+      "n_filas": 2,
+      "latencia_ms": 15763,
+      "tokens": {
+        "in": 55957,
+        "out": 365
+      },
+      "costo_usd": 0.004306,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con la información que tengo, te puedo dar los detalles de la cartera vencida.\n\nEl total en cartera vencida de estos 5 clientes asciende a **$2,418,321.00**.\n\nAquí tienes los 5 clientes con may"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 12378,
+      "tokens": {
+        "in": 52158,
+        "out": 126
+      },
+      "costo_usd": 0.00395,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato del stock de productos terminados.\n\nActualmente, tenemos un total de **1,098.00** unidades de productos terminados en stock."
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 12767,
+      "tokens": {
+        "in": 52599,
+        "out": 150
+      },
+      "costo_usd": 0.00399,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de las órdenes de producción vigentes.\n\nActualmente, tenemos **1,089** órdenes de producción vigentes, con un valor total de **$3,706,220,397.00**.\n\nEs un volumen consi"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-07",
+      "descripcion": "Remisiones pendientes",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n  COUNT(id_remision) AS numero_remisiones_pendientes,\n  SUM(CAST(subtotal AS DECIMAL(15,2))) AS valor_pendiente_sin_iva\nFROM zeffi_remisiones_venta_encabezados\nWHERE estado_remision = 'Pendiente de facturar'\n  AND fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 16620,
+      "tokens": {
+        "in": 75185,
+        "out": 178
+      },
+      "costo_usd": 0.005692,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de las remisiones pendientes de facturar.\n\nActualmente, tenemos **1,040** remisiones pendientes de facturar, que representan un valor total de **$54,129,961.00** sin IV"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-08",
+      "descripcion": "Consignación activa",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    COUNT(*) AS num_ordenes,\n    SUM(CAST(total_neto AS DECIMAL(15,2))) AS valor_total_neto,\n    SUM(CAST(total_bruto AS DECIMAL(15,2))) AS valor_total_bruto\nFROM zeffi_ordenes_venta_encabezados\nWHERE vigencia = 'Vigente';",
+      "n_filas": 2,
+      "latencia_ms": 24632,
+      "tokens": {
+        "in": 76223,
+        "out": 156
+      },
+      "costo_usd": 0.005764,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato del valor en consignación activa.\n\nActualmente, tenemos **13** órdenes de venta vigentes, que representan un valor bruto de **$7,285,391.00**. Este valor corresponde al"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-09",
+      "descripcion": "Comparativo año anterior",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    '2025' AS año,\n    SUM(fin_ventas_netas_sin_iva) AS ventas_netas_sin_iva,\n    SUM(fin_devoluciones) AS devoluciones,\n    SUM(fin_ingresos_netos) AS ingresos_netos,\n    SUM(vol_num_facturas) AS numero_facturas,\n    SUM(cli_clientes_activos) AS clientes_activos,\n    ROUND(AVG(cto_margen_utilidad_pct) * 100, 2) AS margen_promedio_pct\nFROM resumen_ventas_facturas_mes\nWHERE mes IN ('2025-01', '2025-02', '2025-03')\nUNION ALL\nSELECT\n    '2026' AS año,\n    SUM(fin_ventas_netas_sin_iva) AS ven",
+      "n_filas": 2,
+      "latencia_ms": 25254,
+      "tokens": {
+        "in": 55989,
+        "out": 1027
+      },
+      "costo_usd": 0.004507,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te comparto el análisis de ventas de enero a marzo de 2026 en comparación con el mismo período de 2025.\n\nEn general, vemos un **crecimiento en las ventas netas e ingresos**, lo cual e"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-10",
+      "descripcion": "Margen por canal",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    canal,\n    ROUND(AVG(cto_margen_utilidad_pct) * 100, 2) AS margen_promedio_pct,\n    SUM(fin_ventas_netas_sin_iva) AS ventas_netas_sin_iva,\n    SUM(vol_num_facturas) AS numero_facturas,\n    SUM(cli_clientes_activos) AS clientes_activos\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH), '%Y-%m')\n    AND mes <= DATE_FORMAT(CURDATE(), '%Y-%m')\n    AND fin_ventas_netas_sin_iva > 0\nGROUP BY canal\nORDER BY margen_promedio_pct DESC;",
+      "n_filas": 2,
+      "latencia_ms": 22652,
+      "tokens": {
+        "in": 78457,
+        "out": 1114
+      },
+      "costo_usd": 0.006218,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te comparto el margen promedio de cada canal de venta durante los últimos 3 meses.\n\nEs interesante ver la variabilidad en los márgenes entre los diferentes canales, lo que nos da una "
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-11",
+      "descripcion": "Clientes nuevos",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT COUNT(DISTINCT id_cliente) AS clientes_nuevos_2026\nFROM zeffi_facturas_venta_encabezados\nWHERE YEAR(fecha_de_creacion) = 2026\n  AND fecha_de_anulacion IS NULL\n  AND id_cliente NOT IN (\n    SELECT DISTINCT id_cliente\n    FROM zeffi_facturas_venta_encabezados\n    WHERE YEAR(fecha_de_creacion) < 2026\n      AND fecha_de_anulacion IS NULL\n  );",
+      "n_filas": 2,
+      "latencia_ms": 18204,
+      "tokens": {
+        "in": 77931,
+        "out": 195
+      },
+      "costo_usd": 0.005903,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de los clientes nuevos.\n\nEn lo que va del 2026, **21** clientes han comprado por primera vez.\n\nEs un buen número de clientes nuevos que se están sumando a la familia de"
+    },
+    {
+      "fase": "SQL",
+      "query_id": "SQL-12",
+      "descripcion": "Compras materia prima",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_sql": "OK",
+      "sql_generado": "SELECT\n    COUNT(*) AS numero_facturas_compra,\n    SUM(CAST(total_neto AS DECIMAL(15,2))) AS total_compras_con_iva,\n    SUM(CAST(subtotal AS DECIMAL(15,2))) AS total_compras_sin_iva\nFROM zeffi_facturas_compra_encabezados\nWHERE YEAR(fecha_de_creacion) = 2026\n    AND fecha_de_anulacion IS NULL;",
+      "n_filas": 2,
+      "latencia_ms": 14279,
+      "tokens": {
+        "in": 56085,
+        "out": 172
+      },
+      "costo_usd": 0.004258,
+      "error": null,
+      "respuesta_breve": "¡Hola! Con gusto te doy el dato de las compras de materia prima en lo que va del 2026.\n\nSegún los registros, no se encontraron facturas de compra de materia prima en lo que va del 2026. Esto significa"
+    }
+  ],
+  "fase2_respuesta": [
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 9480,
+      "tokens": {
+        "in": 72158,
+        "out": 177
+      },
+      "costo_usd": 0.005465,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nPara este mes de marzo de 2026, las ventas facturadas van así:\n\n*   **Ventas netas sin IVA:** $8,667,799.00\n*   **Devoluciones:** $1,894,618.00\n*   **Ingresos netos (después de devoluciones):** $6,773,181.00\n\nEs importante notar que las devoluciones han sido significativas este mes.",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 9783,
+      "tokens": {
+        "in": 78556,
+        "out": 205
+      },
+      "costo_usd": 0.005953,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nAnalizando las ventas de febrero de 2026, los 3 canales con mayor valor neto sin IVA fueron:\n\n```\nCanal                                        | Ventas Netas sin IVA\n---------------------------------------------|---------------------\n1.5. Mercados, agropecuarias, Fruvers, etc.  | $2,993,795.00\n1.3. Mercado Saludable                       | $2,789,454.00\n1.7. Restaurantes, tiendas, reposterías, etc.| $1,498,235.00\n```",
+      "sql_generado": "SELECT\n  canal,\n  fin_ventas_netas_sin_iva\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 9566,
+      "tokens": {
+        "in": 75570,
+        "out": 147
+      },
+      "costo_usd": 0.005712,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nDurante el año 2025, el producto más vendido en unidades fue:\n\n```\nProducto                         | Unidades Vendidas\n---------------------------------|------------------\nTableta Chocolate 73p 50 grs CPM | 563\n```",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 12582,
+      "tokens": {
+        "in": 55501,
+        "out": 331
+      },
+      "costo_usd": 0.004262,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nCon los datos que tengo, puedo darte el detalle de los 5 clientes con más deuda en mora. Sin embargo, no tengo el dato del total de la cartera vencida, solo el de estos clientes específicos.\n\nAquí te muestro los 5 clientes con mayor deuda vencida:\n\n```\nCliente                                  | Deuda en Mora\n-----------------------------------------|--------------\nINKAMPO - PORRAS ESLAVA KATHY ELIZABETH  | $715,713.00\nCOMERCIALIZADORA RAGESCO S.A.S. MERCANDU | $603,960.00\nKAKAW CHOCOLATERIA DE TAZA. OSORIO DUQUE | $450,065.00\nNuestro - Giraldo Giraldo Maria Paula    | $352,039.00\nEUDANY HINCAPIE FINCA EL REFUGIO FRESAS  | $296,544.00\n```",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "CORTA",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 7593,
+      "tokens": {
+        "in": 51265,
+        "out": 112
+      },
+      "costo_usd": 0.003878,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nActualmente, el stock total de productos terminados que tenemos es de **1,098 unidades**.",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 8523,
+      "tokens": {
+        "in": 51115,
+        "out": 122
+      },
+      "costo_usd": 0.00387,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nActualmente tenemos **1,089 órdenes de producción vigentes**, y su valor total asciende a **$3,706,220,397.00**.",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-01",
+      "descripcion": "Estrategia precio",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 15265,
+      "tokens": {
+        "in": 6988,
+        "out": 318
+      },
+      "costo_usd": 0.00062,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nLa diferencia principal entre la \"Tarifa Pública\" y lo que podríamos llamar \"Tarifa de Distribuidor\" en Origen Silvestre radica en el cliente al que están dirigidas y las condiciones asociadas:\n\n```\nTarifa                  | Descripción\n------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\nPrecio Publico Sugerido | Es el precio estándar para clientes directos y el público general. Es la tarifa base para todos los productos.\nTarifas por Volumen     | No existe una única \"Tarifa Distribuidor\" con un nombre específico. Los distribuidores, al ser generalmente \"Negocios Aliados\" o \"Mayoristas\", acceden a tarifas con descuentos por volumen. Estas son: \"+ de 200.000 en compras\", \"+ de 400.000 en compras\", \"+ de 800.000 en compras\" y \"+ de 1.600.000 en compras\".\n```\n\nEn resumen, los distribuidores no tienen una tarifa única llamada \"Tarifa Distribuidor\", sino que se les asigna una de las tarifas por volumen, que siempre será inferior al \"Precio Publico Sugerido\", ofreciendo descuentos por sus compras de mayor cantidad. Es importante mencionar que Origen Silvestre tiene pendiente ajustar su política de precios para complementar las tarifas actuales con una tabla diferenciada específicamente por canal (incluyendo distribuidores).\n\n¿Hay algo más en lo que pueda ayudarte sobre las tarifas o tipos de cliente?",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-02",
+      "descripcion": "Redacción email",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 4283,
+      "tokens": {
+        "in": 1789,
+        "out": 80
+      },
+      "costo_usd": 0.000158,
+      "error": null,
+      "respuesta_completa": "¡Claro! Aquí tienes una opción corta y directa:\n\n---\n\n¡Hola [Nombre del Cliente]! 👋 Tenemos una excelente noticia: tu pedido #XXXX ya está listo para ser despachado. Te avisaremos cuando esté en camino. ¡Gracias por tu compra!\n\n---\n*(Recuerda reemplazar \"[Nombre del Cliente]\" y \"#XXXX\" con los datos correspondientes.)*",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-03",
+      "descripcion": "Explicación sistema",
+      "agente": "gemini-flash",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 6419,
+      "tokens": {
+        "in": 27446,
+        "out": 243
+      },
+      "costo_usd": 0.002131,
+      "error": null,
+      "respuesta_completa": "No necesito generar SQL para responder a esta pregunta, ya que se refiere a mis propias capacidades y no a datos de la base de datos de Origen Silvestre.\n\nPuedo manejar los siguientes tipos de consulta:\n\n*   **analisis_datos**: Preguntas sobre datos del negocio (ventas, compras, inventario, producción, cartera). **Estas requieren ir a la base de datos** para generar SQL y ejecutarlo.\n*   **conversacion**: Preguntas estratégicas, planes, conceptos. Respondo sin SQL.\n*   **redaccion**: Redactar textos, emails, descripciones. Respondo sin SQL.\n*   **aprendizaje**: Cuando el equipo me enseña nueva lógica de negocio. Respondo sin SQL (guardo la información).\n*   **busqueda_web**: Preguntas sobre información externa al negocio. Respondo sin SQL (busco en internet).\n*   **generacion_imagen**: Crear imágenes. Respondo sin SQL (uso un agente de generación de imágenes).\n*   **generacion_documento**: Documentos formales. Respondo sin SQL (uso un agente de redacción premium).\n\n💡 ¿Quieres que guarde esto en mi memoria de negocio? Responde **'sí, guárdalo'** y lo registraré para futuras consultas.",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 8091,
+      "tokens": {
+        "in": 54109,
+        "out": 154
+      },
+      "costo_usd": 0.002052,
+      "error": null,
+      "respuesta_completa": "Este mes de marzo de 2026, vendimos un total de **$8,667,799.00** en ventas netas sin IVA.\n\nTuvimos **$1,894,618.00** en devoluciones, lo que resulta en unos ingresos netos de **$6,773,181.00** para el mes.",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 8305,
+      "tokens": {
+        "in": 77854,
+        "out": 222
+      },
+      "costo_usd": 0.002953,
+      "error": null,
+      "respuesta_completa": "Claro, aquí tienes el top 3 de canales de venta para febrero de 2026, ordenados por valor neto:\n\n| Canal                                              | Ventas Netas Sin IVA |\n| :------------------------------------------------- | :------------------- |\n| 1.5. Mercados, agropecuarias, Fruvers, graneros, plazas merc | $2,993,795.00        |\n| 1.3. Mercado Saludable                             | $2,789,454.00        |\n| 1.7. Restaurantes, tiendas, reposterias y cafes afines | $1,498,235.00        |",
+      "sql_generado": "SELECT\n  canal,\n  fin_ventas_netas_sin_iva\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 7150,
+      "tokens": {
+        "in": 50418,
+        "out": 134
+      },
+      "costo_usd": 0.001911,
+      "error": null,
+      "respuesta_completa": "El producto más vendido en unidades durante 2025 fue la **Tableta Chocolate 73p 50 grs CPM**, con un total de **563.00 unidades** vendidas.",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 7622,
+      "tokens": {
+        "in": 55245,
+        "out": 340
+      },
+      "costo_usd": 0.002123,
+      "error": null,
+      "respuesta_completa": "¡Claro! Actualmente, la cartera vencida suma un total de **$2,418,321.00**.\n\nAquí están los 5 clientes con mayor deuda en mora:\n\n| Cliente                                                                 | Deuda en Mora |\n| :---------------------------------------------------------------------- | :------------ |\n| INKAMPO - PORRAS ESLAVA KATHY ELIZABETH                                 | $715,713.00   |\n| COMERCIALIZADORA RAGESCO S.A.S. MERCANDU                                | $603,960.00   |\n| KAKAW CHOCOLATERIA DE TAZA. OSORIO DUQUE YOANNA                         | $450,065.00   |\n| Nuestro - Giraldo Giraldo Maria Paula                                   | $352,039.00   |\n| EUDANY HINCAPIE FINCA EL REFUGIO FRESAS EL PLAN                         | $296,544.00   |",
+      "sql_generado": "SELECT\n  tercero AS cliente,\n  id_tercero AS id_cliente,\n  SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) AS deuda_en_mora\nFROM zeffi_cuentas_por_cobrar\nWHERE estado_cxc = 'Pendiente de cobro en mora'\nGROUP BY tercero, id_tercero\nORDER BY deuda_en_mora DESC\nLIMIT 5;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "CORTA",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 7585,
+      "tokens": {
+        "in": 51079,
+        "out": 108
+      },
+      "costo_usd": 0.001932,
+      "error": null,
+      "respuesta_completa": "Tenemos un total de **1,098.00 unidades** en stock de productos terminados.",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 7677,
+      "tokens": {
+        "in": 50992,
+        "out": 117
+      },
+      "costo_usd": 0.00193,
+      "error": null,
+      "respuesta_completa": "Actualmente, hay **1,089 órdenes de producción vigentes**, con un valor total de **$3,706,220,397.00**.",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-01",
+      "descripcion": "Estrategia precio",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 2897,
+      "tokens": {
+        "in": 6948,
+        "out": 268
+      },
+      "costo_usd": 0.000301,
+      "error": null,
+      "respuesta_completa": "¡Hola! Entiendo que quieres saber la diferencia entre la tarifa de distribuidor y la tarifa pública en Origen Silvestre.\n\nEn OS, manejamos 6 listas de precios. La principal diferencia radica en el volumen de compra y el tipo de cliente al que se aplican:\n\n*   **Precio Público Sugerido:** Esta es la tarifa estándar para clientes directos y el público en general.\n*   **Tarifa de Distribuidor:** Esta tarifa se aplica a clientes que compran en volúmenes mayores y suelen ser negocios aliados. Tenemos varias tarifas dentro de esta categoría, que varían según el volumen de compra:\n    *   \"+ de 400.000 en compras\" (negocios aliados clasificación B)\n    *   \"+ de 800.000 en compras\" (negocios aliados clasificación A)\n    *   \"+ de 1.600.000 en compras\" (negocios aliados clasificación A top)\n\nEn resumen, la tarifa de distribuidor ofrece precios más bajos a medida que el volumen de compra aumenta, reconociendo así la alianza y el compromiso de estos negocios con Origen Silvestre.\n\n¿Te gustaría saber más sobre alguna tarifa en específico o cómo se asignan a los clientes?",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-02",
+      "descripcion": "Redacción email",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 2058,
+      "tokens": {
+        "in": 2054,
+        "out": 30
+      },
+      "costo_usd": 8.2e-05,
+      "error": null,
+      "respuesta_completa": "¡Hola! 👋 Tu pedido de Origen Silvestre ya está listo y preparado para ser despachado. ¡Pronto lo tendrás contigo! 😊",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-03",
+      "descripcion": "Explicación sistema",
+      "agente": "gemini-flash-lite",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 10790,
+      "tokens": {
+        "in": 2131,
+        "out": 343
+      },
+      "costo_usd": 0.000131,
+      "error": null,
+      "respuesta_completa": "¡Hola! 👋 Como asistente de IA de Origen Silvestre, puedo manejar varios tipos de consultas. Aquí te los presento de forma clara:\n\n```\nTipo de consulta          | Descripción                                                                 | ¿Requiere BD?\n--------------------------|-----------------------------------------------------------------------------|----------------\nanalisis_datos            | Preguntas sobre ventas, compras, inventario, producción, cartera, etc.     | ✅ Sí (genera SQL)\nconversacion              | Preguntas estratégicas, planes, conceptos, explicaciones del negocio       | ❌ No\nredaccion                 | Redactar textos, emails, descripciones, mensajes                          | ❌ No\naprendizaje               | Cuando el equipo me enseña nueva lógica de negocio (la guardo en memoria)  | ❌ No\nbusqueda_web              | Preguntas sobre información externa al negocio (busco en internet)         | ❌ No\ngeneracion_imagen         | Crear imágenes                                                            | ❌ No\ngeneracion_documento      | Documentos formales                                                       | ❌ No\n```\n\n**En resumen:**\n- Solo las consultas de **`analisis_datos`** (como las que has hecho sobre cartera, stock y órdenes de producción) requieren ir a la base de datos para ejecutar SQL y traer la información actualizada.\n- Todas las demás se resuelven con mis capacidades de conversación, redacción o búsqueda externa.\n\n¿Te gustaría hacer algún tipo de consulta en particular? 😊",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 10840,
+      "tokens": {
+        "in": 71380,
+        "out": 201
+      },
+      "costo_usd": 0.005414,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nPara el mes de **marzo de 2026**, las ventas facturadas de Origen Silvestre fueron las siguientes:\n\n*   **Ventas netas sin IVA**: $8,667,799.00\n*   **Devoluciones (Notas Crédito)**: $1,894,618.00\n*   **Ingresos netos (después de devoluciones)**: $6,773,181.00\n\nEs importante notar que hubo una cantidad considerable de devoluciones este mes, lo que impactó los ingresos netos finales.",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 9711,
+      "tokens": {
+        "in": 56212,
+        "out": 212
+      },
+      "costo_usd": 0.00428,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nEn **febrero de 2026**, los 3 canales de venta con mayor valor neto sin IVA fueron:\n\n```\nCanal                                                    | Ventas Netas sin IVA\n---------------------------------------------------------|--------------------\n1.5. Mercados, agropecuarias, Fruvers, graneros, plazas  | $2,993,795.00\n1.3. Mercado Saludable                                   | $2,789,454.00\n1.7. Restaurantes, tiendas, reposterias y cafes afines   | $1,498,235.00\n```",
+      "sql_generado": "SELECT\n  canal,\n  fin_ventas_netas_sin_iva\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 10559,
+      "tokens": {
+        "in": 50452,
+        "out": 147
+      },
+      "costo_usd": 0.003828,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nDurante el año **2025**, el producto más vendido en unidades fue:\n\n```\nProducto                         | Unidades Vendidas\n---------------------------------|-------------------\nTableta Chocolate 73p 50 grs CPM | 563\n```",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 14632,
+      "tokens": {
+        "in": 55487,
+        "out": 517
+      },
+      "costo_usd": 0.004317,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nActualmente, la **cartera vencida total** de Origen Silvestre asciende a **$3,271,454.00**.\n\nLos 5 clientes con mayor deuda vencida son:\n\n```\nCliente                                         | ID Cliente       | Deuda en Mora\n------------------------------------------------|------------------|---------------\nINKAMPO - PORRAS ESLAVA KATHY ELIZABETH         | CC: 1102857179   | $715,713.00\nCOMERCIALIZADORA RAGESCO S.A.S. MERCANDU        | NIT: 811032480   | $603,960.00\nKAKAW CHOCOLATERIA DE TAZA. OSORIO DUQUE YOANNA | NIT: 66963651    | $450,065.00\nNuestro - Giraldo Giraldo Maria Paula           | NIT: 1038416695  | $352,039.00\nEUDANY HINCAPIE FINCA EL REFUGIO FRESAS EL PLAN | CC: 43477471     | $296,544.00\n```\n\nEs importante hacer seguimiento a estos clientes para recuperar esos saldos.",
+      "sql_generado": "SELECT\n  (SELECT SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) FROM zeffi_cuentas_por_cobrar WHERE estado_cxc = 'Pendiente de cobro en mora') AS total_cartera_vencida,\n  t.tercero AS cliente,\n  t.id_tercero AS id_cliente,\n  t.deuda_en_mora\nFROM (\n  SELECT\n    tercero,\n    id_tercero,\n    SUM(CAST(saldo_"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "CORTA",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 8870,
+      "tokens": {
+        "in": 51329,
+        "out": 112
+      },
+      "costo_usd": 0.003883,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nActualmente, tenemos un total de **1,098 unidades** en stock de productos terminados.",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 9408,
+      "tokens": {
+        "in": 51290,
+        "out": 134
+      },
+      "costo_usd": 0.003887,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nActualmente, Origen Silvestre tiene **1,089 órdenes de producción vigentes**.\n\nEl valor total de estas órdenes de producción activas asciende a **$3,706,220,397.00**.",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-01",
+      "descripcion": "Estrategia precio",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 13131,
+      "tokens": {
+        "in": 7068,
+        "out": 384
+      },
+      "costo_usd": 0.000645,
+      "error": null,
+      "respuesta_completa": "¡Hola!\n\nLa principal diferencia entre la tarifa pública y lo que se considera una \"tarifa de distribuidor\" en Origen Silvestre radica en el cliente al que están dirigidas y el nivel de descuento que ofrecen.\n\nAquí te explico las diferencias:\n\n```\nTarifa                     | Descripción                                                                                                | Nivel de Precio\n---------------------------|------------------------------------------------------------------------------------------------------------|----------------\nPrecio Publico Sugerido    | Es el precio estándar y más alto, dirigido a clientes directos y al público general.                       | Más alto (precio base)\nTarifas para Distribuidores| Son un conjunto de tarifas con descuentos progresivos, asignadas a clientes mayoristas, distribuidores y   | Con descuentos (menor que el público)\n                           | negocios aliados que compran por volumen con fines de reventa. Estas incluyen:                           |\n                           | - + de 200.000 en compras y Miembros (para clientes con volumen histórico >$200k)                          |\n                           | - + de 400.000 en compras (para clientes con volumen >$400k, Negocios Aliados clasificación B)             |\n                           | - + de 800.000 en compras (para clientes con volumen >$800k, Negocios Aliados clasificación A)             |\n                           | - + de 1.600.000 en compras (para clientes con volumen >$1.6M, Negocios Aliados clasificación A top)       |\n```\n\nEn resumen, la **Tarifa Pública** es el precio de venta al consumidor final, mientras que las **Tarifas para Distribuidores** son precios especiales con descuentos por volumen, pensados para negocios que revenden los productos de OS.",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-02",
+      "descripcion": "Redacción email",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 3733,
+      "tokens": {
+        "in": 1928,
+        "out": 63
+      },
+      "costo_usd": 0.000163,
+      "error": null,
+      "respuesta_completa": "¡Claro! Aquí tienes una opción:\n\n---\n\n¡Hola [Nombre del cliente]! 👋\n\nTe escribimos de Origen Silvestre para contarte que tu pedido ya está listo y a punto de salir para despacho. ¡Pronto lo tendrás contigo! 📦\n\nGracias por tu compra. 😊",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-03",
+      "descripcion": "Explicación sistema",
+      "agente": "groq-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 5026,
+      "tokens": {
+        "in": 2263,
+        "out": 199
+      },
+      "costo_usd": 0.000229,
+      "error": null,
+      "respuesta_completa": "¡Hola! Con gusto te explico los tipos de consulta que puedo manejar y cuáles de ellos requieren acceso a la base de datos:\n\n```\nTipo de Consulta   | Descripción                                                                       | ¿Requiere Base de Datos?\n-------------------|-----------------------------------------------------------------------------------|-------------------------\nanalisis_datos     | Preguntas sobre datos del negocio (ventas, compras, inventario, producción, cartera)| Sí (genera SQL y ejecuta)\nconversacion       | Preguntas estratégicas, planes, conceptos                                          | No\nredaccion          | Redactar textos, emails, descripciones                                            | No\naprendizaje        | Cuando el equipo me enseña nueva lógica de negocio                                | No (actualiza mi memoria interna)\nbusqueda_web       | Preguntas sobre información externa al negocio                                    | No\ngeneracion_imagen  | Crear imágenes                                                                    | No\ngeneracion_documento| Documentos formales                                                               | No\n```",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 17034,
+      "tokens": {
+        "in": 73915,
+        "out": 194
+      },
+      "costo_usd": 0.011204,
+      "error": null,
+      "respuesta_completa": "Según los datos del mes de marzo de 2026:\n\n**Ventas netas (sin IVA):** $8.667.799  \n**Devoluciones:** $1.894.618  \n**Ingresos netos finales:** $6.773.181\n\n**Interpretación:** Las ventas fueron sólidas, pero las devoluciones representan un 22% del total de ventas netas, lo que es un porcentaje significativo. Es importante revisar qué productos o clientes están generando estas devoluciones para entender si hay un patrón que podamos corregir.",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 20683,
+      "tokens": {
+        "in": 80220,
+        "out": 339
+      },
+      "costo_usd": 0.012236,
+      "error": null,
+      "respuesta_completa": "Según los datos de febrero de 2026, el **top 3 de canales de venta por valor neto** (ventas sin IVA) fue el siguiente:\n\n| # | Canal | Ventas Netas (sin IVA) |\n|---|---|---|\n| 1 | **1.5. Mercados, agropecuarias, Fruvers, graneros, plazas merc** | $2.993.795 |\n| 2 | **1.3. Mercado Saludable** | $2.789.454 |\n| 3 | **1.7. Restaurantes, tiendas, reposterías y cafés afines** | $1.498.235 |\n\n**Interpretación:**  \nLos canales **minoristas físicos** dominaron las ventas en febrero. El canal de **mercados y agropecuarias** lideró con una ventaja cercana a los $200 mil sobre el segundo lugar, lo que refleja una fuerte presencia en puntos de venta de alimentos frescos y locales. El **Mercado Saludable** y los **restaurantes/cafés** completan el podio, mostrando que la distribución a través de tiendas especializadas y establecimientos de comida es clave para el negocio ese mes.",
+      "sql_generado": "SELECT\n  canal,\n  fin_ventas_netas_sin_iva\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 16494,
+      "tokens": {
+        "in": 77635,
+        "out": 171
+      },
+      "costo_usd": 0.011748,
+      "error": null,
+      "respuesta_completa": "Según los datos de 2025, el producto más vendido en unidades fue:\n\n**Tableta Chocolate 73p 50 grs CPM**  \n**Total de unidades vendidas:** 563\n\nEste producto de chocolate de 50 gramos fue claramente el de mayor rotación, lo que sugiere una alta demanda por su formato pequeño, accesible y de consumo rápido.",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 21316,
+      "tokens": {
+        "in": 57526,
+        "out": 565
+      },
+      "costo_usd": 0.008968,
+      "error": null,
+      "respuesta_completa": "Según los datos actuales de cartera vencida:\n\n**Total de cartera vencida:** $3.271.454\n\n**Top 5 clientes con mayor deuda en mora:**\n\n| Cliente | ID | Deuda en mora |\n|---|---|---|\n| **INKAMPO - PORRAS ESLAVA KATHY ELIZABETH** | CC: 1102857179 | $715.713 |\n| **COMERCIALIZADORA RAGESCO S.A.S. MERCANDU** | NIT: 811032480 | $603.960 |\n| **KAKAW CHOCOLATERIA DE TAZA. OSORIO DUQUE YOANNA** | NIT: 66963651 | $450.065 |\n| **Nuestro - Giraldo Giraldo Maria Paula** | NIT: 1038416695 | $352.039 |\n| **EUDANY HINCAPIE FINCA EL REFUGIO FRESAS EL PLAN** | CC: 43477471 | $296.544 |\n\n**Interpretación:**  \nLa cartera vencida total es de **$3.27 millones**. El cliente **INKAMPO** concentra la mayor deuda individual, con más de $715 mil, lo que representa cerca del **22%** del total vencido. Los cinco clientes listados suman **$2.42 millones**, es decir, aproximadamente el **74%** de la cartera vencida está concentrada en estos cinco deudores. Esto sugiere que un esfuerzo focalizado de cobranza en este grupo podría recuperar una parte significativa de los recursos.",
+      "sql_generado": "SELECT\n  (SELECT SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) FROM zeffi_cuentas_por_cobrar WHERE estado_cxc = 'Pendiente de cobro en mora') AS total_cartera_vencida,\n  t.tercero AS cliente,\n  t.id_tercero AS id_cliente,\n  t.deuda_en_mora\nFROM (\n  SELECT\n    tercero,\n    id_tercero,\n    SUM(CAST(saldo_"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 13205,
+      "tokens": {
+        "in": 53677,
+        "out": 140
+      },
+      "costo_usd": 0.008136,
+      "error": null,
+      "respuesta_completa": "Según los datos actuales del inventario, tenemos **1.098 unidades** de productos terminados disponibles en total.\n\nEste stock incluye todos los artículos listos para la venta, clasificados en las categorías de productos terminados del sistema.",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 13789,
+      "tokens": {
+        "in": 53118,
+        "out": 220
+      },
+      "costo_usd": 0.0081,
+      "error": null,
+      "respuesta_completa": "Según los datos actuales del sistema:\n\n**Órdenes de producción vigentes:** 1.089  \n**Valor total de las órdenes vigentes:** $3.706.220.397\n\n**Interpretación:**  \nHay un volumen significativo de producción en curso, con más de mil órdenes activas y un valor total que supera los **$3.700 millones**. Esto indica una cartera de producción muy amplia, que podría incluir desde órdenes pequeñas hasta proyectos de gran escala. Es importante revisar la distribución de estas órdenes por estado, encargado o tipo de producto para priorizar recursos y asegurar su cumplimiento.",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-01",
+      "descripcion": "Estrategia precio",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 2937,
+      "tokens": {
+        "in": 7157,
+        "out": 657
+      },
+      "costo_usd": 0.001468,
+      "error": null,
+      "respuesta_completa": "¡Hola! 👋 En Origen Silvestre manejamos distintas listas de precios según el tipo de cliente y su volumen de compras. Aquí tienes la diferencia clave entre la **tarifa pública** y la **tarifa de distribuidor**:\n\n```\nTarifa                | A quién se aplica                     | Característica principal\n----------------------|---------------------------------------|-------------------------------\nPrecio Público Sugerido| Clientes directos (personas naturales) | Precio base sin descuento, usado para el público general\nTarifa Distribuidor   | Negocios aliados / mayoristas          | Descuentos por volumen (≥ $200 k, $400 k, $800 k, $1.6 M) según historial de compras\n```\n\n**Detalles**\n\n* **Precio Público Sugerido**  \n  * Es la lista estándar que ves en la columna `precio_precio_publico_sugerido`.  \n  * Se aplica a clientes directos y a cualquier venta al público sin condiciones especiales.  \n  * No incluye descuentos por volumen; es el punto de partida para calcular otras tarifas.\n\n* **Tarifa Distribuidor** (las distintas escalas “+ 200 k…”, “+ 400 k…”, etc.)  \n  * Se asigna a clientes que compran en grandes cantidades o que forman parte de la red de aliados (B, A, etc.).  \n  * Cada nivel otorga un **descuento** respecto al precio público, reflejado en columnas como `precio_+de_200.000_en_compras_y_miembros`, `precio_+de_400.000_en_compras`, etc.  \n  * El vendedor puede cambiar la tarifa en una factura, pero la política es respetar la tarifa **actual** que está guardada en `zeffi_clientes.tarifa_de_precios`.  \n  * El precio realmente facturado se registra en `precio_bruto_unitario`.\n\nEn resumen, la tarifa pública es el precio “sin descuentos”, mientras que la tarifa de distribuidor es una versión rebajada que depende del volumen acumulado del cliente y su clasificación dentro de la red de aliados.  \n\n¿Te gustaría saber cuál tarifa tiene asignado algún cliente en particular o cómo se calculan los descuentos de cada nivel? 🚀",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-02",
+      "descripcion": "Redacción email",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 4434,
+      "tokens": {
+        "in": 2371,
+        "out": 59
+      },
+      "costo_usd": 0.000391,
+      "error": null,
+      "respuesta_completa": "¡Hola [Nombre del cliente]! 👋\n\nTu pedido en Origen Silvestre ya está listo para ser despachado. 📦✨\n\nEn breve nos pondremos en contacto contigo para coordinar la entrega.\n\n¡Gracias por tu compra!",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-03",
+      "descripcion": "Explicación sistema",
+      "agente": "gpt-oss-120b",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 5299,
+      "tokens": {
+        "in": 28024,
+        "out": 336
+      },
+      "costo_usd": 0.004405,
+      "error": null,
+      "respuesta_completa": "No necesito generar SQL para responder a esta pregunta, ya que se refiere a mis propias capacidades y lógica interna.\n\nPuedo manejar los siguientes tipos de consulta:\n\n*   **analisis_datos:** Preguntas sobre datos del negocio (ventas, compras, inventario, producción, cartera). **Estas consultas SÍ requieren ir a la base de datos** para generar SQL y ejecutarlo.\n*   **conversacion:** Preguntas estratégicas, planes, conceptos. Estas se responden sin necesidad de acceder a la base de datos.\n*   **redaccion:** Redactar textos, emails, descripciones. Estas se responden sin necesidad de acceder a la base de datos.\n*   **aprendizaje:** Cuando el equipo me enseña nueva lógica de negocio. Esto se guarda en mi memoria y no requiere acceso a la base de datos para la respuesta en sí.\n*   **busqueda_web:** Preguntas sobre información externa al negocio. **Estas consultas SÍ requieren buscar en internet**, no en la base de datos interna.\n*   **generacion_imagen:** Crear imágenes. Esto se hace con un agente de generación de imágenes y no requiere acceso a la base de datos.\n*   **generacion_documento:** Documentos formales. Esto se hace con un agente de redacción premium y no requiere acceso a la base de datos.\n\nEn resumen, las consultas de **analisis_datos** son las que directamente interactúan con la base de datos para extraer información. Las de **busqueda_web** interactúan con fuentes externas. Las demás se resuelven con mi conocimiento interno o capacidades de generación.\n\n💡 ¿Quieres que guarde esto en mi memoria de negocio? Responde **'sí, guárdalo'** y lo registraré para futuras consultas.",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-01",
+      "descripcion": "Ventas mes actual",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 18688,
+      "tokens": {
+        "in": 70832,
+        "out": 222
+      },
+      "costo_usd": 0.007105,
+      "error": null,
+      "respuesta_completa": "Según los datos disponibles para marzo de 2026:\n\n**Ventas netas sin IVA:** $8.667.799  \n**Devoluciones:** $1.894.618  \n**Ingresos netos:** $6.773.181\n\n**Interpretación:**  \nLas ventas netas del mes fueron de $8,7 millones, pero hubo devoluciones significativas por $1,9 millones (aproximadamente el 22% de las ventas). Esto deja unos ingresos netos reales de $6,8 millones.\n\nEs un dato que llama la atención por el alto volumen de devoluciones. Sería bueno revisar qué productos o clientes están generando tantas devoluciones este mes.",
+      "sql_generado": "SELECT\n  mes,\n  fin_ventas_netas_sin_iva,\n  fin_devoluciones,\n  fin_ingresos_netos\nFROM resumen_ventas_facturas_mes\nWHERE mes = '2026-03';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-02",
+      "descripcion": "Top canales febrero",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 19518,
+      "tokens": {
+        "in": 77445,
+        "out": 296
+      },
+      "costo_usd": 0.007774,
+      "error": null,
+      "respuesta_completa": "Según los datos de febrero 2026, el **top 3 de canales de venta por valor neto** (ventas netas sin IVA) fue:\n\n| Canal | Ventas netas sin IVA |\n|-------|----------------------|\n| **1.5. Mercados, agropecuarias, Fruvers, graneros, plazas merc** | $2.993.795 |\n| **1.3. Mercado Saludable** | $2.789.454 |\n| **1.7. Restaurantes, tiendas, reposterías y cafés afines** | $1.498.235 |\n\n**Interpretación:**  \nLos canales minoristas de **mercados y agropecuarias** lideraron las ventas en febrero, seguidos de cerca por el **Mercado Saludable**. Los restaurantes y cafés afines completan el podio, pero con una brecha considerable respecto a los dos primeros. Esto refleja la fuerza de los puntos de venta tradicionales y especializados en productos naturales durante ese mes.",
+      "sql_generado": "SELECT\n  canal,\n  fin_ventas_netas_sin_iva\nFROM resumen_ventas_facturas_canal_mes\nWHERE mes = '2026-02'\nORDER BY fin_ventas_netas_sin_iva DESC\nLIMIT 3;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-03",
+      "descripcion": "Producto más vendido",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 14293,
+      "tokens": {
+        "in": 50931,
+        "out": 187
+      },
+      "costo_usd": 0.005112,
+      "error": null,
+      "respuesta_completa": "Según los datos disponibles, el **producto más vendido en unidades durante 2025** fue:\n\n**Tableta Chocolate 73p 50 grs CPM**  \n**Total de unidades vendidas:** 563\n\n**Interpretación:**  \nEste producto de chocolate fue claramente el más popular en volumen durante el año, con más de 500 unidades vendidas. Es un dato interesante que muestra la fuerte demanda por este formato específico de tableta de chocolate.",
+      "sql_generado": "SELECT\n  nombre AS nombre_del_producto,\n  SUM(CAST(vol_unidades_vendidas AS DECIMAL(15,2))) AS total_unidades_vendidas\nFROM resumen_ventas_facturas_producto_mes\nWHERE mes LIKE '2025-%'\nGROUP BY nombre\nORDER BY total_unidades_vendidas DESC\nLIMIT 1;"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-04",
+      "descripcion": "Cartera vencida",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 22179,
+      "tokens": {
+        "in": 56567,
+        "out": 567
+      },
+      "costo_usd": 0.005713,
+      "error": null,
+      "respuesta_completa": "Según los datos de cartera vencida:\n\n**Total de cartera vencida actualmente:** $3.271.454\n\n**Top 5 clientes con mayor deuda en mora:**\n\n| Cliente | ID | Deuda en mora |\n|---------|----|---------------|\n| **INKAMPO - PORRAS ESLAVA KATHY ELIZABETH** | CC: 1102857179 | $715.713 |\n| **COMERCIALIZADORA RAGESCO S.A.S. MERCANDU** | NIT: 811032480 | $603.960 |\n| **KAKAW CHOCOLATERIA DE TAZA. OSORIO DUQUE YOANNA** | NIT: 66963651 | $450.065 |\n| **Nuestro - Giraldo Giraldo Maria Paula** | NIT: 1038416695 | $352.039 |\n| **EUDANY HINCAPIE FINCA EL REFUGIO FRESAS EL PLAN** | CC: 43477471 | $296.544 |\n\n**Interpretación:**  \nLa cartera vencida total es de $3,27 millones, concentrada principalmente en estos cinco clientes que acumulan $2,42 millones (aproximadamente el 74% del total). El cliente **INKAMPO** lidera con más de $715 mil en mora, seguido por **RAGESCO** con $604 mil. \n\nEs un nivel de cartera vencida significativo que merece atención prioritaria del área de cobranza, especialmente con estos dos primeros clientes que representan más del 40% del total vencido.",
+      "sql_generado": "SELECT\n  (SELECT SUM(CAST(saldo_en_mora AS DECIMAL(15,2))) FROM zeffi_cuentas_por_cobrar WHERE estado_cxc = 'Pendiente de cobro en mora') AS total_cartera_vencida,\n  t.tercero AS cliente,\n  t.id_tercero AS id_cliente,\n  t.deuda_en_mora\nFROM (\n  SELECT\n    tercero,\n    id_tercero,\n    SUM(CAST(saldo_"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-05",
+      "descripcion": "Stock inventario",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 13796,
+      "tokens": {
+        "in": 52818,
+        "out": 201
+      },
+      "costo_usd": 0.005302,
+      "error": null,
+      "respuesta_completa": "Según los datos disponibles, el **stock total actual de productos terminados** es:\n\n**1.098 unidades**\n\n**Interpretación:**  \nEste es el inventario total de productos listos para la venta (categorías TPT.01 y TPT.02) sumado de todas las bodegas. Es un nivel de inventario que permite atender la demanda actual, aunque sería bueno cruzar este dato con las ventas promedio mensuales para evaluar si es suficiente o si hay exceso de stock en algún producto específico.",
+      "sql_generado": "SELECT\n  SUM(CAST(stock_total_empresa AS DECIMAL(15,2))) AS stock_total_productos_terminados\nFROM zeffi_inventario\nWHERE categoria IN ('TPT.01. VENTA AGROECOLOGICOS VARIOS', 'TPT.02. VENTA OTROS')\n  AND vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "SQL-06",
+      "descripcion": "Órdenes producción vigentes",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": true,
+      "n_filas": 2,
+      "latencia_ms": 15372,
+      "tokens": {
+        "in": 53378,
+        "out": 227
+      },
+      "costo_usd": 0.00536,
+      "error": null,
+      "respuesta_completa": "Según los datos disponibles:\n\n**Órdenes de producción vigentes:** 1.089  \n**Valor total de las órdenes:** $3.706.220.397\n\n**Interpretación:**  \nHay un volumen muy alto de órdenes de producción activas (más de mil), con un valor total que supera los $3.700 millones. Esto indica una cartera de producción significativa en curso, lo que podría representar una alta capacidad de fabricación planificada o, posiblemente, órdenes que han quedado abiertas sin cerrar. Sería recomendable revisar la distribución de estas órdenes por estado y antigüedad para priorizar su procesamiento.",
+      "sql_generado": "SELECT\n  COUNT(id_orden) AS numero_ordenes_vigentes,\n  SUM(CAST(total_precios_de_venta AS DECIMAL(15,2))) AS valor_total_ordenes_vigentes\nFROM zeffi_produccion_encabezados\nWHERE vigencia = 'Vigente';"
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-01",
+      "descripcion": "Estrategia precio",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 2370,
+      "tokens": {
+        "in": 8154,
+        "out": 38
+      },
+      "costo_usd": 0.000819,
+      "error": null,
+      "respuesta_completa": "La tarifa distribuidor y la tarifa pública en OS son dos de las tasas de precio disponibles para los clientes.\n\nLa **tarifa pública** es la tasa de precio",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-02",
+      "descripcion": "Redacción email",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 1323,
+      "tokens": {
+        "in": 2036,
+        "out": 44
+      },
+      "costo_usd": 0.000208,
+      "error": null,
+      "respuesta_completa": "\"¡Atención! Su pedido ha sido preparado y está listo para su despacho. Le estamos enviando la información de seguimiento en este momento, por favor revise su correo electrónico para más detalles.\"",
+      "sql_generado": ""
+    },
+    {
+      "fase": "RESPUESTA",
+      "query_id": "CONV-03",
+      "descripcion": "Explicación sistema",
+      "agente": "cerebras-llama",
+      "ok": true,
+      "calidad_resp": "OK",
+      "tiene_sql": false,
+      "n_filas": 0,
+      "latencia_ms": 1912,
+      "tokens": {
+        "in": 2353,
+        "out": 318
+      },
+      "costo_usd": 0.000267,
+      "error": null,
+      "respuesta_completa": "Como asistente de IA de Origen Silvestre, puedo realizar diferentes tipos de consulta, incluyendo:\n\n1. **Analisis_datos**: Preguntas sobre datos del negocio, como:\n * Ventas, compras, inventario, producción, cartera\n * Ejecutar SQL en la base de datos para obtener información específica\n * Requiere ir a la base de datos para obtener los datos preciso\n\n2. **Conversacion**: Preguntas estratégicas, planes, conceptos\n * No requiere ir a la base de datos, pero puede utilizar conocimientos previos para dar una mejor respuesta\n\n3. **Redaccion**: Redactar textos, emails, descripciones\n * No requiere ir a la base de datos\n\n4. **Aprendizaje**: Cuando el equipo me enseña nueva lógica de negocio\n * No requiere ir a la base de datos, pero se almacena en mi memoria para futuras consultas\n\n5. **Busqueda_web**: Preguntas sobre información externa al negocio\n * Busca en internet para obtener información\n\n6. **Generacion_imagen**: Crear imágenes\n * No requiere ir a la base de datos\n\n7. **Generacion_documento**: Documentos formales\n * No requiere ir a la base de datos\n\nSi la consulta requiere realizar análisis de datos, la respuesta se obtendrá directamente de la base de datos, por lo que puedo ejecutar SQL para obtener los datos precisos.",
+      "sql_generado": ""
+    }
+  ]
+}

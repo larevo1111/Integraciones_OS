@@ -269,19 +269,23 @@ ConsignacionPage — tab Por producto
 - `rol_resumen_agente` = groq-llama, `rol_depurador_agente` = groq-llama
 - Cambiables desde **Roles de agentes** en ia.oscomunidad.com
 
-### Tipos de consulta — agentes por defecto
+### Tipos de consulta — agentes por defecto (actualizado 2026-03-20)
 
-| tipo | principal | suplente |
+| tipo | principal | fallback |
 |---|---|---|
-| analisis_datos | gemini-flash | deepseek-chat |
-| conversacion | gemini-flash | deepseek-chat |
-| redaccion | gemini-flash | deepseek-chat |
-| resumen | gemini-flash | deepseek-chat |
-| aprendizaje | gemini-flash | deepseek-chat |
+| analisis_datos | **cerebras-llama** | gemini-flash-lite |
+| conversacion | **cerebras-llama** | gemini-flash-lite |
+| redaccion | **cerebras-llama** | gemini-flash-lite |
+| resumen | **cerebras-llama** | gemini-flash-lite |
+| aprendizaje | **cerebras-llama** | gemini-flash-lite |
+| busqueda_web | **cerebras-llama** | gemini-flash-lite |
+| generacion_documento | **cerebras-llama** | gemini-flash-lite |
 | enrutamiento | groq-llama | cerebras-llama |
 | clasificacion | groq-llama | cerebras-llama |
-| generacion_documento | claude-sonnet | gpt-oss-120b |
 | generacion_imagen | gemini-image | gemini-flash |
+
+**SQL agent (analisis_datos):** gemini-flash — más rápido (13s) y confiable (93%) con 28K tokens de entrada
+**Benchmark completo:** `.agent/docs/COMPARACION_AGENTES_IA.md` — 3 rondas, 105 llamadas, decisión documentada
 
 ### Bot Telegram — ACTIVO (2026-03-17)
 
@@ -415,6 +419,18 @@ resultado = consultar(
 - **tabla.py**: `MAX_FILAS_INLINE=8, MAX_COLS_INLINE=4` — tablas pequeñas se muestran directamente en chat en vez de solo link mini app
 - Si el LLM ya incluyó tabla (``` + |) en su respuesta → no duplicar
 - System prompts de `analisis_datos` + `conversacion`: instruir al LLM a usar bloques de código con formato tabla cuando lista 3+ ítems comparables
+
+## Completado 2026-03-20 — Benchmark agentes + cerebras-llama como default
+
+### Benchmark comparativo (3 rondas, 105 llamadas, 5 agentes)
+- Script: `scripts/benchmark_agentes.py`
+- Resultados completos: `.agent/docs/COMPARACION_AGENTES_IA.md`
+- **Cambio aplicado**: cerebras-llama como agente de respuesta (100% éxito vs 91% flash, mismo costo)
+- **Fallback cambiado**: deepseek-chat → gemini-flash-lite (RPD ilimitado, más barato)
+- Bot Telegram: cerebras-llama agregado como ★ recomendado en menú de ajustes
+
+### Hallazgo clave sobre velocidad
+groq-llama es rápido para SALIDAS pequeñas (enrutador: 300ms). Para SQL con 28K tokens de ENTRADA es lento (19s). La velocidad de Groq es en tokens generados/segundo, no en procesamiento de input.
 
 ## Completado 2026-03-20 — Auto-conocimiento por keyword
 
