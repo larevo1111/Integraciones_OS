@@ -8,6 +8,8 @@ Parsea la respuesta cruda de la IA y extrae:
 import re
 import json
 
+from .ejecutor_sql import limpiar_sql as _limpiar_sql
+
 
 def parsear_respuesta(texto_crudo: str) -> dict:
     """
@@ -35,16 +37,6 @@ def parsear_respuesta(texto_crudo: str) -> dict:
         'resumen_nuevo': resumen_nuevo,
         'formato':      formato,
     }
-
-
-def _limpiar_sql(sql: str) -> str:
-    """Elimina artefactos de formato: ANSI escape codes, caracteres de control."""
-    # ANSI escape codes (ej: \x1b[4m, \x1b[0m, [4m, [0m del markdown del LLM)
-    sql = re.sub(r'\x1b\[[0-9;]*m', '', sql)
-    sql = re.sub(r'\[[\d;]+m', '', sql)
-    # Caracteres de control excepto newline y tab
-    sql = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', sql)
-    return sql.strip()
 
 
 def extraer_sql(texto: str) -> str | None:

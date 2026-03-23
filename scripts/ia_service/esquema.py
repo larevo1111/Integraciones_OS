@@ -6,8 +6,9 @@ Mantiene compatibilidad con el fallback legacy (conexión directa a Hostinger).
 import time
 from .config import get_local_conn
 
-# Caché legacy para compatibilidad (tema=None → set completo)
+# Caché: DDL completo (tema=None) + DDL por conjunto de tablas
 _cache_legacy = {'ddl': None, 'ts': 0}
+_cache_por_tablas = {}  # frozenset(tablas) → {'ddl': str, 'ts': float}
 _CACHE_TTL = 3600
 
 
@@ -17,11 +18,12 @@ def obtener_ddl(forzar: bool = False, tablas: list = None,
     Devuelve el schema para inyectar al LLM.
 
     - Si tema_id está presente: usa ia_esquemas (conector.py) — camino principal.
+    - Si tablas está presente: genera DDL solo para esas tablas (con caché propio).
     - Si no: fallback al set completo legacy (compatibilidad).
 
     Args:
         forzar:   Ignorar caché.
-        tablas:   Lista de tablas específicas (solo en modo legacy).
+        tablas:   Lista de tablas específicas — genera DDL filtrado.
         tema_id:  ID del tema activo. Preferido.
         empresa:  Empresa activa.
     """
@@ -33,7 +35,18 @@ def obtener_ddl(forzar: bool = False, tablas: list = None,
             sincronizar_schema(tema_id, empresa)
         return obtener_schema_tema(tema_id, empresa)
 
-    # ── Fallback legacy ────────────────────────────────────────────────
+    # ── DDL filtrado por tablas específicas ─────────────────────────────
+    if tablas:
+        clave = frozenset(tablas)
+        if not forzar and clave in _cache_por_tablas:
+            cached = _cache_por_tablas[clave]
+            if (time.time() - cached['ts']) < _CACHE_TTL:
+                return cached['ddl']
+        ddl = _obtener_ddl_directo(tablas)
+        _cache_por_tablas[clave] = {'ddl': ddl, 'ts': time.time()}
+        return ddl
+
+    # ── Fallback legacy (set completo) ─────────────────────────────────
     global _cache_legacy
     if not forzar and _cache_legacy['ddl'] and (time.time() - _cache_legacy['ts']) < _CACHE_TTL:
         return _cache_legacy['ddl']

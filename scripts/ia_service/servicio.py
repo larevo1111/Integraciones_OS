@@ -429,8 +429,9 @@ def _procesar_bloque_aprendizaje(respuesta: str, empresa: str):
     Falla silenciosamente para no interrumpir la respuesta al usuario.
     """
     import re
+    # Regex tolerante: acepta [GUARDAR_NEGOCIO], [GUARDAR NEGOCIO], [guardar_negocio], etc.
     match = re.search(
-        r'\[GUARDAR_NEGOCIO\](.*?)\[/GUARDAR_NEGOCIO\]',
+        r'\[GUARDAR[_ ]NEGOCIO\](.*?)\[/GUARDAR[_ ]NEGOCIO\]',
         respuesta, re.DOTALL | re.IGNORECASE
     )
     if not match:
@@ -530,6 +531,24 @@ def _guardar_ejemplo_sql(empresa: str, pregunta: str, sql: str):
         pass  # No fallar si no se puede guardar
 
 
+def _incrementar_uso_ejemplos(ids: list):
+    """Incrementa veces_usado y actualiza ultima_vez para los ejemplos recuperados."""
+    if not ids:
+        return
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            placeholders = ','.join(['%s'] * len(ids))
+            cur.execute(
+                f"UPDATE ia_ejemplos_sql SET veces_usado = veces_usado + 1, "
+                f"ultima_vez = NOW() WHERE id IN ({placeholders})", ids
+            )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
 def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
     """
     Recupera los N ejemplos Q→SQL más relevantes para la pregunta actual.
@@ -539,6 +558,8 @@ def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
     try:
         filas = embeddings_module.buscar_ejemplos_semanticos(empresa, pregunta, n)
         if filas:
+            # Incrementar veces_usado para aprendizaje acumulativo
+            _incrementar_uso_ejemplos([f['id'] for f in filas])
             ejemplos = '\n\n'.join([
                 f"Pregunta: {f['pregunta']}\nSQL:\n{f['sql_generado']}"
                 for f in filas
@@ -1576,22 +1597,37 @@ def _obtener_logica_negocio(empresa: str, pregunta: str) -> str:
         return ''
 
 
+_cache_agentes = {}  # slug → {'data': dict, 'ts': float}
+_cache_tipos = {}    # slug → {'data': dict, 'ts': float}
+_CACHE_CONFIG_TTL = 300  # 5 minutos
+
+
 def _cargar_agente(slug: str) -> dict | None:
+    cached = _cache_agentes.get(slug)
+    if cached and (time.time() - cached['ts']) < _CACHE_CONFIG_TTL:
+        return cached['data']
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM ia_agentes WHERE slug = %s AND activo = 1", (slug,))
-            return cur.fetchone()
+            row = cur.fetchone()
+        _cache_agentes[slug] = {'data': row, 'ts': time.time()}
+        return row
     finally:
         conn.close()
 
 
 def _cargar_tipo(slug: str) -> dict | None:
+    cached = _cache_tipos.get(slug)
+    if cached and (time.time() - cached['ts']) < _CACHE_CONFIG_TTL:
+        return cached['data']
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM ia_tipos_consulta WHERE slug = %s AND activo = 1", (slug,))
-            return cur.fetchone()
+            row = cur.fetchone()
+        _cache_tipos[slug] = {'data': row, 'ts': time.time()}
+        return row
     finally:
         conn.close()
 

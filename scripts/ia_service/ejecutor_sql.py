@@ -14,7 +14,7 @@ import sqlglot.expressions as exp
 from .config import get_local_conn, get_hostinger_conn
 
 
-def _limpiar_sql(sql: str) -> str:
+def limpiar_sql(sql: str) -> str:
     """Elimina ANSI escape codes y caracteres de control que el LLM a veces inyecta."""
     sql = re.sub(r'\x1b\[[0-9;]*[mGKHF]', '', sql)   # ANSI con ESC
     sql = re.sub(r'\[[\d;]+[mGKHF]', '', sql)          # ANSI sin ESC (artefacto markdown)
@@ -127,7 +127,7 @@ def ejecutar(sql: str, conexion_id: int = None) -> dict:
     Returns:
         {ok, filas, columnas, total, truncado, error}
     """
-    sql = _limpiar_sql(sql)
+    sql = limpiar_sql(sql)
     sql = _normalizar_sql(sql)
 
     # ── Capa 1: validación AST ────────────────────────────────────────

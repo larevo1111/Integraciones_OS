@@ -1,7 +1,7 @@
 """
 Módulo de embeddings semánticos para búsqueda de ejemplos Q→SQL.
 
-Usa Google text-embedding-004 (768 dimensiones, API gratuita).
+Usa Google gemini-embedding-001 (3072 dimensiones, API gratuita).
 Almacena vectores como JSON en ia_ejemplos_sql.embedding.
 La búsqueda por cosine similarity reemplaza la búsqueda por LIKE.
 
@@ -18,8 +18,8 @@ from .config import get_local_conn
 
 # ── Configuración ────────────────────────────────────────────────────────────
 
-_EMBEDDING_MODEL = 'text-embedding-004'
-_EMBEDDING_DIMS  = 768
+_EMBEDDING_MODEL = 'gemini-embedding-001'
+_EMBEDDING_DIMS  = 3072
 _API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:embedContent?key={key}'
 
 
