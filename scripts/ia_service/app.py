@@ -351,7 +351,7 @@ def endpoint_logica_negocio_crear():
     Después de guardar, dispara el depurador si supera 800 palabras.
     """
     import threading
-    from ia_service.servicio import _depurar_logica_negocio
+    from ia_service.aprendizaje import depurar_logica_negocio
     data = request.get_json(silent=True) or {}
     empresa   = data.get('empresa', 'ori_sil_2')
     concepto  = data.get('concepto', '').strip()
@@ -386,7 +386,7 @@ def endpoint_logica_negocio_crear():
     conn.close()
 
     # Depurar en background si es necesario
-    threading.Thread(target=_depurar_logica_negocio, args=(empresa,), daemon=True).start()
+    threading.Thread(target=depurar_logica_negocio, args=(empresa,), daemon=True).start()
 
     return jsonify({'ok': True, 'id': nuevo_id, 'palabras': palabras})
 

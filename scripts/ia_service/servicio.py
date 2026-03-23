@@ -1,270 +1,31 @@
 """
 Orquestador principal del servicio de IA.
 Expone la función consultar() que es el punto de entrada único.
+
+Módulos auxiliares (extraídos para separación de responsabilidades):
+  - seguridad.py:       rate limit, circuit breaker, verificar_limites
+  - alertas.py:         notificaciones Telegram, verificar gasto
+  - aprendizaje.py:     guardar reglas, ejemplos SQL, depurador, resúmenes
+  - utilidades_sql.py:  columnas reales, fecha máxima, cobertura tablas
 """
 import json
-import math
-import threading
 import time
-from collections import defaultdict, deque
 from .config import get_local_conn
 from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
-from . import embeddings as embeddings_module
 from .proveedores import openai_compat, google, anthropic_prov
-import os, requests as _requests
-
-
-# ── Notificaciones Telegram (bot de alertas) ──────────────────────────────────
-
-def _notificar(mensaje: str):
-    """Envía una alerta al bot de notificaciones del sistema. Falla silenciosamente."""
-    try:
-        token    = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN') or os.getenv('TELEGRAM_BOT_TOKEN')
-        chat_id  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')
-        if not token or not chat_id:
-            return
-        _requests.post(
-            f'https://api.telegram.org/bot{token}/sendMessage',
-            json={'chat_id': chat_id, 'text': mensaje, 'parse_mode': 'HTML'},
-            timeout=5
-        )
-    except Exception:
-        pass
-
-
-_alertas_enviadas = {}  # clave → timestamp último envío (anti-spam 1h)
-
-def _verificar_gasto_y_notificar(empresa: str, costo_llamada: float):
-    """Verifica gasto diario y por hora — notifica si supera umbrales."""
-    try:
-        ahora = time.time()
-        conn  = get_local_conn()
-        with conn.cursor() as cur:
-            # Gasto del día
-            cur.execute(
-                "SELECT COALESCE(SUM(costo_usd),0) AS total FROM ia_logs "
-                "WHERE empresa=%s AND DATE(created_at)=CURDATE()", (empresa,)
-            )
-            gasto_dia = float(cur.fetchone()['total'])
-            # Gasto última hora
-            cur.execute(
-                "SELECT COALESCE(SUM(costo_usd),0) AS total FROM ia_logs "
-                "WHERE empresa=%s AND created_at >= NOW() - INTERVAL 1 HOUR", (empresa,)
-            )
-            gasto_hora = float(cur.fetchone()['total'])
-        conn.close()
-
-        def _alerta_si(clave, condicion, msg):
-            ultimo = _alertas_enviadas.get(clave, 0)
-            if condicion and (ahora - ultimo) > 3600:
-                _notificar(msg)
-                _alertas_enviadas[clave] = ahora
-
-        _alerta_si('gasto_dia_2',  gasto_dia  >= 2.0,
-            f"💸 <b>Gasto Gemini alto hoy</b>: ${gasto_dia:.2f} USD (~COP {gasto_dia*4200:,.0f})\n"
-            f"Límite sugerido: $2 USD/día. Revisa si hay uso excesivo.")
-        _alerta_si('gasto_hora_05', gasto_hora >= 0.5,
-            f"⚡ <b>Gasto elevado última hora</b>: ${gasto_hora:.2f} USD\n"
-            f"Posible pico de consultas o bucle de llamadas.")
-    except Exception:
-        pass
-
-
-# ── Rate limiter por usuario — sliding window in-memory ──────────────────────
-# Clave: "{empresa}:{usuario_id}" → ventanas de timestamps por intervalo
-
-_rl_lock    = threading.Lock()
-_rl_windows = defaultdict(lambda: {'1s': deque(), '10s': deque(), '60s': deque()})
-
-def _limpiar_ventana(dq: deque, ventana_seg: float, ahora: float):
-    while dq and (ahora - dq[0]) > ventana_seg:
-        dq.popleft()
-
-def verificar_rate_usuario(usuario_id: str, empresa: str) -> dict | None:
-    """
-    Sliding window rate limit por usuario.
-    Límites leídos de ia_config: rate_usuario_rps / rp10s / rpm.
-    Devuelve None si OK, o dict {error, retry_after} si debe bloquearse.
-    No falla aunque la BD no responda.
-    """
-    try:
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT clave, valor FROM ia_config "
-                "WHERE clave IN ('rate_usuario_rps','rate_usuario_rp10s','rate_usuario_rpm')"
-            )
-            cfg = {r['clave']: int(r['valor']) for r in cur.fetchall()}
-        conn.close()
-    except Exception:
-        return None  # Si no puede leer config, deja pasar
-
-    lim_1s  = cfg.get('rate_usuario_rps',   1)
-    lim_10s = cfg.get('rate_usuario_rp10s', 3)
-    lim_60s = cfg.get('rate_usuario_rpm',  15)
-
-    clave = f"{empresa}:{usuario_id}"
-    ahora = time.monotonic()
-
-    with _rl_lock:
-        w = _rl_windows[clave]
-
-        _limpiar_ventana(w['1s'],  1.0,  ahora)
-        _limpiar_ventana(w['10s'], 10.0, ahora)
-        _limpiar_ventana(w['60s'], 60.0, ahora)
-
-        # Verificar ANTES de registrar — más restrictivo primero (1s → 10s → 60s)
-        if len(w['1s']) >= lim_1s:
-            retry = math.ceil(1.0 - (ahora - w['1s'][0])) + 1
-            return {
-                'error': (
-                    f"Solicitud rechazada: límite de {lim_1s} por segundo alcanzado. "
-                    f"Intente en {retry} segundo{'s' if retry != 1 else ''}."
-                ),
-                'retry_after': retry,
-            }
-
-        if len(w['10s']) >= lim_10s:
-            retry = math.ceil(10.0 - (ahora - w['10s'][0])) + 1
-            return {
-                'error': (
-                    f"Solicitud rechazada: límite de {lim_10s} en 10 segundos alcanzado. "
-                    f"Intente en {retry} segundos."
-                ),
-                'retry_after': retry,
-            }
-
-        if len(w['60s']) >= lim_60s:
-            retry = math.ceil(60.0 - (ahora - w['60s'][0])) + 1
-            return {
-                'error': (
-                    f"Solicitud rechazada: límite de {lim_60s} por minuto alcanzado. "
-                    f"Intente en {retry} segundos."
-                ),
-                'retry_after': retry,
-            }
-
-        # Registrar el request en las 3 ventanas
-        w['1s'].append(ahora)
-        w['10s'].append(ahora)
-        w['60s'].append(ahora)
-
-    return None  # OK
-
-
-# ── Seguridad: verificación de límites de costo y circuit breaker ─────────────
-
-def _get_config(conn, clave: str, default):
-    with conn.cursor() as cur:
-        cur.execute("SELECT valor FROM ia_config WHERE clave = %s", (clave,))
-        row = cur.fetchone()
-    return row['valor'] if row else default
-
-
-def _get_config_simple(clave: str, default: str) -> str:
-    """Lee un valor de ia_config sin necesitar conexión externa."""
-    try:
-        conn = get_local_conn()
-        result = _get_config(conn, clave, default)
-        conn.close()
-        return result
-    except Exception:
-        return default
-
-
-def _slugs_router() -> list[str]:
-    """Devuelve la cadena de agentes router en orden, desde ia_config."""
-    return [
-        _get_config_simple('rol_router_principal',  'groq-llama'),
-        _get_config_simple('rol_router_suplente_1', 'cerebras-llama'),
-        _get_config_simple('rol_router_suplente_2', 'gemini-flash-lite'),
-        _get_config_simple('rol_router_suplente_3', 'gemini-flash'),
-    ]
-
-
-def verificar_limites(agente_slug: str, empresa: str) -> dict | None:
-    """
-    Verifica 3 capas de protección antes de llamar a la API externa.
-    Devuelve None si todo OK, o dict {error, capa} si hay que bloquear.
-    capa=1: presupuesto global (sin salida). capa=2: RPD agente. capa=3: circuit breaker.
-    """
-    conn = get_local_conn()
-    try:
-        # — Config global —
-        limite_costo = float(_get_config(conn, 'limite_costo_dia_usd', '0'))
-        cb_errores   = int(_get_config(conn, 'circuit_breaker_errores', '5'))
-        cb_ventana   = int(_get_config(conn, 'circuit_breaker_ventana_min', '10'))
-
-        with conn.cursor() as cur:
-
-            # CAPA 1: Costo diario global (toda la empresa)
-            if limite_costo > 0:
-                cur.execute(
-                    "SELECT COALESCE(SUM(costo_usd), 0) AS total FROM ia_logs "
-                    "WHERE empresa = %s AND DATE(created_at) = CURDATE()",
-                    (empresa,)
-                )
-                costo_hoy = float(cur.fetchone()['total'])
-                if costo_hoy >= limite_costo:
-                    return {
-                        'capa': 1,
-                        'error': (
-                            f"⛔ Límite de gasto diario alcanzado "
-                            f"(${costo_hoy:.4f} / ${limite_costo:.2f} USD). "
-                            f"Reinicia mañana o ajusta el límite en ia_config."
-                        )
-                    }
-
-            # CAPA 2: RPD por agente (rate_limit_rpd de ia_agentes)
-            cur.execute(
-                "SELECT rate_limit_rpd FROM ia_agentes WHERE slug = %s",
-                (agente_slug,)
-            )
-            agente_row = cur.fetchone()
-            rpd = agente_row['rate_limit_rpd'] if agente_row else None
-            if rpd:
-                cur.execute(
-                    "SELECT COUNT(*) AS n FROM ia_logs "
-                    "WHERE agente_slug = %s AND DATE(created_at) = CURDATE()",
-                    (agente_slug,)
-                )
-                llamadas_hoy = cur.fetchone()['n']
-                if llamadas_hoy >= rpd:
-                    return {
-                        'capa': 2,
-                        'error': (
-                            f"⛔ Agente '{agente_slug}' alcanzó su límite diario "
-                            f"({llamadas_hoy}/{rpd} llamadas). "
-                            f"Usa otro agente o espera mañana."
-                        )
-                    }
-
-            # CAPA 3: Circuit breaker — errores recientes
-            cur.execute(
-                "SELECT COUNT(*) AS n FROM ia_logs "
-                "WHERE agente_slug = %s "
-                "  AND error IS NOT NULL "
-                "  AND created_at >= NOW() - INTERVAL %s MINUTE",
-                (agente_slug, cb_ventana)
-            )
-            errores_recientes = cur.fetchone()['n']
-            if errores_recientes >= cb_errores:
-                return {
-                    'capa': 3,
-                    'error': (
-                        f"⛔ Agente '{agente_slug}' suspendido automáticamente "
-                        f"({errores_recientes} errores en los últimos {cb_ventana} min). "
-                        f"Revisa el agente o espera {cb_ventana} minutos."
-                    )
-                }
-
-        return None  # Todo OK
-
-    except Exception as e:
-        # Si la verificación falla, dejar pasar (no bloquear por error de seguridad)
-        return None
-    finally:
-        conn.close()
+from .seguridad import (
+    verificar_rate_usuario, verificar_limites, slugs_router,
+    get_config_simple, nivel_usuario, mejor_agente_para_nivel,
+)
+from .alertas import notificar, verificar_gasto_y_notificar
+from .aprendizaje import (
+    procesar_bloque_aprendizaje, guardar_ejemplo_sql,
+    obtener_ejemplos_dinamicos, obtener_logica_negocio,
+    generar_resumen, depurar_logica_negocio,
+)
+from .utilidades_sql import (
+    obtener_columnas_reales, obtener_fecha_maxima, obtener_cobertura_tablas,
+)
 
 
 def _resolver_agente_disponible(nivel_usr: int, agente_bloqueado: str, empresa: str) -> dict | None:
@@ -294,514 +55,6 @@ def _resolver_agente_disponible(nivel_usr: int, agente_bloqueado: str, empresa: 
         return None
     except Exception:
         return None
-
-def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str,
-                          empresa: str = 'ori_sil_2') -> str | None:
-    """
-    Genera el resumen actualizado de conversación usando Groq (rápido, gratis).
-    El agente principal ya no necesita incluir el resumen en su respuesta.
-    Retorna el nuevo resumen como texto plano, o None si falla.
-    """
-    agente_cfg = None
-    slug_resumen = _get_config_simple('rol_resumen_agente', 'groq-llama')
-    cadena_resumen = [slug_resumen] + [s for s in _slugs_router() if s != slug_resumen]
-    for slug in cadena_resumen:
-        cand = _cargar_agente(slug)
-        if cand and cand.get('api_key'):
-            agente_cfg = cand
-            break
-    if not agente_cfg:
-        return None
-
-    contexto_previo = f'Resumen previo:\n{resumen_anterior}\n\n' if resumen_anterior else ''
-    prompt = (
-        f'{contexto_previo}'
-        f'Nuevo intercambio:\n'
-        f'Usuario: {pregunta}\n'
-        f'Asistente: {respuesta}\n\n'
-        f'Actualiza el resumen de la conversación en máximo 600 palabras. '
-        f'Incluye: datos numéricos mencionados, preguntas ya respondidas, '
-        f'nombres de clientes/productos/períodos, decisiones o conclusiones. '
-        f'Solo el resumen, sin etiquetas ni explicaciones.'
-    )
-    msgs = [
-        {'role': 'system', 'content': 'Eres un asistente que genera resúmenes concisos de conversaciones.'},
-        {'role': 'user',   'content': prompt},
-    ]
-    res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
-    _log_aux(agente_cfg, res, 'resumen', '(resumen conversación)', empresa)
-    if res['ok'] and res.get('texto'):
-        return res['texto'].strip()
-    return None
-
-
-def _depurar_logica_negocio(empresa: str):
-    """
-    Depurador de lógica de negocio: si el total de palabras supera 800,
-    comprime las reglas más largas UNA A UNA hasta bajar del target.
-    NUNCA borra, desactiva ni fusiona reglas. Solo acorta la explicación.
-    """
-    try:
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, concepto, explicacion, palabras FROM ia_logica_negocio "
-                "WHERE empresa=%s AND activo=1 ORDER BY palabras DESC",
-                (empresa,)
-            )
-            fragmentos = cur.fetchall()
-        conn.close()
-
-        total_palabras = sum(f.get('palabras') or len(f['explicacion'].split()) for f in fragmentos)
-        TARGET = 900
-
-        if total_palabras <= 1000:
-            return
-
-        # Buscar agente
-        agente_cfg = None
-        for slug in ('gemini-flash-lite', 'cerebras-llama', 'groq-llama', 'gemini-flash'):
-            cand = _cargar_agente(slug)
-            if cand and cand.get('api_key'):
-                agente_cfg = cand
-                break
-        if not agente_cfg:
-            return
-
-        # Comprimir reglas una a una, empezando por la más larga
-        actualizadas = 0
-        for f in fragmentos:
-            if total_palabras <= TARGET:
-                break  # Ya llegamos al target
-
-            palabras_regla = f.get('palabras') or len(f['explicacion'].split())
-            if palabras_regla <= 30:
-                continue  # Reglas cortas no tienen grasa
-
-            # Calcular cuántas palabras debe tener esta regla
-            exceso = total_palabras - TARGET
-            reducir = min(exceso, int(palabras_regla * 0.6))  # máx reducir 60%
-            target_regla = max(20, palabras_regla - reducir)
-
-            msgs = [
-                {'role': 'system', 'content': 'Comprimes texto técnico. Preservas TODOS los nombres de campos, tablas, cifras y porcentajes. Solo devuelves el texto comprimido.'},
-                {'role': 'user', 'content': (
-                    f"Comprime este texto de {palabras_regla} a ~{target_regla} palabras. "
-                    f"Preserva cifras, nombres de campos y tablas. Elimina redundancias.\n\n"
-                    f"{f['explicacion']}"
-                )},
-            ]
-
-            res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=500)
-            if not res.get('ok') or not res.get('texto'):
-                continue
-
-            texto_nuevo = res['texto'].strip()
-            palabras_nuevas = len(texto_nuevo.split())
-
-            # Solo guardar si realmente se redujo (al menos 10% menos)
-            if palabras_nuevas < palabras_regla * 0.9:
-                conn = get_local_conn()
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "UPDATE ia_logica_negocio SET explicacion=%s, palabras=%s WHERE id=%s",
-                        (texto_nuevo, palabras_nuevas, f['id'])
-                    )
-                conn.commit()
-                conn.close()
-                total_palabras -= (palabras_regla - palabras_nuevas)
-                actualizadas += 1
-
-        if actualizadas > 0:
-            _notificar(
-                f"🗜️ <b>Lógica depurada</b>\n"
-                f"{actualizadas} reglas comprimidas → ~{total_palabras} palabras\n"
-                f"Ninguna regla eliminada"
-            )
-    except Exception:
-        pass
-
-
-def _procesar_bloque_aprendizaje(respuesta: str, empresa: str):
-    """
-    Detecta [GUARDAR_NEGOCIO]...[/GUARDAR_NEGOCIO] en la respuesta del agente.
-    Si lo encuentra, guarda el fragmento en ia_logica_negocio y llama al depurador.
-    Falla silenciosamente para no interrumpir la respuesta al usuario.
-    """
-    import re
-    # Regex tolerante: acepta [GUARDAR_NEGOCIO], [GUARDAR NEGOCIO], [guardar_negocio], etc.
-    match = re.search(
-        r'\[GUARDAR[_ ]NEGOCIO\](.*?)\[/GUARDAR[_ ]NEGOCIO\]',
-        respuesta, re.DOTALL | re.IGNORECASE
-    )
-    if not match:
-        return
-
-    try:
-        bloque = match.group(1).strip()
-        # Parsear concepto, keywords, explicacion
-        concepto  = re.search(r'concepto\s*:\s*(.+)', bloque, re.IGNORECASE)
-        keywords  = re.search(r'keywords\s*:\s*(.+)', bloque, re.IGNORECASE)
-        explicacion = re.search(r'explicacion\s*:\s*([\s\S]+)', bloque, re.IGNORECASE)
-
-        if not (concepto and keywords and explicacion):
-            return
-
-        concepto_txt    = concepto.group(1).strip()[:100]
-        keywords_txt    = keywords.group(1).strip()[:500]
-        explicacion_txt = explicacion.group(1).strip()
-
-        # Limpiar si explicacion capturó keywords o concepto al final
-        for tag in ['concepto', 'keywords']:
-            idx = explicacion_txt.lower().find(f'\n{tag}')
-            if idx > 0:
-                explicacion_txt = explicacion_txt[:idx].strip()
-
-        palabras = len(explicacion_txt.split())
-
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            # Si ya existe un fragmento con el mismo concepto, desactivarlo
-            cur.execute(
-                "UPDATE ia_logica_negocio SET activo=0 WHERE empresa=%s AND concepto=%s",
-                (empresa, concepto_txt)
-            )
-            cur.execute("""
-                INSERT INTO ia_logica_negocio
-                (empresa, concepto, explicacion, keywords, siempre_presente, palabras, creado_por)
-                VALUES (%s, %s, %s, %s, 0, %s, %s)
-            """, (empresa, concepto_txt, explicacion_txt, keywords_txt, palabras, 'usuario-aprendizaje'))
-        conn.commit()
-        conn.close()
-
-        _notificar(
-            f"🧠 <b>Nueva lógica de negocio aprendida</b>\n"
-            f"Concepto: <i>{concepto_txt}</i>\n"
-            f"Palabras: {palabras}"
-        )
-
-        # Depurar si supera el límite
-        import threading
-        threading.Thread(target=_depurar_logica_negocio, args=(empresa,), daemon=True).start()
-
-    except Exception:
-        pass
-
-
-def _extraer_palabras_clave(texto: str) -> str:
-    """Extrae palabras relevantes de una pregunta para indexar ejemplos SQL."""
-    import re
-    palabras_negocio = [
-        'ventas', 'venta', 'facturas', 'factura', 'remisiones', 'remision',
-        'clientes', 'cliente', 'productos', 'producto', 'mes', 'dia', 'hoy',
-        'ayer', 'semana', 'año', 'canal', 'margen', 'utilidad', 'costo',
-        'consignacion', 'pendiente', 'top', 'mejor', 'mayor', 'menor',
-        'comparar', 'comparame', 'vs', 'resumen', 'total', 'cuanto', 'cuantos'
-    ]
-    texto_lower = texto.lower()
-    encontradas = [p for p in palabras_negocio if p in texto_lower]
-    return ','.join(encontradas[:10])
-
-
-def _guardar_ejemplo_sql(empresa: str, pregunta: str, sql: str):
-    """Guarda un Q→SQL exitoso para auto-mejora progresiva del agente."""
-    try:
-        import re
-        tablas_raw = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', sql, re.IGNORECASE)
-        tablas = [t for par in tablas_raw for t in par if t]
-        tablas_str = ','.join(set(tablas))[:500]
-        palabras = _extraer_palabras_clave(pregunta)
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO ia_ejemplos_sql (empresa, pregunta, sql_generado, tablas_usadas, palabras_clave)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (empresa, pregunta[:500], sql[:2000], tablas_str, palabras))
-            ejemplo_id = cur.lastrowid
-            conn.commit()
-        conn.close()
-        # Generar y guardar embedding en background (no bloquea la respuesta)
-        import threading
-        threading.Thread(
-            target=embeddings_module.guardar_embedding,
-            args=(ejemplo_id, pregunta),
-            daemon=True
-        ).start()
-    except Exception:
-        pass  # No fallar si no se puede guardar
-
-
-def _incrementar_uso_ejemplos(ids: list):
-    """Incrementa veces_usado y actualiza ultima_vez para los ejemplos recuperados."""
-    if not ids:
-        return
-    try:
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            placeholders = ','.join(['%s'] * len(ids))
-            cur.execute(
-                f"UPDATE ia_ejemplos_sql SET veces_usado = veces_usado + 1, "
-                f"ultima_vez = NOW() WHERE id IN ({placeholders})", ids
-            )
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
-
-
-def _obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
-    """
-    Recupera los N ejemplos Q→SQL más relevantes para la pregunta actual.
-    Estrategia: embeddings semánticos (principal) → keywords LIKE (fallback).
-    """
-    # Intento 1: búsqueda semántica por embeddings
-    try:
-        filas = embeddings_module.buscar_ejemplos_semanticos(empresa, pregunta, n)
-        if filas:
-            # Incrementar veces_usado para aprendizaje acumulativo
-            _incrementar_uso_ejemplos([f['id'] for f in filas])
-            ejemplos = '\n\n'.join([
-                f"Pregunta: {f['pregunta']}\nSQL:\n{f['sql_generado']}"
-                for f in filas
-            ])
-            return f"\n\nEJEMPLOS DE CONSULTAS ANTERIORES EXITOSAS (referencia):\n{ejemplos}"
-    except Exception:
-        pass
-
-    # Fallback: búsqueda por palabras clave (LIKE) — funciona aunque no haya embeddings
-    try:
-        palabras = _extraer_palabras_clave(pregunta).split(',')
-        if not palabras:
-            return ''
-        condicion = ' OR '.join([f"palabras_clave LIKE %s" for _ in palabras])
-        params = [f'%{p}%' for p in palabras] + [empresa, n]
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute(f"""
-                SELECT pregunta, sql_generado FROM ia_ejemplos_sql
-                WHERE ({condicion}) AND empresa = %s
-                ORDER BY veces_usado DESC, ultima_vez DESC
-                LIMIT %s
-            """, params)
-            filas = cur.fetchall()
-        conn.close()
-        if not filas:
-            return ''
-        ejemplos = '\n\n'.join([
-            f"Pregunta: {f['pregunta']}\nSQL:\n{f['sql_generado']}"
-            for f in filas
-        ])
-        return f"\n\nEJEMPLOS DE CONSULTAS ANTERIORES EXITOSAS (referencia):\n{ejemplos}"
-    except Exception:
-        return ''
-
-
-_CACHE_COBERTURA: dict = {}   # {empresa: (timestamp, texto)}
-_CACHE_COBERTURA_TTL = 3600  # 1 hora
-
-
-def _obtener_cobertura_tablas(empresa: str = 'ori_sil_2') -> str:
-    """
-    Calcula y devuelve un bloque de texto con la cobertura real de datos
-    de las tablas principales: rango de fechas, total de registros,
-    días distintos con ventas, y última actualización.
-
-    Se cachea 1 hora para no hacer queries en cada llamada.
-    Se inyecta en el system prompt (Capa 0) para que el modelo sepa
-    con qué datos cuenta antes de razonar — evita "no hay datos" falsos
-    cuando en realidad el rango correcto sí tiene información.
-    """
-    import time
-    ahora = time.time()
-    if empresa in _CACHE_COBERTURA:
-        ts, texto = _CACHE_COBERTURA[empresa]
-        if ahora - ts < _CACHE_COBERTURA_TTL:
-            return texto
-
-    tablas_config = [
-        {
-            'tabla': 'zeffi_facturas_venta_encabezados',
-            'col_fecha': 'fecha_de_creacion',
-            'filtro': "fecha_de_anulacion IS NULL",
-            'etiqueta': 'Facturas de venta',
-        },
-        {
-            'tabla': 'zeffi_remisiones_venta_encabezados',
-            'col_fecha': 'fecha_de_creacion',
-            'filtro': "fecha_de_anulacion IS NULL",
-            'etiqueta': 'Remisiones de venta',
-        },
-        {
-            'tabla': 'zeffi_ordenes_venta_encabezados',
-            'col_fecha': 'fecha_de_creacion',
-            'filtro': "vigencia = 'Vigente'",
-            'etiqueta': 'Órdenes activas (consignación)',
-        },
-    ]
-
-    lineas = ['Cobertura de datos disponibles en la base de datos:']
-    try:
-        from .config import get_hostinger_conn
-        conn = get_hostinger_conn()
-        with conn.cursor() as cur:
-            for t in tablas_config:
-                try:
-                    where = f"WHERE {t['filtro']}" if t['filtro'] else ''
-                    cur.execute(f"""
-                        SELECT
-                            MIN(DATE({t['col_fecha']}))                     AS fecha_min,
-                            MAX(DATE({t['col_fecha']}))                     AS fecha_max,
-                            COUNT(*)                                        AS total_registros,
-                            COUNT(DISTINCT DATE({t['col_fecha']}))          AS dias_con_datos
-                        FROM {t['tabla']}
-                        {where}
-                    """)
-                    row = cur.fetchone()
-                    if row and row.get('fecha_max'):
-                        lineas.append(
-                            f"  {t['etiqueta']}: {row['fecha_min']} → {row['fecha_max']} "
-                            f"({row['total_registros']:,} registros en {row['dias_con_datos']:,} días distintos)"
-                        )
-                except Exception:
-                    pass
-
-            # Meses disponibles en resúmenes
-            try:
-                cur.execute(
-                    "SELECT MIN(mes) AS desde, MAX(mes) AS hasta, COUNT(*) AS n "
-                    "FROM resumen_ventas_facturas_mes"
-                )
-                row = cur.fetchone()
-                if row and row.get('hasta'):
-                    lineas.append(
-                        f"  Resúmenes mensuales: {row['desde']} → {row['hasta']} ({row['n']} meses)"
-                    )
-            except Exception:
-                pass
-
-        conn.close()
-    except Exception:
-        return ''
-
-    if len(lineas) <= 1:
-        return ''
-
-    lineas.append(
-        'Nota: la ausencia de datos en un día específico puede significar que ese día '
-        'no hubo ventas (fin de semana, feriado, o simplemente sin actividad). '
-        'En ese caso, considera consultar la semana completa o el acumulado del período.'
-    )
-
-    texto = '\n'.join(lineas)
-    _CACHE_COBERTURA[empresa] = (ahora, texto)
-    return texto
-
-
-def _obtener_columnas_reales(sql: str) -> str:
-    """
-    Dado un SQL fallido, extrae las tablas con sqlglot y hace DESCRIBE
-    contra la BD real (Hostinger) para obtener columnas reales.
-    Retorna texto con las columnas de cada tabla, o '' si falla.
-    """
-    try:
-        import sqlglot
-        import sqlglot.expressions as exp
-        stmts = sqlglot.parse(sql, dialect='mysql')
-        tablas = set()
-        for stmt in stmts:
-            if stmt is None:
-                continue
-            for node in stmt.walk():
-                if isinstance(node, exp.Table) and node.name:
-                    tablas.add(node.name)
-        if not tablas:
-            return ''
-
-        from .config import get_hostinger_conn
-        conn = get_hostinger_conn()
-        partes = []
-        with conn.cursor() as cur:
-            for tabla in sorted(tablas):
-                try:
-                    cur.execute(f"DESCRIBE {tabla}")
-                    cols = cur.fetchall()
-                    nombres = [c['Field'] for c in cols]
-                    partes.append(f"  {tabla}: {', '.join(nombres)}")
-                except Exception:
-                    pass  # tabla no existe — ignorar
-        conn.close()
-
-        if not partes:
-            return ''
-        return 'Columnas REALES de las tablas usadas:\n' + '\n'.join(partes) + '\n\n'
-    except Exception:
-        return ''
-
-
-def _obtener_fecha_maxima(sql: str) -> str:
-    """
-    Dado un SQL, detecta las tablas consultadas y obtiene la fecha máxima
-    real disponible. Se usa para informar al LLM cuándo hay 0 filas.
-    """
-    try:
-        import re
-        tablas_raw = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', sql, re.IGNORECASE)
-        tablas = [t for par in tablas_raw for t in par if t]
-        if not tablas:
-            return ''
-        # Columnas de fecha comunes en las tablas de Effi
-        cols_fecha = ['fecha_de_creacion', 'fecha', 'fecha_factura', 'fecha_remision']
-        resultados = []
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            for tabla in set(tablas):
-                for col in cols_fecha:
-                    try:
-                        cur.execute(f"SELECT MAX({col}) AS max_fecha FROM {tabla}")
-                        row = cur.fetchone()
-                        if row and row.get('max_fecha'):
-                            resultados.append(f"{tabla}.{col}: {row['max_fecha']}")
-                            break  # Con una columna de fecha por tabla es suficiente
-                    except Exception:
-                        continue
-        conn.close()
-        if resultados:
-            return f"Fechas más recientes en las tablas consultadas:\n" + '\n'.join(resultados) + '\n\n'
-        return ''
-    except Exception:
-        return ''
-
-
-def _nivel_usuario(usuario_id: str, empresa: str) -> int:
-    """Obtiene el nivel del usuario desde ia_usuarios. Default 1 si no existe."""
-    try:
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT nivel FROM ia_usuarios WHERE email = %s", (usuario_id,))
-            row = cur.fetchone()
-        conn.close()
-        return int(row['nivel']) if row else 1
-    except Exception:
-        return 1
-
-
-def _mejor_agente_para_nivel(nivel: int) -> str:
-    """Devuelve el slug del mejor agente disponible para el nivel dado."""
-    try:
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT slug FROM ia_agentes "
-                "WHERE activo=1 AND api_key != '' AND nivel_minimo <= %s "
-                "ORDER BY nivel_minimo DESC, orden ASC LIMIT 1",
-                (nivel,)
-            )
-            row = cur.fetchone()
-        conn.close()
-        return row['slug'] if row else 'gemini-flash'
-    except Exception:
-        return 'gemini-flash'
-
 
 def consultar(
     pregunta:        str,
@@ -993,11 +246,11 @@ def consultar(
         agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash'
 
     # ── 4b. Verificar nivel de usuario vs agente ─────────────────────
-    nivel_usr = _nivel_usuario(usuario_id, empresa)
+    nivel_usr = nivel_usuario(usuario_id, empresa)
     agente_nivel_min = (agente_cfg or {}).get('nivel_minimo', 1) or 1
     if nivel_usr < agente_nivel_min:
         # Redirigir silenciosamente al mejor agente disponible para su nivel
-        agente_slug = _mejor_agente_para_nivel(nivel_usr)
+        agente_slug = mejor_agente_para_nivel(nivel_usr)
         agente_cfg  = _cargar_agente(agente_slug)
 
     # ── 4d. Agente capa mecánica (generación SQL) ─────────────────────
@@ -1028,7 +281,7 @@ def consultar(
         # Capa 2 (RPD) o 3 (circuit breaker) — intentar otro agente
         agente_alt = _resolver_agente_disponible(nivel_usr, agente_slug, empresa)
         if agente_alt:
-            _notificar(
+            notificar(
                 f"🔄 <b>Fallback automático</b>\n"
                 f"Agente <code>{agente_slug}</code> bloqueado (capa {capa})\n"
                 f"Alternativa: <code>{agente_alt['slug']}</code>"
@@ -1080,7 +333,7 @@ def consultar(
             _cliente_ctx = 'Cliente que consulta:\n' + '\n'.join(f'  {p}' for p in partes)
 
     # CAPA 0: Lógica de negocio — siempre presente o activada por keywords
-    _logica_negocio = _obtener_logica_negocio(empresa, pregunta)
+    _logica_negocio = obtener_logica_negocio(empresa, pregunta)
 
     # CAPA 1: System prompt base (tema tiene prioridad sobre tipo)
     system_prompt = _fecha_ctx + '\n\n'
@@ -1198,7 +451,7 @@ def consultar(
             if paso == 'generar_sql':
                 pasos_ejecutados.append('generar_sql')
                 # Recuperar ejemplos dinámicos de consultas exitosas anteriores
-                ejemplos_din = _obtener_ejemplos_dinamicos(empresa, pregunta)
+                ejemplos_din = obtener_ejemplos_dinamicos(empresa, pregunta)
                 prompt_sql = (
                     f"Genera el SQL para responder esta pregunta:\n{pregunta}"
                     f"{ejemplos_din}\n\n"
@@ -1220,7 +473,7 @@ def consultar(
                     if slug_fb and slug_fb != agente_cfg_sql.get('slug'):
                         ag_fb = _cargar_agente(slug_fb)
                         if ag_fb:
-                            _notificar(
+                            notificar(
                                 f"⚠️ <b>Agente SQL fallback activado</b>\n"
                                 f"Principal: <code>{agente_cfg_sql.get('slug')}</code> falló\n"
                                 f"Respaldo: <code>{slug_fb}</code>\n"
@@ -1256,7 +509,7 @@ def consultar(
                 if not res_sql['ok']:
                     # Reintento: obtener columnas REALES de las tablas usadas y enviar al LLM
                     error_sql = res_sql['error']
-                    columnas_reales = _obtener_columnas_reales(sql_generado)
+                    columnas_reales = obtener_columnas_reales(sql_generado)
                     prompt_retry = (
                         f"El SQL que generaste falló con este error:\n{error_sql}\n\n"
                         f"SQL fallido:\n{sql_generado}\n\n"
@@ -1290,7 +543,7 @@ def consultar(
                 # (máx 2 reintentos). Corrige filtros demasiado estrictos, fechas erróneas, etc.
                 if len(datos_crudos) == 0:
                     for _ in range(2):
-                        fecha_max_ctx = _obtener_fecha_maxima(sql_generado)
+                        fecha_max_ctx = obtener_fecha_maxima(sql_generado)
                         prompt_vacio = (
                             f"El SQL ejecutó sin errores pero devolvió 0 filas.\n"
                             f"SQL ejecutado:\n```sql\n{sql_generado}\n```\n\n"
@@ -1317,7 +570,7 @@ def consultar(
                         # Si sigue vacío, continuar el siguiente intento (o dejarlo vacío)
 
                 # Auto-mejora: guardar este Q→SQL exitoso para futuras consultas similares
-                _guardar_ejemplo_sql(empresa, pregunta, sql_generado)
+                guardar_ejemplo_sql(empresa, pregunta, sql_generado)
 
             elif paso == 'conversar':
                 # Modo aprendizaje — conversación multi-turno con guardado al confirmar
@@ -1331,10 +584,10 @@ def consultar(
                     raise Exception(f"Error en modo aprendizaje: {res['error']}")
 
                 respuesta_final = res['texto'].strip()
-                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final, empresa)
+                resumen_nuevo = generar_resumen(resumen_anterior, pregunta, respuesta_final, empresa)
 
                 # Detectar bloque [GUARDAR_NEGOCIO] en la respuesta
-                _procesar_bloque_aprendizaje(respuesta_final, empresa)
+                procesar_bloque_aprendizaje(respuesta_final, empresa)
 
             elif paso in ('redactar', 'resumir', 'generar_doc'):
                 pasos_ejecutados.append(paso)
@@ -1352,7 +605,7 @@ def consultar(
                     if slug_fb and slug_fb != agente_cfg.get('slug'):
                         ag_fb = _cargar_agente(slug_fb)
                         if ag_fb:
-                            _notificar(
+                            notificar(
                                 f"⚠️ <b>Agente fallback activado</b>\n"
                                 f"Principal: <code>{agente_cfg.get('slug')}</code> falló\n"
                                 f"Respaldo: <code>{slug_fb}</code>\n"
@@ -1370,10 +623,10 @@ def consultar(
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
                 # Resumen generado por Groq en lugar del agente principal
-                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final, empresa)
+                resumen_nuevo = generar_resumen(resumen_anterior, pregunta, respuesta_final, empresa)
                 # Red de seguridad: solo en conversacion — analisis_datos NUNCA debe guardar lógica de negocio
                 if tipo == 'conversacion':
-                    _procesar_bloque_aprendizaje(res['texto'], empresa)
+                    procesar_bloque_aprendizaje(res['texto'], empresa)
 
             elif paso == 'analizar':
                 pasos_ejecutados.append('analizar')
@@ -1388,9 +641,9 @@ def consultar(
 
                 parsed = formateador.parsear_respuesta(res['texto'])
                 respuesta_final = parsed['respuesta']
-                resumen_nuevo = _generar_resumen_groq(resumen_anterior, pregunta, respuesta_final, empresa)
+                resumen_nuevo = generar_resumen(resumen_anterior, pregunta, respuesta_final, empresa)
                 # Red de seguridad: clasificacion mal enrutada puede contener una enseñanza
-                _procesar_bloque_aprendizaje(res['texto'], empresa)
+                procesar_bloque_aprendizaje(res['texto'], empresa)
 
             elif paso == 'buscar_web':
                 pasos_ejecutados.append('buscar_web')
@@ -1456,7 +709,7 @@ def consultar(
     )
 
     # ── 9b. Alertas de gasto ──────────────────────────────────────────
-    _verificar_gasto_y_notificar(empresa, costo_usd)
+    verificar_gasto_y_notificar(empresa, costo_usd)
 
     # ── 10. Devolver resultado estándar ───────────────────────────────
     return {
@@ -1519,7 +772,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
     # Intentar cada agente candidato hasta obtener respuesta válida
-    for slug in _slugs_router():
+    for slug in slugs_router():
         cand = _cargar_agente(slug)
         if not (cand and cand.get('api_key')):
             continue
@@ -1555,46 +808,6 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
                 return (slug_t, tema_default, slug_t == 'analisis_datos')
 
     return ('analisis_datos', 'general', True)  # default conservador: si todo falla, intentar SQL
-
-
-def _obtener_logica_negocio(empresa: str, pregunta: str) -> str:
-    """
-    Capa 0: recupera fragmentos de lógica de negocio relevantes para la pregunta.
-    - siempre_presente=1 → siempre se inyectan sin importar la pregunta
-    - otros → se inyectan si alguna keyword aparece en la pregunta
-    Falla silenciosamente si hay error de BD.
-    """
-    try:
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT concepto, explicacion, keywords, siempre_presente "
-                "FROM ia_logica_negocio WHERE empresa=%s AND activo=1",
-                (empresa,)
-            )
-            fragmentos = cur.fetchall()
-        conn.close()
-
-        if not fragmentos:
-            return ''
-
-        pregunta_lower = pregunta.lower()
-        relevantes = []
-        for f in fragmentos:
-            if f.get('siempre_presente'):
-                relevantes.append(f)
-                continue
-            keywords = [k.strip().lower() for k in (f.get('keywords') or '').split(',') if k.strip()]
-            if any(kw in pregunta_lower for kw in keywords):
-                relevantes.append(f)
-
-        if not relevantes:
-            return ''
-
-        partes = [f"### {f['concepto']}\n{f['explicacion']}" for f in relevantes]
-        return '<logica_negocio>\n' + '\n\n'.join(partes) + '\n</logica_negocio>'
-    except Exception:
-        return ''
 
 
 _cache_agentes = {}  # slug → {'data': dict, 'ts': float}
@@ -1718,7 +931,7 @@ def _log_aux(agente_cfg: dict, res: dict, tipo: str, pregunta_breve: str,
             error=res.get('error') if not res.get('ok') else None,
         )
         if costo > 0:
-            _verificar_gasto_y_notificar(empresa, costo)
+            verificar_gasto_y_notificar(empresa, costo)
     except Exception:
         pass
 
