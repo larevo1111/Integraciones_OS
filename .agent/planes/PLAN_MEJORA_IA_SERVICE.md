@@ -414,41 +414,25 @@ _CACHE_AGENTE_TTL = 300
 
 ---
 
-## Orden de ejecución recomendado
+## Estado de ejecución (actualizado 2026-03-23)
 
-| # | Fase | Riesgo | Esfuerzo | Impacto |
+| # | Fase | Estado | Commit | Notas |
 |---|---|---|---|---|
-| 1 | **2.1 — Activar embeddings** | Cero | 15 min | Alto — SQL con ejemplos relevantes |
-| 2 | **2.4 — Incrementar veces_usado** | Cero | 10 min | Medio — datos para auto-optimización |
-| 3 | **2.3A — Regex tolerante** | Bajo | 5 min | Medio — no perder aprendizaje |
-| 4 | **3 — DDL por tema** | Bajo | 30 min | **Altísimo** — 70K→20K tokens |
-| 5 | **5.3 — Eliminar duplicado** | Bajo | 10 min | Bajo — limpieza |
-| 6 | **5.4 — Caché agentes/tipos** | Bajo | 15 min | Medio — menos queries BD |
-| 7 | **1 — Separar servicio.py** | Medio | 2h | **Altísimo** — mantenibilidad |
-| 8 | **2.2 — Tabla ia_feedback** | Bajo | 1h | Alto — base para mejora continua |
-| 9 | **2.3B — JSON estructurado** | Medio | 30 min | Alto — aprendizaje robusto |
-| 10 | **5.1 — Timeout pipeline** | Bajo | 20 min | Medio — protección |
-| 11 | **5.2 — Limpiar caché** | Bajo | 15 min | Bajo — higiene |
-| 12 | **4 — Script CLI mejora** | Medio | 4-6h | **Transformacional** |
+| 1 | **2.1 — Activar embeddings** | ✅ Completado | `8743fc1` | 648/658 migrados a gemini-embedding-001 (3072 dims) |
+| 2 | **2.4 — Incrementar veces_usado** | ✅ Completado | `8743fc1` | `_incrementar_uso_ejemplos()` en aprendizaje.py |
+| 3 | **2.3A — Regex tolerante** | ✅ Completado | `8743fc1` | Acepta `[GUARDAR NEGOCIO]`, case-insensitive |
+| 4 | **3 — DDL por tema (fix caché)** | ✅ Completado | `8743fc1` | `_cache_por_tablas` separado del legacy |
+| 5 | **5.3 — Eliminar duplicado** | ✅ Completado | `8743fc1` | `limpiar_sql` público en ejecutor_sql, importado en formateador |
+| 6 | **5.4 — Caché agentes/tipos** | ✅ Completado | `8743fc1` | TTL 5 min en `_cache_agentes` y `_cache_tipos` |
+| 7 | **1 — Separar servicio.py** | ✅ Completado | `d23cc79` | 1,756→1,005 líneas. 4 módulos: seguridad, alertas, aprendizaje, utilidades_sql |
+| 8 | **2.2 — Tabla ia_feedback** | ✅ Completado | `b2c17df` | Tabla en ia_service_os + registro auto en flujo SQL (error/corrección) |
+| 9 | **2.3B — JSON estructurado** | ✅ Completado | `dc43a16` | `_extraer_guardado_json()` + fallback regex |
+| 10 | **5.1 — Timeout pipeline** | ✅ Completado | `dc43a16` | `MAX_PIPELINE_SEG=30` check antes de cada paso |
+| 11 | **5.2 — Limpiar caché** | ✅ Completado | `dc43a16` | `limpiar_rate_windows()` en cada health check |
+| 12 | **4 — Script CLI mejora** | 🔲 Pendiente | — | Requiere: feedback acumulado + diseño de suite de pruebas |
 
-**Total estimado**: ~10-12 horas de implementación.
-**Recomendación**: Hacer los primeros 6 pasos de una (2.5 horas, riesgo bajo, alto impacto). La separación de servicio.py se hace después con calma. El script CLI al final cuando toda la estructura esté limpia.
-
----
-
-## Visión a futuro — lo que se desbloquea
-
-Con estas mejoras, el sistema queda preparado para:
-
-1. **Auto-mejora**: El script CLI revisa errores → genera correcciones → las verifica → las incorpora. Cada día el sistema es mejor que el anterior.
-
-2. **Enseñanza fácil**: El usuario dice "/enseñar X" o toca "Mala respuesta" → el sistema aprende sin depender de etiquetas exactas del LLM.
-
-3. **Eficiencia**: De 70K a ~20K tokens por consulta = 3.5x menos costo, sin perder capacidad. Las consultas de producción (5 tablas) bajan a ~5K tokens.
-
-4. **Mantenibilidad**: Si mañana hay que agregar un nuevo tipo de aprendizaje (ej: aprender de correcciones manuales), hay un solo archivo donde ir (`aprendizaje.py`), no buscar entre 1,756 líneas.
-
-5. **Escalabilidad**: La tabla `ia_feedback` + el detector de patrones permite que el sistema identifique sus propias debilidades y se auto-corrija. Esto es lo que separa un chatbot de un sistema inteligente.
+**Fases 1-11 completadas** — servicio verificado en producción.
+**Pendiente**: Fase 4 (script CLI de mejora continua) — se implementará cuando haya feedback acumulado suficiente.
 
 ---
 
@@ -458,12 +442,3 @@ Con estas mejoras, el sistema queda preparado para:
 - **Agregar más tablas al DDL**: Al contrario — la idea es enviar MENOS tablas, no más.
 - **Reescribir el enrutador**: Funciona bien (cuando groq responde). El problema era el rate limit, ya corregido.
 - **Dashboard visual**: Es bonito pero no mejora el servicio. Se puede hacer después.
-
----
-
-## Preguntas para Santi antes de empezar
-
-1. **¿Empezamos por las victorias rápidas (Fases 2.1-2.4 + 3)?** Son los primeros 6 pasos — 2.5 horas, riesgo bajo, impacto alto.
-2. **¿O preferís que hagamos la separación de servicio.py primero (Fase 1)?** Es más trabajo pero deja todo limpio para lo demás.
-3. **El script CLI (Fase 4): ¿lo querés como cron automático o solo manual?** Recomiendo empezar manual y automatizar cuando veamos que funciona bien.
-4. **¿Querés el botón "Mala respuesta" en Telegram?** Es útil pero agrega un elemento visual al bot.
