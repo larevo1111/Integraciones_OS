@@ -429,10 +429,10 @@ _CACHE_AGENTE_TTL = 300
 | 9 | **2.3B — JSON estructurado** | ✅ Completado | `dc43a16` | `_extraer_guardado_json()` + fallback regex |
 | 10 | **5.1 — Timeout pipeline** | ✅ Completado | `dc43a16` | `MAX_PIPELINE_SEG=30` check antes de cada paso |
 | 11 | **5.2 — Limpiar caché** | ✅ Completado | `dc43a16` | `limpiar_rate_windows()` en cada health check |
-| 12 | **4 — Script CLI mejora** | 🔲 Pendiente | — | Requiere: feedback acumulado + diseño de suite de pruebas |
+| 12 | **4 — Script mejora continua** | ✅ Completado | `1ba6858` | `ia_mejora_continua.py` + cron cada 6h. Agente barato para correcciones. |
 
-**Fases 1-11 completadas** — servicio verificado en producción.
-**Pendiente**: Fase 4 (script CLI de mejora continua) — se implementará cuando haya feedback acumulado suficiente.
+**12/12 fases completadas** — plan ejecutado al 100%.
+Ciclo completo: error SQL → feedback auto → corrección con agente barato → ejemplo guardado → embedding → sistema más capaz.
 
 ---
 
