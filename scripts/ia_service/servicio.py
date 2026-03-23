@@ -164,8 +164,10 @@ def _get_config(conn, clave: str, default):
 def _get_config_simple(clave: str, default: str) -> str:
     """Lee un valor de ia_config sin necesitar conexión externa."""
     try:
-        with _db() as conn:
-            return _get_config(conn, clave, default)
+        conn = get_local_conn()
+        result = _get_config(conn, clave, default)
+        conn.close()
+        return result
     except Exception:
         return default
 
@@ -351,9 +353,9 @@ def _depurar_logica_negocio(empresa: str):
         conn.close()
 
         total_palabras = sum(f.get('palabras') or len(f['explicacion'].split()) for f in fragmentos)
-        TARGET = 700
+        TARGET = 900
 
-        if total_palabras <= 800:
+        if total_palabras <= 1000:
             return
 
         # Buscar agente
