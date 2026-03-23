@@ -22,6 +22,7 @@ from .aprendizaje import (
     procesar_bloque_aprendizaje, guardar_ejemplo_sql,
     obtener_ejemplos_dinamicos, obtener_logica_negocio,
     generar_resumen, depurar_logica_negocio,
+    registrar_feedback,
 )
 from .utilidades_sql import (
     obtener_columnas_reales, obtener_fecha_maxima, obtener_cobertura_tablas,
@@ -526,12 +527,30 @@ def consultar(
                         if sql_retry:
                             res_sql = ejecutor_sql.ejecutar(sql_retry)
                             if res_sql['ok']:
+                                # Retry exitoso → registrar corrección
+                                registrar_feedback(
+                                    empresa, 'correccion', pregunta,
+                                    sql_fallido=sql_generado, sql_correcto=sql_retry,
+                                    error_original=error_sql,
+                                )
                                 sql_generado = sql_retry
                             else:
+                                registrar_feedback(
+                                    empresa, 'sql_error', pregunta,
+                                    sql_fallido=sql_generado, error_original=error_sql,
+                                )
                                 raise Exception(f"Error ejecutando SQL: {res_sql['error']}")
                         else:
+                            registrar_feedback(
+                                empresa, 'sql_error', pregunta,
+                                sql_fallido=sql_generado, error_original=error_sql,
+                            )
                             raise Exception(f"Error ejecutando SQL: {error_sql}")
                     else:
+                        registrar_feedback(
+                            empresa, 'sql_error', pregunta,
+                            sql_fallido=sql_generado, error_original=error_sql,
+                        )
                         raise Exception(f"Error ejecutando SQL: {error_sql}")
 
                 datos_crudos = res_sql['filas']
