@@ -335,106 +335,87 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str,
 
 def _depurar_logica_negocio(empresa: str):
     """
-    Bot depurador: si la lógica de negocio supera 800 palabras totales,
-    comprime SOLO las reglas consolidadas (creado_por='depurador-auto').
-    Las reglas aprendidas individualmente (creado_por='usuario-aprendizaje' u otro)
-    NUNCA se desactivan — siempre quedan activas.
+    Depurador de lógica de negocio: si el total de palabras supera 800,
+    comprime las reglas más largas UNA A UNA hasta bajar del target.
+    NUNCA borra, desactiva ni fusiona reglas. Solo acorta la explicación.
     """
     try:
         conn = get_local_conn()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, concepto, explicacion, creado_por FROM ia_logica_negocio "
-                "WHERE empresa=%s AND activo=1 ORDER BY siempre_presente DESC, id",
+                "SELECT id, concepto, explicacion, palabras FROM ia_logica_negocio "
+                "WHERE empresa=%s AND activo=1 ORDER BY palabras DESC",
                 (empresa,)
             )
             fragmentos = cur.fetchall()
         conn.close()
 
-        texto_total = '\n\n'.join(f"### {f['concepto']}\n{f['explicacion']}" for f in fragmentos)
-        total_palabras = len(texto_total.split())
+        total_palabras = sum(f.get('palabras') or len(f['explicacion'].split()) for f in fragmentos)
+        TARGET = 700
 
         if total_palabras <= 800:
-            return  # No necesita depuración
+            return
 
-        # Separar: reglas individuales (intocables) vs consolidadas (comprimibles)
-        individuales = [f for f in fragmentos if f.get('creado_por') != 'depurador-auto']
-        consolidadas = [f for f in fragmentos if f.get('creado_por') == 'depurador-auto']
-
-        # Solo comprimir las consolidadas — las individuales se preservan tal cual
-        if not consolidadas:
-            return  # Solo hay reglas individuales, no tocar nada
-
-        texto_a_comprimir = '\n\n'.join(
-            f"### {f['concepto']}\n{f['explicacion']}" for f in consolidadas
-        )
-        palabras_individuales = sum(len(f['explicacion'].split()) for f in individuales)
-        target_palabras = max(200, 600 - palabras_individuales)
-
-        # Buscar agente para comprimir
+        # Buscar agente
         agente_cfg = None
-        slug_dep_cfg = _get_config_simple('rol_depurador_agente', 'groq-llama')
-        cadena_dep = [slug_dep_cfg] + [s for s in _slugs_router() if s != slug_dep_cfg]
-        for slug_dep in cadena_dep:
-            cand = _cargar_agente(slug_dep)
+        for slug in ('gemini-flash-lite', 'cerebras-llama', 'groq-llama', 'gemini-flash'):
+            cand = _cargar_agente(slug)
             if cand and cand.get('api_key'):
                 agente_cfg = cand
                 break
         if not agente_cfg:
             return
 
-        prompt = (
-            f"El siguiente es un documento de lógica de negocio ({len(texto_a_comprimir.split())} palabras). "
-            f"Comprímelo a máximo {target_palabras} palabras.\n"
-            f"REGLAS CRÍTICAS:\n"
-            f"- NUNCA elimines ni cambies cifras, porcentajes ni reglas exactas\n"
-            f"- NUNCA cambies nombres de campos, tablas o agentes\n"
-            f"- Elimina redundancias y ejemplos repetidos\n"
-            f"- Mantén la estructura ### Concepto\n"
-            f"- Solo devuelve el texto comprimido, sin explicaciones\n\n"
-            f"{texto_a_comprimir}"
-        )
-        msgs = [
-            {'role': 'system', 'content': 'Eres un asistente que comprime documentos técnicos preservando toda la precisión.'},
-            {'role': 'user',   'content': prompt},
-        ]
-        res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
-        _log_aux(agente_cfg, res, 'depurador', '(depurar lógica negocio)', empresa)
-        if not res['ok'] or not res.get('texto'):
-            for slug_dep in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
-                if agente_cfg and agente_cfg.get('slug') == slug_dep:
-                    continue
-                cand = _cargar_agente(slug_dep)
-                if cand and cand.get('api_key'):
-                    res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=900)
-                    _log_aux(cand, res, 'depurador', '(depurar lógica negocio — suplente)', empresa)
-                    if res['ok'] and res.get('texto'):
-                        agente_cfg = cand
-                        break
-            if not res['ok'] or not res.get('texto'):
-                return
+        # Comprimir reglas una a una, empezando por la más larga
+        actualizadas = 0
+        for f in fragmentos:
+            if total_palabras <= TARGET:
+                break  # Ya llegamos al target
 
-        texto_comprimido = res['texto'].strip()
-        palabras_nuevas = len(texto_comprimido.split())
+            palabras_regla = f.get('palabras') or len(f['explicacion'].split())
+            if palabras_regla <= 30:
+                continue  # Reglas cortas no tienen grasa
 
-        # Solo desactivar las consolidadas viejas — NUNCA las individuales
-        ids_consolidadas = [f['id'] for f in consolidadas]
-        conn = get_local_conn()
-        with conn.cursor() as cur:
-            if ids_consolidadas:
-                placeholders = ','.join(['%s'] * len(ids_consolidadas))
-                cur.execute(
-                    f"UPDATE ia_logica_negocio SET activo=0 WHERE id IN ({placeholders})",
-                    ids_consolidadas
-                )
-            cur.execute("""
-                INSERT INTO ia_logica_negocio (empresa, concepto, explicacion, keywords, siempre_presente, palabras, creado_por)
-                VALUES (%s, %s, %s, %s, 1, %s, %s)
-            """, (empresa, 'Lógica de negocio consolidada', texto_comprimido,
-                  'negocio,tarifa,agente,canal,cliente,venta,produccion', palabras_nuevas, 'depurador-auto'))
-        conn.commit()
-        conn.close()
-        _notificar(f"🗜️ <b>Lógica depurada</b>\n{len(texto_a_comprimir.split())} → {palabras_nuevas} palabras (individuales intactas: {len(individuales)})")
+            # Calcular cuántas palabras debe tener esta regla
+            exceso = total_palabras - TARGET
+            reducir = min(exceso, int(palabras_regla * 0.6))  # máx reducir 60%
+            target_regla = max(20, palabras_regla - reducir)
+
+            msgs = [
+                {'role': 'system', 'content': 'Comprimes texto técnico. Preservas TODOS los nombres de campos, tablas, cifras y porcentajes. Solo devuelves el texto comprimido.'},
+                {'role': 'user', 'content': (
+                    f"Comprime este texto de {palabras_regla} a ~{target_regla} palabras. "
+                    f"Preserva cifras, nombres de campos y tablas. Elimina redundancias.\n\n"
+                    f"{f['explicacion']}"
+                )},
+            ]
+
+            res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=500)
+            if not res.get('ok') or not res.get('texto'):
+                continue
+
+            texto_nuevo = res['texto'].strip()
+            palabras_nuevas = len(texto_nuevo.split())
+
+            # Solo guardar si realmente se redujo (al menos 10% menos)
+            if palabras_nuevas < palabras_regla * 0.9:
+                conn = get_local_conn()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE ia_logica_negocio SET explicacion=%s, palabras=%s WHERE id=%s",
+                        (texto_nuevo, palabras_nuevas, f['id'])
+                    )
+                conn.commit()
+                conn.close()
+                total_palabras -= (palabras_regla - palabras_nuevas)
+                actualizadas += 1
+
+        if actualizadas > 0:
+            _notificar(
+                f"🗜️ <b>Lógica depurada</b>\n"
+                f"{actualizadas} reglas comprimidas → ~{total_palabras} palabras\n"
+                f"Ninguna regla eliminada"
+            )
     except Exception:
         pass
 
