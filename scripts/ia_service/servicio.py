@@ -105,6 +105,7 @@ def consultar(
         }
     """
     t_inicio = time.time()
+    MAX_PIPELINE_SEG = 30  # timeout total del pipeline
     pasos_ejecutados = []
 
     # ── 0. Rate limit por usuario (sliding window in-memory) ─────────
@@ -448,6 +449,9 @@ def consultar(
         mensajes_base = [{'role': 'system', 'content': system_prompt}]
 
         for paso in pasos_del_tipo:
+            # Timeout global del pipeline
+            if (time.time() - t_inicio) > MAX_PIPELINE_SEG:
+                raise Exception(f"Timeout: pipeline superó {MAX_PIPELINE_SEG}s")
 
             if paso == 'generar_sql':
                 pasos_ejecutados.append('generar_sql')

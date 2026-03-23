@@ -24,6 +24,9 @@ app = Flask(__name__)
 
 @app.route('/ia/health', methods=['GET'])
 def health():
+    # Limpieza periódica de rate limit windows inactivos
+    from ia_service.seguridad import limpiar_rate_windows
+    limpiar_rate_windows()
     return jsonify({'ok': True, 'servicio': 'ia_service_os', 'version': '1.0'})
 
 

@@ -95,37 +95,72 @@ def depurar_logica_negocio(empresa: str):
         pass
 
 
+def _extraer_guardado_json(respuesta: str) -> dict | None:
+    """Intenta extraer {"guardar": {"concepto":..., "keywords":..., "explicacion":...}} de la respuesta."""
+    import json as _json
+    for pattern in [
+        r'\{[^{}]*"guardar"\s*:\s*\{[^{}]+\}[^{}]*\}',
+        r'```json\s*(\{[^`]+\})\s*```',
+    ]:
+        m = re.search(pattern, respuesta, re.DOTALL | re.IGNORECASE)
+        if m:
+            try:
+                obj = _json.loads(m.group(1) if m.lastindex else m.group(0))
+                g = obj.get('guardar', obj)
+                if g.get('concepto') and g.get('explicacion'):
+                    return {
+                        'concepto': str(g['concepto']).strip()[:100],
+                        'keywords': str(g.get('keywords', '')).strip()[:500],
+                        'explicacion': str(g['explicacion']).strip(),
+                    }
+            except Exception:
+                continue
+    return None
+
+
 def procesar_bloque_aprendizaje(respuesta: str, empresa: str):
     """
-    Detecta [GUARDAR_NEGOCIO]...[/GUARDAR_NEGOCIO] en la respuesta del agente.
-    Si lo encuentra, guarda el fragmento en ia_logica_negocio y llama al depurador.
+    Detecta aprendizaje en la respuesta del agente.
+    Soporta dos formatos:
+      1. JSON: {"guardar": {"concepto":..., "keywords":..., "explicacion":...}}
+      2. Etiquetas: [GUARDAR_NEGOCIO]...[/GUARDAR_NEGOCIO]
     """
-    # Regex tolerante: acepta [GUARDAR_NEGOCIO], [GUARDAR NEGOCIO], [guardar_negocio], etc.
-    match = re.search(
-        r'\[GUARDAR[_ ]NEGOCIO\](.*?)\[/GUARDAR[_ ]NEGOCIO\]',
-        respuesta, re.DOTALL | re.IGNORECASE
-    )
-    if not match:
-        return
-
-    try:
-        bloque = match.group(1).strip()
-        concepto  = re.search(r'concepto\s*:\s*(.+)', bloque, re.IGNORECASE)
-        keywords  = re.search(r'keywords\s*:\s*(.+)', bloque, re.IGNORECASE)
-        explicacion = re.search(r'explicacion\s*:\s*([\s\S]+)', bloque, re.IGNORECASE)
-
-        if not (concepto and keywords and explicacion):
+    # Intentar JSON primero (más robusto)
+    datos_json = _extraer_guardado_json(respuesta)
+    if datos_json:
+        concepto_txt = datos_json['concepto']
+        keywords_txt = datos_json['keywords']
+        explicacion_txt = datos_json['explicacion']
+    else:
+        # Fallback: regex tolerante
+        match = re.search(
+            r'\[GUARDAR[_ ]NEGOCIO\](.*?)\[/GUARDAR[_ ]NEGOCIO\]',
+            respuesta, re.DOTALL | re.IGNORECASE
+        )
+        if not match:
             return
 
-        concepto_txt    = concepto.group(1).strip()[:100]
-        keywords_txt    = keywords.group(1).strip()[:500]
-        explicacion_txt = explicacion.group(1).strip()
+        try:
+            bloque = match.group(1).strip()
+            concepto  = re.search(r'concepto\s*:\s*(.+)', bloque, re.IGNORECASE)
+            keywords  = re.search(r'keywords\s*:\s*(.+)', bloque, re.IGNORECASE)
+            explicacion = re.search(r'explicacion\s*:\s*([\s\S]+)', bloque, re.IGNORECASE)
 
-        for tag in ['concepto', 'keywords']:
-            idx = explicacion_txt.lower().find(f'\n{tag}')
-            if idx > 0:
-                explicacion_txt = explicacion_txt[:idx].strip()
+            if not (concepto and keywords and explicacion):
+                return
 
+            concepto_txt    = concepto.group(1).strip()[:100]
+            keywords_txt    = keywords.group(1).strip()[:500]
+            explicacion_txt = explicacion.group(1).strip()
+
+            for tag in ['concepto', 'keywords']:
+                idx = explicacion_txt.lower().find(f'\n{tag}')
+                if idx > 0:
+                    explicacion_txt = explicacion_txt[:idx].strip()
+        except Exception:
+            return
+
+    try:
         palabras = len(explicacion_txt.split())
 
         conn = get_local_conn()
