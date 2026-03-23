@@ -414,7 +414,7 @@ resultado = consultar(
 - ✅ **Nuevos endpoints** en ia-admin/api/server.js: CRUD Ejemplos SQL + CRUD Conversaciones
 - ✅ **Fix**: `requiere_estructura AS requiere_bd` en GET `/api/ia/tipos-admin`
 
-## Completado 2026-03-22 — Fix tabla bot + depurador lógica de negocio
+## Completado 2026-03-22 — Fix tabla bot + depurador + resúmenes cerebras + bug _get_config_simple
 
 ### Tabla bot — regla definitiva
 - **`MAX_FILAS_INLINE = 2`** — más de 2 registros → botón "Ver tabla completa" SIEMPRE (sin importar columnas)
@@ -422,11 +422,28 @@ resultado = consultar(
 - `_limpiar_tablas_texto()` elimina pipes markdown del texto del LLM en TODAS las respuestas
 - System prompt de `_construir_prompt_respuesta()` prohíbe al LLM formatear datos como tabla markdown
 
-### Depurador de lógica de negocio — corregido
-- **Bug crítico**: el depurador hacía `SET activo=0 WHERE empresa=%s` → **mataba TODAS las reglas** incluyendo las recién aprendidas por usuarios
-- **Fix**: ahora solo desactiva reglas `creado_por='depurador-auto'` (consolidaciones). Las reglas individuales (usuario-aprendizaje, claude-code) quedan SIEMPRE activas
-- 14 reglas reactivadas en BD que el depurador había desactivado
-- Test 10/10 consultas verificadas
+### Depurador de lógica de negocio — rediseño completo
+- **Bug crítico**: el depurador hacía `SET activo=0 WHERE empresa=%s` → **mataba TODAS las reglas**
+- **Nuevo diseño**: comprime cada regla individualmente en-lugar (UPDATE en BD), NUNCA borra ni desactiva
+- Umbral: 1000 palabras (antes 800). Target compresión: 900 palabras.
+- 14 reglas reactivadas en BD. Test: 2263 → 1164 palabras, 15/15 reglas preservadas.
+- `rol_depurador_agente` en ia_config (antes hardcoded). Usa gemini-flash-lite preferentemente.
+
+### Bug crítico _get_config_simple — CORREGIDO
+- **Causa raíz**: `_get_config_simple()` usaba `_db()` que nunca existió → siempre lanzaba NameError → always returned hardcoded default
+- **Efecto**: `rol_resumen_agente`, `rol_depurador_agente` y cualquier config leída por `_get_config_simple` ignoraba la BD completamente. cerebras-llama nunca fue tomado aunque estuviera en la BD.
+- **Fix**: reemplazado por `get_local_conn()` (patrón correcto del resto del código)
+- **Resultado**: resúmenes ya usan cerebras-llama (verificado en ia_logs). Groq queda exclusivamente para routing.
+
+### Groq token exhaustion — causa identificada
+- 26 consultas → 26 calls router (groq) + ~27 calls resumen (groq) = ~53 groq calls / día → ~110K tokens > 100K límite
+- Fix: `rol_resumen_agente = cerebras-llama` en ia_config (ilimitado, $0.10/M, 2200 t/s)
+- Groq ahora EXCLUSIVO para routing (2.5K tokens/call, ~600 calls antes de límite)
+
+### Configuración actual ia_config (2026-03-22)
+- `rol_router_principal` = groq-llama
+- `rol_resumen_agente` = cerebras-llama ← CAMBIADO (antes groq-llama, pero nunca funcionó por el bug)
+- `rol_depurador_agente` = groq-llama (pendiente cambiar a gemini-flash-lite si se quiere)
 
 ## Completado 2026-03-19 — Tabla inline en bot Telegram (OBSOLETO — reemplazado por fix 2026-03-22)
 
