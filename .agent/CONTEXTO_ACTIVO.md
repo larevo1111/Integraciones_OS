@@ -414,11 +414,21 @@ resultado = consultar(
 - ✅ **Nuevos endpoints** en ia-admin/api/server.js: CRUD Ejemplos SQL + CRUD Conversaciones
 - ✅ **Fix**: `requiere_estructura AS requiere_bd` en GET `/api/ia/tipos-admin`
 
-## Completado 2026-03-19 — Tabla inline en bot Telegram
+## Completado 2026-03-22 — Fix tabla bot + depurador lógica de negocio
 
-- **tabla.py**: `MAX_FILAS_INLINE=8, MAX_COLS_INLINE=4` — tablas pequeñas se muestran directamente en chat en vez de solo link mini app
-- Si el LLM ya incluyó tabla (``` + |) en su respuesta → no duplicar
-- System prompts de `analisis_datos` + `conversacion`: instruir al LLM a usar bloques de código con formato tabla cuando lista 3+ ítems comparables
+### Tabla bot — regla definitiva
+- **`MAX_FILAS_INLINE = 2`** — más de 2 registros → botón "Ver tabla completa" SIEMPRE (sin importar columnas)
+- Solo 1-2 filas se muestran inline
+- `_limpiar_tablas_texto()` elimina pipes markdown del texto del LLM en TODAS las respuestas
+- System prompt de `_construir_prompt_respuesta()` prohíbe al LLM formatear datos como tabla markdown
+
+### Depurador de lógica de negocio — corregido
+- **Bug crítico**: el depurador hacía `SET activo=0 WHERE empresa=%s` → **mataba TODAS las reglas** incluyendo las recién aprendidas por usuarios
+- **Fix**: ahora solo desactiva reglas `creado_por='depurador-auto'` (consolidaciones). Las reglas individuales (usuario-aprendizaje, claude-code) quedan SIEMPRE activas
+- 14 reglas reactivadas en BD que el depurador había desactivado
+- Test 10/10 consultas verificadas
+
+## Completado 2026-03-19 — Tabla inline en bot Telegram (OBSOLETO — reemplazado por fix 2026-03-22)
 
 ## Completado 2026-03-20 — Benchmark agentes + cerebras-llama como default
 
@@ -607,6 +617,10 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
 - ✅ **Cascada de estados (2026-03-20)** — Completar tarea padre → subtareas Pendiente/En Progreso → Completada. Cancelar padre → subtareas → Cancelada. Revertir a Pendiente → subtareas no-Canceladas → Pendiente. Lógica en backend (server.js): PUT `/tareas/:id` + POST `/tareas/:id/completar`.
 - ✅ **Popup completar con tiempo pre-llenado (2026-03-20)** — mini-modal al completar muestra `tiempo_real_min` actual (incluyendo cronómetro en vivo). Botón "Cancelar" cierra sin completar. "Confirmar" guarda y completa. Botón "Completar" eliminado del footer del TareaPanel.
 - ✅ **Auto-start cronómetro desde check (2026-03-20)** — al hacer check a "En Progreso" desde la lista (sin panel abierto), se llama automáticamente `POST /tareas/:id/iniciar` en `cambiarEstado()`. Guarda en la lista con `cronometro_activo=1` + `cronometro_inicio`. Guard: solo si panel NO tiene esa tarea abierta (evita double-start con el watcher de TareaPanel).
+- ✅ **Fix timezone filtros (2026-03-21)** — `hoyISO()`, `mananaISO()`, `isoRelativo()` usan `_localISO(new Date())` (fecha local del navegador) en lugar de `.toISOString()` (UTC). Evita desfase después de las 7 PM Colombia.
+- ✅ **Fix alineación círculo (2026-03-21)** — `.btn-add-sub-solo` (botón ↳ invisible) era `position: static`, añadiendo 12px al `estado-col` y empujando el círculo 6px arriba del centro. Ahora `position: absolute; top: 100%` como `.sub-controls`.
+- ✅ **Fix cronómetro ROUND→FLOOR (2026-03-21)** — duracion_min en g_tarea_tiempo ahora usa `FLOOR` (no `ROUND`). Evita que sesiones de 30-59 segundos redondeen a 1 minuto y el cronómetro arranque en "01:00".
+- ✅ **Fix tiempo_real_min al revertir a Pendiente (2026-03-21)** — al revertir una tarea de Completada → Pendiente, se envía `tiempo_real_min: 0` y el backend borra las sesiones de `g_tarea_tiempo`. La tarea vuelve a 0:00 listo para empezar de nuevo.
 
 ### Rutas y servicios
 - **URL**: gestion.oscomunidad.com

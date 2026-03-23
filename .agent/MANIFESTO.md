@@ -419,7 +419,16 @@ El servicio consulta esto para elegir el agente correcto por capacidad, sin hard
 
 ---
 
-### 9.4 ESTRUCTURA DEL REPO — REGLA DE MÓDULOS
+### 9.4 BOT TELEGRAM — PRESENTACIÓN DE DATOS
+
+**Regla absoluta (2026-03-22):** Si una consulta devuelve **más de 2 registros**, el bot SIEMPRE debe mostrar el botón "Ver tabla completa" con la mini app visual. Sin excepción, sin importar número de columnas.
+
+- `tabla.py` → `MAX_FILAS_INLINE = 2`. Solo 1-2 filas van inline. >2 = botón siempre.
+- El LLM NUNCA debe formatear datos como tabla markdown (pipes `|`) en su texto. El system prompt de `_construir_prompt_respuesta()` lo prohíbe explícitamente.
+- `_limpiar_tablas_texto()` elimina pipes del texto del LLM como red de seguridad.
+- Gotcha del depurador viejo: el depurador de `ia_logica_negocio` hacía `SET activo=0 WHERE empresa=%s` (mataba TODAS las reglas incluyendo las recién aprendidas). Corregido: ahora solo comprime las consolidaciones (`creado_por='depurador-auto'`), nunca toca reglas individuales.
+
+### 9.5 ESTRUCTURA DEL REPO — REGLA DE MÓDULOS
 
 Cada módulo o herramienta independiente **debe tener su propio directorio en la raíz del repo**.
 
