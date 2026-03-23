@@ -1620,14 +1620,26 @@ def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generad
                 f"{datos_crudos}\n\n"
                 f"Responde la pregunta usando la información anterior."
             )
+        n_total = len(datos_crudos)
         filas_texto = json.dumps(datos_crudos[:50], ensure_ascii=False, default=str)
+        tiene_tabla = n_total > 2
+        instruccion_tabla = (
+            f"Hay {n_total} registros en total — el sistema mostrará un botón 'Ver tabla completa' "
+            f"para que el usuario pueda verlos todos con filtros. "
+            f"Tu respuesta debe ser un resumen ejecutivo BREVE (3-5 líneas máximo) que incluya SIEMPRE:\n"
+            f"1. Total de registros ({n_total})\n"
+            f"2. El valor o métrica principal (suma, total, promedio) si hay columnas numéricas\n"
+            f"3. Los 2-3 registros más destacados (mayor valor, más reciente, etc.)\n"
+            f"Luego indica que puede ver el detalle completo en la tabla.\n"
+        ) if tiene_tabla else (
+            f"Responde la pregunta de forma directa y concisa con los datos obtenidos. "
+            f"Incluye los valores numéricos formateados.\n"
+        )
         return (
             f"Pregunta del usuario: {pregunta}\n\n"
-            f"Datos obtenidos de la base de datos:\n{filas_texto}\n\n"
-            f"Responde la pregunta usando SOLO estos datos. "
-            f"NUNCA formatees los datos como tabla markdown (con | pipes). "
-            f"El sistema genera la tabla visual automáticamente — tú solo redacta "
-            f"un resumen narrativo claro con los datos más relevantes y números formateados."
+            f"Datos obtenidos de la base de datos ({n_total} registros):\n{filas_texto}\n\n"
+            f"{instruccion_tabla}"
+            f"NUNCA formatees los datos como tabla markdown (con | pipes)."
         )
 
     return pregunta
