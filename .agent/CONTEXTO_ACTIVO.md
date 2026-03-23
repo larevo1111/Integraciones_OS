@@ -445,6 +445,47 @@ resultado = consultar(
 - `rol_resumen_agente` = cerebras-llama ← CAMBIADO (antes groq-llama, pero nunca funcionó por el bug)
 - `rol_depurador_agente` = groq-llama (pendiente cambiar a gemini-flash-lite si se quiere)
 
+## Completado 2026-03-22 (sesión 2) — Reconfiguración de agentes por límites reales
+
+### Problema descubierto: cerebras-llama NO soporta analisis_datos
+- cerebras-llama (Llama 3.1 8B) tiene `max_tokens_entrada = 8,192`
+- El prompt de `analisis_datos` con DDL completo = 34K-37K tokens → **excede el límite por 4x**
+- CADA consulta analítica fallaba → caía a fallback → generaba notificación spam
+- El benchmark de 2026-03-20 (100% éxito) se hizo bajo condiciones diferentes
+
+### Fix: schema notas crédito detalle
+- `zeffi_notas_credito_venta_detalle` NO tiene columna `id_numeracion`
+- El campo de join hacia encabezado es `id_nota_credito`
+- Agregado a `<reglas_sql>` del system prompt de analisis_datos
+
+### Configuración de agentes por tipo (DEFINITIVA — 2026-03-22)
+
+| Tipo | agente_preferido | agente_fallback | agente_sql | Por qué |
+|---|---|---|---|---|
+| analisis_datos | gemini-flash | gemini-flash-lite | gemini-flash | DDL 28K tokens, necesita 1M contexto |
+| conversacion | gemini-flash-lite | cerebras-llama | — | Razonamiento contextual, RPD ilimitado |
+| redaccion | gemini-flash-lite | cerebras-llama | — | Prompt chico, barato |
+| aprendizaje | gemini-flash-lite | cerebras-llama | — | Tarea simple |
+| busqueda_web | gemini-flash-lite | cerebras-llama | — | Prompt chico |
+| resumen | cerebras-llama | gemini-flash-lite | — | Prompt chico (~2K), rápido |
+| generacion_documento | gemini-flash | gemini-flash-lite | — | Docs largos |
+| clasificacion | groq-llama | cerebras-llama | — | Rápido, simple |
+| enrutamiento | groq-llama | cerebras-llama | — | 300ms, gratis |
+
+### ia_temas — agente_preferido puesto en NULL
+- Antes todos los temas tenían `agente_preferido = gemini-flash` → sobreescribía la config del tipo
+- Ahora NULL → el tipo decide el agente (comportamiento correcto)
+
+### Prioridad real de selección de agente (código línea ~953)
+`agente del caller` > `conv.agente_activo` > `tema.agente_preferido` > `tipo.agente_preferido` > default
+
+### Testeos: 9/10 OK
+- Analítica con gemini-flash ✅, sin fallback innecesario
+- Conversación con gemini-flash-lite ✅
+- Redacción con gemini-flash-lite ✅
+- Join notas crédito inkampo ✅ (antes fallaba)
+- Cartera ❌ (SQL con 2 SELECTs separados — issue de calidad SQL, no de agente)
+
 ## Completado 2026-03-19 — Tabla inline en bot Telegram (OBSOLETO — reemplazado por fix 2026-03-22)
 
 ## Completado 2026-03-20 — Benchmark agentes + cerebras-llama como default
