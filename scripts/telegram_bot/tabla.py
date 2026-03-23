@@ -1,14 +1,13 @@
 """
 Formateador de tablas para Telegram.
-- Modo inline (≤8 filas y ≤4 cols): tabla ASCII monoespaciada en el chat.
-- Modo mini app (>8 filas o >4 cols): genera token y devuelve URL.
+- ≤2 filas: tabla ASCII inline en el chat.
+- >2 filas: SIEMPRE genera token + botón "Ver tabla completa" (mini app).
 """
 import uuid, json
 from db import guardar_tabla_temp
 
 TABLA_BASE_URL = 'https://menu.oscomunidad.com/bot/tabla'
-MAX_FILAS_INLINE = 8   # hasta 8 filas se muestran inline
-MAX_COLS_INLINE  = 4   # hasta 4 columnas se muestran inline (>4 es muy ancho en mobile)
+MAX_FILAS_INLINE = 2   # >2 filas → SIEMPRE botón "Ver tabla completa"
 
 
 def _formatear_valor(v) -> str:
@@ -69,6 +68,31 @@ def _tabla_texto(columnas: list, filas: list, titulo: str = '') -> str:
     return f'{encabezado}```\n{tabla_str}\n```'
 
 
+def _limpiar_tablas_texto(texto: str) -> str:
+    """Elimina tablas markdown (pipes) del texto del LLM para que no se vean feas en Telegram."""
+    import re
+    if '|' not in texto:
+        return texto
+    # Eliminar bloques de código que contengan tablas
+    texto = re.sub(r'```[^\n]*\n[^`]*\|[^`]*```', '', texto, flags=re.DOTALL)
+    # Eliminar líneas de tabla markdown (| col1 | col2 |) y separadores (|---|---|)
+    lineas = texto.split('\n')
+    limpias = []
+    for linea in lineas:
+        stripped = linea.strip()
+        # Línea de tabla: empieza y termina con | o es separador de tabla
+        if stripped.startswith('|') and stripped.endswith('|'):
+            continue
+        # Líneas separadoras sueltas tipo :--- | ---:
+        if re.match(r'^[\s|:\-]+$', stripped) and '|' in stripped:
+            continue
+        limpias.append(linea)
+    resultado = '\n'.join(limpias).strip()
+    # Limpiar saltos de línea excesivos dejados por la limpieza
+    resultado = re.sub(r'\n{3,}', '\n\n', resultado)
+    return resultado
+
+
 def _filas_validas(filas: list) -> list:
     """Filtra filas vacías o nulas."""
     result = []
@@ -84,34 +108,32 @@ def _filas_validas(filas: list) -> list:
 
 def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -> dict:
     """
-    Siempre usa resultado['respuesta'] como texto principal.
-    Si hay tabla con datos reales:
-    - ≤MAX_FILAS_INLINE filas Y ≤MAX_COLS_INLINE cols → tabla ASCII inline (appended al texto)
-    - Caso contrario → genera token para Mini App
+    Procesa respuesta del ia_service para Telegram.
+    - Limpia tablas markdown (pipes) del texto del LLM SIEMPRE.
+    - ≤2 filas: tabla ASCII inline en el chat.
+    - >2 filas: genera token + botón "Ver tabla completa" (mini app).
     """
     tabla   = resultado.get('tabla')
     texto   = (resultado.get('respuesta') or '').strip()
     n_filas = 0
     token   = None
 
+    # Limpiar tablas markdown del LLM SIEMPRE (con o sin datos estructurados)
+    texto = _limpiar_tablas_texto(texto)
+
     if tabla and isinstance(tabla, dict):
         columnas = tabla.get('columnas', [])
         filas    = _filas_validas(tabla.get('filas', []))
         n_filas  = len(filas)
-        n_cols   = len(columnas)
 
         if n_filas > 0:
-            # Si el LLM ya incluyó una tabla (bloque de código con pipes), no duplicar
-            _llm_ya_tiene_tabla = '```' in texto and '|' in texto
 
-            if n_filas <= MAX_FILAS_INLINE and n_cols <= MAX_COLS_INLINE:
-                if not _llm_ya_tiene_tabla:
-                    # Tabla pequeña que el LLM no incluyó → mostrar inline
-                    tabla_str = _tabla_texto(columnas, filas)
-                    texto = f"{texto}\n\n{tabla_str}" if texto else tabla_str
-                # Si el LLM ya tiene tabla: no hacer nada extra (ya está bien formateada)
+            if n_filas <= MAX_FILAS_INLINE:
+                # 1-2 filas: tabla inline (cabe bien en el chat)
+                tabla_str = _tabla_texto(columnas, filas)
+                texto = f"{texto}\n\n{tabla_str}" if texto else tabla_str
             else:
-                # Tabla grande → mini app
+                # >2 filas: SIEMPRE botón "Ver tabla completa"
                 token = str(uuid.uuid4())
                 guardar_tabla_temp(token, pregunta, columnas, filas, empresa)
 

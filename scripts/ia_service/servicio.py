@@ -336,14 +336,15 @@ def _generar_resumen_groq(resumen_anterior: str, pregunta: str, respuesta: str,
 def _depurar_logica_negocio(empresa: str):
     """
     Bot depurador: si la lógica de negocio supera 800 palabras totales,
-    llama a Groq para comprimirla a ~600 palabras preservando precisión exacta.
-    Se llama en background después de guardar un nuevo fragmento.
+    comprime SOLO las reglas consolidadas (creado_por='depurador-auto').
+    Las reglas aprendidas individualmente (creado_por='usuario-aprendizaje' u otro)
+    NUNCA se desactivan — siempre quedan activas.
     """
     try:
         conn = get_local_conn()
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, concepto, explicacion FROM ia_logica_negocio "
+                "SELECT id, concepto, explicacion, creado_por FROM ia_logica_negocio "
                 "WHERE empresa=%s AND activo=1 ORDER BY siempre_presente DESC, id",
                 (empresa,)
             )
@@ -356,7 +357,21 @@ def _depurar_logica_negocio(empresa: str):
         if total_palabras <= 800:
             return  # No necesita depuración
 
-        # Buscar agente para comprimir — desde ia_config, suplentes si falla
+        # Separar: reglas individuales (intocables) vs consolidadas (comprimibles)
+        individuales = [f for f in fragmentos if f.get('creado_por') != 'depurador-auto']
+        consolidadas = [f for f in fragmentos if f.get('creado_por') == 'depurador-auto']
+
+        # Solo comprimir las consolidadas — las individuales se preservan tal cual
+        if not consolidadas:
+            return  # Solo hay reglas individuales, no tocar nada
+
+        texto_a_comprimir = '\n\n'.join(
+            f"### {f['concepto']}\n{f['explicacion']}" for f in consolidadas
+        )
+        palabras_individuales = sum(len(f['explicacion'].split()) for f in individuales)
+        target_palabras = max(200, 600 - palabras_individuales)
+
+        # Buscar agente para comprimir
         agente_cfg = None
         slug_dep_cfg = _get_config_simple('rol_depurador_agente', 'groq-llama')
         cadena_dep = [slug_dep_cfg] + [s for s in _slugs_router() if s != slug_dep_cfg]
@@ -369,15 +384,15 @@ def _depurar_logica_negocio(empresa: str):
             return
 
         prompt = (
-            f"El siguiente es el documento de lógica de negocio de Origen Silvestre ({total_palabras} palabras). "
-            f"Comprímelo a máximo 600 palabras.\n"
+            f"El siguiente es un documento de lógica de negocio ({len(texto_a_comprimir.split())} palabras). "
+            f"Comprímelo a máximo {target_palabras} palabras.\n"
             f"REGLAS CRÍTICAS:\n"
             f"- NUNCA elimines ni cambies cifras, porcentajes ni reglas exactas\n"
             f"- NUNCA cambies nombres de campos, tablas o agentes\n"
             f"- Elimina redundancias y ejemplos repetidos\n"
             f"- Mantén la estructura ### Concepto\n"
             f"- Solo devuelve el texto comprimido, sin explicaciones\n\n"
-            f"{texto_total}"
+            f"{texto_a_comprimir}"
         )
         msgs = [
             {'role': 'system', 'content': 'Eres un asistente que comprime documentos técnicos preservando toda la precisión.'},
@@ -386,7 +401,6 @@ def _depurar_logica_negocio(empresa: str):
         res = _llamar_agente(agente_cfg, msgs, temperatura=0.1, max_tokens=900)
         _log_aux(agente_cfg, res, 'depurador', '(depurar lógica negocio)', empresa)
         if not res['ok'] or not res.get('texto'):
-            # Suplente si el primero falló
             for slug_dep in ('groq-llama', 'cerebras-llama', 'gemini-flash-lite', 'gemini-flash'):
                 if agente_cfg and agente_cfg.get('slug') == slug_dep:
                     continue
@@ -403,10 +417,16 @@ def _depurar_logica_negocio(empresa: str):
         texto_comprimido = res['texto'].strip()
         palabras_nuevas = len(texto_comprimido.split())
 
-        # Reemplazar: marcar todos como inactivos y crear uno nuevo consolidado
+        # Solo desactivar las consolidadas viejas — NUNCA las individuales
+        ids_consolidadas = [f['id'] for f in consolidadas]
         conn = get_local_conn()
         with conn.cursor() as cur:
-            cur.execute("UPDATE ia_logica_negocio SET activo=0 WHERE empresa=%s", (empresa,))
+            if ids_consolidadas:
+                placeholders = ','.join(['%s'] * len(ids_consolidadas))
+                cur.execute(
+                    f"UPDATE ia_logica_negocio SET activo=0 WHERE id IN ({placeholders})",
+                    ids_consolidadas
+                )
             cur.execute("""
                 INSERT INTO ia_logica_negocio (empresa, concepto, explicacion, keywords, siempre_presente, palabras, creado_por)
                 VALUES (%s, %s, %s, %s, 1, %s, %s)
@@ -414,7 +434,7 @@ def _depurar_logica_negocio(empresa: str):
                   'negocio,tarifa,agente,canal,cliente,venta,produccion', palabras_nuevas, 'depurador-auto'))
         conn.commit()
         conn.close()
-        _notificar(f"🗜️ <b>Lógica de negocio depurada</b>\n{total_palabras} → {palabras_nuevas} palabras")
+        _notificar(f"🗜️ <b>Lógica depurada</b>\n{len(texto_a_comprimir.split())} → {palabras_nuevas} palabras (individuales intactas: {len(individuales)})")
     except Exception:
         pass
 
@@ -1622,8 +1642,9 @@ def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generad
             f"Pregunta del usuario: {pregunta}\n\n"
             f"Datos obtenidos de la base de datos:\n{filas_texto}\n\n"
             f"Responde la pregunta usando SOLO estos datos. "
-            f"Si la tabla tiene muchas columnas, presenta las más relevantes. "
-            f"Usa formato claro con números formateados."
+            f"NUNCA formatees los datos como tabla markdown (con | pipes). "
+            f"El sistema genera la tabla visual automáticamente — tú solo redacta "
+            f"un resumen narrativo claro con los datos más relevantes y números formateados."
         )
 
     return pregunta
