@@ -145,6 +145,9 @@ Cuando la IA falla en una consulta:
 **Para tareas frontend además:**
 - `frontend/design-system/MANUAL_ESTILOS.md`
 
+**Para CUALQUIER tarea que involucre código Python:**
+- **OBLIGATORIO leer primero:** `.agent/skills/desarrollo_python.md` — límites de líneas, reglas de modularidad, checklist pre-commit. **Este manual existe porque `servicio.py` llegó a 1,756 líneas y requirió refactor mayor. No repetir.**
+
 **Para tareas del Servicio IA (`scripts/ia_service/` o `scripts/telegram_bot/`):**
 - Cargar skill `/ia-service` — contexto completo con BD, agentes, flujos, latencias, troubleshooting
 - Manual detallado: `.agent/manuales/ia_service_manual.md` (24 secciones, v2.8)
@@ -204,6 +207,7 @@ Antes de dar una tarea por terminada, responder estas preguntas:
 4. ¿Aprendí algo sobre Effi, la BD o el frontend que no estaba documentado? → **Skill del dominio correspondiente**
 5. ¿Definí un patrón nuevo reutilizable? → **Crear/actualizar skill + entrada en catálogo**
 6. ¿Adopté una técnica de una fuente externa (paper, guía, librería)? → **CATALOGO_REFERENCIAS** con URL, relevancia y dónde se aplicó
+7. ¿Algún archivo Python supera 400 líneas o alguna función supera 80 líneas? → **Refactorizar ANTES de hacer commit** (ver `.agent/skills/desarrollo_python.md`)
 
 **Regla absoluta: ningún problema resuelto queda sin registrar. Si se descubrió en esta sesión, se documenta en esta sesión.**
 

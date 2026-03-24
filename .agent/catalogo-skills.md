@@ -12,6 +12,7 @@ Patrones técnicos reutilizables y reglas de negocio obligatorias. Aplican a cua
 |--------|---------|-------------|---------------|
 | **Servicio Central de IA** | `.agent/skills/manejo_ia.md` | Arquitectura ia_service_os: agentes, enrutamiento, RAG, multi-empresa. Sirve a todos los proyectos OS. | Regla 3 Pasos: Generar SQL → Ejecutar SQL → Responder con datos reales. NUNCA inventar cifras. |
 | **Integridad de Datos** | `.agent/skills/integridad_datos.md` | 8 checks universales para verificar cualquier tabla/vista resumen: muestreo manual, suma total vs fuente, unicidad PK, porcentajes, comparativos year_ant/mes_ant, NULLs. | **Obligatorio** antes de dar por terminado cualquier script de agregación o resumen. |
+| **Desarrollo Python** | `.agent/skills/desarrollo_python.md` | Límites de líneas (400/archivo, 80/función), regla de 1 responsabilidad, estructura estándar de módulos, prevención de duplicados, checklist pre-commit. Inventario actual de tamaños. | **Obligatorio** antes de escribir o modificar cualquier código Python. Nació del refactor de servicio.py (1,756→1,028 líneas). |
 
 ---
 
