@@ -651,7 +651,7 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
   - JWT temporal → JWT final con `empresa_activa`
   - DashboardPage: bug fecha y optional chaining corregidos
 
-## Sistema Gestión OS — Estado (2026-03-17)
+## Sistema Gestión OS — Estado (2026-03-23)
 
 > App de tareas y conocimiento del equipo. Reemplaza Notion. Web (gestion.oscomunidad.com) + Android futuro (Capacitor).
 
@@ -679,6 +679,7 @@ Cotizaciones: 8→$4.2M | Consignaciones: 13→$7.76M | CxC: $17.2M | CxP: $75.7
 - ✅ **Fix alineación círculo (2026-03-21)** — `.btn-add-sub-solo` (botón ↳ invisible) era `position: static`, añadiendo 12px al `estado-col` y empujando el círculo 6px arriba del centro. Ahora `position: absolute; top: 100%` como `.sub-controls`.
 - ✅ **Fix cronómetro ROUND→FLOOR (2026-03-21)** — duracion_min en g_tarea_tiempo ahora usa `FLOOR` (no `ROUND`). Evita que sesiones de 30-59 segundos redondeen a 1 minuto y el cronómetro arranque en "01:00".
 - ✅ **Fix tiempo_real_min al revertir a Pendiente (2026-03-21)** — al revertir una tarea de Completada → Pendiente, se envía `tiempo_real_min: 0` y el backend borra las sesiones de `g_tarea_tiempo`. La tarea vuelve a 0:00 listo para empezar de nuevo.
+- ✅ **RemisionSelector + PedidoSelector (2026-03-23)** — para categoría Empaque (`g_categorias.es_empaque=1`). Busca remisiones (`zeffi_remisiones_venta_encabezados`) y cotizaciones (`zeffi_cotizaciones_ventas_encabezados`) por ID o cliente. Tag con número + cliente + 2 botones hover: abrir en Effi + Ver PDF. Presente en QuickAdd y TareaPanel. Nuevas columnas en `g_tareas`: `id_remision`, `id_pedido`. Scripts: `get_remision_pdf.js`, `get_pedido_pdf.js` (URL directa, no placeholder — evita fragilidad).
 
 ### Rutas y servicios
 - **URL**: gestion.oscomunidad.com
@@ -715,6 +716,13 @@ DELETE /api/gestion/proyectos/:id  — desancla tareas y elimina
 GET/POST/PUT/DELETE /api/gestion/etiquetas/:id — CRUD etiquetas por empresa
 GET  /api/gestion/ops              — OPs pendientes vigentes. Acepta ?q=
 GET  /api/gestion/op/:id           — detalle OP
+GET  /api/gestion/op/:id/pdf       — PDF OP via Playwright (requireAuth)
+GET  /api/gestion/remisiones       — remisiones de venta. Acepta ?q=
+GET  /api/gestion/remision/:id     — detalle remisión
+GET  /api/gestion/remision/:id/pdf — PDF remisión via Playwright (requireAuth)
+GET  /api/gestion/pedidos          — cotizaciones de venta. Acepta ?q=
+GET  /api/gestion/pedido/:id       — detalle pedido/cotización
+GET  /api/gestion/pedido/:id/pdf   — PDF pedido via Playwright (requireAuth)
 ```
 
 ### Pendiente — próximas fases

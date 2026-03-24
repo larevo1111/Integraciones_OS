@@ -338,12 +338,42 @@ Ver manual completo: `sistema_gestion/MANUAL_DISENO_HIBRIDO.md`
 - **EtiquetasSelector**: multi-select chips, toggle individual, "Crear etiqueta X" si no hay match exacto
 - **Sidebar colapsado** (64px): al colapsar, `sidebar-logo` queda centrado con solo el botón chevron rotado (chevron_left → chevron_right via `rotate(180deg)`) — nav-item-labels, proyectos y counters ocultos
 
-### Componentes nuevos (desde sesión 2026-03-16)
-| Componente | Archivo | Propósito |
-|---|---|---|
-| ProyectoSelector | `components/ProyectoSelector.vue` | Dropdown simple para seleccionar/crear proyecto |
-| EtiquetasSelector | `components/EtiquetasSelector.vue` | Multi-select para etiquetas con chips |
-| ResponsablesSelector | `components/ResponsablesSelector.vue` | Multi-select para usuarios (emails), igual patrón que EtiquetasSelector |
+### Componentes nuevos
+| Componente | Archivo | Propósito | Condición de visibilidad |
+|---|---|---|---|
+| ProyectoSelector | `components/ProyectoSelector.vue` | Dropdown simple para seleccionar/crear proyecto | Siempre |
+| EtiquetasSelector | `components/EtiquetasSelector.vue` | Multi-select para etiquetas con chips | Siempre |
+| ResponsablesSelector | `components/ResponsablesSelector.vue` | Multi-select para usuarios (emails) | Siempre |
+| OpSelector | `components/OpSelector.vue` | Busca OPs Effi por número o artículo | `categoria.es_produccion = 1` |
+| RemisionSelector | `components/RemisionSelector.vue` | Busca remisiones de venta por ID o cliente | `categoria.es_empaque = 1` |
+| PedidoSelector | `components/PedidoSelector.vue` | Busca cotizaciones (pedidos) por ID o cliente | `categoria.es_empaque = 1` |
+
+### Patrón selector de documentos Effi (OpSelector / RemisionSelector / PedidoSelector)
+Todos siguen el mismo patrón. Propiedades comunes:
+- Input con búsqueda debounced 250ms + dropdown `position: fixed` via Teleport
+- Tag cuando tiene valor: `núm + descripción/cliente` + 2 botones hover al hacer hover
+- Botón 1: `open_in_new` → abre en Effi (link `<a target="_blank">`)
+- Botón 2: `picture_as_pdf` → llama endpoint backend que corre script Playwright y devuelve PDF
+- Limpiar con botón `close`
+
+**URLs Effi para abrir en nueva pestaña:**
+- OP: `https://effi.com.co/app/orden_produccion?id={id}`  (NO /app/orden_produccion/{id})
+- Remisión: `https://effi.com.co/app/remision_v?id={id}`
+- Pedido/Cotización: `https://effi.com.co/app/cotizacion?id={id}&id={id}` (doble id — así lo requiere Effi)
+
+**Scripts Playwright PDF:**
+- `scripts/get_op_pdf.js` — navega a URL base + aplica filtros manualmente
+- `scripts/get_remision_pdf.js` — navega DIRECTAMENTE a `remision_v?id={id}` (más robusto)
+- `scripts/get_pedido_pdf.js` — navega DIRECTAMENTE a `cotizacion?id={id}&id={id}` (más robusto)
+- ⚠️ **REGLA PDF scripts**: usar URL directa con ID, no placeholder de input. El placeholder es frágil si Effi cambia el texto de la interfaz.
+
+**Endpoints PDF backend (server.js):**
+```
+GET /api/gestion/op/:id/pdf        — requireAuth, execFile get_op_pdf.js
+GET /api/gestion/remision/:id/pdf  — requireAuth, execFile get_remision_pdf.js
+GET /api/gestion/pedido/:id/pdf    — requireAuth, execFile get_pedido_pdf.js
+```
+Todos: timeout 90s, Content-Type application/pdf, limpian /tmp tras pipe.
 
 ### Regla de consistencia de campos (ver REGLAS_APP.md)
 - **SIEMPRE** usar los selectors existentes — nunca reimplementar inline
