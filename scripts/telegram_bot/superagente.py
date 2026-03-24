@@ -134,17 +134,13 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
     sesion     = obtener_o_crear_sesion(usuario_id, empresa)
     historial  = _formatear_historial(sesion['mensajes'])
 
-    try:
-        prompt = prompt_tpl.format(
-            usuario_nombre=nombre_usuario,
-            nivel=nivel,
-            empresa=empresa,
-            sesion_id=sesion['id'],
-            historial=historial,
-            pregunta=pregunta,
-        )
-    except KeyError as e:
-        return {'ok': False, 'error': f'Error en el prompt del sistema (placeholder faltante: {e})'}
+    prompt = (prompt_tpl
+              .replace('{usuario_nombre}', nombre_usuario)
+              .replace('{nivel}',          str(nivel))
+              .replace('{empresa}',        empresa)
+              .replace('{sesion_id}',      str(sesion['id']))
+              .replace('{historial}',      historial)
+              .replace('{pregunta}',       pregunta))
 
     # Llamar claude -p desde el repo
     # Se limpia CLAUDECODE del env para permitir ejecución cuando el bot corre
