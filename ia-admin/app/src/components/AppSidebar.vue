@@ -42,6 +42,10 @@
       <div class="nav-divider" />
       <div class="nav-group-label">Comportamiento</div>
       <div class="nav-section">
+        <router-link v-if="nivel >= 7" to="/superagente" class="nav-item" active-class="active">
+          <SparklesIcon :size="15" class="nav-icon" />
+          <span>Super Agente</span>
+        </router-link>
         <router-link v-if="nivel >= 7" to="/agentes" class="nav-item" active-class="active">
           <BotIcon :size="15" class="nav-icon" />
           <span>Agentes</span>
@@ -124,7 +128,7 @@ import {
   LayoutDashboardIcon, BotIcon, SettingsIcon, UsersIcon,
   ScrollIcon, PlayIcon, LogOutIcon, DatabaseIcon, LinkIcon,
   SlidersHorizontalIcon, BookOpenIcon, MessageSquareIcon,
-  FileTextIcon, CodeIcon, SmartphoneIcon, ShieldIcon
+  FileTextIcon, CodeIcon, SmartphoneIcon, ShieldIcon, SparklesIcon
 } from 'lucide-vue-next'
 import { useAuthStore } from 'stores/authStore'
 

@@ -26,6 +26,7 @@ const routes = [
       { path: 'ejemplos-sql',    component: () => import('pages/EjemplosSqlPage.vue') },
       { path: 'conversaciones',  component: () => import('pages/ConversacionesPage.vue') },
       { path: 'roles',           component: () => import('pages/RolesPage.vue') },
+      { path: 'superagente',     component: () => import('pages/SuperAgentePage.vue') },
     ]
   },
   { path: '/:catchAll(.*)*', redirect: '/dashboard' }

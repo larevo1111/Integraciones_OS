@@ -1229,6 +1229,71 @@ app.delete('/api/ia/conversaciones/:id', requireAdmin, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── Super Agente ─────────────────────────────────────────────────
+app.get('/api/ia/superagente/config', requireAuth, requireAdmin, async (req, res) => {
+  const empresa = req.usuario.empresa_activa || 'ori_sil_2'
+  try {
+    const [[row]] = await db.query(
+      'SELECT id, prompt_sistema, updated_at, usuario_ult_mod FROM sa_config WHERE empresa=? AND activo=1 LIMIT 1',
+      [empresa]
+    )
+    res.json({ ok: true, config: row || null })
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }) }
+})
+
+app.put('/api/ia/superagente/config', requireAuth, requireAdmin, async (req, res) => {
+  const empresa = req.usuario.empresa_activa || 'ori_sil_2'
+  const { prompt_sistema } = req.body
+  if (!prompt_sistema) return res.status(400).json({ ok: false, error: 'prompt_sistema requerido' })
+  try {
+    await db.query(
+      `INSERT INTO sa_config (empresa, prompt_sistema, usuario_ult_mod)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE prompt_sistema=VALUES(prompt_sistema), usuario_ult_mod=VALUES(usuario_ult_mod), activo=1`,
+      [empresa, prompt_sistema, req.usuario.email]
+    )
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }) }
+})
+
+app.get('/api/ia/superagente/sesiones', requireAuth, requireAdmin, async (req, res) => {
+  const empresa = req.usuario.empresa_activa || 'ori_sil_2'
+  try {
+    const [rows] = await db.query(
+      `SELECT s.id, s.usuario_id, s.updated_at, s.mensajes,
+              u.nombre as usuario_nombre
+       FROM sa_sesiones s
+       LEFT JOIN ia_usuarios u ON u.telegram_id = s.usuario_id
+       WHERE s.empresa=?
+       ORDER BY s.updated_at DESC
+       LIMIT 100`,
+      [empresa]
+    )
+    const sesiones = rows.map(r => {
+      const msgs = typeof r.mensajes === 'string' ? JSON.parse(r.mensajes || '[]') : (r.mensajes || [])
+      const primera = msgs.find(m => m.role === 'user')
+      return {
+        id: r.id,
+        usuario_id: r.usuario_id,
+        usuario_nombre: r.usuario_nombre || r.usuario_id,
+        primera_pregunta: primera?.content?.substring(0, 80) || '(vacía)',
+        n_mensajes: Math.floor(msgs.length / 2),
+        updated_at: r.updated_at
+      }
+    })
+    res.json({ ok: true, sesiones })
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }) }
+})
+
+app.get('/api/ia/superagente/sesiones/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const [[row]] = await db.query('SELECT * FROM sa_sesiones WHERE id=?', [req.params.id])
+    if (!row) return res.status(404).json({ ok: false, error: 'Sesión no encontrada' })
+    const mensajes = typeof row.mensajes === 'string' ? JSON.parse(row.mensajes || '[]') : (row.mensajes || [])
+    res.json({ ok: true, sesion: { ...row, mensajes } })
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }) }
+})
+
 // ─── Frontend estático ────────────────────────────────────────────
 const distPath = path.join(__dirname, '../app/dist/spa')
 app.use(express.static(distPath))
