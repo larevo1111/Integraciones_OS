@@ -127,10 +127,11 @@ def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -
         n_filas  = len(filas)
 
         if n_filas > 0:
+            titulo_tabla = tabla.get('titulo', '')
 
             if n_filas <= MAX_FILAS_INLINE:
                 # 1-2 filas: tabla inline (cabe bien en el chat)
-                tabla_str = _tabla_texto(columnas, filas)
+                tabla_str = _tabla_texto(columnas, filas, titulo_tabla)
                 texto = f"{texto}\n\n{tabla_str}" if texto else tabla_str
             else:
                 # >2 filas: SIEMPRE botón "Ver tabla completa"

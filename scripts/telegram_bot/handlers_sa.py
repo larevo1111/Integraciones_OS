@@ -32,9 +32,15 @@ async def manejar_superagente(update: Update, sa_mod, tabla_mod,
 
     if tipo == 'tabla':
         data     = resultado['contenido']
-        res_fake = {'ok': True, 'respuesta': data.get('texto', ''),
-                    'datos': data.get('filas', []), 'columnas': data.get('columnas', []),
-                    'titulo': data.get('titulo', '')}
+        res_fake = {
+            'ok':       True,
+            'respuesta': data.get('texto', ''),
+            'tabla': {
+                'columnas': data.get('columnas', []),
+                'filas':    data.get('filas', []),
+                'titulo':   data.get('titulo', ''),
+            }
+        }
         info = tabla_mod.procesar_tabla(res_fake, pregunta, empresa)
         kb   = inline_datos_fn(info['token'], info['n_filas']) if info['token'] else inline_solo_nuevo_fn()
         try:
