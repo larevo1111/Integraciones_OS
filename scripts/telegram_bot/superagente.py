@@ -12,8 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ia_service.config import get_local_conn
 
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
+CLAUDE_BIN = '/home/osserver/.local/bin/claude'
 MAX_HISTORIAL = 10   # últimos N pares pregunta/respuesta que se incluyen en el prompt
-TIMEOUT_CLAUDE = 120  # segundos
+TIMEOUT_CLAUDE = 300  # segundos (5 min — consultas complejas con múltiples queries tardan 1-2 min)
 
 
 # ── Sesiones ──────────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
 
     try:
         proc = subprocess.run(
-            ['claude', '-p', prompt, '--output-format', 'text'],
+            [CLAUDE_BIN, '-p', prompt, '--output-format', 'text'],
             capture_output=True, text=True,
             cwd=REPO_DIR, timeout=TIMEOUT_CLAUDE,
             env=env,
