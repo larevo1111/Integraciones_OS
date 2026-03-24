@@ -38,7 +38,24 @@ Antes de cualquier tarea, revisar estos archivos en orden:
 - Scripts en `scripts/` — corren con `node` o `python3` directamente en el host (NO docker exec)
 - MariaDB: `mysql -u osadmin -pEpist2487. effi_data -e "..." 2>/dev/null`
 - Git: commit + push sin preguntar, con mensaje descriptivo en español
-- Al terminar una tarea significativa: actualizar `.agent/CONTEXTO_ACTIVO.md` con el estado nuevo
+- Al terminar una tarea significativa: actualizar el contexto del módulo en `.agent/contextos/<modulo>.md` y actualizar `.agent/CONTEXTO_ACTIVO.md` si cambió el estado global
+
+## ⚠️ REGLAS MODO AUTÓNOMO — claude -p sin supervisión
+
+Cuando Claude Code corre sin supervisión directa (cron, scripts `claude_trainer.sh`, `claude_aplicar.sh`):
+
+- **SOLO puede modificar datos en BD**: reglas (`ia_logica_negocio`), ejemplos (`ia_ejemplos_sql`), prompts de tipos (`ia_tipos_consulta`)
+- **NUNCA modificar archivos Python, JS o de configuración** — eso solo en sesión interactiva con Santi
+- **NUNCA aplicar workarounds ni parches superficiales**
+- **NUNCA meter try/catch vacíos o genéricos**
+- **NUNCA hardcodear valores para "resolver" un bug**
+- **Si no identifica causa raíz → solo documentar, nunca "arreglar" el síntoma**
+- Cada cambio en BD debe: registrar el valor anterior + loguear qué cambió y por qué
+- Notificar a Telegram cada vez que se aplica un cambio en modo autónomo
+- Respetar la arquitectura existente del servicio IA
+- Seguir las convenciones de `.agent/skills/desarrollo_python.md`
+
+**Los cambios de código Python → SOLO en sesión interactiva con Santi.**
 
 ## Estilo de respuesta
 

@@ -62,8 +62,8 @@ Su visión es el norte y su aprobación es la ÚNICA llave para ejecutar cambios
 **Claude Code** — Arquitecto Senior + Constructor Principal + Operador de Infraestructura.
 Es el cerebro técnico del proyecto. Diseña la estructura de módulos, planifica cambios cross-file, ejecuta refactors profundos, accede a MySQL y servidores por terminal directo. Toma decisiones de arquitectura del ERP. Recibe el **70% del trabajo pesado**: diseño, implementación compleja, consultas de DB, debugging profundo y análisis de arquitectura.
 
-**Antigravity (Google Labs)** — Consultor Secundario + Asesor de Arquitectura.
-Plataforma agentic de Google Labs (lanzada Nov 2025). IDE agent-first basado en Gemini 3.1 Pro con **contexto de 1 millón de tokens**. Puede navegar browsers de forma autónoma, tomar screenshots/grabaciones, y revisar codebases completos en una sola pasada. **Su rol principal en OS**: segunda opinión arquitectural cuando hay que revisar mucho contexto a la vez, QA visual autónomo, exploración de repositorios grandes. **NO reemplaza a Claude Code** — complementa. Ver perfil completo: `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`.
+**Antigravity (Google Labs)** — Constructor Secundario Ocasional.
+Plataforma agentic de Google Labs (lanzada Nov 2025). IDE agent-first basado en Gemini 3.1 Pro con **contexto de 1 millón de tokens**. **Su uso es ocasional y por demanda explícita de Santi** — cuando el contexto necesario supera ampliamente lo que cabe en Claude Code. Claude Code ya puede navegar la web, leer codebase completo con subagentes, y hacer QA funcional — Antigravity **no es necesario para esas tareas**. Ver perfil completo: `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`.
 
 **Subagentes Claude** — Ejecutores Paralelos de Claude Code.
 Instancias de Claude lanzadas por Claude Code con la herramienta `Agent`. Mismas capacidades que Claude Code (Bash, Playwright, Read, Write, DB) pero corren en paralelo sin consumir tokens del contexto principal. Recibe el **máximo posible de trabajo secundario**: construcción de módulos, QA, exploración de codebase, diagnósticos de BD, documentación. **Regla: si una tarea no requiere razonamiento arquitectónico profundo → va al subagente.** NO confundir con Antigravity Google Labs — son conceptos distintos.
@@ -76,10 +76,9 @@ Instancias de Claude lanzadas por Claude Code con la herramienta `Agent`. Mismas
 | Implementación de features completas | Claude Code | Multi-archivo, PR-ready |
 | Consultas MySQL / acceso a servidores | Claude Code | Terminal directo, sin intermediarios |
 | Refactors complejos cross-module | Claude Code | Planificación + ejecución coordinada |
-| Revisión de arquitectura con contexto masivo | Antigravity Google Labs | 1M tokens — puede leer el codebase completo |
-| Segunda opinión arquitectural | Antigravity Google Labs | Contexto enorme + navegación browser autónoma |
-| QA visual / browser testing autónomo | Antigravity Google Labs | Screenshots, grabaciones, navegación real |
-| Exploración de repos o docs grandes | Antigravity Google Labs | Ideal cuando el contexto supera Claude Code |
+| Revisión de arquitectura con contexto masivo (>200K tokens) | Antigravity Google Labs | Solo si el contexto supera lo que Claude Code puede procesar con subagentes |
+| QA visual / browser testing | Subagente Claude | Playwright, screenshots, verificación funcional |
+| Exploración de repos grandes | Subagente Claude o Claude Code | Subagentes corren en paralelo sin bloquear |
 | Construcción secundaria (módulos, CRUD) | Subagente Claude | Paralelo, sin consumir contexto principal |
 | Tareas paralelas simultáneas | Subagente Claude | Multi-agente sin bloquear la conversación |
 | QA funcional (endpoints, BD, logs) | Subagente Claude | Ejecución autónoma de checks |
@@ -134,7 +133,7 @@ Cuando la IA falla en una consulta:
 
 ---
 
-## 4. ARCHIVOS DE CONTEXTO Y CONFIGURACIÓN
+## 3. ARCHIVOS DE CONTEXTO Y CONFIGURACIÓN
 
 **Leer SIEMPRE al iniciar sesión, en este orden:**
 1. `.agent/MANIFESTO.md` — Estado actual, decisiones tomadas, arquitectura vigente. Fuente de verdad #1.
@@ -158,7 +157,7 @@ Las instrucciones de conexión están documentadas como skills. Si no existe la 
 
 ---
 
-## 5. TONO Y COMUNICACIÓN
+## 4. TONO Y COMUNICACIÓN
 
 - **Claridad Quirúrgica**: Profesional, directa y empática.
 - **NUNCA suponer, SIEMPRE preguntar.** Admitir ignorancia es una virtud; suponer es un error crítico.
@@ -169,7 +168,7 @@ Las instrucciones de conexión están documentadas como skills. Si no existe la 
 
 ---
 
-## 4. AUTONOMÍA DE EJECUCIÓN — DOS FASES
+## 5. AUTONOMÍA DE EJECUCIÓN — DOS FASES
 
 **Esta distinción es fundamental para trabajar eficientemente.**
 
@@ -183,7 +182,7 @@ Una vez que Santi dio la orden, no interrumpir para pedir permiso en cada comand
 
 ---
 
-## 5. FILOSOFÍA DE MEMORIA EXTERNA Y PROTOCOLO DE REGISTRO
+## 6. FILOSOFÍA DE MEMORIA EXTERNA Y PROTOCOLO DE REGISTRO
 
 **Principio:** No confiar en la memoria del chat. La verdad reside en los archivos del repositorio. Resolver sin documentar es resolver a medias.
 
@@ -218,7 +217,7 @@ Toda skill o manual nuevo → entrada en el catálogo antes de terminar.
 
 ---
 
-## 6. FLUJO DE TRABAJO OBLIGATORIO
+## 7. FLUJO DE TRABAJO OBLIGATORIO
 
 **Orden de construcción (INVIOLABLE):**
 ```
@@ -232,14 +231,14 @@ No se puede construir sin entender qué quiere Santi. No se debe generar código
 
 **Antes de iniciar CUALQUIER tarea no trivial (más de 1 archivo o 1 endpoint):**
 
-1. Crear un archivo de plan en `.agent/planes/actuales/<NOMBRE_PLAN>.md` con:
+1. Crear un archivo de plan en `.agent/planes/actuales/PLAN_NOMBRE_YYYY-MM-DD.md` con:
    - Objetivo y decisiones de diseño
-   - Checklist numerado de pasos (`- [ ] 1. ...`)
+   - Checklist de tareas (`- [ ] Tarea`) — marcar `[x]` con fecha al completar
    - Schema SQL si aplica
-   - Sección "Tareas para Antigravity" (QA visual)
+   - Sección "Tareas para Subagentes" si hay trabajo paralelizable (opcional)
 2. Mostrar el plan a Santi y esperar confirmación
 3. Solo entonces ejecutar — ir tildando `[x]` a medida que se completa cada paso
-4. Al terminar: mover el archivo a `.agent/planes/` (fuera de `actuales/`) y actualizar `CONTEXTO_ACTIVO.md`
+4. Al terminar: mover el archivo a `.agent/planes/completados/` y actualizar el contexto del módulo
 
 **Consecuencias si no se cumple:**
 - Tareas quedan a medias sin registro de qué faltó
@@ -265,7 +264,7 @@ No se puede construir sin entender qué quiere Santi. No se debe generar código
 
 ---
 
-## 7. REGLA TRANSVERSAL DE ENTORNOS
+## 8. REGLA TRANSVERSAL DE ENTORNOS
 
 **NUNCA conectarse ni alterar las bases de datos o servidores de Producción de manera directa para desarrollo.**
 
@@ -289,7 +288,7 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 
 ---
 
-## 8. CONTEXTO DEL PROYECTO: Integraciones_OS
+## 9. CONTEXTO DEL PROYECTO: Integraciones_OS
 
 - **Propósito**: Centralizar y automatizar datos de Effi, EspoCRM y otras fuentes en MariaDB para análisis y gestión operativa.
 - **Persistencia**: MariaDB local — BD `effi_data` (Effi), `espocrm` (CRM), `nocodb_meta` (NocoDB).
@@ -308,7 +307,7 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 
 ---
 
-## 9. REGLAS TÉCNICAS APRENDIDAS
+## 10. REGLAS TÉCNICAS APRENDIDAS
 
 ### ⚠️ REGLA ARQUITECTURAL: EMPRESA Y AUDITORÍA EN TODA TABLA
 
@@ -458,7 +457,7 @@ Integraciones_OS/
 
 ---
 
-## 10. ESTRUCTURA DE MEMORIA
+## 11. ESTRUCTURA DE MEMORIA
 
 - `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
 - `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
@@ -479,7 +478,7 @@ Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
 
 ---
 
-## 11. MANUAL DE ESTILOS — Frontend ERP
+## 12. MANUAL DE ESTILOS — Frontend ERP
 
 | Archivo | Contenido |
 |---|---|
@@ -493,7 +492,7 @@ Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
 
 ---
 
-## 12. ESTÁNDAR DE NAVEGACIÓN DRILL-DOWN — ERP
+## 13. ESTÁNDAR DE NAVEGACIÓN DRILL-DOWN — ERP
 
 ### Regla universal: toda tabla tiene drill-down
 
@@ -535,7 +534,7 @@ O para módulos con mes:
 
 ---
 
-## 13. DICCIONARIO DE NEGOCIO
+## 14. DICCIONARIO DE NEGOCIO
 
 - Nomenclatura en Español (coherente con ERP Effi).
 - Clientes Effi → `tipo_de_persona` distingue empresa/persona natural.
@@ -543,7 +542,7 @@ O para módulos con mes:
 
 ---
 
-## 14. GESTIÓN DE SCREENSHOTS TEMPORALES Y UI
+## 15. GESTIÓN DE SCREENSHOTS TEMPORALES Y UI
 
 **Protocolo para Claude Code y Codex respecto a validación visual:**
 Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando capturas de pantalla en `/home/osserver/Proyectos_Antigravity/Integraciones_OS/screenshots_temporales/`.
@@ -553,11 +552,11 @@ Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando
 
 ---
 
-## 14. DELEGACIÓN — POLÍTICA DE EQUIPO Y AHORRO DE TOKENS
+## 16. DELEGACIÓN — POLÍTICA DE EQUIPO Y AHORRO DE TOKENS
 
 **Principio:** Claude Code es el arquitecto y constructor principal. Para trabajo secundario y paralelo existen DOS recursos distintos — aprender a distinguirlos es crítico.
 
-### 14.1 Los dos tipos de agentes colaboradores
+### 16.1 Los dos tipos de agentes colaboradores
 
 #### Subagentes Claude (vía herramienta `Agent`)
 Claude Code puede lanzar subinstancias de sí mismo con la herramienta `Agent`. Son instancias independientes de Claude con acceso a todas las herramientas (Bash, Read, Write, Edit, Playwright, etc.). Corren en paralelo o en segundo plano **sin consumir tokens del contexto principal**. Úselos para construcción secundaria, QA funcional, exploración, documentación.
@@ -567,55 +566,30 @@ Plataforma agentic independiente de Google Labs. **NO es un subagente de Claude*
 
 > ⚠️ **REGLA ANTI-CONFUSIÓN**: Cuando este documento (o cualquier conversación) mencione "Antigravity" sin calificador, se refiere a **Antigravity de Google Labs** (el agente externo). Los subagentes de Claude se llaman "subagentes Claude" o "subagente".
 
-### 14.2 Roles en el equipo
+### 16.2 Roles en el equipo
 
 | Rol | Quién | Responsabilidad |
 |---|---|---|
 | **Director** | Santi | Visión, decisiones de negocio, aprobación de planes |
-| **Arquitecto + Constructor principal** | Claude Code | Diseño técnico, decisiones arquitecturales, coordinación, features críticas, BD |
-| **Consultor + Asesor de arquitectura** | Antigravity Google Labs | Segunda opinión con contexto masivo (1M tokens), QA visual autónomo, exploración de repos grandes |
+| **Arquitecto + Constructor principal** | Claude Code | Diseño técnico, decisiones arquitecturales, coordinación, features críticas, BD, web |
 | **Ejecutores paralelos** | Subagentes Claude | Construcción secundaria, QA funcional, tareas paralelas sin bloquear la conversación |
+| **Consultor Ocasional** | Antigravity Google Labs | Solo cuando el contexto supera >200K tokens; por demanda explícita de Santi |
 
-### 14.3 Regla de los planes — OBLIGATORIO
+### 16.3 Regla de los planes
 
-**Con CADA PLAN que Claude Code presente a Santi, debe incluir una sección explícita:**
+Cada plan puede incluir una sección opcional de tareas delegables:
+- **"Tareas para Subagentes Claude"** — trabajo secundario/paralelo que Claude Code puede delegar a instancias `Agent`
+- **"Tareas para Antigravity"** — solo si el contexto del análisis supera lo que Claude Code puede procesar con subagentes (>200K tokens); no es obligatorio
 
-```
-## Tareas para Antigravity
-- [ ] Tarea 1 — descripción
-- [ ] Tarea 2 — descripción
-```
+### 16.4 Qué puede hacer Antigravity (ocasional, por demanda)
 
-Si no hay tareas delegables, justificarlo. Santi necesita saber siempre qué puede hacer Antigravity.
+Solo cuando el contexto supera lo que Claude Code puede procesar con subagentes (>200K tokens):
+- Segunda opinión arquitectural con el codebase completo
+- Análisis masivo de logs o datos históricos que no caben en contexto normal
 
-### 14.4 Qué puede hacer Antigravity
+Todo lo demás (QA, exploración, construcción secundaria) → **Subagentes Claude**.
 
-**Construcción secundaria (Antigravity construye, Claude Code revisa):**
-- Páginas/vistas nuevas de estructura estándar (CRUD, listados, formularios)
-- Endpoints REST simples (GET/POST/PUT/DELETE de tablas)
-- Migraciones de BD simples (CREATE TABLE, ALTER TABLE)
-- Componentes Vue reutilizables siguiendo el design system
-- Scripts Python/Node de utilidad (exports, imports, sync)
-- Refactoring y limpieza de código
-
-**QA y verificación (Antigravity verifica de forma autónoma):**
-- Probar endpoints con curl, verificar respuestas
-- Verificar UI con Playwright: navegar, tomar screenshots, reportar bugs
-- Comparar schema real de BD vs código
-- Verificar integridad de datos tras cambios
-
-**Exploración y diagnóstico:**
-- Leer múltiples archivos, mapear estructura de código
-- Diagnosticar bugs: leer logs, trazar causa raíz
-- Investigar APIs externas (docs, ejemplos)
-- Validar configuraciones del sistema
-
-**Documentación:**
-- Actualizar archivos `.agent/`
-- Generar reportes de QA
-- Escribir comentarios en código
-
-### 14.5 Qué retiene Claude Code (nunca delegar)
+### 16.5 Qué retiene Claude Code (nunca delegar)
 
 - Diseño arquitectural y decisiones técnicas críticas
 - Features con lógica de negocio compleja
@@ -623,7 +597,7 @@ Si no hay tareas delegables, justificarlo. Santi necesita saber siempre qué pue
 - Decisiones que necesitan aprobación de Santi
 - Tareas que requieren contexto acumulado de la conversación
 
-### 14.6 Protocolo de ejecución
+### 16.6 Protocolo de ejecución
 
 Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente:
 1. **¿Puedo delegarlo?** → Si toma >3 lecturas de archivo o >3 comandos bash → **delegarlo**.
@@ -631,36 +605,84 @@ Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente
 3. **En segundo plano si es posible** → `run_in_background: true` para no bloquear la conversación.
 4. **Informar a Santi** qué se delegó y en qué directorio quedará el resultado.
 
-### 14.7 Archivos de resultados de Antigravity
+### 16.7 Archivos de resultados
 
 - **QA/Testing:** `.agent/QA_REGISTRO.md` — registro vivo de bugs y checklists
 - **Screenshots temporales:** `screenshots_temporales/<modulo>_<desc>_<timestamp>.png`
 - **Diagnósticos:** `.agent/docs/DIAG_<tema>_<fecha>.md`
-- **Exploraciones:** Reportar directamente en la conversación
+- **Reportes del entrenador IA:** `/tmp/reporte_mejoras_<fecha>.md`
 
 ---
 
-## 16. PROTOCOLO DE QA Y TESTING
+## 17. PROTOCOLO DE QA Y TESTING
 
 ### Archivos clave
 - `.agent/INSTRUCCIONES_TESTING.md` — **política y protocolo completo de QA** (leer antes de cualquier sesión de testing)
 - `.agent/QA_REGISTRO.md` — **registro vivo de bugs** — se actualiza en cada sesión de QA
 
 ### Reglas fundamentales
-1. **Antigravity** es el responsable exclusivo de QA visual y funcional.
-2. Cada feature nueva terminada por Claude Code **debe pasar por QA de Antigravity** antes de considerarse cerrada.
-3. Los bugs se documentan en `QA_REGISTRO.md` con estado 🔴/🟡/🟢.
-4. Los screenshots de bugs abiertos viven en `screenshots_temporales/`. **Al cerrarse, se borran.**
-5. Claude Code no puede marcar una tarea como terminada si hay bugs 🔴 abiertos relacionados.
-6. Santi da el visto bueno final — Antigravity solo verifica, no aprueba.
+1. **Claude Code** (o un subagente) hace el QA funcional de cada feature antes de declararla terminada.
+2. Los bugs se documentan en `QA_REGISTRO.md` con estado 🔴/🟡/🟢.
+3. Los screenshots de bugs abiertos viven en `screenshots_temporales/`. **Al cerrarse, se borran.**
+4. Claude Code no puede marcar una tarea como terminada si hay bugs 🔴 abiertos relacionados.
+5. Santi da el visto bueno final.
+6. Antigravity puede hacer QA visual si Santi lo decide, pero no es requerido ni bloqueante.
 
 ### Flujo mínimo de QA por feature
 ```
 Claude Code implementa + build + restart
-  → Antigravity: curl endpoints → verificar datos
-  → Antigravity: Playwright → navegar UI → screenshots
-  → Antigravity: documenta en QA_REGISTRO.md
+  → Subagente o Claude Code: curl endpoints → verificar datos
+  → Subagente o Claude Code: Playwright → navegar UI → screenshots si aplica
+  → Documentar bugs en QA_REGISTRO.md
   → Claude Code: corrige bugs reportados
-  → Antigravity: re-verifica → cierra bugs
+  → Re-verificar → cerrar bugs
   → Screenshots de bugs resueltos → borrar
 ```
+
+---
+
+## 18. ESTRUCTURA MULTI-CONTEXTO — .agent/
+
+### Por qué múltiples contextos
+
+El proyecto tiene varios módulos activos en paralelo con ciclos de trabajo independientes:
+- Servicio IA + Bot Telegram
+- Pipeline Effi
+- ERP Frontend
+- Sistema Gestión OS (gestion.oscomunidad.com)
+- EspoCRM
+
+Un solo archivo de contexto de 700+ líneas mezcla todo. Cuando Claude empieza una sesión de trabajo en el Módulo de Tareas, no necesita leer el estado del pipeline Effi — y viceversa.
+
+### Estructura de directorios
+
+```
+.agent/
+├── MANIFESTO.md              ← Reglas globales, arquitectura, gotchas técnicos (este archivo)
+├── CONTEXTO_ACTIVO.md        ← Índice de 1 página: módulos activos y qué se está haciendo
+├── contextos/                ← Un archivo por módulo con su estado detallado
+│   ├── ia_service.md         ← Servicio IA, bot Telegram, aprendizaje, agentes
+│   ├── pipeline_effi.md      ← Pipeline Effi→MariaDB→Hostinger, 18 pasos
+│   ├── erp_frontend.md       ← ERP Vue/Quasar, módulo Ventas, design system
+│   ├── sistema_gestion.md    ← Módulo Tareas, auth, gestion.oscomunidad.com
+│   └── espocrm.md            ← Integración bidireccional, campos custom
+├── planes/
+│   ├── actuales/             ← Planes en ejecución (PLAN_NOMBRE_YYYY-MM-DD.md)
+│   └── completados/          ← Planes terminados (no se borran)
+├── skills/                   ← Cómo hacer cosas específicas (por dominio)
+├── manuales/                 ← Guías detalladas de referencia
+└── docs/                     ← Informes, perfiles, documentación externa
+```
+
+### Protocolo de trabajo por módulo
+
+**Al empezar a trabajar en un módulo:**
+1. Leer `CONTEXTO_ACTIVO.md` para ver qué está activo
+2. Leer el contexto del módulo: `.agent/contextos/<modulo>.md`
+3. Verificar si hay plan activo en `.agent/planes/actuales/`
+
+**Al terminar una tarea significativa:**
+1. Actualizar `.agent/contextos/<modulo>.md` con el nuevo estado
+2. Actualizar `CONTEXTO_ACTIVO.md` si cambió la prioridad o estado del módulo
+3. La memoria de Claude (`MEMORY.md`) siempre refleja el contexto activo más reciente
+
