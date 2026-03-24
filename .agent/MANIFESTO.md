@@ -544,11 +544,10 @@ O para módulos con mes:
 
 ## 15. GESTIÓN DE SCREENSHOTS TEMPORALES Y UI
 
-**Protocolo para Claude Code y Codex respecto a validación visual:**
-Antigravity (Verificador Visual) documentará bugs y estado de la UI almacenando capturas de pantalla en `/home/osserver/Proyectos_Antigravity/Integraciones_OS/screenshots_temporales/`.
-1. **Lectura:** Usen estas imágenes para entender el resultado final de la UI al hacer debug de componentes Vue (ej. alineación, tablas vacías, etc).
-2. **Ciclo de Vida:** Cuando la tarea o bug se dé por finalizado/resuelto, **tienen la obligación de borrar las capturas asociadas** de la carpeta temporal para no contaminar el repo.
-3. **Excepción:** Si una captura representa un patrón importante de diseño que debe recordarse a futuro, muévanla a `frontend/design-system/screenshots/` y actualicen su `INDEX.md`.
+Claude Code (o un subagente) documenta bugs de UI almacenando capturas en `screenshots_temporales/`.
+1. **Lectura:** Usar estas imágenes para entender el estado real de la UI al hacer debug de componentes Vue (alineación, tablas vacías, etc).
+2. **Ciclo de Vida:** Cuando el bug se cierre, **borrar las capturas asociadas** — no contaminar el repo.
+3. **Excepción:** Si una captura representa un patrón de diseño importante → moverla a `frontend/design-system/screenshots/` y actualizar su `INDEX.md`.
 
 ---
 
@@ -686,3 +685,33 @@ Un solo archivo de contexto de 700+ líneas mezcla todo. Cuando Claude empieza u
 2. Actualizar `CONTEXTO_ACTIVO.md` si cambió la prioridad o estado del módulo
 3. La memoria de Claude (`MEMORY.md`) siempre refleja el contexto activo más reciente
 
+---
+
+## 19. SUPER AGENTE CLAUDE CODE — Modo paralelo en el Bot de Telegram
+
+Claude Code corre como **Super Agente** en el bot de Telegram, en paralelo al `ia_service` existente. No es otro proveedor LLM — es el mismo Claude Code con acceso total al sistema.
+
+### Acceso
+- Nivel 5+ → puede usar el Super Agente para consultas
+- Nivel 7 (Santi) → puede aprobar cambios de código/estructurales
+
+### Arquitectura
+```
+Bot Telegram
+├── Modo normal → ia_service Flask (gemini, groq, etc.)
+└── Modo Super Agente → claude -p desde REPO_DIR (bypass ia_service)
+```
+
+### Tablas en ia_service_os (prefijo sa_)
+- `sa_sesiones` — historial de conversación por usuario+empresa (JSON rotante, últimos 10 pares)
+- `sa_config` — prompt_sistema editable por empresa (desde ia.oscomunidad.com → Super Agente)
+- `sa_cambios` — registro de correcciones autónomas en BD (backup antes/después)
+
+### Reglas de corrección
+- **BD** (ia_logica_negocio, ia_ejemplos_sql, ia_tipos_consulta): automático con registro en sa_cambios
+- **Código/estructura**: requiere aprobación nivel 7 — Claude envía mensaje a Santi con botones ✅/❌
+- **Nunca**: parches, hardcoding, try/catch vacíos — si no hay causa raíz, solo documentar
+
+### Archivos clave
+- `scripts/telegram_bot/superagente.py` — lógica de sesiones + llamada claude -p
+- `scripts/telegram_bot/handlers_sa.py` — handlers Telegram del Super Agente

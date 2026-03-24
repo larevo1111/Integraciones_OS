@@ -178,36 +178,31 @@ Dos pantallas — nada más:
 ## Tareas
 
 ### A — BD y datos
-- [ ] Crear tabla `superagente_sesiones` en ia_service_os
-- [ ] Crear tabla `superagente_config` en ia_service_os con prompt inicial
-- [ ] Crear tabla `ia_cambios_autonomos` en ia_service_os
+- [x] Crear tabla `sa_sesiones` en ia_service_os — 2026-03-24
+- [x] Crear tabla `sa_config` en ia_service_os con prompt inicial — 2026-03-24
+- [x] Crear tabla `sa_cambios` en ia_service_os — 2026-03-24
 
 ### B — Prompt del sistema
-- [ ] Escribir `prompt_sistema` inicial en `superagente_config` con:
-  identidad, accesos disponibles, reglas anti-parche, flujo de aprobación, formato de respuesta
+- [x] Prompt inicial cargado en sa_config (empresa=ori_sil_2, 2180 chars) — 2026-03-24
 
 ### C — Bot Telegram
-- [ ] Agregar "Super Agente" como opción en el selector de agentes (niveles 5+)
-- [ ] Función `_manejar_superagente()` en bot.py:
-  - Lee `superagente_config` para el prompt del sistema
-  - Lee últimos 10 mensajes de `superagente_sesiones`
-  - Construye prompt y llama `claude -p`
-  - Detecta si respuesta es JSON (tabla) o texto plano
-  - Guarda pregunta + respuesta en `superagente_sesiones`
-- [ ] Reutilizar `tabla.py` para renderizar tablas del super agente
-- [ ] Implementar notificación a Santi (nivel 7) cuando Claude pide aprobación de código
-  - Mensaje privado con descripción del cambio + botones [✅ Aprobar] [❌ Rechazar]
-  - Callback handler para procesar la respuesta de Santi
+- [x] `🦾 Super Agente (Claude Code)` en selector de agentes nivel 5+ — 2026-03-24
+- [x] `superagente.py`: obtener_sesion, consultar, guardar_intercambio, formatear_historial — 2026-03-24
+- [x] `handlers_sa.py`: manejar_superagente, handle_sa_callback — 2026-03-24
+- [x] bot.py: routing agente='superagente' → bypass ia_service → claude -p — 2026-03-24
+- [x] Tablas reutilizan tabla.py existente (res_fake con columnas/filas del JSON) — 2026-03-24
+- [x] Notificación a nivel 7 con botones ✅/❌ + callback handler — 2026-03-24
 
 ### D — Admin ia.oscomunidad.com
-- [ ] Ruta `/superagente/prompt` — editor del prompt del sistema
-- [ ] Ruta `/superagente/historial` — listado de sesiones con drill-down
+- [x] SuperAgentePage.vue — tabs Prompt + Historial con drill-down — 2026-03-24
+- [x] server.js: 4 endpoints /api/ia/superagente/{config, sesiones, sesiones/:id} — 2026-03-24
+- [x] routes.js: ruta /superagente — 2026-03-24
 
 ### E — Verificación
-- [ ] Probar consulta simple de datos con Jen (nivel 5)
-- [ ] Verificar que la tabla se renderiza correctamente
-- [ ] Probar flujo de aprobación: Claude detecta cambio de código → mensaje a Santi → aprobación
-- [ ] Verificar que correcciones automáticas en BD quedan registradas en ia_cambios_autonomos
+- [ ] Probar consulta simple de datos desde Telegram
+- [ ] Verificar renderizado de tablas
+- [ ] Probar flujo de aprobación de cambio de código
+- [ ] Verificar que correcciones en BD quedan en sa_cambios
 
 ---
 

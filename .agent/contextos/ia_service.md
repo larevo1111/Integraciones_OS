@@ -1,5 +1,5 @@
 # Contexto: Servicio IA — ia_service_os
-**Actualizado**: 2026-03-23
+**Actualizado**: 2026-03-24
 
 ## Scope y propósito
 
@@ -249,8 +249,19 @@ IA aprende lógica de negocio en tiempo real:
 | `scripts/ia_service/aprendizaje.py` | Protocolo de aprendizaje Sócrates |
 | `scripts/ia_service/alertas.py` | Sistema de alertas (nuevo) |
 | `scripts/ia_service/utilidades_sql.py` | Utilidades SQL (nuevo) |
-| `scripts/telegram_bot/` | Bot Telegram completo |
+| `scripts/telegram_bot/bot.py` | Bot Telegram — handler principal |
+| `scripts/telegram_bot/superagente.py` | Super Agente — sesiones + llamada claude -p |
+| `scripts/telegram_bot/handlers_sa.py` | Super Agente — handlers Telegram |
 | `ia-admin/` | Frontend admin Vue+Quasar |
 | `ia-admin/api/server.js` | API Express puerto 9200 |
 | `.agent/manuales/ia_service_manual.md` | Manual completo v2.7 |
 | `.agent/docs/COMPARACION_AGENTES_IA.md` | Benchmark 3 rondas, 105 llamadas |
+
+## Super Agente (activo — 2026-03-24)
+
+Claude Code corre en paralelo al ia_service como Super Agente en el bot. El usuario selecciona `🦾 Super Agente` en el menú de agentes (nivel 5+).
+
+**Tablas**: `sa_sesiones`, `sa_config`, `sa_cambios` en ia_service_os.
+**Prompt**: editable desde ia.oscomunidad.com → sección "Super Agente".
+**Aprobación de código**: Claude envía mensaje privado a nivel 7 (Santi) con botones ✅/❌.
+**Próximo**: verificar en producción (E — Verificación del plan).
