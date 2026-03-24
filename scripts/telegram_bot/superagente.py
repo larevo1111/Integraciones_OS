@@ -107,7 +107,7 @@ def obtener_telegram_ids_nivel7(empresa: str) -> list[str]:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT telegram_id FROM ia_usuarios WHERE nivel>=7 AND telegram_id IS NOT NULL AND estado='activo'",
+                "SELECT telegram_id FROM ia_usuarios WHERE nivel>=7 AND telegram_id IS NOT NULL AND activo=1",
             )
             return [str(r['telegram_id']) for r in cur.fetchall()]
     finally:
@@ -147,11 +147,17 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
         return {'ok': False, 'error': f'Error en el prompt del sistema (placeholder faltante: {e})'}
 
     # Llamar claude -p desde el repo
+    # Se limpia CLAUDECODE del env para permitir ejecución cuando el bot corre
+    # desde dentro de otra sesión de Claude Code (ej: testing)
+    env = os.environ.copy()
+    env.pop('CLAUDECODE', None)
+
     try:
         proc = subprocess.run(
             ['claude', '-p', prompt, '--output-format', 'text'],
             capture_output=True, text=True,
             cwd=REPO_DIR, timeout=TIMEOUT_CLAUDE,
+            env=env,
         )
         respuesta_raw = proc.stdout.strip()
         if not respuesta_raw and proc.stderr:
@@ -166,18 +172,22 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
     if not respuesta_raw:
         return {'ok': False, 'error': 'El Super Agente no respondió.'}
 
-    # Intentar parsear como JSON especial (tabla o aprobación)
-    try:
-        data = json.loads(respuesta_raw)
+    # Intentar extraer y parsear JSON especial (tabla o aprobación)
+    data = _extraer_json(respuesta_raw)
+    if data:
         tipo = data.get('tipo')
         if tipo == 'tabla':
+            # Normalizar filas: si son dicts, convertir a listas usando el orden de columnas
+            filas = data.get('filas', [])
+            columnas = data.get('columnas', [])
+            if filas and isinstance(filas[0], dict):
+                filas = [[str(f.get(c, '')) for c in columnas] for f in filas]
+                data['filas'] = filas
             guardar_intercambio(sesion['id'], pregunta, data.get('texto', '(tabla)'))
             return {'ok': True, 'tipo': 'tabla', 'contenido': data}
         if tipo == 'aprobacion':
             ids7 = obtener_telegram_ids_nivel7(empresa)
             return {'ok': True, 'tipo': 'aprobacion', 'contenido': data, 'ids_nivel7': ids7}
-    except (json.JSONDecodeError, AttributeError):
-        pass
 
     # Respuesta de texto plano
     guardar_intercambio(sesion['id'], pregunta, respuesta_raw)
@@ -185,6 +195,26 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _extraer_json(texto: str) -> dict | None:
+    """Extrae un JSON de tipo tabla/aprobacion del texto de Claude.
+    Maneja: JSON puro, JSON dentro de bloques markdown, JSON precedido de texto."""
+    import re
+    # Remover bloques de código markdown
+    texto = re.sub(r'```(?:json)?\s*', '', texto).replace('```', '').strip()
+    # Buscar primer { hasta el último }
+    inicio = texto.find('{')
+    fin    = texto.rfind('}')
+    if inicio == -1 or fin == -1:
+        return None
+    try:
+        data = json.loads(texto[inicio:fin + 1])
+        if isinstance(data, dict) and data.get('tipo') in ('tabla', 'aprobacion'):
+            return data
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return None
+
 
 def _formatear_historial(mensajes: list) -> str:
     if not mensajes:
