@@ -1,9 +1,11 @@
 """
 superagente.py — Super Agente Claude Code para el bot de Telegram.
-Responsabilidad: llamar claude -p con contexto de sesión y gestionar historial.
-Usado por: telegram_bot/bot.py
+Usa claude -p con --resume para mantener sesiones persistentes.
+Cada usuario puede tener múltiples conversaciones nombradas.
+Usado por: telegram_bot/handlers_sa.py
 """
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -11,84 +13,167 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ia_service.config import get_local_conn
 
+log = logging.getLogger('os_ia_bot')
+
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
 CLAUDE_BIN = '/home/osserver/.local/bin/claude'
-MAX_HISTORIAL = 10   # últimos N pares pregunta/respuesta que se incluyen en el prompt
-TIMEOUT_CLAUDE = 300  # segundos (5 min — consultas complejas con múltiples queries tardan 1-2 min)
+CLAUDE_SESSIONS_DIR = os.path.expanduser(
+    '~/.claude/projects/-home-osserver-Proyectos-Antigravity-Integraciones-OS'
+)
+TIMEOUT_CLAUDE = 300  # segundos
 
 
-# ── Sesiones ──────────────────────────────────────────────────────────────────
+# ── Ejecutar Claude ──────────────────────────────────────────────────────────
 
-def obtener_o_crear_sesion(usuario_id: str, empresa: str) -> dict:
-    """Retorna la sesión activa del usuario o crea una nueva."""
+def _ejecutar_claude(prompt: str, session_id: str = None) -> dict:
+    """Ejecuta claude -p y retorna {ok, result, session_id} parseado del JSON."""
+    env = os.environ.copy()
+    env.pop('CLAUDECODE', None)
+
+    cmd = [CLAUDE_BIN, '-p', prompt, '--output-format', 'json']
+    if session_id:
+        cmd += ['--resume', session_id]
+
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True,
+            cwd=REPO_DIR, timeout=TIMEOUT_CLAUDE, env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return {'ok': False, 'error': 'El Super Agente tardó demasiado. Intenta de nuevo.'}
+    except FileNotFoundError:
+        return {'ok': False, 'error': 'claude no está instalado.'}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+    stdout = proc.stdout.strip()
+    if not stdout:
+        stderr = (proc.stderr or '').strip()
+        return {'ok': False, 'error': stderr[:200] if stderr else 'El Super Agente no respondió.'}
+
+    # claude --output-format json puede emitir múltiples líneas; la última es el resultado
+    last_line = stdout.strip().split('\n')[-1]
+    try:
+        data = json.loads(last_line)
+        return {
+            'ok': True,
+            'result': data.get('result', ''),
+            'session_id': data.get('session_id', ''),
+        }
+    except (json.JSONDecodeError, ValueError):
+        return {'ok': False, 'error': f'Respuesta no válida: {last_line[:200]}'}
+
+
+# ── Sesiones BD ──────────────────────────────────────────────────────────────
+
+def obtener_sesion_activa(usuario_id: str, empresa: str) -> dict | None:
+    """Retorna la sesión activa del usuario o None."""
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                'SELECT id, mensajes FROM sa_sesiones WHERE usuario_id=%s AND empresa=%s',
+                'SELECT id, claude_session_id, nombre FROM sa_sesiones '
+                'WHERE usuario_id=%s AND empresa=%s AND activa=1 '
+                'ORDER BY updated_at DESC LIMIT 1',
                 (usuario_id, empresa)
             )
-            row = cur.fetchone()
-            if row:
-                msgs = row['mensajes']
-                if isinstance(msgs, str):
-                    msgs = json.loads(msgs or '[]')
-                return {'id': row['id'], 'mensajes': msgs}
-            cur.execute(
-                "INSERT INTO sa_sesiones (empresa, usuario_id) VALUES (%s, %s)",
-                (empresa, usuario_id)
-            )
-            conn.commit()
-            return {'id': cur.lastrowid, 'mensajes': []}
+            return cur.fetchone()
     finally:
         conn.close()
 
 
-def guardar_intercambio(sesion_id: int, pregunta: str, respuesta: str):
-    """Agrega el par pregunta/respuesta al historial y lo rota al máximo."""
-    conn = get_local_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute('SELECT mensajes FROM sa_sesiones WHERE id=%s', (sesion_id,))
-            row = cur.fetchone()
-            msgs = row['mensajes'] if row else []
-            if isinstance(msgs, str):
-                msgs = json.loads(msgs or '[]')
-
-            msgs.append({'role': 'user',      'content': pregunta})
-            msgs.append({'role': 'assistant', 'content': respuesta})
-
-            # Rotar: mantener solo los últimos MAX_HISTORIAL pares
-            if len(msgs) > MAX_HISTORIAL * 2:
-                msgs = msgs[-(MAX_HISTORIAL * 2):]
-
-            cur.execute(
-                'UPDATE sa_sesiones SET mensajes=%s WHERE id=%s',
-                (json.dumps(msgs, ensure_ascii=False), sesion_id)
-            )
-            conn.commit()
-    finally:
-        conn.close()
-
-
-def limpiar_sesion(usuario_id: str, empresa: str):
-    """Borra el historial de la sesión."""
+def crear_sesion(usuario_id: str, empresa: str, claude_session_id: str,
+                 nombre: str = 'Sin nombre') -> int:
+    """Crea una sesión nueva y la marca como activa. Desactiva las demás."""
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE sa_sesiones SET mensajes='[]' WHERE usuario_id=%s AND empresa=%s",
+                'UPDATE sa_sesiones SET activa=0 WHERE usuario_id=%s AND empresa=%s',
                 (usuario_id, empresa)
             )
+            cur.execute(
+                'INSERT INTO sa_sesiones (empresa, usuario_id, claude_session_id, nombre, activa) '
+                'VALUES (%s, %s, %s, %s, 1)',
+                (empresa, usuario_id, claude_session_id, nombre)
+            )
+            conn.commit()
+            return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def listar_conversaciones(usuario_id: str, empresa: str) -> list[dict]:
+    """Lista todas las conversaciones del usuario, activa primero."""
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT id, nombre, activa, created_at FROM sa_sesiones '
+                'WHERE usuario_id=%s AND empresa=%s '
+                'ORDER BY activa DESC, updated_at DESC',
+                (usuario_id, empresa)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def cambiar_conversacion(usuario_id: str, empresa: str, sesion_id: int) -> bool:
+    """Activa una conversación y desactiva las demás."""
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                'UPDATE sa_sesiones SET activa=0 WHERE usuario_id=%s AND empresa=%s',
+                (usuario_id, empresa)
+            )
+            cur.execute(
+                'UPDATE sa_sesiones SET activa=1 WHERE id=%s AND usuario_id=%s',
+                (sesion_id, usuario_id)
+            )
+            conn.commit()
+            return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def renombrar_conversacion(sesion_id: int, nombre: str):
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute('UPDATE sa_sesiones SET nombre=%s WHERE id=%s', (nombre, sesion_id))
             conn.commit()
     finally:
         conn.close()
 
 
-# ── Config ────────────────────────────────────────────────────────────────────
+def borrar_conversacion(sesion_id: int, usuario_id: str) -> str | None:
+    """Borra la sesión de BD y el .jsonl del disco. Retorna nombre borrado o None."""
+    conn = get_local_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT claude_session_id, nombre FROM sa_sesiones WHERE id=%s AND usuario_id=%s',
+                (sesion_id, usuario_id)
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            # Borrar archivo de sesión de Claude
+            jsonl = os.path.join(CLAUDE_SESSIONS_DIR, f"{row['claude_session_id']}.jsonl")
+            if os.path.exists(jsonl):
+                os.remove(jsonl)
+            cur.execute('DELETE FROM sa_sesiones WHERE id=%s', (sesion_id,))
+            conn.commit()
+            return row['nombre']
+    finally:
+        conn.close()
+
+
+# ── Config ───────────────────────────────────────────────────────────────────
 
 def obtener_prompt_sistema(empresa: str) -> str | None:
-    """Lee el prompt_sistema desde sa_config."""
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
@@ -103,105 +188,123 @@ def obtener_prompt_sistema(empresa: str) -> str | None:
 
 
 def obtener_telegram_ids_nivel7(empresa: str) -> list[str]:
-    """Retorna los telegram_id de usuarios nivel 7 para enviar aprobaciones."""
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT telegram_id FROM ia_usuarios WHERE nivel>=7 AND telegram_id IS NOT NULL AND activo=1",
+                "SELECT telegram_id FROM ia_usuarios "
+                "WHERE nivel>=7 AND telegram_id IS NOT NULL AND activo=1",
             )
             return [str(r['telegram_id']) for r in cur.fetchall()]
     finally:
         conn.close()
 
 
-# ── Consulta principal ────────────────────────────────────────────────────────
+# ── Consulta principal ───────────────────────────────────────────────────────
 
 def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
               nivel: int, empresa: str) -> dict:
     """
-    Llama claude -p con el contexto completo.
-    Returns:
-      {'ok': True,  'tipo': 'texto',     'contenido': str}
-      {'ok': True,  'tipo': 'tabla',     'contenido': dict}
-      {'ok': True,  'tipo': 'aprobacion','contenido': dict, 'ids_nivel7': list}
-      {'ok': False, 'error': str}
+    Consulta al Super Agente. Usa --resume si hay sesión activa.
+    Si no hay sesión, crea una nueva enviando primero el prompt sistema.
     """
+    sesion = obtener_sesion_activa(usuario_id, empresa)
+
+    if sesion:
+        # Sesión existente → resume directo
+        log.info(f'SA resume sesión {sesion["id"]} para {nombre_usuario}')
+        resp = _ejecutar_claude(pregunta, session_id=sesion['claude_session_id'])
+        if not resp.get('ok'):
+            return resp
+        return _procesar_respuesta(resp['result'])
+    else:
+        # Sin sesión → crear nueva con prompt sistema (ya retorna procesado)
+        return _iniciar_sesion(pregunta, usuario_id, nombre_usuario, nivel, empresa)
+
+
+def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
+                       nivel: int, empresa: str) -> dict:
+    """Fuerza creación de una conversación nueva."""
+    return _iniciar_sesion(pregunta, usuario_id, nombre_usuario, nivel, empresa,
+                           procesar=True)
+
+
+def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
+                    nivel: int, empresa: str, procesar: bool = True) -> dict:
+    """Crea sesión nueva: envía prompt sistema, luego la pregunta con --resume."""
     prompt_tpl = obtener_prompt_sistema(empresa)
     if not prompt_tpl or prompt_tpl == 'PROMPT_PENDIENTE':
-        return {'ok': False, 'error': 'El Super Agente no está configurado aún. '
-                                      'Pedile a Santi que configure el prompt en el admin.'}
+        return {'ok': False, 'error': 'El Super Agente no está configurado. '
+                                      'Pedile a Santi que configure el prompt.'}
 
-    sesion     = obtener_o_crear_sesion(usuario_id, empresa)
-    historial  = _formatear_historial(sesion['mensajes'])
+    prompt_sistema = (prompt_tpl
+                      .replace('{usuario_nombre}', nombre_usuario)
+                      .replace('{nivel}', str(nivel))
+                      .replace('{empresa}', empresa))
 
-    prompt = (prompt_tpl
-              .replace('{usuario_nombre}', nombre_usuario)
-              .replace('{nivel}',          str(nivel))
-              .replace('{empresa}',        empresa)
-              .replace('{sesion_id}',      str(sesion['id']))
-              .replace('{historial}',      historial)
-              .replace('{pregunta}',       pregunta))
+    # Paso 1: enviar prompt sistema → obtener session_id
+    log.info(f'SA creando sesión nueva para {nombre_usuario}')
+    resp1 = _ejecutar_claude(prompt_sistema)
+    if not resp1.get('ok'):
+        return resp1
 
-    # Llamar claude -p desde el repo
-    # Se limpia CLAUDECODE del env para permitir ejecución cuando el bot corre
-    # desde dentro de otra sesión de Claude Code (ej: testing)
-    env = os.environ.copy()
-    env.pop('CLAUDECODE', None)
+    session_id = resp1['session_id']
+    if not session_id:
+        return {'ok': False, 'error': 'No se obtuvo session_id de Claude.'}
 
+    # Guardar en BD
+    crear_sesion(usuario_id, empresa, session_id)
+
+    # Paso 2: enviar la pregunta con --resume
+    log.info(f'SA enviando pregunta a sesión nueva {session_id[:8]}...')
+    resp2 = _ejecutar_claude(pregunta, session_id=session_id)
+    if not resp2.get('ok'):
+        return resp2
+
+    # Nombrar la conversación con la primera pregunta (truncada)
+    nombre = pregunta[:80].strip()
+    conn = get_local_conn()
     try:
-        proc = subprocess.run(
-            [CLAUDE_BIN, '-p', prompt, '--output-format', 'text'],
-            capture_output=True, text=True,
-            cwd=REPO_DIR, timeout=TIMEOUT_CLAUDE,
-            env=env,
-        )
-        respuesta_raw = proc.stdout.strip()
-        if not respuesta_raw and proc.stderr:
-            return {'ok': False, 'error': f'Claude error: {proc.stderr[:200]}'}
-    except subprocess.TimeoutExpired:
-        return {'ok': False, 'error': 'El Super Agente tardó demasiado. Intenta de nuevo.'}
-    except FileNotFoundError:
-        return {'ok': False, 'error': 'claude no está instalado o no está en el PATH.'}
-    except Exception as e:
-        return {'ok': False, 'error': str(e)}
+        with conn.cursor() as cur:
+            cur.execute(
+                'UPDATE sa_sesiones SET nombre=%s WHERE claude_session_id=%s',
+                (nombre, session_id)
+            )
+            conn.commit()
+    finally:
+        conn.close()
 
-    if not respuesta_raw:
-        return {'ok': False, 'error': 'El Super Agente no respondió.'}
+    if procesar:
+        return _procesar_respuesta(resp2['result'])
+    return resp2
 
-    # Intentar extraer y parsear JSON especial (tabla o aprobación)
-    data = _extraer_json(respuesta_raw)
+
+# ── Procesar respuesta ───────────────────────────────────────────────────────
+
+def _procesar_respuesta(result_text: str) -> dict:
+    """Parsea la respuesta de Claude y retorna dict tipado."""
+    data = _extraer_json(result_text)
     if data:
         tipo = data.get('tipo')
         if tipo == 'tabla':
-            # Normalizar filas: si son dicts, convertir a listas usando el orden de columnas
             filas = data.get('filas', [])
             columnas = data.get('columnas', [])
             if filas and isinstance(filas[0], dict):
-                filas = [[str(f.get(c, '')) for c in columnas] for f in filas]
-                data['filas'] = filas
-            guardar_intercambio(sesion['id'], pregunta, data.get('texto', '(tabla)'))
+                data['filas'] = [[str(f.get(c, '')) for c in columnas] for f in filas]
             return {'ok': True, 'tipo': 'tabla', 'contenido': data}
         if tipo == 'aprobacion':
-            ids7 = obtener_telegram_ids_nivel7(empresa)
+            ids7 = obtener_telegram_ids_nivel7('ori_sil_2')
             return {'ok': True, 'tipo': 'aprobacion', 'contenido': data, 'ids_nivel7': ids7}
 
-    # Respuesta de texto plano
-    guardar_intercambio(sesion['id'], pregunta, respuesta_raw)
-    return {'ok': True, 'tipo': 'texto', 'contenido': respuesta_raw}
+    return {'ok': True, 'tipo': 'texto', 'contenido': result_text}
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _extraer_json(texto: str) -> dict | None:
-    """Extrae un JSON de tipo tabla/aprobacion del texto de Claude.
-    Maneja: JSON puro, JSON dentro de bloques markdown, JSON precedido de texto."""
+    """Extrae JSON de tipo tabla/aprobacion del texto de Claude."""
     import re
-    # Remover bloques de código markdown
     texto = re.sub(r'```(?:json)?\s*', '', texto).replace('```', '').strip()
-    # Buscar primer { hasta el último }
     inicio = texto.find('{')
-    fin    = texto.rfind('}')
+    fin = texto.rfind('}')
     if inicio == -1 or fin == -1:
         return None
     try:
@@ -211,13 +314,3 @@ def _extraer_json(texto: str) -> dict | None:
     except (json.JSONDecodeError, ValueError):
         pass
     return None
-
-
-def _formatear_historial(mensajes: list) -> str:
-    if not mensajes:
-        return '(sin historial previo en esta sesión)'
-    lineas = []
-    for m in mensajes:
-        prefijo = 'Usuario' if m.get('role') == 'user' else 'Super Agente'
-        lineas.append(f"{prefijo}: {m.get('content', '')}")
-    return '\n'.join(lineas)

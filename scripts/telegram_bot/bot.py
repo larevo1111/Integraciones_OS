@@ -37,6 +37,9 @@ log = logging.getLogger('os_ia_bot')
 
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 
+# Set de user_ids que forzaron "Nueva conversación" — el próximo mensaje crea sesión
+SA_FORZAR_NUEVA = set()
+
 NOMBRES_AGENTES = {
     'gemini-flash':      'Gemini Flash ⚡',
     'gemini-flash-lite': 'Gemini Flash Lite ⚡',
@@ -383,8 +386,33 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
 
     # ── Modo Super Agente (bypass ia_service) ────────────────────────────────
     if agente_slug == 'superagente':
+        uid = str(user.id)
+        # Si el usuario pidió "Nueva conversación", forzar creación
+        if uid in SA_FORZAR_NUEVA:
+            SA_FORZAR_NUEVA.discard(uid)
+            await update.effective_chat.send_action(ChatAction.TYPING)
+            resultado = sa_mod.nueva_conversacion(
+                pregunta=texto, usuario_id=uid,
+                nombre_usuario=nombre, nivel=nivel,
+                empresa=sesion.get('empresa', 'ori_sil_2')
+            )
+            if not resultado.get('ok'):
+                await update.message.reply_text(
+                    f'😔 {resultado.get("error", "Error.")}',
+                    reply_markup=handlers_sa.teclado_sa()
+                )
+                return
+            # Delegar renderizado al handler normal
+            await handlers_sa.manejar_superagente(
+                update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
+                sesion=sesion, nombre=nombre, nivel=nivel,
+                empresa=sesion.get('empresa', 'ori_sil_2'), pregunta=texto,
+                resultado_previo=resultado
+            )
+            return
+
         await handlers_sa.manejar_superagente(
-            update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo, reply_kb,
+            update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
             sesion=sesion, nombre=nombre, nivel=nivel,
             empresa=sesion.get('empresa', 'ori_sil_2'), pregunta=texto
         )
@@ -467,6 +495,14 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     sesion = await _verificar_acceso(update)
     if not sesion:
+        return
+
+    # Super Agente no soporta imágenes
+    if sesion.get('agente_preferido') == 'superagente':
+        await update.message.reply_text(
+            '🦾 El Super Agente no procesa imágenes. Escribí tu pregunta en texto.',
+            reply_markup=handlers_sa.teclado_sa()
+        )
         return
 
     nombre = sesion.get('nombre') or _nombre(user)
@@ -591,14 +627,25 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         db.guardar_sesion(user.id, user.username or '', _nombre(user),
                           agente_preferido=agente)
-        await query.edit_message_text(
-            f'✅ Agente cambiado a *{NOMBRES_AGENTES.get(agente, agente)}*\n\n'
-            'Ya puedes hacer tu próxima consulta.',
-            parse_mode=ParseMode.MARKDOWN
-        )
+        if agente == 'superagente':
+            await query.edit_message_text(
+                f'✅ Agente cambiado a *{NOMBRES_AGENTES.get(agente, agente)}*\n\n'
+                'Ya puedes hacer tu próxima consulta.',
+                parse_mode=ParseMode.MARKDOWN
+            )
+            await query.message.reply_text(
+                '🦾 Modo Super Agente activo.',
+                reply_markup=handlers_sa.teclado_sa()
+            )
+        else:
+            await query.edit_message_text(
+                f'✅ Agente cambiado a *{NOMBRES_AGENTES.get(agente, agente)}*\n\n'
+                'Ya puedes hacer tu próxima consulta.',
+                parse_mode=ParseMode.MARKDOWN
+            )
 
-    elif data.startswith('sa_aprobar:') or data.startswith('sa_rechazar:'):
-        await handlers_sa.handle_sa_callback(query, user, nivel, _nombre(user))
+    elif data.startswith('sa_'):
+        await handlers_sa.handle_sa_callback(query, user, nivel, _nombre(user), sa_mod)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
