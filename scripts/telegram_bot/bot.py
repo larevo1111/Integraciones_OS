@@ -18,7 +18,8 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode, ChatAction
 
-import api_ia, db, tabla as tabla_mod, whisper as whisper_mod
+import api_ia, db, tabla as tabla_mod, whisper as whisper_mod, superagente as sa_mod
+import handlers_sa
 from teclado import REPLY_KB, reply_kb, inline_ajustes, MAX_INLINE, teclado_compartir_telefono, AGENTES
 
 logging.basicConfig(
@@ -44,6 +45,7 @@ NOMBRES_AGENTES = {
     'claude-sonnet':     'Claude Sonnet 🤖',
     'deepseek-chat':     'DeepSeek Chat 💡',
     'automático':        'Automático 🔀',
+    'superagente':       'Super Agente 🦾',
 }
 
 ICONOS_AGENTES = {
@@ -379,6 +381,15 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
         )
         agente_slug = agente_sesion if nivel >= nivel_min_agente else None
 
+    # ── Modo Super Agente (bypass ia_service) ────────────────────────────────
+    if agente_slug == 'superagente':
+        await handlers_sa.manejar_superagente(
+            update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo, reply_kb,
+            sesion=sesion, nombre=nombre, nivel=nivel,
+            empresa=sesion.get('empresa', 'ori_sil_2'), pregunta=texto
+        )
+        return
+
     # Llamar ia_service
     resultado = api_ia.consultar(
         pregunta=texto,
@@ -585,6 +596,9 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             'Ya puedes hacer tu próxima consulta.',
             parse_mode=ParseMode.MARKDOWN
         )
+
+    elif data.startswith('sa_aprobar:') or data.startswith('sa_rechazar:'):
+        await handlers_sa.handle_sa_callback(query, user, nivel, _nombre(user))
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
