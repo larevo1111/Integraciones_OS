@@ -184,11 +184,16 @@ function onTouchEnd()  { if (longPressTimer) { clearTimeout(longPressTimer); lon
 function onTouchMove() { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } }
 
 function activarEdicion(e) {
+  // Ignorar click post-longpress también aquí (el título captura el click con .stop)
+  if (_longPressTriggered) { _longPressTriggered = false; return }
   if (e.ctrlKey || e.metaKey) {    // Ctrl+click en el título → multi-select
     emit('seleccionar-multi', props.tarea)
     return
   }
-  if (props.compacto) return          // móvil: no editar inline
+  if (props.compacto) {             // móvil: no editar inline, reenviar al flujo normal
+    emit('click', props.tarea)
+    return
+  }
   e.stopPropagation()
   tituloEditando.value  = props.tarea.titulo
   editandoTitulo.value  = true
