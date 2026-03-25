@@ -689,7 +689,9 @@ Un solo archivo de contexto de 700+ líneas mezcla todo. Cuando Claude empieza u
 
 ## 19. SUPER AGENTE CLAUDE CODE — Modo paralelo en el Bot de Telegram
 
-Claude Code corre como **Super Agente** en el bot de Telegram, en paralelo al `ia_service` existente. No es otro proveedor LLM — es el mismo Claude Code con acceso total al sistema.
+Claude Code corre como **Super Agente** en el bot de Telegram, en paralelo al `ia_service` existente. NO es otro proveedor LLM dentro de ia_service — es el mismo Claude Code CLI con acceso total al sistema, corriendo como proceso independiente.
+
+**⚠️ IMPORTANTE: Si estás leyendo esto como instancia de Claude Code invocada por el bot (claude -p), seguí las reglas de esta sección al pie de la letra.**
 
 ### Acceso
 - Nivel 5+ → puede usar el Super Agente para consultas
@@ -698,20 +700,50 @@ Claude Code corre como **Super Agente** en el bot de Telegram, en paralelo al `i
 ### Arquitectura
 ```
 Bot Telegram
-├── Modo normal → ia_service Flask (gemini, groq, etc.)
-└── Modo Super Agente → claude -p desde REPO_DIR (bypass ia_service)
+├── Modo normal → ia_service Flask (gemini, groq, cerebras, etc.)
+└── Modo Super Agente → claude -p con --resume (bypass ia_service completo)
 ```
 
-### Tablas en ia_service_os (prefijo sa_)
-- `sa_sesiones` — historial de conversación por usuario+empresa (JSON rotante, últimos 10 pares)
-- `sa_config` — prompt_sistema editable por empresa (desde ia.oscomunidad.com → Super Agente)
-- `sa_cambios` — registro de correcciones autónomas en BD (backup antes/después)
+### Sesiones persistentes (--resume)
+- Cada usuario tiene conversaciones con sesiones persistentes de Claude Code.
+- Primera vez: `claude -p "PROMPT SISTEMA" --output-format json` → obtiene session_id → `claude -p "PREGUNTA" --resume SESSION_ID --output-format json`
+- Siguientes mensajes: `claude -p "PREGUNTA" --resume SESSION_ID --output-format json`
+- Claude mantiene el historial internamente — NO se pasa historial en el prompt.
+- El prompt sistema se envía UNA vez al crear la sesión, no en cada mensaje.
+- Las sesiones se guardan como archivos `.jsonl` en `~/.claude/projects/-home-osserver-Proyectos-Antigravity-Integraciones-OS/`
 
-### Reglas de corrección
-- **BD** (ia_logica_negocio, ia_ejemplos_sql, ia_tipos_consulta): automático con registro en sa_cambios
-- **Código/estructura**: requiere aprobación nivel 7 — Claude envía mensaje a Santi con botones ✅/❌
-- **Nunca**: parches, hardcoding, try/catch vacíos — si no hay causa raíz, solo documentar
+### Menú del Super Agente en Telegram
+```
+[📝 Nueva] [📋 Conversaciones] [⚙️ Ajustes]
+```
+- **📝 Nueva**: crea conversación nueva (nuevo session_id)
+- **📋 Conversaciones**: lista inline → tap para ver opciones (🔄 Cambiar / ✏️ Renombrar / 🗑️ Borrar)
+- **⚙️ Ajustes**: vuelve al menú normal del bot (cambiar agente, etc.)
+
+### Tablas en ia_service_os (prefijo sa_)
+- `sa_sesiones` — conversaciones por usuario: `id`, `empresa`, `usuario_id`, `claude_session_id` (UUID), `nombre`, `activa` (1=activa, 0=inactiva), `created_at`, `updated_at`
+- `sa_config` — `prompt_sistema` editable por empresa (desde ia.oscomunidad.com → Super Agente)
+- `sa_cambios` — registro detallado de TODA corrección autónoma en BD
+
+### Formato de respuesta (definido en el prompt sistema)
+El prompt le indica al Super Agente 3 formatos:
+1. **Tabla** → JSON puro: `{"tipo":"tabla","texto":"desc","titulo":"T","columnas":[...],"filas":[[...]]}`
+   - filas = arrays de strings, NO objetos
+   - El bot renderiza: ≤2 filas ASCII inline, >2 filas botón "Ver tabla completa"
+2. **Texto** → texto plano directo
+3. **Aprobación** → JSON: `{"tipo":"aprobacion","mensaje_usuario":"...","descripcion":"...","causa_raiz":"...","cambio_propuesto":"..."}`
+   - El bot envía mensaje a todos los usuarios nivel 7 con botones ✅/❌
+
+### Reglas de corrección — REGISTRO OBLIGATORIO
+- **Correcciones automáticas (sin aprobación)**: tablas `ia_logica_negocio`, `ia_ejemplos_sql`, `ia_tipos_consulta`
+  - **ANTES de cada cambio**: registrar en `sa_cambios` con: `tabla_afectada`, `campo`, `valor_anterior`, `valor_nuevo`, `razon`, `usuario_id`
+  - Si no se registra en `sa_cambios`, el cambio NO está autorizado
+- **Cambios que requieren aprobación nivel 7**: archivos Python/JS/config, ALTER/DROP/CREATE TABLE, systemd, Docker, Cloudflare
+  - Devolver JSON tipo `aprobacion` — el bot notifica a Santi
+- **PROHIBIDO siempre**: parches superficiales, hardcoding, try/catch vacíos/genéricos
+  - Si no hay causa raíz → solo documentar, NUNCA "arreglar" el síntoma
 
 ### Archivos clave
-- `scripts/telegram_bot/superagente.py` — lógica de sesiones + llamada claude -p
-- `scripts/telegram_bot/handlers_sa.py` — handlers Telegram del Super Agente
+- `scripts/telegram_bot/superagente.py` — sesiones + `_ejecutar_claude()` con --resume + procesamiento de respuesta
+- `scripts/telegram_bot/handlers_sa.py` — handlers Telegram: menú, conversaciones, callbacks
+- `scripts/telegram_bot/bot.py` — routing: si agente='superagente' → handlers_sa (NO ia_service)
