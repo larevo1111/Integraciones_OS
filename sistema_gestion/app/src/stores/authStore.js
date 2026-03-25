@@ -5,11 +5,22 @@ const KEY_USUARIO = 'gestion_usuario'
 const KEY_EMPRESA = 'gestion_empresa'
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    token:          localStorage.getItem(KEY_JWT) || null,
-    usuario:        JSON.parse(localStorage.getItem(KEY_USUARIO) || 'null'),
-    empresa_activa: JSON.parse(localStorage.getItem(KEY_EMPRESA) || 'null')
-  }),
+  state: () => {
+    const token = localStorage.getItem(KEY_JWT) || null
+    let usuario = JSON.parse(localStorage.getItem(KEY_USUARIO) || 'null')
+    // Si hay token pero no hay usuario guardado, hidratarlo desde el payload JWT
+    if (token && !usuario) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        if (payload.email) {
+          usuario = { email: payload.email, nombre: payload.nombre, foto: payload.foto || '',
+                      nivel: payload.nivel, tema: payload.tema || 'dark', perfil: payload.perfil || null }
+          localStorage.setItem(KEY_USUARIO, JSON.stringify(usuario))
+        }
+      } catch (e) {}
+    }
+    return { token, usuario, empresa_activa: JSON.parse(localStorage.getItem(KEY_EMPRESA) || 'null') }
+  },
 
   getters: {
     estaAutenticado: s => !!s.token,
@@ -33,8 +44,11 @@ export const useAuthStore = defineStore('auth', {
         this.establecerSesion(data.token, data.usuario, data.empresa)
         this._aplicarTema(data.usuario?.tema || 'dark')
       } else {
-        this.token = data.token
-        localStorage.setItem(KEY_JWT, data.token)
+        // Temporal: guardar token Y usuario (para que esté disponible al seleccionar empresa)
+        this.token   = data.token
+        this.usuario = data.usuario || null
+        localStorage.setItem(KEY_JWT,     data.token)
+        localStorage.setItem(KEY_USUARIO, JSON.stringify(data.usuario || null))
       }
       return data
     },
@@ -47,7 +61,7 @@ export const useAuthStore = defineStore('auth', {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al seleccionar empresa')
-      this.establecerSesion(data.token, this.usuario, data.empresa)
+      this.establecerSesion(data.token, data.usuario || this.usuario, data.empresa)
       return data
     },
 

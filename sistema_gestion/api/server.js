@@ -212,7 +212,15 @@ app.post('/api/gestion/auth/seleccionar_empresa', async (req, res) => {
       empresa_siglas: emp.siglas || ''
     }, JWT_SECRET, { expiresIn: '7d' })
 
-    res.json({ ok: true, token: newToken,
+    const usuarioFinal = {
+      email:   decoded.email,
+      nombre:  decoded.nombre,
+      foto:    decoded.foto || '',
+      nivel:   decoded.nivel,
+      tema:    config?.tema   || 'dark',
+      perfil:  config?.perfil || null
+    }
+    res.json({ ok: true, token: newToken, usuario: usuarioFinal,
       empresa: { uid: emp.uid, nombre: emp.nombre, siglas: emp.siglas || '' } })
   } catch (e) {
     res.status(500).json({ error: e.message })
@@ -1867,11 +1875,11 @@ app.put('/api/gestion/jornadas/:id/reabrir', requireAuth, async (req, res) => {
 app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
   try {
     const fecha = req.query.fecha || new Date().toISOString().slice(0, 10)
+
+    // Query jornadas + pausas desde gestion DB (sin cross-join)
     const [jornadas] = await db.gestion.query(`
       SELECT
         j.*,
-        su.Nombre_Usuario   AS nombre_usuario,
-        su.Nivel_Acceso     AS nivel_usuario,
         COALESCE(
           SUM(CASE WHEN p.hora_fin IS NOT NULL
             THEN TIMESTAMPDIFF(MINUTE, p.hora_inicio, p.hora_fin) ELSE 0 END), 0
@@ -1882,12 +1890,26 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
           ELSE 0
         END AS tiempo_total_min
       FROM g_jornadas j
-      LEFT JOIN u768061575_os_comunidad.sys_usuarios su ON su.\`Email\` = j.usuario
       LEFT JOIN g_jornada_pausas p ON p.jornada_id = j.id
       WHERE j.empresa = ? AND j.fecha = ?
       GROUP BY j.id
-      ORDER BY COALESCE(su.Nivel_Acceso, 0) DESC, su.Nombre_Usuario
+      ORDER BY j.hora_inicio
     `, [req.empresa, fecha])
+
+    // Enriquecer con nombres desde comunidad DB (pool separado, sin cross-join SQL)
+    if (jornadas.length > 0) {
+      const emails = jornadas.map(j => j.usuario)
+      const placeholders = emails.map(() => '?').join(',')
+      const [usuarios] = await db.comunidad.query(
+        `SELECT \`Email\`, \`Nombre_Usuario\`, \`Nivel_Acceso\` FROM sys_usuarios WHERE \`Email\` IN (${placeholders})`,
+        emails
+      )
+      const uMap = Object.fromEntries(usuarios.map(u => [u.Email, u]))
+      jornadas.forEach(j => {
+        j.Nombre_Usuario = uMap[j.usuario]?.Nombre_Usuario || null
+        j.Nivel_Acceso   = uMap[j.usuario]?.Nivel_Acceso   || null
+      })
+    }
 
     // tiempo_laborado = total - pausas
     jornadas.forEach(j => {
