@@ -5,9 +5,7 @@ export const useJornadaStore = defineStore('jornada', {
   state: () => ({
     jornada: null,       // jornada del día (con pausas[])
     tiposPausa: [],      // catálogo de tipos
-    cargando: false,
-    _timerInterval: null,
-    timerSegundos: 0      // segundos trabajados (sin pausas cerradas)
+    cargando: false
   }),
 
   getters: {
@@ -33,7 +31,6 @@ export const useJornadaStore = defineStore('jornada', {
       try {
         const data = await api('/api/gestion/jornadas/hoy')
         this.jornada = data.jornada
-        this._actualizarTimer()
       } finally { this.cargando = false }
     },
 
@@ -46,7 +43,6 @@ export const useJornadaStore = defineStore('jornada', {
       const body = horaInicio ? JSON.stringify({ hora_inicio: horaInicio }) : undefined
       const data = await api('/api/gestion/jornadas/iniciar', { method: 'POST', body })
       this.jornada = data.jornada
-      this._actualizarTimer()
       return data.jornada
     },
 
@@ -55,7 +51,6 @@ export const useJornadaStore = defineStore('jornada', {
       const body = horaFin ? JSON.stringify({ hora_fin: horaFin }) : undefined
       const data = await api(`/api/gestion/jornadas/${this.jornada.id}/finalizar`, { method: 'PUT', body })
       this.jornada = { ...this.jornada, ...data.jornada }
-      this._detenerTimer()
       return data.jornada
     },
 
@@ -63,7 +58,6 @@ export const useJornadaStore = defineStore('jornada', {
       if (!this.jornada) return
       const data = await api(`/api/gestion/jornadas/${this.jornada.id}/reabrir`, { method: 'PUT' })
       this.jornada = data.jornada
-      this._actualizarTimer()
       return data.jornada
     },
 
@@ -74,7 +68,6 @@ export const useJornadaStore = defineStore('jornada', {
         body: JSON.stringify(campos)
       })
       this.jornada = { ...this.jornada, ...data.jornada }
-      this._actualizarTimer()
     },
 
     async iniciarPausa(tipos, observaciones, horaInicio, horaFin) {
@@ -86,7 +79,6 @@ export const useJornadaStore = defineStore('jornada', {
         method: 'POST', body: JSON.stringify(body)
       })
       this.jornada.pausas = [...(this.jornada.pausas || []), data.pausa]
-      if (!horaFin) this._detenerTimer() // solo detener timer si no es retroactiva
       return data.pausa
     },
 
@@ -96,38 +88,7 @@ export const useJornadaStore = defineStore('jornada', {
       const data = await api(`/api/gestion/jornadas/${this.jornada.id}/pausas/${pausaId}/reanudar`, { method: 'PUT', body })
       const idx = this.jornada.pausas.findIndex(p => p.id === pausaId)
       if (idx >= 0) this.jornada.pausas[idx] = data.pausa
-      this._actualizarTimer()
       return data.pausa
-    },
-
-    // --- Timer ---
-    _actualizarTimer() {
-      this._detenerTimer()
-      if (this.estado !== 2) return // solo corre si está trabajando
-
-      const calcular = () => {
-        if (!this.jornada) return
-        const inicio = new Date(this.jornada.hora_inicio).getTime()
-        const ahora = Date.now()
-        // Restar pausas cerradas
-        let pausaMs = 0
-        for (const p of (this.jornada.pausas || [])) {
-          if (p.hora_fin) {
-            pausaMs += new Date(p.hora_fin).getTime() - new Date(p.hora_inicio).getTime()
-          }
-        }
-        this.timerSegundos = Math.max(0, Math.floor((ahora - inicio - pausaMs) / 1000))
-      }
-
-      calcular()
-      this._timerInterval = setInterval(calcular, 1000)
-    },
-
-    _detenerTimer() {
-      if (this._timerInterval) {
-        clearInterval(this._timerInterval)
-        this._timerInterval = null
-      }
     }
   }
 })

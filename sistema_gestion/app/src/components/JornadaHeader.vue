@@ -50,8 +50,9 @@
         <span class="jh-sep">&middot;</span>
         <span class="jh-hora">{{ horaInicio }}</span>
         <span class="jh-sep">&middot;</span>
-        <span class="jh-timer jh-timer-pausa">{{ timerFormateado }}</span>
         <span class="jh-pausa-tipo">{{ store.pausaActiva?.tipos_nombre || 'Pausa' }}</span>
+        <span class="jh-sep">&middot;</span>
+        <span class="jh-timer jh-timer-pausa">{{ timerFormateado }}</span>
       </div>
       <div class="jh-right">
         <button class="jh-btn jh-btn-reanudar" @click="reanudarPausa">
@@ -136,17 +137,17 @@ const popover = reactive({
   visible: false, titulo: '', anchorEl: null, onConfirmar: () => {}
 })
 
-// Countdown para reabrir (se actualiza cada 10s)
+// Tick reactivo — se actualiza cada segundo para el timer y cada 10s para el countdown
 const ahora = ref(Date.now())
-let clockInterval = null
+let tickInterval = null
 
 onMounted(async () => {
   if (auth.estaAutenticado) {
     await Promise.allSettled([store.cargarHoy(), store.cargarTiposPausa()])
   }
-  clockInterval = setInterval(() => { ahora.value = Date.now() }, 10000)
+  tickInterval = setInterval(() => { ahora.value = Date.now() }, 1000)
 })
-onUnmounted(() => { if (clockInterval) clearInterval(clockInterval) })
+onUnmounted(() => { if (tickInterval) clearInterval(tickInterval) })
 
 // ── Computed ─────────────────────────────────────────────────────────
 const nombreUsuario = computed(() => {
@@ -170,11 +171,37 @@ const horaFin = computed(() => {
   return new Date(store.jornada.hora_fin).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
 })
 
-const timerFormateado = computed(() => {
-  const s = store.timerSegundos
+// Timer: segundos laborados (total - pausas cerradas). Se calcula desde jornada directamente,
+// sin depender de store.timerSegundos, para evitar el flash inicial de "0m".
+const timerLaboradoSeg = computed(() => {
+  if (!store.jornada?.hora_inicio) return 0
+  const inicio = new Date(store.jornada.hora_inicio).getTime()
+  let pausaMs = 0
+  for (const p of (store.jornada.pausas || [])) {
+    if (p.hora_fin) {
+      pausaMs += new Date(p.hora_fin).getTime() - new Date(p.hora_inicio).getTime()
+    }
+  }
+  return Math.max(0, Math.floor((ahora.value - inicio - pausaMs) / 1000))
+})
+
+// Timer de pausa activa (cuánto lleva en pausa)
+const timerPausaSeg = computed(() => {
+  const p = store.pausaActiva
+  if (!p?.hora_inicio) return 0
+  return Math.max(0, Math.floor((ahora.value - new Date(p.hora_inicio).getTime()) / 1000))
+})
+
+function fmtSeg(s) {
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+// Estado 2: muestra tiempo laborado | Estado 3: muestra tiempo DE la pausa actual
+const timerFormateado = computed(() => {
+  if (store.estado === 3) return fmtSeg(timerPausaSeg.value)
+  return fmtSeg(timerLaboradoSeg.value)
 })
 
 const minutosParaReabrir = computed(() => {
