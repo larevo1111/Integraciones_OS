@@ -387,6 +387,25 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
     # ── Modo Super Agente (bypass ia_service) ────────────────────────────────
     if agente_slug == 'superagente':
         uid = str(user.id)
+        empresa_sa = sesion.get('empresa', 'ori_sil_2')
+
+        # Botón "📝 Nueva" → marcar flag y pedir primera pregunta
+        if texto == '📝 Nueva':
+            SA_FORZAR_NUEVA.add(uid)
+            await update.message.reply_text(
+                '🆕 *Nueva conversación*\nEscribí tu primera pregunta.',
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=handlers_sa.teclado_sa()
+            )
+            return
+
+        # Botón "📋 Conversaciones" → listar
+        if texto == '📋 Conversaciones':
+            await handlers_sa.listar_conversaciones_msg(
+                update, sa_mod, uid, empresa_sa
+            )
+            return
+
         # Si el usuario pidió "Nueva conversación", forzar creación
         if uid in SA_FORZAR_NUEVA:
             SA_FORZAR_NUEVA.discard(uid)
@@ -394,7 +413,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
             resultado = sa_mod.nueva_conversacion(
                 pregunta=texto, usuario_id=uid,
                 nombre_usuario=nombre, nivel=nivel,
-                empresa=sesion.get('empresa', 'ori_sil_2')
+                empresa=empresa_sa
             )
             if not resultado.get('ok'):
                 await update.message.reply_text(
@@ -402,11 +421,10 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
                     reply_markup=handlers_sa.teclado_sa()
                 )
                 return
-            # Delegar renderizado al handler normal
             await handlers_sa.manejar_superagente(
                 update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
                 sesion=sesion, nombre=nombre, nivel=nivel,
-                empresa=sesion.get('empresa', 'ori_sil_2'), pregunta=texto,
+                empresa=empresa_sa, pregunta=texto,
                 resultado_previo=resultado
             )
             return
@@ -414,7 +432,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
         await handlers_sa.manejar_superagente(
             update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
             sesion=sesion, nombre=nombre, nivel=nivel,
-            empresa=sesion.get('empresa', 'ori_sil_2'), pregunta=texto
+            empresa=empresa_sa, pregunta=texto
         )
         return
 

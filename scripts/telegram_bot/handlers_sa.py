@@ -38,14 +38,6 @@ async def manejar_superagente(update: Update, sa_mod, tabla_mod,
     user = update.effective_user
     uid = str(user.id)
 
-    # Botones del teclado
-    if pregunta == '📝 Nueva':
-        await _nueva_conversacion_inicio(update, uid, empresa)
-        return
-    if pregunta == '📋 Conversaciones':
-        await _listar_conversaciones(update, sa_mod, uid, empresa)
-        return
-
     # ¿Esperando renombrar?
     if uid in _esperando_renombrar:
         sesion_id = _esperando_renombrar.pop(uid)
@@ -138,19 +130,12 @@ async def manejar_superagente(update: Update, sa_mod, tabla_mod,
         )
 
 
-# ── Nueva conversación ──────────────────────────────────────────────────────
-
-async def _nueva_conversacion_inicio(update, uid, empresa):
-    """Indica al usuario que escriba su primera pregunta."""
-    import bot as bot_module
-    bot_module.SA_FORZAR_NUEVA.add(uid)
-    await update.message.reply_text(
-        '🆕 *Nueva conversación*\nEscribí tu primera pregunta.',
-        parse_mode=ParseMode.MARKDOWN, reply_markup=teclado_sa()
-    )
-
-
 # ── Listar / cambiar / renombrar / borrar ────────────────────────────────────
+
+async def listar_conversaciones_msg(update, sa_mod, uid, empresa):
+    """Muestra lista de conversaciones (llamada desde bot.py)."""
+    return await _listar_conversaciones(update, sa_mod, uid, empresa)
+
 
 async def _listar_conversaciones(update, sa_mod, uid, empresa):
     convs = sa_mod.listar_conversaciones(uid, empresa)
