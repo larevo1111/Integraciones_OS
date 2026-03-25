@@ -530,7 +530,7 @@ function fmtNum(n) {
 function formatCell(val, col) {
   if (val === null || val === undefined || val === '—') return val === '—' ? '—' : '—'
   if (col && isNumeric(col.key)) {
-    const n = parseFloat(String(val).replace(',', '.'))
+    const n = parseFloat(String(val).replace(/,/g, ''))
     if (!isNaN(n)) return fmtNum(n)
   }
   return val
