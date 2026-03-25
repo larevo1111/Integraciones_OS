@@ -7,7 +7,8 @@ const routes = [
     children: [
       { path: '',        redirect: '/tareas' },
       { path: 'tareas',  component: () => import('pages/TareasPage.vue') },
-      { path: 'equipo',  component: () => import('pages/EquipoPage.vue') },
+      { path: 'equipo',  component: () => import('pages/TareasPage.vue'), props: { soloMias: false } },
+      { path: 'jornadas', component: () => import('pages/EquipoPage.vue') },
       { path: 'dificultades',  component: () => import('pages/DificultadesPage.vue') },
       { path: 'dificultades/:id', component: () => import('pages/DetalleDificultadPage.vue') },
       { path: 'ideas',   component: () => import('pages/IdeasPage.vue') },

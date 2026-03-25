@@ -26,6 +26,10 @@
             <span class="nav-item-icon material-icons">group</span>
             <span class="nav-item-label">Equipo</span>
           </RouterLink>
+          <RouterLink to="/jornadas" class="nav-item" :class="{ active: ruta === '/jornadas' }">
+            <span class="nav-item-icon material-icons">schedule</span>
+            <span class="nav-item-label">Jornadas</span>
+          </RouterLink>
         </div>
 
         <!-- PROYECTOS -->
@@ -341,6 +345,7 @@ const ruta = computed(() => route.path)
 const TITULOS = {
   '/tareas':       'Mis Tareas',
   '/equipo':       'Equipo',
+  '/jornadas':     'Jornadas',
   '/dificultades': 'Dificultades',
   '/ideas':        'Ideas y Hechos',
   '/pendientes':   'Pendientes',
