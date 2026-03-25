@@ -91,7 +91,7 @@ const posStyle = computed(() => {
   margin-bottom: 14px;
 }
 .jp-hora-input {
-  font-size: 22px; font-weight: 700;
+  font-size: 15px; font-weight: 600;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   background: transparent;
