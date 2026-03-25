@@ -1178,6 +1178,13 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 .google-btn:hover { background: var(--bg-card-hover); border-color: var(--border-focus); }
 
+/* Backdrop invisible para cerrar dropdowns en mobile (Teleport) */
+.dropdown-backdrop {
+  position: fixed; inset: 0;
+  z-index: 9998;
+  background: transparent;
+}
+
 /* ─── DROPDOWN AGRUPACIÓN (Teleport to body) ─── */
 .dropdown-menu-teleport {
   background: var(--bg-modal);

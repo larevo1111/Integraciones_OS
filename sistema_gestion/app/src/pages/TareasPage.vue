@@ -39,6 +39,7 @@
               <span class="material-icons" style="font-size:13px">expand_more</span>
             </button>
             <Teleport to="body">
+              <div v-if="menuAgrupar" class="dropdown-backdrop" @click="menuAgrupar=false" />
               <div v-if="menuAgrupar" class="dropdown-menu-teleport" :style="dropdownAgruparStyle" @mouseleave="menuAgrupar=false">
                 <div
                   v-for="ag in AGRUPACIONES"
@@ -208,8 +209,8 @@
 
       <div v-else class="empty-state"><span class="material-icons spin">refresh</span></div>
 
-      <!-- FAB mobile -->
-      <button class="fab d-mobile-only" @click="mostrarForm = true">
+      <!-- FAB mobile (oculto durante multi-selección) -->
+      <button v-if="!seleccionMultiIds.length" class="fab d-mobile-only" @click="mostrarForm = true">
         <span class="material-icons">add</span>
       </button>
     </div>
@@ -302,71 +303,77 @@
     <Teleport to="body">
       <Transition name="multi-bar">
         <div v-if="seleccionMultiIds.length" class="multi-bar">
-          <button class="multi-bar-close" @click="seleccionMultiIds = []" title="Cancelar selección">
-            <span class="material-icons" style="font-size:15px">close</span>
-          </button>
-          <span class="multi-bar-count">{{ seleccionMultiIds.length }} seleccionada{{ seleccionMultiIds.length !== 1 ? 's' : '' }}</span>
-          <div class="multi-bar-divider" />
-
-          <!-- Fecha -->
-          <div style="position:relative">
-            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuFecha }" @click="cerrarMenusMulti('fecha')">
-              <span class="material-icons" style="font-size:14px">event</span> Fecha
+          <!-- Fila 1: close + count -->
+          <div class="multi-bar-row1">
+            <button class="multi-bar-close" @click="seleccionMultiIds = []" title="Cancelar selección">
+              <span class="material-icons" style="font-size:15px">close</span>
             </button>
-            <div v-if="multiMenuFecha" class="multi-bar-menu">
-              <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(0))">Hoy</div>
-              <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(1))">Mañana</div>
-              <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(2))">Pasado mañana</div>
-              <div class="multi-menu-sep" />
-              <input type="date" class="multi-date-input" @change="aplicarFechaMulti($event.target.value)" />
-              <div class="multi-menu-item" @click="aplicarFechaMulti(null)">Sin fecha</div>
-            </div>
+            <span class="multi-bar-count">{{ seleccionMultiIds.length }} seleccionada{{ seleccionMultiIds.length !== 1 ? 's' : '' }}</span>
+            <div class="multi-bar-divider d-desktop-divider" />
           </div>
 
-          <!-- Estado -->
-          <div style="position:relative">
-            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuEstado }" @click="cerrarMenusMulti('estado')">
-              <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
-            </button>
-            <div v-if="multiMenuEstado" class="multi-bar-menu">
-              <div v-for="e in ['Pendiente','En Progreso','Completada','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
-            </div>
-          </div>
-
-          <!-- Categoría -->
-          <div style="position:relative">
-            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuCategoria }" @click="cerrarMenusMulti('categoria')">
-              <span class="material-icons" style="font-size:14px">label</span> Categoría
-            </button>
-            <div v-if="multiMenuCategoria" class="multi-bar-menu multi-bar-menu-scroll">
-              <div v-for="c in categorias" :key="c.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarCategoriaMulti(c.id)">
-                <span class="multi-dot" :style="{ background: c.color }" />
-                {{ c.nombre.replace(/_/g, ' ') }}
+          <!-- Fila 2 (mobile) / misma línea (desktop): acciones -->
+          <div class="multi-bar-actions">
+            <!-- Fecha -->
+            <div style="position:relative">
+              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuFecha }" @click="cerrarMenusMulti('fecha')">
+                <span class="material-icons" style="font-size:14px">event</span> Fecha
+              </button>
+              <div v-if="multiMenuFecha" class="multi-bar-menu">
+                <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(0))">Hoy</div>
+                <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(1))">Mañana</div>
+                <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(2))">Pasado mañana</div>
+                <div class="multi-menu-sep" />
+                <input type="date" class="multi-date-input" @change="aplicarFechaMulti($event.target.value)" />
+                <div class="multi-menu-item" @click="aplicarFechaMulti(null)">Sin fecha</div>
               </div>
             </div>
-          </div>
 
-          <!-- Proyecto -->
-          <div style="position:relative">
-            <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuProyecto }" @click="cerrarMenusMulti('proyecto')">
-              <span class="material-icons" style="font-size:14px">folder</span> Proyecto
-            </button>
-            <div v-if="multiMenuProyecto" class="multi-bar-menu multi-bar-menu-scroll">
-              <div v-for="p in proyectos" :key="p.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarProyectoMulti(p.id)">
-                <span class="multi-dot" :style="{ background: p.color || '#607D8B' }" />
-                {{ p.nombre }}
+            <!-- Estado -->
+            <div style="position:relative">
+              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuEstado }" @click="cerrarMenusMulti('estado')">
+                <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
+              </button>
+              <div v-if="multiMenuEstado" class="multi-bar-menu">
+                <div v-for="e in ['Pendiente','En Progreso','Completada','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
               </div>
-              <div class="multi-menu-sep" />
-              <div class="multi-menu-item" @click="aplicarProyectoMulti(null)">Sin proyecto</div>
             </div>
+
+            <!-- Categoría -->
+            <div style="position:relative">
+              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuCategoria }" @click="cerrarMenusMulti('categoria')">
+                <span class="material-icons" style="font-size:14px">label</span> Cat.
+              </button>
+              <div v-if="multiMenuCategoria" class="multi-bar-menu multi-bar-menu-scroll">
+                <div v-for="c in categorias" :key="c.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarCategoriaMulti(c.id)">
+                  <span class="multi-dot" :style="{ background: c.color }" />
+                  {{ c.nombre.replace(/_/g, ' ') }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Proyecto -->
+            <div style="position:relative">
+              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuProyecto }" @click="cerrarMenusMulti('proyecto')">
+                <span class="material-icons" style="font-size:14px">folder</span> Proy.
+              </button>
+              <div v-if="multiMenuProyecto" class="multi-bar-menu multi-bar-menu-scroll">
+                <div v-for="p in proyectos" :key="p.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarProyectoMulti(p.id)">
+                  <span class="multi-dot" :style="{ background: p.color || '#607D8B' }" />
+                  {{ p.nombre }}
+                </div>
+                <div class="multi-menu-sep" />
+                <div class="multi-menu-item" @click="aplicarProyectoMulti(null)">Sin proyecto</div>
+              </div>
+            </div>
+
+            <div class="multi-bar-divider" />
+
+            <!-- Eliminar -->
+            <button class="multi-bar-btn multi-bar-btn-danger" @click="eliminarMulti">
+              <span class="material-icons" style="font-size:14px">delete</span>
+            </button>
           </div>
-
-          <div class="multi-bar-divider" />
-
-          <!-- Eliminar -->
-          <button class="multi-bar-btn multi-bar-btn-danger" @click="eliminarMulti">
-            <span class="material-icons" style="font-size:14px">delete</span> Eliminar
-          </button>
         </div>
       </Transition>
     </Teleport>
@@ -1133,6 +1140,9 @@ onUnmounted(() => {
   .quickadd-cats::-webkit-scrollbar { display: none; }
   /* Extra (proyecto + etiquetas) en móvil */
   .quickadd-extra { padding-left: 0; }
+  /* Selectores OP/Remisión/Pedido: ancho completo sin padding excesivo */
+  .quickadd-op { padding-left: 0; }
+  .quickadd-op > div { max-width: 100% !important; }
 }
 
 /* QuickAdd */
@@ -1291,6 +1301,12 @@ onUnmounted(() => {
   white-space: nowrap;
   user-select: none;
 }
+.multi-bar-row1 {
+  display: contents;
+}
+.multi-bar-actions {
+  display: contents;
+}
 .multi-bar-count {
   font-size: 12px;
   color: var(--text-secondary);
@@ -1326,6 +1342,36 @@ onUnmounted(() => {
 .multi-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 .multi-bar-btn-active { background: var(--bg-hover); color: var(--text-primary); }
 .multi-bar-btn-danger:hover { color: #ef4444; }
+
+/* Mobile: multi-bar en 2 filas */
+@media (max-width: 768px) {
+  .multi-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100vw - 32px);
+    bottom: 16px;
+    padding: 6px 8px;
+    gap: 2px;
+  }
+  .multi-bar-row1 {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    justify-content: center;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 2px;
+  }
+  .multi-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-wrap: nowrap;
+  }
+  .d-desktop-divider { display: none; }
+  .multi-bar-btn { padding: 4px 6px; font-size: 11px; }
+}
 .multi-bar-menu {
   position: absolute;
   bottom: calc(100% + 8px);

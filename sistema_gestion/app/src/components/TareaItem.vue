@@ -158,7 +158,11 @@ const tituloEditando  = ref('')
 const inputTituloRef  = ref(null)
 
 // Ctrl+click o long-press → multi-select
+let _longPressTriggered = false
+
 function onItemClick(e) {
+  // Ignorar click que viene justo después de un long-press (mobile)
+  if (_longPressTriggered) { _longPressTriggered = false; e.stopPropagation(); return }
   if (e.ctrlKey || e.metaKey) {
     e.stopPropagation()
     emit('seleccionar-multi', props.tarea)
@@ -169,8 +173,10 @@ function onItemClick(e) {
 
 let longPressTimer = null
 function onTouchStart() {
+  _longPressTriggered = false
   longPressTimer = setTimeout(() => {
     longPressTimer = null
+    _longPressTriggered = true
     emit('seleccionar-multi', props.tarea)
   }, 500)
 }
