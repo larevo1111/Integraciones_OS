@@ -245,7 +245,7 @@ def consultar(
                 agente_cfg = cur.fetchone()
         finally:
             conn.close()
-        agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash'
+        agente_slug = agente_cfg['slug'] if agente_cfg else 'gemini-flash-lite'
 
     # ── 4b. Verificar nivel de usuario vs agente ─────────────────────
     nivel_usr = nivel_usuario(usuario_id, empresa)
