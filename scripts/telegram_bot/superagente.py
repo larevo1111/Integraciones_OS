@@ -237,14 +237,19 @@ def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
         return {'ok': False, 'error': 'El Super Agente no está configurado. '
                                       'Pedile a Santi que configure el prompt.'}
 
+    # Generar nombre: "SA - " + pregunta truncada al último espacio antes de 40 chars
+    nombre = _generar_nombre(pregunta)
+
     prompt_sistema = (prompt_tpl
                       .replace('{usuario_nombre}', nombre_usuario)
                       .replace('{nivel}', str(nivel))
                       .replace('{empresa}', empresa))
 
-    # Paso 1: enviar prompt sistema → obtener session_id
-    log.info(f'SA creando sesión nueva para {nombre_usuario}')
-    resp1 = _ejecutar_claude(prompt_sistema)
+    # Paso 1: enviar nombre + prompt sistema → obtener session_id
+    # El nombre va al inicio para que Claude nombre la sesión con "SA - ..."
+    log.info(f'SA creando sesión "{nombre}" para {nombre_usuario}')
+    prompt_con_nombre = f'{nombre}\n\n{prompt_sistema}'
+    resp1 = _ejecutar_claude(prompt_con_nombre)
     if not resp1.get('ok'):
         return resp1
 
@@ -252,27 +257,14 @@ def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
     if not session_id:
         return {'ok': False, 'error': 'No se obtuvo session_id de Claude.'}
 
-    # Guardar en BD
-    crear_sesion(usuario_id, empresa, session_id)
+    # Guardar en BD con el mismo nombre
+    crear_sesion(usuario_id, empresa, session_id, nombre=nombre)
 
     # Paso 2: enviar la pregunta con --resume
-    log.info(f'SA enviando pregunta a sesión nueva {session_id[:8]}...')
+    log.info(f'SA enviando pregunta a sesión {session_id[:8]}...')
     resp2 = _ejecutar_claude(pregunta, session_id=session_id)
     if not resp2.get('ok'):
         return resp2
-
-    # Nombrar la conversación con la primera pregunta (truncada)
-    nombre = pregunta[:80].strip()
-    conn = get_local_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                'UPDATE sa_sesiones SET nombre=%s WHERE claude_session_id=%s',
-                (nombre, session_id)
-            )
-            conn.commit()
-    finally:
-        conn.close()
 
     if procesar:
         return _procesar_respuesta(resp2['result'])
@@ -314,3 +306,15 @@ def _extraer_json(texto: str) -> dict | None:
     except (json.JSONDecodeError, ValueError):
         pass
     return None
+
+
+def _generar_nombre(pregunta: str, max_len: int = 40) -> str:
+    """Genera nombre de sesión: 'SA - ' + pregunta truncada al último espacio."""
+    texto = pregunta.strip()
+    if len(texto) <= max_len:
+        return f'SA - {texto}'
+    truncado = texto[:max_len]
+    ultimo_espacio = truncado.rfind(' ')
+    if ultimo_espacio > 10:
+        truncado = truncado[:ultimo_espacio]
+    return f'SA - {truncado}'
