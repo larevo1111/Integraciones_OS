@@ -339,6 +339,16 @@ Del ERP `u768061575_os_comunidad.sys_usuarios` — empresa `Ori_Sil_2`:
 - [ ] 3.11 EquipoPage.vue — vista del equipo
 - [ ] 3.12 Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
 
+### Fase 3.5 — Módulo Jornadas (inicio/fin jornada + pausas) ⬅️ PRÓXIMO
+Spec completo: `.agent/specs/SPEC_JORNADAS.md`
+- [ ] 3.5.1 Crear tablas en Hostinger: g_jornadas, g_jornada_pausas, g_jornada_pausa_tipos, g_tipos_pausa + seed
+- [ ] 3.5.2 API endpoints en server.js: jornadas CRUD + pausas + tipos-pausa
+- [ ] 3.5.3 jornadaStore.js — estado reactivo, API calls, timer live
+- [ ] 3.5.4 JornadaHeader.vue — header con 3 estados en MainLayout
+- [ ] 3.5.5 JornadaPopover.vue — confirmación iniciar/finalizar
+- [ ] 3.5.6 PausaDialog.vue — multiselect tipos + observaciones
+- [ ] 3.5.7 Build, deploy y verificar en gestion.oscomunidad.com
+
 ### Fase 4 — Android + Push
 - [ ] 4.1 Firebase project "os-gestion" + google-services.json
 - [ ] 4.2 Push backend (firebase-admin) + frontend (@capacitor/push-notifications)

@@ -1576,6 +1576,281 @@ app.delete('/api/gestion/etiquetas/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ─── JORNADAS ────────────────────────────────────────────────────────
+
+// GET /api/gestion/jornadas/hoy — jornada del día del usuario actual + pausas
+app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
+  try {
+    const hoy = new Date().toISOString().slice(0, 10)
+    const [[jornada]] = await db.gestion.query(
+      'SELECT * FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ?',
+      [req.empresa, req.usuario.email, hoy]
+    )
+    if (!jornada) return res.json({ ok: true, jornada: null })
+
+    // Pausas con sus tipos
+    const [pausas] = await db.gestion.query(`
+      SELECT p.*, GROUP_CONCAT(tp.nombre ORDER BY tp.orden SEPARATOR ', ') AS tipos_nombre
+      FROM g_jornada_pausas p
+      LEFT JOIN g_jornada_pausa_tipos pt ON pt.pausa_id = p.id
+      LEFT JOIN g_tipos_pausa tp ON tp.id = pt.tipo_pausa_id
+      WHERE p.jornada_id = ?
+      GROUP BY p.id
+      ORDER BY p.hora_inicio
+    `, [jornada.id])
+
+    jornada.pausas = pausas
+    res.json({ ok: true, jornada })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/jornadas/iniciar — crear jornada del día
+app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
+  try {
+    const ahora = new Date()
+    const hoy = ahora.toISOString().slice(0, 10)
+
+    // Verificar que no exista jornada hoy
+    const [[existe]] = await db.gestion.query(
+      'SELECT id FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ?',
+      [req.empresa, req.usuario.email, hoy]
+    )
+    if (existe) return res.status(409).json({ error: 'Ya existe una jornada para hoy' })
+
+    const [result] = await db.gestion.query(`
+      INSERT INTO g_jornadas (empresa, usuario, fecha, hora_inicio, hora_inicio_registro, usuario_creador, usuario_ult_modificacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [req.empresa, req.usuario.email, hoy, ahora, ahora, req.usuario.email, req.usuario.email])
+
+    const [[jornada]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [result.insertId])
+    jornada.pausas = []
+    res.status(201).json({ ok: true, jornada })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/jornadas/:id/finalizar — registrar hora de fin
+app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => {
+  try {
+    const [[jornada]] = await db.gestion.query(
+      'SELECT * FROM g_jornadas WHERE id = ? AND empresa = ?',
+      [req.params.id, req.empresa]
+    )
+    if (!jornada) return res.status(404).json({ error: 'Jornada no encontrada' })
+    if (jornada.hora_fin) return res.status(409).json({ error: 'La jornada ya fue finalizada' })
+
+    // Verificar que no haya pausa activa
+    const [[pausaAbierta]] = await db.gestion.query(
+      'SELECT id FROM g_jornada_pausas WHERE jornada_id = ? AND hora_fin IS NULL',
+      [jornada.id]
+    )
+    if (pausaAbierta) return res.status(409).json({ error: 'Hay una pausa activa. Reanuda antes de finalizar.' })
+
+    const ahora = new Date()
+    await db.gestion.query(`
+      UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ?
+      WHERE id = ?
+    `, [ahora, ahora, req.usuario.email, jornada.id])
+
+    const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [jornada.id])
+    res.json({ ok: true, jornada: updated })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/jornadas/:id/editar — editar horas reportadas
+app.put('/api/gestion/jornadas/:id/editar', requireAuth, async (req, res) => {
+  try {
+    const [[jornada]] = await db.gestion.query(
+      'SELECT * FROM g_jornadas WHERE id = ? AND empresa = ?',
+      [req.params.id, req.empresa]
+    )
+    if (!jornada) return res.status(404).json({ error: 'Jornada no encontrada' })
+
+    const { hora_inicio, hora_fin, observaciones } = req.body
+    const sets = []; const params = []
+    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); params.push(hora_inicio) }
+    if (hora_fin !== undefined)    { sets.push('hora_fin = ?');    params.push(hora_fin) }
+    if (observaciones !== undefined) { sets.push('observaciones = ?'); params.push(observaciones) }
+    if (!sets.length) return res.status(400).json({ error: 'Nada que actualizar' })
+
+    sets.push('usuario_ult_modificacion = ?')
+    params.push(req.usuario.email, req.params.id, req.empresa)
+
+    await db.gestion.query(
+      `UPDATE g_jornadas SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`,
+      params
+    )
+    const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [req.params.id])
+    res.json({ ok: true, jornada: updated })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/jornadas/historial — historial con filtros y visibilidad por nivel
+app.get('/api/gestion/jornadas/historial', requireAuth, async (req, res) => {
+  try {
+    const { usuario, fecha_desde, fecha_hasta } = req.query
+    let where = 'j.empresa = ?'
+    const params = [req.empresa]
+
+    // Visibilidad por nivel
+    if (req.usuario.nivel < 7) {
+      if (usuario) {
+        // Solo puede ver usuarios de nivel inferior o a sí mismo
+        where += ' AND (j.usuario = ? OR EXISTS (SELECT 1 FROM ' +
+          'u768061575_os_comunidad.sys_usuarios su ' +
+          'WHERE su.Email = j.usuario AND su.Nivel_Acceso < ?))'
+        params.push(req.usuario.email, req.usuario.nivel)
+      } else {
+        where += ' AND (j.usuario = ? OR EXISTS (SELECT 1 FROM ' +
+          'u768061575_os_comunidad.sys_usuarios su ' +
+          'WHERE su.Email = j.usuario AND su.Nivel_Acceso < ?))'
+        params.push(req.usuario.email, req.usuario.nivel)
+      }
+    }
+
+    if (usuario) { where += ' AND j.usuario = ?'; params.push(usuario) }
+    if (fecha_desde) { where += ' AND j.fecha >= ?'; params.push(fecha_desde) }
+    if (fecha_hasta) { where += ' AND j.fecha <= ?'; params.push(fecha_hasta) }
+
+    const [jornadas] = await db.gestion.query(`
+      SELECT j.*, su.Nombre_Usuario AS nombre_usuario
+      FROM g_jornadas j
+      LEFT JOIN u768061575_os_comunidad.sys_usuarios su ON su.Email = j.usuario
+      WHERE ${where}
+      ORDER BY j.fecha DESC, j.hora_inicio DESC
+      LIMIT 100
+    `, params)
+
+    res.json({ ok: true, jornadas })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/jornadas/:id/pausas/iniciar — iniciar pausa
+app.post('/api/gestion/jornadas/:id/pausas/iniciar', requireAuth, async (req, res) => {
+  try {
+    const [[jornada]] = await db.gestion.query(
+      'SELECT * FROM g_jornadas WHERE id = ? AND empresa = ?',
+      [req.params.id, req.empresa]
+    )
+    if (!jornada) return res.status(404).json({ error: 'Jornada no encontrada' })
+    if (jornada.hora_fin) return res.status(409).json({ error: 'La jornada ya fue finalizada' })
+
+    // Verificar que no haya otra pausa abierta
+    const [[pausaAbierta]] = await db.gestion.query(
+      'SELECT id FROM g_jornada_pausas WHERE jornada_id = ? AND hora_fin IS NULL',
+      [jornada.id]
+    )
+    if (pausaAbierta) return res.status(409).json({ error: 'Ya hay una pausa activa' })
+
+    const { tipos, observaciones } = req.body
+    if (!tipos || !Array.isArray(tipos) || !tipos.length) {
+      return res.status(400).json({ error: 'Debes seleccionar al menos un tipo de pausa' })
+    }
+
+    const ahora = new Date()
+    const [result] = await db.gestion.query(`
+      INSERT INTO g_jornada_pausas (empresa, jornada_id, hora_inicio, hora_inicio_registro, observaciones, usuario_creador, usuario_ult_modificacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [req.empresa, jornada.id, ahora, ahora, observaciones || null, req.usuario.email, req.usuario.email])
+
+    // Insertar tipos de pausa (M:N)
+    const vals = tipos.map(tipoId => [result.insertId, tipoId, req.empresa, req.usuario.email])
+    await db.gestion.query(
+      'INSERT INTO g_jornada_pausa_tipos (pausa_id, tipo_pausa_id, empresa, usuario_creador) VALUES ?',
+      [vals]
+    )
+
+    // Retornar pausa con nombres de tipos
+    const [[pausa]] = await db.gestion.query(`
+      SELECT p.*, GROUP_CONCAT(tp.nombre ORDER BY tp.orden SEPARATOR ', ') AS tipos_nombre
+      FROM g_jornada_pausas p
+      LEFT JOIN g_jornada_pausa_tipos pt ON pt.pausa_id = p.id
+      LEFT JOIN g_tipos_pausa tp ON tp.id = pt.tipo_pausa_id
+      WHERE p.id = ?
+      GROUP BY p.id
+    `, [result.insertId])
+
+    res.status(201).json({ ok: true, pausa })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/jornadas/:id/pausas/:pausaId/reanudar — finalizar pausa
+app.put('/api/gestion/jornadas/:id/pausas/:pausaId/reanudar', requireAuth, async (req, res) => {
+  try {
+    const [[pausa]] = await db.gestion.query(
+      'SELECT p.* FROM g_jornada_pausas p JOIN g_jornadas j ON j.id = p.jornada_id WHERE p.id = ? AND j.id = ? AND j.empresa = ?',
+      [req.params.pausaId, req.params.id, req.empresa]
+    )
+    if (!pausa) return res.status(404).json({ error: 'Pausa no encontrada' })
+    if (pausa.hora_fin) return res.status(409).json({ error: 'La pausa ya fue cerrada' })
+
+    const ahora = new Date()
+    await db.gestion.query(
+      'UPDATE g_jornada_pausas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ? WHERE id = ?',
+      [ahora, ahora, req.usuario.email, pausa.id]
+    )
+
+    const [[updated]] = await db.gestion.query(`
+      SELECT p.*, GROUP_CONCAT(tp.nombre ORDER BY tp.orden SEPARATOR ', ') AS tipos_nombre
+      FROM g_jornada_pausas p
+      LEFT JOIN g_jornada_pausa_tipos pt ON pt.pausa_id = p.id
+      LEFT JOIN g_tipos_pausa tp ON tp.id = pt.tipo_pausa_id
+      WHERE p.id = ?
+      GROUP BY p.id
+    `, [pausa.id])
+
+    res.json({ ok: true, pausa: updated })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── TIPOS DE PAUSA ──────────────────────────────────────────────────
+
+// GET /api/gestion/tipos-pausa
+app.get('/api/gestion/tipos-pausa', requireAuth, async (req, res) => {
+  try {
+    const [tipos] = await db.gestion.query(
+      'SELECT * FROM g_tipos_pausa WHERE empresa = ? AND activa = 1 ORDER BY orden',
+      [req.empresa]
+    )
+    res.json({ ok: true, tipos })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/tipos-pausa
+app.post('/api/gestion/tipos-pausa', requireAuth, async (req, res) => {
+  try {
+    const { nombre, orden } = req.body
+    if (!nombre) return res.status(400).json({ error: 'Nombre requerido' })
+    const [result] = await db.gestion.query(
+      'INSERT INTO g_tipos_pausa (empresa, nombre, orden, usuario_creador, usuario_ult_modificacion) VALUES (?, ?, ?, ?, ?)',
+      [req.empresa, nombre, orden || 0, req.usuario.email, req.usuario.email]
+    )
+    const [[tipo]] = await db.gestion.query('SELECT * FROM g_tipos_pausa WHERE id = ?', [result.insertId])
+    res.status(201).json({ ok: true, tipo })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/tipos-pausa/:id
+app.put('/api/gestion/tipos-pausa/:id', requireAuth, async (req, res) => {
+  try {
+    const { nombre, activa, orden } = req.body
+    const sets = []; const params = []
+    if (nombre !== undefined) { sets.push('nombre = ?'); params.push(nombre) }
+    if (activa !== undefined) { sets.push('activa = ?'); params.push(activa) }
+    if (orden !== undefined)  { sets.push('orden = ?');  params.push(orden) }
+    if (!sets.length) return res.status(400).json({ error: 'Nada que actualizar' })
+
+    sets.push('usuario_ult_modificacion = ?')
+    params.push(req.usuario.email, req.params.id, req.empresa)
+
+    await db.gestion.query(
+      `UPDATE g_tipos_pausa SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`,
+      params
+    )
+    const [[tipo]] = await db.gestion.query('SELECT * FROM g_tipos_pausa WHERE id = ?', [req.params.id])
+    res.json({ ok: true, tipo })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── Fallback SPA ──────────────────────────────────────────────────
 app.use((req, res) => {
   const spa = path.join(__dirname, '../app/dist/spa/index.html')

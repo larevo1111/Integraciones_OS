@@ -126,8 +126,38 @@ GET  /api/gestion/pedido/:id             — detalle pedido/cotización
 GET  /api/gestion/pedido/:id/pdf         — PDF pedido via Playwright (requireAuth)
 ```
 
+## Módulo Jornadas — en diseño (2026-03-24)
+
+Spec completo: `.agent/specs/SPEC_JORNADAS.md`
+
+Sistema de check-in/check-out de jornada laboral con pausas. Header visible en todas las páginas del módulo.
+
+### Tablas nuevas (4)
+- `g_jornadas` — una fila por día por usuario. Hora inicio/fin reportada + auditoría inmutable
+- `g_jornada_pausas` — múltiples pausas por jornada, cada una con inicio/fin
+- `g_jornada_pausa_tipos` — puente M:N (multiselect de tipos por pausa)
+- `g_tipos_pausa` — catálogo: Almuerzo, Desayuno, Pausa Activa, Imprevisto, Otro
+
+### Componentes nuevos (4)
+- `JornadaHeader.vue` — header entre topbar y page-body en MainLayout
+- `JornadaPopover.vue` — confirmación iniciar/finalizar
+- `PausaDialog.vue` — multiselect tipos + observaciones
+- `jornadaStore.js` — estado reactivo + timer live
+
+### 3 estados del header
+1. Sin jornada → fecha + nombre + botón "Iniciar Jornada"
+2. Trabajando → hora inicio + timer vivo + Pausa/Fin + punto verde
+3. En pausa → timer pausado + tipo pausa + Reanudar + punto amarillo
+
+### Endpoints API (7)
+- GET /jornadas/hoy, POST /jornadas/iniciar, PUT /jornadas/:id/finalizar
+- PUT /jornadas/:id/editar, GET /jornadas/historial
+- POST /jornadas/:id/pausas/iniciar, PUT /jornadas/:id/pausas/:pausaId/reanudar
+- GET/POST/PUT /tipos-pausa (admin)
+
 ## Próximas fases pendientes
 
+- [ ] Implementar Módulo Jornadas (Fase 3.5 — spec aprobado)
 - [ ] Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
 - [ ] Push notifications FCM (Fase 4)
 - [ ] APK Android (Fase 4)

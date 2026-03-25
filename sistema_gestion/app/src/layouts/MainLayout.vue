@@ -153,6 +153,9 @@
         <slot name="topbar-actions" />
       </div>
 
+      <!-- Header jornada -->
+      <JornadaHeader />
+
       <!-- Contenido de la página -->
       <div class="page-body">
         <router-view />
@@ -220,6 +223,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
 import ProyectoModal from 'src/components/ProyectoModal.vue'
+import JornadaHeader from 'src/components/JornadaHeader.vue'
 
 const auth             = useAuthStore()
 const router           = useRouter()
