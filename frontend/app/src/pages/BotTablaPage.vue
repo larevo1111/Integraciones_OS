@@ -454,7 +454,7 @@ const activeAggregateCount = computed(() => Object.keys(columnAggregates.value).
 const hasAggregates        = computed(() => activeAggregateCount.value > 0)
 
 function computeAggregate(key, aggType, rows) {
-  const vals = rows.map(r => parseFloat(String(r[key] ?? '').replace(',', '.'))).filter(n => !isNaN(n))
+  const vals = rows.map(r => parseFloat(String(r[key] ?? '').replace(/,/g, ''))).filter(n => !isNaN(n))
   if (!vals.length) return null
   if (aggType === 'sum') return vals.reduce((a, b) => a + b, 0)
   if (aggType === 'avg') return vals.reduce((a, b) => a + b, 0) / vals.length
@@ -507,7 +507,9 @@ function isNumericKey(key) {
     const v = r[key]
     if (v === null || v === undefined || v === '') return true
     const s = String(v).trim()
-    return s !== '' && !isNaN(Number(s))
+    if (s === '') return true
+    // Soporta números formateados con coma de miles: "69,800" → "69800"
+    return !isNaN(Number(s.replace(/,/g, '')))
   })
 }
 function isNumeric(key) {
