@@ -3,7 +3,7 @@
     <Transition name="fade">
       <div v-if="modelValue" class="pd-overlay" @click="cerrar">
         <div class="pd-dialog" @click.stop>
-          <div class="pd-title">Iniciar Pausa</div>
+          <div class="pd-title">{{ retroactiva ? 'Agregar Pausa Pasada' : 'Iniciar Pausa' }}</div>
 
           <div class="pd-label">Tipo de pausa</div>
           <div class="pd-chips">
@@ -17,6 +17,21 @@
           </div>
           <div v-if="errorTipos" class="pd-error">Selecciona al menos un tipo</div>
 
+          <!-- Campos de tiempo para pausa retroactiva -->
+          <template v-if="retroactiva">
+            <div class="pd-row-2col" style="margin-top:12px">
+              <div>
+                <div class="pd-label">Hora inicio</div>
+                <input v-model="horaInicio" type="time" step="60" class="pd-time-input" />
+              </div>
+              <div>
+                <div class="pd-label">Hora fin</div>
+                <input v-model="horaFin" type="time" step="60" class="pd-time-input" />
+              </div>
+            </div>
+            <div v-if="errorTiempo" class="pd-error">{{ errorTiempo }}</div>
+          </template>
+
           <div class="pd-label" style="margin-top:12px">Observaciones <span class="pd-optional">(opcional)</span></div>
           <textarea
             v-model="observaciones"
@@ -27,7 +42,9 @@
 
           <div class="pd-actions">
             <button class="pd-btn pd-btn-cancel" @click="cerrar">Cancelar</button>
-            <button class="pd-btn pd-btn-confirm" @click="confirmar">Iniciar Pausa</button>
+            <button class="pd-btn pd-btn-confirm" @click="confirmar">
+              {{ retroactiva ? 'Guardar Pausa' : 'Iniciar Pausa' }}
+            </button>
           </div>
         </div>
       </div>
@@ -40,20 +57,34 @@ import { ref, watch } from 'vue'
 
 const props = defineProps({
   modelValue: Boolean,
-  tipos: { type: Array, default: () => [] }
+  tipos: { type: Array, default: () => [] },
+  retroactiva: { type: Boolean, default: false },
+  fecha: { type: String, default: '' }   // 'YYYY-MM-DD' para construir datetime
 })
 
 const emit = defineEmits(['update:modelValue', 'confirmar'])
 
 const seleccionados = ref([])
 const observaciones = ref('')
-const errorTipos = ref(false)
+const horaInicio    = ref('')
+const horaFin       = ref('')
+const errorTipos    = ref(false)
+const errorTiempo   = ref('')
 
 watch(() => props.modelValue, (v) => {
   if (v) {
     seleccionados.value = []
     observaciones.value = ''
-    errorTipos.value = false
+    errorTipos.value    = false
+    errorTiempo.value   = ''
+    // Valores por defecto para retroactiva: hace 30 y 15 min
+    if (props.retroactiva) {
+      const ahora = new Date()
+      const hace30 = new Date(ahora - 30 * 60000)
+      const hace15 = new Date(ahora - 15 * 60000)
+      horaInicio.value = hace30.toTimeString().slice(0, 5)
+      horaFin.value    = hace15.toTimeString().slice(0, 5)
+    }
   }
 })
 
@@ -64,19 +95,27 @@ function toggleTipo(id) {
   errorTipos.value = false
 }
 
-function cerrar() {
-  emit('update:modelValue', false)
-}
+function cerrar() { emit('update:modelValue', false) }
 
 function confirmar() {
-  if (!seleccionados.value.length) {
-    errorTipos.value = true
-    return
+  if (!seleccionados.value.length) { errorTipos.value = true; return }
+
+  if (props.retroactiva) {
+    if (!horaInicio.value || !horaFin.value) { errorTiempo.value = 'Completa los dos horarios'; return }
+    const fecha = props.fecha || new Date().toISOString().slice(0, 10)
+    const ini   = new Date(`${fecha}T${horaInicio.value}:00`)
+    const fin   = new Date(`${fecha}T${horaFin.value}:00`)
+    if (fin <= ini) { errorTiempo.value = 'La hora de fin debe ser después del inicio'; return }
+
+    emit('confirmar', {
+      tipos: seleccionados.value,
+      observaciones: observaciones.value.trim(),
+      hora_inicio: ini.toISOString(),
+      hora_fin:    fin.toISOString()
+    })
+  } else {
+    emit('confirmar', { tipos: seleccionados.value, observaciones: observaciones.value.trim() })
   }
-  emit('confirmar', {
-    tipos: seleccionados.value,
-    observaciones: observaciones.value.trim()
-  })
   cerrar()
 }
 </script>
@@ -105,13 +144,11 @@ function confirmar() {
 .pd-label {
   font-size: 12px; font-weight: 500;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .pd-optional { color: var(--text-tertiary); font-weight: 400; }
 
-.pd-chips {
-  display: flex; flex-wrap: wrap; gap: 6px;
-}
+.pd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pd-chip {
   padding: 5px 12px;
   border-radius: var(--radius-full);
@@ -129,14 +166,26 @@ function confirmar() {
   color: var(--accent);
 }
 
-.pd-error {
-  font-size: 11px; color: var(--color-error, #ef5350);
-  margin-top: 4px;
+.pd-row-2col {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
 }
+.pd-time-input {
+  width: 100%;
+  background: var(--bg-input, var(--bg-card));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 14px; font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.pd-time-input:focus { outline: none; border-color: var(--accent); }
+
+.pd-error { font-size: 11px; color: var(--color-error, #ef5350); margin-top: 4px; }
 
 .pd-textarea {
   width: 100%;
-  background: var(--bg-surface, var(--bg-card));
+  background: var(--bg-input, var(--bg-card));
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 8px 10px;
@@ -160,16 +209,9 @@ function confirmar() {
   border: 1px solid var(--border-default);
   transition: background 80ms;
 }
-.pd-btn-cancel {
-  background: transparent;
-  color: var(--text-secondary);
-}
+.pd-btn-cancel { background: transparent; color: var(--text-secondary); }
 .pd-btn-cancel:hover { background: var(--bg-row-hover); }
-.pd-btn-confirm {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
+.pd-btn-confirm { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pd-btn-confirm:hover { background: var(--accent-hover); }
 
 .fade-enter-active, .fade-leave-active { transition: opacity 150ms; }

@@ -3,13 +3,18 @@
     <div class="jp-overlay" @click="$emit('cancelar')">
       <div class="jp-popover" :style="posStyle" @click.stop>
         <div class="jp-title">{{ titulo }}</div>
-        <div class="jp-hora">
-          <span class="material-icons" style="font-size:18px;color:var(--text-tertiary)">schedule</span>
-          {{ hora }}
+        <div class="jp-hora-wrap">
+          <span class="material-icons" style="font-size:16px;color:var(--text-tertiary)">schedule</span>
+          <input
+            v-model="horaEditable"
+            type="time"
+            step="60"
+            class="jp-hora-input"
+          />
         </div>
         <div class="jp-actions">
           <button class="jp-btn jp-btn-cancel" @click="$emit('cancelar')">Cancelar</button>
-          <button class="jp-btn jp-btn-confirm" @click="$emit('confirmar')">Confirmar</button>
+          <button class="jp-btn jp-btn-confirm" @click="confirmar">Confirmar</button>
         </div>
       </div>
     </div>
@@ -21,20 +26,32 @@ import { computed, onMounted, ref } from 'vue'
 
 const props = defineProps({
   titulo: String,
-  hora: String,
+  fecha: String,   // 'YYYY-MM-DD' — para construir el datetime completo
   anchorEl: Object
 })
 
-defineEmits(['confirmar', 'cancelar'])
+const emit = defineEmits(['confirmar', 'cancelar'])
 
 const anchorRect = ref(null)
+const horaEditable = ref('')
 
 onMounted(() => {
+  // Inicializar con la hora actual en formato HH:MM
+  const ahora = new Date()
+  horaEditable.value = ahora.toTimeString().slice(0, 5)
+
   if (props.anchorEl) {
     const el = props.anchorEl.$el || props.anchorEl
     anchorRect.value = el.getBoundingClientRect()
   }
 })
+
+function confirmar() {
+  // Construir datetime completo combinando fecha del día + hora editada por el usuario
+  const fecha = props.fecha || new Date().toISOString().slice(0, 10)
+  const datetime = `${fecha}T${horaEditable.value}:00`
+  emit('confirmar', new Date(datetime).toISOString())
+}
 
 const posStyle = computed(() => {
   if (!anchorRect.value) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
@@ -59,20 +76,34 @@ const posStyle = computed(() => {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: 14px 16px;
-  min-width: 200px;
+  min-width: 210px;
   z-index: 9001;
 }
 .jp-title {
-  font-size: 13px; font-weight: 600;
-  color: var(--text-primary);
+  font-size: 12px; font-weight: 600;
+  color: var(--text-secondary);
   margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.jp-hora {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 20px; font-weight: 600;
+.jp-hora-wrap {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px;
+}
+.jp-hora-input {
+  font-size: 22px; font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-default);
+  padding: 2px 4px;
+  width: 100px;
+  cursor: pointer;
+}
+.jp-hora-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 .jp-actions {
   display: flex; gap: 8px; justify-content: flex-end;

@@ -1605,6 +1605,7 @@ app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
 })
 
 // POST /api/gestion/jornadas/iniciar — crear jornada del día
+// Body opcional: { hora_inicio } — hora reportada por el usuario (si omite, usa NOW())
 app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
   try {
     const ahora = new Date()
@@ -1617,10 +1618,13 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
     )
     if (existe) return res.status(409).json({ error: 'Ya existe una jornada para hoy' })
 
+    // hora_inicio = valor del usuario (editable), hora_inicio_registro = momento real del click (inmutable)
+    const horaInicio = req.body.hora_inicio ? new Date(req.body.hora_inicio) : ahora
+
     const [result] = await db.gestion.query(`
       INSERT INTO g_jornadas (empresa, usuario, fecha, hora_inicio, hora_inicio_registro, usuario_creador, usuario_ult_modificacion)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [req.empresa, req.usuario.email, hoy, ahora, ahora, req.usuario.email, req.usuario.email])
+    `, [req.empresa, req.usuario.email, hoy, horaInicio, ahora, req.usuario.email, req.usuario.email])
 
     const [[jornada]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [result.insertId])
     jornada.pausas = []
@@ -1646,10 +1650,12 @@ app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => 
     if (pausaAbierta) return res.status(409).json({ error: 'Hay una pausa activa. Reanuda antes de finalizar.' })
 
     const ahora = new Date()
+    // hora_fin = valor del usuario (editable), hora_fin_registro = momento real del click (inmutable)
+    const horaFin = req.body.hora_fin ? new Date(req.body.hora_fin) : ahora
     await db.gestion.query(`
       UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ?
       WHERE id = ?
-    `, [ahora, ahora, req.usuario.email, jornada.id])
+    `, [horaFin, ahora, req.usuario.email, jornada.id])
 
     const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [jornada.id])
     res.json({ ok: true, jornada: updated })
@@ -1741,16 +1747,30 @@ app.post('/api/gestion/jornadas/:id/pausas/iniciar', requireAuth, async (req, re
     )
     if (pausaAbierta) return res.status(409).json({ error: 'Ya hay una pausa activa' })
 
-    const { tipos, observaciones } = req.body
+    const { tipos, observaciones, hora_inicio: hiBody, hora_fin: hfBody } = req.body
     if (!tipos || !Array.isArray(tipos) || !tipos.length) {
       return res.status(400).json({ error: 'Debes seleccionar al menos un tipo de pausa' })
     }
 
     const ahora = new Date()
+    // Pausa retroactiva: si vienen hora_inicio y hora_fin del body → pausa completa inmediata
+    // Pausa normal: hora_inicio = ahora, hora_fin = NULL (se cierra después con /reanudar)
+    const horaInicioPausa = hiBody ? new Date(hiBody) : ahora
+    const horaFinPausa    = hfBody ? new Date(hfBody) : null
+
+    // Si NO es retroactiva, verificar que no haya otra pausa abierta
+    if (!hfBody) {
+      const [[pausaAbierta]] = await db.gestion.query(
+        'SELECT id FROM g_jornada_pausas WHERE jornada_id = ? AND hora_fin IS NULL',
+        [jornada.id]
+      )
+      if (pausaAbierta) return res.status(409).json({ error: 'Ya hay una pausa activa' })
+    }
+
     const [result] = await db.gestion.query(`
-      INSERT INTO g_jornada_pausas (empresa, jornada_id, hora_inicio, hora_inicio_registro, observaciones, usuario_creador, usuario_ult_modificacion)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [req.empresa, jornada.id, ahora, ahora, observaciones || null, req.usuario.email, req.usuario.email])
+      INSERT INTO g_jornada_pausas (empresa, jornada_id, hora_inicio, hora_inicio_registro, hora_fin, hora_fin_registro, observaciones, usuario_creador, usuario_ult_modificacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [req.empresa, jornada.id, horaInicioPausa, ahora, horaFinPausa, horaFinPausa ? ahora : null, observaciones || null, req.usuario.email, req.usuario.email])
 
     // Insertar tipos de pausa (M:N)
     const vals = tipos.map(tipoId => [result.insertId, tipoId, req.empresa, req.usuario.email])
@@ -1784,9 +1804,11 @@ app.put('/api/gestion/jornadas/:id/pausas/:pausaId/reanudar', requireAuth, async
     if (pausa.hora_fin) return res.status(409).json({ error: 'La pausa ya fue cerrada' })
 
     const ahora = new Date()
+    // hora_fin = valor del usuario (editable), hora_fin_registro = momento real del click (inmutable)
+    const horaFinPausa = req.body.hora_fin ? new Date(req.body.hora_fin) : ahora
     await db.gestion.query(
       'UPDATE g_jornada_pausas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ? WHERE id = ?',
-      [ahora, ahora, req.usuario.email, pausa.id]
+      [horaFinPausa, ahora, req.usuario.email, pausa.id]
     )
 
     const [[updated]] = await db.gestion.query(`
@@ -1799,6 +1821,80 @@ app.put('/api/gestion/jornadas/:id/pausas/:pausaId/reanudar', requireAuth, async
     `, [pausa.id])
 
     res.json({ ok: true, pausa: updated })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/jornadas/:id/reabrir
+// Permisos: dueño dentro de 1 hora desde cierre, O nivel >= 7
+app.put('/api/gestion/jornadas/:id/reabrir', requireAuth, async (req, res) => {
+  try {
+    const [[jornada]] = await db.gestion.query(
+      'SELECT * FROM g_jornadas WHERE id = ? AND empresa = ?',
+      [req.params.id, req.empresa]
+    )
+    if (!jornada) return res.status(404).json({ error: 'Jornada no encontrada' })
+    if (!jornada.hora_fin) return res.status(409).json({ error: 'La jornada no está finalizada' })
+
+    const esDueno  = jornada.usuario === req.usuario.email
+    const esAdmin  = (req.usuario.nivel || 1) >= 7
+    const msDesde  = Date.now() - new Date(jornada.hora_fin_registro).getTime()
+    const dentroVentana = msDesde <= 60 * 60 * 1000 // 1 hora
+
+    if (!esAdmin && !(esDueno && dentroVentana)) {
+      return res.status(403).json({ error: 'Sin permiso para reabrir esta jornada' })
+    }
+
+    await db.gestion.query(
+      'UPDATE g_jornadas SET hora_fin = NULL, hora_fin_registro = NULL, usuario_ult_modificacion = ? WHERE id = ?',
+      [req.usuario.email, jornada.id]
+    )
+
+    const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [jornada.id])
+    const [pausas] = await db.gestion.query(`
+      SELECT p.*, GROUP_CONCAT(tp.nombre ORDER BY tp.orden SEPARATOR ', ') AS tipos_nombre
+      FROM g_jornada_pausas p
+      LEFT JOIN g_jornada_pausa_tipos pt ON pt.pausa_id = p.id
+      LEFT JOIN g_tipos_pausa tp ON tp.id = pt.tipo_pausa_id
+      WHERE p.jornada_id = ? GROUP BY p.id ORDER BY p.hora_inicio
+    `, [jornada.id])
+    updated.pausas = pausas
+    res.json({ ok: true, jornada: updated })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/jornadas/equipo — jornadas de hoy para TODOS los usuarios (admin)
+// Incluye cálculos: tiempo_total_min, tiempo_pausa_min, tiempo_laborado_min
+app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
+  try {
+    const fecha = req.query.fecha || new Date().toISOString().slice(0, 10)
+    const [jornadas] = await db.gestion.query(`
+      SELECT
+        j.*,
+        su.Nombre_Usuario   AS nombre_usuario,
+        su.Nivel_Acceso     AS nivel_usuario,
+        COALESCE(
+          SUM(CASE WHEN p.hora_fin IS NOT NULL
+            THEN TIMESTAMPDIFF(MINUTE, p.hora_inicio, p.hora_fin) ELSE 0 END), 0
+        ) AS tiempo_pausa_min,
+        CASE
+          WHEN j.hora_fin IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, j.hora_fin)
+          WHEN j.hora_inicio IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, NOW())
+          ELSE 0
+        END AS tiempo_total_min
+      FROM g_jornadas j
+      LEFT JOIN u768061575_os_comunidad.sys_usuarios su ON su.\`Email\` = j.usuario
+      LEFT JOIN g_jornada_pausas p ON p.jornada_id = j.id
+      WHERE j.empresa = ? AND j.fecha = ?
+      GROUP BY j.id
+      ORDER BY COALESCE(su.Nivel_Acceso, 0) DESC, su.Nombre_Usuario
+    `, [req.empresa, fecha])
+
+    // tiempo_laborado = total - pausas
+    jornadas.forEach(j => {
+      j.tiempo_laborado_min = Math.max(0, (j.tiempo_total_min || 0) - (j.tiempo_pausa_min || 0))
+    })
+
+    res.json({ ok: true, fecha, jornadas })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 

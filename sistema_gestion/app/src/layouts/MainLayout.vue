@@ -144,6 +144,9 @@
 
     <!-- MAIN -->
     <div class="main-content">
+      <!-- Header jornada — arriba de todo -->
+      <JornadaHeader />
+
       <!-- Topbar mobile -->
       <div class="topbar">
         <button class="btn-icon d-mobile-only" @click="drawerOpen = true">
@@ -152,9 +155,6 @@
         <span class="topbar-title">{{ tituloRuta }}</span>
         <slot name="topbar-actions" />
       </div>
-
-      <!-- Header jornada -->
-      <JornadaHeader />
 
       <!-- Contenido de la página -->
       <div class="page-body">
