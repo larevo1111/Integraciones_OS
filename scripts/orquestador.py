@@ -217,6 +217,15 @@ def enviar_email(env, asunto, cuerpo):
         log.error(f'Error enviando email: {e}')
 
 
+def _escape_html(text):
+    """Escapa caracteres especiales de HTML para que Telegram no rechace el mensaje."""
+    # Escapar &, <, > pero preservar tags HTML intencionales (<b>, </b>)
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    # Restaurar <b> y </b> que usamos en las notificaciones
+    text = text.replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
+    return text
+
+
 def enviar_telegram(env, mensaje):
     # Usar bot de notificaciones si está configurado, sino caer al bot de IA (legacy)
     token   = env.get('TELEGRAM_NOTIF_BOT_TOKEN') or env.get('TELEGRAM_BOT_TOKEN', '')
@@ -225,6 +234,11 @@ def enviar_telegram(env, mensaje):
     if not token or not chat_id:
         log.warning('📱 Telegram no configurado en .env — omitiendo.')
         return
+
+    # Escapar HTML y truncar a 4096 chars (límite Telegram)
+    mensaje = _escape_html(mensaje)
+    if len(mensaje) > 4090:
+        mensaje = mensaje[:4087] + '...'
 
     try:
         url  = f'https://api.telegram.org/bot{token}/sendMessage'
@@ -496,7 +510,7 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
 """
     enviar_email(env, asunto, cuerpo)
 
-    # ── 6. Telegram (solo en error) ──────────────────────────────
+    # ── 6. Telegram (siempre — éxito corto, error detallado) ─────
     if hay_error:
         partes = [f'<b>⚠️ Pipeline Effi — ERROR</b>', f'📅 {ahora}']
 
@@ -527,9 +541,14 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
             icono_paso = '❌' if exit_code != 0 else '✅'
             # Solo mostrar los que fallaron + import (siempre útil)
             if exit_code != 0 or nombre == 'Import':
-                partes.append(f'{icono_paso} {nombre}: {resumen}')
+                # Para resumen multilinea, solo mostrar primera línea (resumen) en Telegram
+                resumen_corto = resumen.split('\n')[0] if '\n' in resumen else resumen
+                partes.append(f'{icono_paso} {nombre}: {resumen_corto}')
 
         enviar_telegram(env, '\n'.join(partes))
+    else:
+        # Notificación corta de éxito
+        enviar_telegram(env, f'✅ <b>Pipeline Effi — OK</b>\n📅 {ahora}\n⏱ {dur_total}s')
 
 
 if __name__ == '__main__':
