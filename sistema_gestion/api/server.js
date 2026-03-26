@@ -1589,12 +1589,17 @@ app.delete('/api/gestion/etiquetas/:id', async (req, res) => {
 // GET /api/gestion/jornadas/hoy — jornada del día del usuario actual + pausas
 app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
   try {
-    const hoy = new Date().toISOString().slice(0, 10)
-    // Preferir jornada activa (sin hora_fin); si no, la más reciente del día
+    const hoy  = new Date().toISOString().slice(0, 10)
+    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    // Preferir jornada activa (sin hora_fin) de hoy o ayer (turno nocturno);
+    // si no, la más reciente de hoy
     const [[jornada]] = await db.gestion.query(
-      `SELECT * FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ?
+      `SELECT * FROM g_jornadas
+       WHERE empresa = ? AND usuario = ? AND (
+         fecha = ? OR (fecha = ? AND hora_fin IS NULL)
+       )
        ORDER BY CASE WHEN hora_fin IS NULL THEN 0 ELSE 1 END, id DESC LIMIT 1`,
-      [req.empresa, req.usuario.email, hoy]
+      [req.empresa, req.usuario.email, hoy, ayer]
     )
     if (!jornada) return res.json({ ok: true, jornada: null })
 
