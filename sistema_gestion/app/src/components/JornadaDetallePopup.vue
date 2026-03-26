@@ -27,7 +27,7 @@
               </div>
               <div class="field">
                 <span class="field-label">Fecha</span>
-                <span class="field-val">{{ jornada.fecha }}</span>
+                <span class="field-val">{{ fmtFecha(jornada.fecha) }}</span>
               </div>
               <div class="field">
                 <span class="field-label">Inicio</span>
@@ -219,6 +219,13 @@ async function reabrir() {
   }
 }
 
+function fmtFecha(val) {
+  if (!val) return '—'
+  // fecha puede llegar como '2026-03-26' o '2026-03-26T05:00:00.000Z'
+  const s = String(val).slice(0, 10) // tomar solo YYYY-MM-DD
+  const [y, m, d] = s.split('-')
+  return `${d}/${m}/${y}`
+}
 function fmt(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
