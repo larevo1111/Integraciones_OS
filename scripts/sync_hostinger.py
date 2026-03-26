@@ -76,28 +76,11 @@ def sync_tabla(conn_src, cursor_src, cursor_dst, conn_dst, tabla):
     create_sql_dst = create_sql.replace('ENGINE=Aria', 'ENGINE=InnoDB') \
                                .replace('PAGE_CHECKSUM=1', '') \
                                .replace('TRANSACTIONAL=1', '')
-    # CREATE TABLE IF NOT EXISTS
-    create_sql_dst = create_sql_dst.replace(
-        f'CREATE TABLE `{tabla}`',
-        f'CREATE TABLE IF NOT EXISTS `{tabla}`',
-        1
-    )
-    # Para tablas resumen_ y codigos_ciudades_dane: DROP + CREATE para asegurar schema actualizado
-    if tabla.startswith('resumen_') or tabla == 'codigos_ciudades_dane':
-        cursor_dst.execute(f"DROP TABLE IF EXISTS `{tabla}`")
-        conn_dst.commit()
-        final_sql = create_sql_dst.replace(
-            f'CREATE TABLE IF NOT EXISTS `{tabla}`',
-            f'CREATE TABLE `{tabla}`',
-            1
-        )
-    else:
-        final_sql = create_sql_dst
-    cursor_dst.execute(final_sql)
+    # DROP + CREATE siempre para asegurar schema actualizado
+    # (Effi puede cambiar nombres de columnas en cualquier momento)
+    cursor_dst.execute(f"DROP TABLE IF EXISTS `{tabla}`")
     conn_dst.commit()
-
-    # 2. TRUNCATE (para tablas zeffi_; resumen_ ya están vacías tras DROP+CREATE)
-    cursor_dst.execute(f"TRUNCATE TABLE `{tabla}`")
+    cursor_dst.execute(create_sql_dst)
     conn_dst.commit()
 
     # 3. Leer columnas (cursor independiente para no mezclar resultados)
@@ -199,7 +182,8 @@ def main():
 
     dur = int((datetime.datetime.now() - inicio).total_seconds())
     ok  = len(tablas) - len(errores)
-    print(f'\n✅ sync_hostinger — {ok}/{len(tablas)} tablas OK  ❌ {len(errores)} errores  [{dur}s]')
+    err_txt = f'  ❌ {len(errores)} errores' if errores else ''
+    print(f'\n✅ sync_hostinger — {ok}/{len(tablas)} tablas OK{err_txt}  [{dur}s]')
 
     if errores:
         sys.exit(1)

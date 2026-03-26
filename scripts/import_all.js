@@ -210,5 +210,6 @@ async function importTable(conn, tableName, headers, rows) {
 
   await conn.end();
   console.log(`\n─────────────────────────────`);
-  console.log(`✅ ${ok} tablas importadas  ❌ ${err} errores`);
+  const errMsg = err > 0 ? `  ❌ ${err} errores` : '';
+  console.log(`✅ ${ok} tablas importadas${errMsg}`);
 })();
