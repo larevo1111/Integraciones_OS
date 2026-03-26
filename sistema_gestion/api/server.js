@@ -1796,34 +1796,30 @@ app.post('/api/gestion/jornadas/:id/pausas/iniciar', requireAuth, async (req, re
       [req.params.id, req.empresa]
     )
     if (!jornada) return res.status(404).json({ error: 'Jornada no encontrada' })
-    if (jornada.hora_fin) return res.status(409).json({ error: 'La jornada ya fue finalizada' })
-
-    // Verificar que no haya otra pausa abierta
-    const [[pausaAbierta]] = await db.gestion.query(
-      'SELECT id FROM g_jornada_pausas WHERE jornada_id = ? AND hora_fin IS NULL',
-      [jornada.id]
-    )
-    if (pausaAbierta) return res.status(409).json({ error: 'Ya hay una pausa activa' })
 
     const { tipos, observaciones, hora_inicio: hiBody, hora_fin: hfBody } = req.body
-    if (!tipos || !Array.isArray(tipos) || !tipos.length) {
-      return res.status(400).json({ error: 'Debes seleccionar al menos un tipo de pausa' })
-    }
+    const esRetroactiva = hiBody && hfBody // pausa completa retroactiva
 
-    const ahora = new Date()
-    // Pausa retroactiva: si vienen hora_inicio y hora_fin del body → pausa completa inmediata
-    // Pausa normal: hora_inicio = ahora, hora_fin = NULL (se cierra después con /reanudar)
-    const horaInicioPausa = hiBody ? new Date(hiBody) : ahora
-    const horaFinPausa    = hfBody ? new Date(hfBody) : null
+    // Solo bloquear jornadas finalizadas si NO es retroactiva
+    if (jornada.hora_fin && !esRetroactiva) return res.status(409).json({ error: 'La jornada ya fue finalizada' })
 
-    // Si NO es retroactiva, verificar que no haya otra pausa abierta
-    if (!hfBody) {
+    // Verificar que no haya otra pausa abierta (solo si no es retroactiva)
+    if (!esRetroactiva) {
       const [[pausaAbierta]] = await db.gestion.query(
         'SELECT id FROM g_jornada_pausas WHERE jornada_id = ? AND hora_fin IS NULL',
         [jornada.id]
       )
       if (pausaAbierta) return res.status(409).json({ error: 'Ya hay una pausa activa' })
     }
+    if (!tipos || !Array.isArray(tipos) || !tipos.length) {
+      return res.status(400).json({ error: 'Debes seleccionar al menos un tipo de pausa' })
+    }
+
+    const ahora = new Date()
+    // Pausa retroactiva: hora_inicio y hora_fin del body → pausa completa inmediata
+    // Pausa normal: hora_inicio = ahora, hora_fin = NULL (se cierra después con /reanudar)
+    const horaInicioPausa = hiBody ? new Date(hiBody) : ahora
+    const horaFinPausa    = hfBody ? new Date(hfBody) : null
 
     const [result] = await db.gestion.query(`
       INSERT INTO g_jornada_pausas (empresa, jornada_id, hora_inicio, hora_inicio_registro, hora_fin, hora_fin_registro, observaciones, usuario_creador, usuario_ult_modificacion)

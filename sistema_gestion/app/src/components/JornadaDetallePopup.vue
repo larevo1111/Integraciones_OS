@@ -6,7 +6,8 @@
         <!-- Header -->
         <div class="modal-header">
           <div class="modal-header-left">
-            <span class="modal-title">Detalle Jornada</span>
+            <span class="modal-title">Jornada</span>
+            <span class="modal-fecha">{{ fmtFechaConDia(jornada.fecha) }}</span>
             <span class="badge" :class="badgeClass">{{ estadoLabel }}</span>
           </div>
           <button class="modal-close" @click="$emit('cerrar')">
@@ -17,18 +18,21 @@
         <!-- Body -->
         <div class="modal-body">
 
-          <!-- Sección: Jornada -->
+          <!-- Fila: Usuario + Nombre -->
           <div class="sec">
-            <div class="sec-label">Jornada</div>
-            <div class="fields-grid">
+            <div class="row-2col">
               <div class="field">
                 <span class="field-label">Usuario</span>
-                <span class="field-val">{{ jornada.Nombre_Usuario || jornada.usuario }}</span>
+                <span class="field-val">{{ jornada.usuario }}</span>
               </div>
               <div class="field">
-                <span class="field-label">Fecha</span>
-                <span class="field-val">{{ fmtFecha(jornada.fecha) }}</span>
+                <span class="field-label">Nombre</span>
+                <span class="field-val">{{ jornada.Nombre_Usuario || '—' }}</span>
               </div>
+            </div>
+
+            <!-- Fila: Inicio + Fin -->
+            <div class="row-2col" style="margin-top:10px">
               <div class="field">
                 <span class="field-label">Inicio</span>
                 <span v-if="!editando" class="field-val">{{ fmt(jornada.hora_inicio) }}</span>
@@ -41,6 +45,14 @@
                 <input v-else v-model="editHoraFin" type="datetime-local" class="field-input" />
                 <span v-if="jornada.hora_fin_registro" class="field-audit">registro: {{ fmt(jornada.hora_fin_registro) }}</span>
               </div>
+            </div>
+
+            <!-- Fila: Tiempos -->
+            <div class="row-3col" style="margin-top:10px">
+              <div class="field">
+                <span class="field-label">T. Laborado</span>
+                <span class="field-val td-laborado">{{ formatMins(jornada.tiempo_laborado_min) }}</span>
+              </div>
               <div class="field">
                 <span class="field-label">T. Total</span>
                 <span class="field-val">{{ formatMins(jornada.tiempo_total_min) }}</span>
@@ -49,14 +61,10 @@
                 <span class="field-label">T. Pausas</span>
                 <span class="field-val td-pausa">{{ formatMins(jornada.tiempo_pausa_min) }}</span>
               </div>
-              <div class="field">
-                <span class="field-label">T. Laborado</span>
-                <span class="field-val td-laborado">{{ formatMins(jornada.tiempo_laborado_min) }}</span>
-              </div>
             </div>
 
             <!-- Observaciones -->
-            <div class="field field-full" style="margin-top:8px">
+            <div class="field" style="margin-top:10px">
               <span class="field-label">Observaciones</span>
               <span v-if="!editando" class="field-val">{{ jornada.observaciones || '—' }}</span>
               <textarea v-else v-model="editObservaciones" class="field-textarea" rows="2" placeholder="Sin observaciones" />
@@ -65,16 +73,22 @@
 
           <!-- Sección: Pausas -->
           <div class="sec">
-            <div class="sec-label">Pausas ({{ pausas.length }})</div>
-            <div v-if="!pausas.length" class="empty-pausas">Sin pausas registradas</div>
-            <table v-else class="pausas-table">
+            <div class="sec-header-row">
+              <div class="sec-label">Pausas ({{ pausas.length }})</div>
+              <button v-if="esAdmin" class="btn-add-pausa" @click="abrirNuevaPausa">
+                <span class="material-icons" style="font-size:14px">add</span>
+                Añadir pausa
+              </button>
+            </div>
+            <div v-if="!pausas.length && !mostrarFormPausa" class="empty-pausas">Sin pausas registradas</div>
+            <table v-if="pausas.length" class="pausas-table">
               <thead>
                 <tr>
                   <th class="pth">Tipo</th>
                   <th class="pth">Inicio</th>
                   <th class="pth">Fin</th>
                   <th class="pth">Duración</th>
-                  <th class="pth">Observaciones</th>
+                  <th class="pth">Obs.</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,6 +101,42 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- Form inline para añadir pausa retroactiva -->
+            <div v-if="mostrarFormPausa" class="nueva-pausa-form">
+              <div class="npf-label">Nueva pausa</div>
+              <div class="npf-chips">
+                <button
+                  v-for="t in tiposPausa"
+                  :key="t.id"
+                  class="npf-chip"
+                  :class="{ selected: npTipos.includes(t.id) }"
+                  @click="toggleNpTipo(t.id)"
+                >{{ t.nombre }}</button>
+              </div>
+              <div v-if="npErrorTipos" class="npf-error">Selecciona al menos un tipo</div>
+              <div class="row-2col" style="margin-top:8px">
+                <div class="field">
+                  <span class="field-label">Hora inicio</span>
+                  <input v-model="npHoraInicio" type="time" step="60" class="field-input" />
+                </div>
+                <div class="field">
+                  <span class="field-label">Hora fin</span>
+                  <input v-model="npHoraFin" type="time" step="60" class="field-input" />
+                </div>
+              </div>
+              <div v-if="npErrorTiempo" class="npf-error">{{ npErrorTiempo }}</div>
+              <div class="field" style="margin-top:8px">
+                <span class="field-label">Observaciones <span style="color:var(--text-tertiary);font-weight:400">(opcional)</span></span>
+                <textarea v-model="npObservaciones" class="field-textarea" rows="1" placeholder="Comentario..." />
+              </div>
+              <div class="npf-actions">
+                <button class="btn-admin btn-cancel" @click="cerrarFormPausa">Cancelar</button>
+                <button class="btn-admin btn-guardar" :disabled="guardandoPausa" @click="guardarNuevaPausa">
+                  {{ guardandoPausa ? 'Guardando...' : 'Guardar pausa' }}
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Sección: Acciones admin -->
@@ -127,7 +177,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from 'src/services/api'
 
 const props = defineProps({
@@ -136,8 +186,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['cerrar', 'actualizada'])
 
-// Pausas desde la jornada cargada en equipo (viene con pausas incluidas si el endpoint las trae)
-// Si no vienen, mostramos vacío
 const pausas = computed(() => props.jornada.pausas || [])
 
 // Estado
@@ -159,7 +207,7 @@ const puedeReabrir = computed(() => {
   return ms < 60 * 60 * 1000
 })
 
-// Edición
+// Edición jornada
 const editando          = ref(false)
 const editHoraInicio    = ref('')
 const editHoraFin       = ref('')
@@ -167,6 +215,80 @@ const editObservaciones = ref('')
 const guardando         = ref(false)
 const reabriendo        = ref(false)
 const error             = ref('')
+
+// Nueva pausa
+const tiposPausa       = ref([])
+const mostrarFormPausa = ref(false)
+const npTipos          = ref([])
+const npHoraInicio     = ref('')
+const npHoraFin        = ref('')
+const npObservaciones  = ref('')
+const npErrorTipos     = ref(false)
+const npErrorTiempo    = ref('')
+const guardandoPausa   = ref(false)
+
+onMounted(async () => {
+  if (props.esAdmin) {
+    try {
+      const data = await api('/api/gestion/tipos-pausa')
+      tiposPausa.value = data || []
+    } catch { /* silencio */ }
+  }
+})
+
+function toggleNpTipo(id) {
+  const idx = npTipos.value.indexOf(id)
+  if (idx >= 0) npTipos.value.splice(idx, 1)
+  else npTipos.value.push(id)
+  npErrorTipos.value = false
+}
+
+function abrirNuevaPausa() {
+  npTipos.value = []
+  npObservaciones.value = ''
+  npErrorTipos.value = false
+  npErrorTiempo.value = ''
+  // Defaults: hace 30 y 15 min
+  const ahora = new Date()
+  const hace30 = new Date(ahora - 30 * 60000)
+  const hace15 = new Date(ahora - 15 * 60000)
+  npHoraInicio.value = hace30.toTimeString().slice(0, 5)
+  npHoraFin.value    = hace15.toTimeString().slice(0, 5)
+  mostrarFormPausa.value = true
+}
+
+function cerrarFormPausa() { mostrarFormPausa.value = false }
+
+async function guardarNuevaPausa() {
+  if (!npTipos.value.length) { npErrorTipos.value = true; return }
+  if (!npHoraInicio.value || !npHoraFin.value) { npErrorTiempo.value = 'Completa los dos horarios'; return }
+
+  // Construir datetime usando la fecha de la jornada
+  const fecha = String(props.jornada.fecha).slice(0, 10)
+  const ini = new Date(`${fecha}T${npHoraInicio.value}:00`)
+  const fin = new Date(`${fecha}T${npHoraFin.value}:00`)
+  if (fin <= ini) { npErrorTiempo.value = 'La hora de fin debe ser después del inicio'; return }
+
+  guardandoPausa.value = true
+  npErrorTiempo.value = ''
+  try {
+    await api(`/api/gestion/jornadas/${props.jornada.id}/pausas/iniciar`, {
+      method: 'POST',
+      body: JSON.stringify({
+        tipos: npTipos.value,
+        observaciones: npObservaciones.value.trim() || null,
+        hora_inicio: ini.toISOString(),
+        hora_fin: fin.toISOString(),
+      })
+    })
+    mostrarFormPausa.value = false
+    emit('actualizada')
+  } catch (e) {
+    npErrorTiempo.value = e.message || 'Error al guardar pausa'
+  } finally {
+    guardandoPausa.value = false
+  }
+}
 
 function toLocalISO(iso) {
   if (!iso) return ''
@@ -219,13 +341,17 @@ async function reabrir() {
   }
 }
 
-function fmtFecha(val) {
-  if (!val) return '—'
-  // fecha puede llegar como '2026-03-26' o '2026-03-26T05:00:00.000Z'
-  const s = String(val).slice(0, 10) // tomar solo YYYY-MM-DD
+const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function fmtFechaConDia(val) {
+  if (!val) return ''
+  const s = String(val).slice(0, 10)
   const [y, m, d] = s.split('-')
-  return `${d}/${m}/${y}`
+  const date = new Date(Number(y), Number(m) - 1, Number(d))
+  return `${DIAS[date.getDay()]} ${Number(d)} ${MESES[date.getMonth()]} ${y}`
 }
+
 function fmt(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
@@ -260,7 +386,7 @@ function durPausa(p) {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  width: 100%; max-width: 640px;
+  width: 100%; max-width: 580px;
   max-height: 85vh; display: flex; flex-direction: column;
   animation: modal-in 150ms ease-out;
 }
@@ -273,30 +399,33 @@ function durPausa(p) {
   padding: 14px 18px; border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
-.modal-header-left { display: flex; align-items: center; gap: 10px; }
+.modal-header-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .modal-title       { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.modal-fecha       { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
 .modal-close {
   display: flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: var(--radius-sm);
   border: none; background: transparent; color: var(--text-tertiary);
-  cursor: pointer; transition: background 80ms, color 80ms;
+  cursor: pointer; transition: background 80ms, color 80ms; flex-shrink: 0;
 }
 .modal-close:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
-.modal-body { overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 20px; }
+.modal-body { overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 18px; }
 
-.sec       { display: flex; flex-direction: column; gap: 10px; }
+.sec       { display: flex; flex-direction: column; gap: 8px; }
 .sec-label {
   font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.07em; color: var(--text-tertiary);
 }
-
-.fields-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+.sec-header-row {
+  display: flex; align-items: center; justify-content: space-between;
 }
+
+/* Grids */
+.row-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
 .field      { display: flex; flex-direction: column; gap: 3px; }
-.field-full { grid-column: 1 / -1; }
 .field-label { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
 .field-val   { font-size: 13px; color: var(--text-primary); font-weight: 500; }
 .field-audit { font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
@@ -310,7 +439,7 @@ function durPausa(p) {
   padding: 6px 8px; border-radius: var(--radius-sm);
   border: 1px solid var(--border-default); background: var(--bg-card-hover);
   color: var(--text-primary); font-size: 12px; font-family: var(--font-sans);
-  resize: vertical; min-height: 52px;
+  resize: vertical; min-height: 40px;
 }
 .field-textarea:focus { outline: none; border-color: var(--accent); }
 
@@ -325,6 +454,37 @@ function durPausa(p) {
 .ptd { padding: 0 8px; height: 32px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); }
 .ptd-mono { font-variant-numeric: tabular-nums; }
 .ptr:last-child .ptd { border-bottom: none; }
+
+/* Botón añadir pausa */
+.btn-add-pausa {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 8px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default); background: transparent;
+  font-size: 11px; font-weight: 500; color: var(--text-tertiary);
+  cursor: pointer; font-family: var(--font-sans); transition: all 80ms;
+}
+.btn-add-pausa:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: var(--border-strong); }
+
+/* Form nueva pausa */
+.nueva-pausa-form {
+  margin-top: 8px; padding: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.npf-label { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.npf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.npf-chip {
+  padding: 4px 10px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default); background: transparent;
+  color: var(--text-secondary); font-size: 11px; font-weight: 500;
+  cursor: pointer; transition: all 80ms;
+}
+.npf-chip:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.npf-chip.selected { background: var(--accent-muted); border-color: var(--accent-border); color: var(--accent); }
+.npf-error { font-size: 11px; color: var(--color-error, #ef5350); margin-top: 2px; }
+.npf-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 
 /* Admin */
 .sec-admin { background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; }
@@ -356,7 +516,8 @@ function durPausa(p) {
 .td-laborado { color: var(--accent); }
 
 @media (max-width: 600px) {
-  .fields-grid { grid-template-columns: 1fr 1fr; }
+  .row-2col { grid-template-columns: 1fr 1fr; }
+  .row-3col { grid-template-columns: 1fr 1fr 1fr; }
   .modal { max-height: 95vh; }
 }
 </style>
