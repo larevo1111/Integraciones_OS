@@ -1590,8 +1590,10 @@ app.delete('/api/gestion/etiquetas/:id', async (req, res) => {
 app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
   try {
     const hoy = new Date().toISOString().slice(0, 10)
+    // Preferir jornada activa (sin hora_fin); si no, la más reciente del día
     const [[jornada]] = await db.gestion.query(
-      'SELECT * FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ?',
+      `SELECT * FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ?
+       ORDER BY CASE WHEN hora_fin IS NULL THEN 0 ELSE 1 END, id DESC LIMIT 1`,
       [req.empresa, req.usuario.email, hoy]
     )
     if (!jornada) return res.json({ ok: true, jornada: null })
@@ -1619,12 +1621,12 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
     const ahora = new Date()
     const hoy = ahora.toISOString().slice(0, 10)
 
-    // Verificar que no exista jornada hoy
-    const [[existe]] = await db.gestion.query(
-      'SELECT id FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ?',
+    // Verificar que no exista jornada ACTIVA hoy (sin hora_fin)
+    const [[activa]] = await db.gestion.query(
+      'SELECT id FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ? AND hora_fin IS NULL',
       [req.empresa, req.usuario.email, hoy]
     )
-    if (existe) return res.status(409).json({ error: 'Ya existe una jornada para hoy' })
+    if (activa) return res.status(409).json({ error: 'Ya tienes una jornada activa hoy' })
 
     // hora_inicio = valor del usuario (editable), hora_inicio_registro = momento real del click (inmutable)
     const horaInicio = req.body.hora_inicio ? new Date(req.body.hora_inicio) : ahora
@@ -1886,7 +1888,7 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
         ) AS tiempo_pausa_min,
         CASE
           WHEN j.hora_fin IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, j.hora_fin)
-          WHEN j.hora_inicio IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, NOW())
+          WHEN j.hora_inicio IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, UTC_TIMESTAMP())
           ELSE 0
         END AS tiempo_total_min
       FROM g_jornadas j

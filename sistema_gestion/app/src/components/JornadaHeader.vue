@@ -86,6 +86,10 @@
           <span class="material-icons" style="font-size:15px">history</span>
           <span class="jh-btn-label">Pausa pasada</span>
         </button>
+        <button class="jh-btn jh-btn-iniciar" ref="btnIniciar" @click="confirmarIniciar">
+          <span class="material-icons" style="font-size:15px">play_arrow</span>
+          <span class="jh-btn-label">Nueva Jornada</span>
+        </button>
       </div>
     </template>
 
