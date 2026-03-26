@@ -135,14 +135,13 @@ async function importTable(conn, tableName, headers, rows) {
   const colDefs  = dedupedHeaders.map(c => `\`${c}\` TEXT`).join(',\n  ');
   const colNames = dedupedHeaders.map(c => `\`${c}\``).join(', ');
 
+  await conn.query(`DROP TABLE IF EXISTS \`${sqlTable}\``);
   await conn.query(`
-    CREATE TABLE IF NOT EXISTS \`${sqlTable}\` (
+    CREATE TABLE \`${sqlTable}\` (
       _pk BIGINT AUTO_INCREMENT PRIMARY KEY,
       ${colDefs}
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `);
-
-  await conn.query(`TRUNCATE TABLE \`${sqlTable}\``);
 
   if (rows.length === 0) {
     console.log(`  ⚠️  Sin filas.`);
