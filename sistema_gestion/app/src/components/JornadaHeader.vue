@@ -86,9 +86,15 @@
           <span class="material-icons" style="font-size:15px">history</span>
           <span class="jh-btn-label">Pausa pasada</span>
         </button>
-        <button class="jh-btn jh-btn-iniciar" ref="btnIniciar" @click="confirmarIniciar">
+        <button
+          class="jh-btn jh-btn-iniciar"
+          :class="{ 'jh-btn-disabled': minutosParaNuevaJornada > 0 }"
+          :title="minutosParaNuevaJornada > 0 ? `Disponible en ${labelEsperaJornada}` : 'Iniciar nueva jornada'"
+          ref="btnIniciar"
+          @click="minutosParaNuevaJornada === 0 && confirmarIniciar()"
+        >
           <span class="material-icons" style="font-size:15px">play_arrow</span>
-          <span class="jh-btn-label">Nueva Jornada</span>
+          <span class="jh-btn-label">{{ minutosParaNuevaJornada > 0 ? `en ${labelEsperaJornada}` : 'Nueva Jornada' }}</span>
         </button>
       </div>
     </template>
@@ -212,6 +218,21 @@ const minutosParaReabrir = computed(() => {
   if (!store.jornada?.hora_fin_registro) return 0
   const ms = 60 * 60 * 1000 - (ahora.value - new Date(store.jornada.hora_fin_registro).getTime())
   return ms > 0 ? Math.ceil(ms / 60000) : 0
+})
+
+// Minutos restantes para poder abrir una nueva jornada (gap mínimo 6h)
+const minutosParaNuevaJornada = computed(() => {
+  if (!store.jornada?.hora_fin_registro) return 0
+  const ms = 6 * 60 * 60 * 1000 - (ahora.value - new Date(store.jornada.hora_fin_registro).getTime())
+  return ms > 0 ? Math.ceil(ms / 60000) : 0
+})
+
+const labelEsperaJornada = computed(() => {
+  const min = minutosParaNuevaJornada.value
+  if (!min) return ''
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
 })
 
 const puedeReabrir = computed(() => {
@@ -371,6 +392,11 @@ async function reabrir() {
 .jh-btn-iniciar:hover, .jh-btn-reanudar:hover {
   background: var(--accent-hover); border-color: var(--accent-hover); color: #fff;
 }
+.jh-btn-iniciar.jh-btn-disabled {
+  background: transparent; border-color: var(--border-default);
+  color: var(--text-tertiary); cursor: default; opacity: 0.6;
+}
+.jh-btn-iniciar.jh-btn-disabled:hover { background: transparent; border-color: var(--border-default); color: var(--text-tertiary); }
 
 .jh-btn-fin { border-color: var(--color-error, #ef5350); color: var(--color-error, #ef5350); }
 .jh-btn-fin:hover { background: rgba(239,83,80,0.1); }

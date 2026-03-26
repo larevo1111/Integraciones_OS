@@ -1633,6 +1633,22 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
     )
     if (activa) return res.status(409).json({ error: 'Ya tienes una jornada activa hoy' })
 
+    // Si ya hay una jornada cerrada hoy, exigir gap de 6 horas desde que se cerró
+    const [[cerrada]] = await db.gestion.query(
+      'SELECT hora_fin_registro FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ? AND hora_fin IS NOT NULL ORDER BY id DESC LIMIT 1',
+      [req.empresa, req.usuario.email, hoy]
+    )
+    if (cerrada) {
+      const minDesdecierre = (ahora - new Date(cerrada.hora_fin_registro)) / 60000
+      if (minDesdecierre < 360) {
+        const restantes = Math.ceil(360 - minDesdecierre)
+        const horas = Math.floor(restantes / 60)
+        const mins  = restantes % 60
+        const label = horas > 0 ? `${horas}h ${mins}m` : `${mins}m`
+        return res.status(409).json({ error: `Debes esperar ${label} para iniciar una nueva jornada` })
+      }
+    }
+
     // hora_inicio = valor del usuario (editable), hora_inicio_registro = momento real del click (inmutable)
     const horaInicio = req.body.hora_inicio ? new Date(req.body.hora_inicio) : ahora
 
