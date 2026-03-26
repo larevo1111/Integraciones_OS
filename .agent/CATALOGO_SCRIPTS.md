@@ -648,7 +648,7 @@ python3 bot.py
 > Directorio raíz: `sistema_gestion/` — autónomo (api/ + app/).
 
 ### sistema_gestion/api/server.js
-- **Propósito**: API Express 9300 — auth Google OAuth + JWT multi-empresa + CRUD tareas + OPs
+- **Propósito**: API Express 9300 — auth Google OAuth + JWT multi-empresa + CRUD tareas + OPs + Jornadas completo
 - **Tipo**: servidor principal
 - **Arrancar (dev)**:
   ```bash
@@ -660,16 +660,28 @@ python3 bot.py
 - **Endpoints activos**: Ver sección en CONTEXTO_ACTIVO.md → "Sistema Gestión OS"
 
 ### sistema_gestion/api/db.js
-- **Propósito**: SSH tunnel a Hostinger + 3 pools MySQL (comunidad/gestion/integracion)
+- **Propósito**: SSH tunnel a Hostinger + 3 pools MySQL (comunidad/gestion/integracion) + **auto-reconnect**
 - **Tipo**: módulo de conexión (no se ejecuta directo)
+- **Auto-reconnect**: TCP server permanente, solo sshClient se recrea al detectar `close`. Retry 5s → 15s si falla. Pools se destruyen y recrean al reconectar.
 - **Credenciales**: cada pool tiene su propio usuario (Hostinger no comparte usuarios entre BDs)
   - poolComunidad → `u768061575_ssierra047` / `Epist2487.`
   - poolGestion → `u768061575_os_gestion` / `Epist2487.`
   - poolIntegracion → `u768061575_osserver` / `Epist2487.`
 - **⚠️ NUNCA usar u768061575_osserver para os_comunidad** — Access Denied garantizado
 
+### scripts/notif_jornadas_abiertas.py
+- **Propósito**: Notifica por Telegram a usuarios con jornada abierta a las 8pm. Resumen al admin.
+- **Ejecución**: cron `0 20 * * 1-5` (8pm lunes a viernes, hora Colombia)
+  ```bash
+  cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts
+  python3 notif_jornadas_abiertas.py
+  ```
+- **Flujo**: SSH tunnel → Hostinger `u768061575_os_gestion` → consulta `g_jornadas WHERE hora_fin IS NULL` → lookup `telegram_id` en `ia_service_os.ia_usuarios` → envía Telegram individual + resumen admin
+- **Dependencias**: `sshtunnel`, `pymysql`, `requests`, `.env` (TELEGRAM_BOT_TOKEN)
+- **Tablas**: `g_jornadas` (Hostinger), `ia_usuarios` (local)
+
 ### sistema_gestion/app (Vue+Quasar)
-- **Propósito**: Frontend SPA — LoginPage, TareasPage, MainLayout (sidebar/drawer)
+- **Propósito**: Frontend SPA — LoginPage, TareasPage, EquipoPage (jornadas), MainLayout (sidebar/drawer)
 - **Dev**:
   ```bash
   cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/sistema_gestion/app
@@ -741,6 +753,7 @@ Skills disponibles para agentes Claude Code. Se invocan con `/nombre-skill` en l
 | Archivo | Cuándo usarlo |
 |---|---|
 | `.agent/skills/sistema_gestion.md` | Skill rápida: arquitectura, credenciales 3 pools, errores documentados (SQL, auth, Vue), endpoints activos. Cargar SIEMPRE antes de modificar `sistema_gestion/`. |
+| `.agent/skills/tabla_estandar.md` | **Estándar de tablas** — patrón obligatorio para cualquier vista con tabla (ERP o Gestión). Toolbar, popup columna, subtotales, selector campos, popup detalle, CSS base. |
 | `sistema_gestion/ACTA_APLICACION.md` | **Acta de decisiones** — schema BD completo, decisiones de diseño UX, opciones descartadas con razón, próximos pasos. Actualizar con cada decisión nueva. |
 | `sistema_gestion/MANUAL_DISENO_HIBRIDO.md` | Referencia de diseño visual: variables CSS, layout desktop/mobile, componentes, patrones (QuickAdd, bottom sheet, OpSelector, etiquetas, proyectos). |
 

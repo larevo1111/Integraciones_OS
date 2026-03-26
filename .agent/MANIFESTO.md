@@ -333,7 +333,7 @@ updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CUR
 **Tablas de empresa y acceso:**
 - `ia_empresas` — catálogo de empresas del sistema
 - `ia_usuarios_empresas` — qué empresas puede ver cada usuario y con qué rol
-- Plan de migración: `.agent/planes/actuales/PLAN_MULTITENANT_IA.md`
+- Plan de migración: `.agent/planes/completados/PLAN_MULTITENANT_IA.md`
 
 
 
@@ -362,6 +362,27 @@ updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CUR
 - Alternativa: subquery dentro de la misma BD (no funciona cross-DB de todas formas).
 
 ---
+
+### ⚠️ REGLA: UTC_TIMESTAMP EN HOSTINGER — NUNCA NOW()
+
+**Descubierto 2026-03-26: desfase de 5 horas entre header y tabla de jornadas.**
+
+El servidor MySQL de Hostinger corre en `UTC+5` (zona de Bogotá), pero los datos se almacenan como UTC.
+- `NOW()` devuelve hora local del servidor MySQL (UTC+5) → **5 horas adelantada** respecto a UTC
+- `UTC_TIMESTAMP()` devuelve siempre UTC → correcto
+
+**Regla**: En TODA query hacia Hostinger que calcule diferencias de tiempo (TIMESTAMPDIFF, comparación con fecha actual, etc.), usar `UTC_TIMESTAMP()` en lugar de `NOW()`.
+
+### ⚠️ REGLA: SSH TUNNEL — ARQUITECTURA AUTO-RECONNECT
+
+**Descubierto 2026-03-26: servicio caía tras ~16h de inactividad (ECONNRESET).**
+
+`sistema_gestion/api/db.js` implementa auto-reconnect:
+1. TCP server se crea UNA VEZ y permanece (nunca se recrea)
+2. sshClient se recrea al detectar evento `close`
+3. El callback del TCP server lee `sshClient` en runtime (no closure) → usa el cliente reconectado automáticamente
+4. Pools MySQL se destruyen y recrean al reconectar
+5. Retry: 5s primer intento, 15s si falla
 
 ### Gotchas críticos — zeffi_facturas_venta_detalle
 - **`precio_neto_total` INCLUYE IVA**: usar `precio_bruto_total - descuento_total` para "ventas sin IVA". Nombre engañoso — nunca asumir.

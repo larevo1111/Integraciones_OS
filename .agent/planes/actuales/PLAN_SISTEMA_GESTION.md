@@ -336,18 +336,26 @@ Del ERP `u768061575_os_comunidad.sys_usuarios` — empresa `Ori_Sil_2`:
 - [ ] 3.6 TareaItem.vue + EstadoBadge.vue — fila compacta Linear con cronómetro
 - [ ] 3.9 Cronometro.vue — start/stop/complete tiempo real
 - [ ] 3.10 TareaPanel.vue — panel lateral derecho detalle (desktop)
-- [ ] 3.11 EquipoPage.vue — vista del equipo
+- [x] 3.11 EquipoPage.vue — vista jornadas con GestionTable ✅ 2026-03-26
 - [ ] 3.12 Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
 
-### Fase 3.5 — Módulo Jornadas (inicio/fin jornada + pausas) ⬅️ PRÓXIMO
-Spec completo: `.agent/specs/SPEC_JORNADAS.md`
-- [ ] 3.5.1 Crear tablas en Hostinger: g_jornadas, g_jornada_pausas, g_jornada_pausa_tipos, g_tipos_pausa + seed
-- [ ] 3.5.2 API endpoints en server.js: jornadas CRUD + pausas + tipos-pausa
-- [ ] 3.5.3 jornadaStore.js — estado reactivo, API calls, timer live
-- [ ] 3.5.4 JornadaHeader.vue — header con 3 estados en MainLayout
-- [ ] 3.5.5 JornadaPopover.vue — confirmación iniciar/finalizar
-- [ ] 3.5.6 PausaDialog.vue — multiselect tipos + observaciones
-- [ ] 3.5.7 Build, deploy y verificar en gestion.oscomunidad.com
+### Fase 3.5 — Módulo Jornadas ✅ COMPLETADO (2026-03-26)
+Spec original: `.agent/specs/SPEC_JORNADAS.md`
+- [x] 3.5.1 Tablas: g_jornadas (UNIQUE eliminado, observaciones TEXT), g_jornada_pausas, g_jornada_pausa_tipos, g_tipos_pausa + seed ✅
+- [x] 3.5.2 API endpoints: 10 endpoints (hoy, iniciar, finalizar, reabrir, editar, editar-admin, equipo con ?desde/hasta, pausas, tipos-pausa) ✅
+- [x] 3.5.3 jornadaStore.js — estado reactivo, API calls, timer live ✅
+- [x] 3.5.4 JornadaHeader.vue — 3 estados + botón Nueva Jornada con countdown 6h ✅
+- [x] 3.5.5 JornadaPopover.vue — confirmación iniciar/finalizar ✅
+- [x] 3.5.6 PausaDialog.vue — multiselect tipos + observaciones ✅
+- [x] 3.5.7 GestionTable.vue — tabla estándar (popup columna, filtro/orden/subtotales, campos) ✅
+- [x] 3.5.8 JornadaDetallePopup.vue — modal detalle + pausas + admin edit (horas/observaciones) ✅
+- [x] 3.5.9 Turno nocturno: GET /hoy detecta jornada activa de ayer ✅
+- [x] 3.5.10 Gap 6h entre jornadas + reabrir máx 1h ✅
+- [x] 3.5.11 SSH tunnel auto-reconnect en db.js ✅
+- [x] 3.5.12 UTC_TIMESTAMP en equipo (fix timezone Hostinger) ✅
+- [x] 3.5.13 notif_jornadas_abiertas.py — cron 8pm L-V Telegram ✅
+- [x] 3.5.14 Skill tabla_estandar.md — documentación patrón tabla ✅
+- [x] 3.5.15 Build, deploy y verificar en gestion.oscomunidad.com ✅
 
 ### Fase 4 — Android + Push
 - [ ] 4.1 Firebase project "os-gestion" + google-services.json
@@ -359,6 +367,9 @@ Spec completo: `.agent/specs/SPEC_JORNADAS.md`
 ## Notas técnicas importantes
 - `sys_usuarios.Email` — columna con E mayúscula (gotcha SQL: usar backticks)
 - `sys_empresa.uid` = `Ori_Sil_2` (mayúsculas, diferente a ia_service_os que es `ori_sil_2`)
+- **UTC_TIMESTAMP()**: SIEMPRE usar en lugar de NOW() — Hostinger MySQL corre UTC+5, datos almacenados UTC
+- **SSH tunnel**: db.js reconecta automáticamente (TCP server permanente, sshClient se recrea en `close`)
+- **Jornadas fecha DATE**: work_date = fecha en que INICIÓ el turno, incluso si cruza medianoche
 - Estados en español con mayúscula: 'Pendiente', 'En Progreso', 'Completada', 'Cancelada'
 - Prioridades en español con mayúscula: 'Baja', 'Media', 'Alta', 'Urgente'
 - Tipos de ideas: 'Idea', 'Hecho'

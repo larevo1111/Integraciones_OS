@@ -1,21 +1,23 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-03-23
+**Actualizado**: 2026-03-26
 
 ## Módulos activos en paralelo
 
 | Módulo | Archivo de contexto | Estado actual | Prioridad |
 |---|---|---|---|
-| Servicio IA + Bot Telegram | [contextos/ia_service.md](contextos/ia_service.md) | Plan Claude Code CLI en diseño | Alta |
+| Servicio IA + Bot Telegram | [contextos/ia_service.md](contextos/ia_service.md) | Super Agente activo, mejora continua cron | Alta |
 | Pipeline Effi | [contextos/pipeline_effi.md](contextos/pipeline_effi.md) | Estable, 18 pasos activos | Normal |
 | ERP Frontend | [contextos/erp_frontend.md](contextos/erp_frontend.md) | Módulo Ventas completo | Normal |
-| Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Módulo Tareas en desarrollo | Alta |
+| Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ activos | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Integración bidireccional activa | Normal |
 
-## Trabajo activo esta semana (2026-03-24)
+## Trabajo activo esta semana (2026-03-26)
 
-- **Sistema Gestión**: Módulo Jornadas — spec aprobado (`.agent/specs/SPEC_JORNADAS.md`), listo para implementar
-- **IA Service**: Diseñando integración Claude Code CLI como entrenador y agente autónomo
-- **Sistema Gestión**: Módulo Tareas activo en gestion.oscomunidad.com
+- **Sistema Gestión — Jornadas ✅**: Módulo completo (check-in/out, pausas, turno nocturno, 6h gap, reabrir 1h, GestionTable, popup detalle, admin edit, observaciones, notificación Telegram 8pm)
+- **Sistema Gestión — Tareas ✅**: TickTick-style activo, fix mobile subtask button + contraste
+- **Sistema Gestión — Infra**: SSH tunnel auto-reconnect en db.js, UTC_TIMESTAMP fix en equipo
+- **IA Service**: Super Agente Claude Code activo en bot, mejora continua cada 6h
+- **Pendiente próximo**: Notificaciones jornada olvidada (activas vía cron 8pm L-V)
 
 ## Regla de actualización
 

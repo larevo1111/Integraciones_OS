@@ -1,5 +1,5 @@
 # Contexto: Sistema Gestión OS
-**Actualizado**: 2026-03-23
+**Actualizado**: 2026-03-26
 
 ## Propósito
 
@@ -93,6 +93,8 @@ Hostinger NO permite compartir usuario MySQL entre BDs — cada BD tiene su prop
 | Alineación círculo | `.btn-add-sub-solo` ahora `position: absolute; top: 100%` (antes static, empujaba 6px arriba) |
 | Cronómetro ROUND→FLOOR | `duracion_min` usa `FLOOR` (no `ROUND`). Evita que 30-59 seg redondeen a 1 min |
 | Tiempo al revertir | Al revertir Completada → Pendiente: envía `tiempo_real_min: 0`, backend borra sesiones de `g_tarea_tiempo` |
+| Mobile subtask btn | `btn-add-sub-solo` → `position: relative` en mobile (no absolute), opacity 0.6 (siempre visible, no depende de :hover) |
+| Contraste botones | opacity base 0.4 (web), 0.65 (mobile); hover 0.8; `:active` feedback 24×24px touch target |
 
 ## Endpoints API activos
 
@@ -126,38 +128,60 @@ GET  /api/gestion/pedido/:id             — detalle pedido/cotización
 GET  /api/gestion/pedido/:id/pdf         — PDF pedido via Playwright (requireAuth)
 ```
 
-## Módulo Jornadas — en diseño (2026-03-24)
+## Módulo Jornadas — ✅ IMPLEMENTADO (2026-03-26)
 
-Spec completo: `.agent/specs/SPEC_JORNADAS.md`
+Spec original: `.agent/specs/SPEC_JORNADAS.md`
 
-Sistema de check-in/check-out de jornada laboral con pausas. Header visible en todas las páginas del módulo.
+Sistema de check-in/check-out de jornada laboral con pausas, turno nocturno, vista admin con tabla estándar.
 
-### Tablas nuevas (4)
-- `g_jornadas` — una fila por día por usuario. Hora inicio/fin reportada + auditoría inmutable
-- `g_jornada_pausas` — múltiples pausas por jornada, cada una con inicio/fin
-- `g_jornada_pausa_tipos` — puente M:N (multiselect de tipos por pausa)
+### Tablas (4 + campo nuevo)
+- `g_jornadas` — múltiples jornadas por día por usuario (UNIQUE eliminado). Campos: hora_inicio/hora_fin (editables) + hora_inicio_registro/hora_fin_registro (auditoría inmutable) + `observaciones TEXT NULL`
+- `g_jornada_pausas` — múltiples pausas por jornada
+- `g_jornada_pausa_tipos` — puente M:N
 - `g_tipos_pausa` — catálogo: Almuerzo, Desayuno, Pausa Activa, Imprevisto, Otro
 
-### Componentes nuevos (4)
-- `JornadaHeader.vue` — header entre topbar y page-body en MainLayout
-- `JornadaPopover.vue` — confirmación iniciar/finalizar
+### Reglas de negocio implementadas
+- **Múltiples jornadas/día**: solo bloquea si hay una jornada activa (hora_fin IS NULL)
+- **Gap 6 horas**: tras cerrar jornada, debe esperar ≥6h antes de abrir nueva. Enforced en API + frontend con countdown
+- **Reabrir**: máximo 1 hora después de cerrar (no cambió)
+- **Turno nocturno**: GET /hoy busca jornada activa de ayer si cruza medianoche
+- **work_date (fecha DATE)**: siempre la fecha en que INICIÓ el turno, incluso si cruza medianoche
+- **Dual-timestamp**: hora_* (editable por admin) + hora_*_registro (auditoría, siempre UTC_TIMESTAMP(), nunca editable)
+
+### Componentes
+- `JornadaHeader.vue` — 3 estados (sin jornada / trabajando / pausa) + botón "Nueva Jornada" con countdown 6h
+- `JornadaPopover.vue` — confirmaciones
 - `PausaDialog.vue` — multiselect tipos + observaciones
 - `jornadaStore.js` — estado reactivo + timer live
+- **`GestionTable.vue`** — componente tabla estándar (equivalente a OsDataTable del ERP, dark mode, Material Icons, popup columna vía Teleport, filtro/orden/subtotales)
+- **`JornadaDetallePopup.vue`** — modal detalle: campos jornada + pausas + sección admin (editar horas/observaciones, reabrir)
+- **`EquipoPage.vue`** — vista `/jornadas` con GestionTable, filtro Desde/Hasta, botón Hoy, click → popup detalle
 
-### 3 estados del header
-1. Sin jornada → fecha + nombre + botón "Iniciar Jornada"
-2. Trabajando → hora inicio + timer vivo + Pausa/Fin + punto verde
-3. En pausa → timer pausado + tipo pausa + Reanudar + punto amarillo
+### Endpoints API Jornadas (10)
+```
+GET  /api/gestion/jornadas/hoy              — jornada activa hoy (o ayer si turno nocturno)
+POST /api/gestion/jornadas/iniciar          — iniciar (valida gap 6h + no activa)
+PUT  /api/gestion/jornadas/:id/finalizar    — cerrar jornada
+PUT  /api/gestion/jornadas/:id/reabrir      — reabrir (max 1h)
+PUT  /api/gestion/jornadas/:id/editar       — editar horas manuales
+PUT  /api/gestion/jornadas/:id/editar-admin — admin: edita hora_inicio, hora_fin, observaciones (NUNCA _registro)
+GET  /api/gestion/jornadas/equipo           — ?desde=&hasta= (backward compat ?fecha=). Incluye pausas array
+POST /api/gestion/jornadas/:id/pausas       — iniciar/finalizar pausa
+GET  /api/gestion/tipos-pausa               — catálogo tipos
+POST /api/gestion/tipos-pausa               — crear tipo (admin)
+```
 
-### Endpoints API (7)
-- GET /jornadas/hoy, POST /jornadas/iniciar, PUT /jornadas/:id/finalizar
-- PUT /jornadas/:id/editar, GET /jornadas/historial
-- POST /jornadas/:id/pausas/iniciar, PUT /jornadas/:id/pausas/:pausaId/reanudar
-- GET/POST/PUT /tipos-pausa (admin)
+### Infraestructura
+- **SSH tunnel auto-reconnect** (`db.js`): TCP server permanente, solo sshClient se recrea al detectar `close`. Retry 5s → 15s si falla.
+- **UTC_TIMESTAMP()**: SIEMPRE usar en lugar de NOW() — Hostinger MySQL corre UTC+5 pero datos se almacenan UTC.
+- **Notificación jornada abierta**: `scripts/notif_jornadas_abiertas.py` — cron 8pm L-V, SSH tunnel → Hostinger → Telegram individual + resumen admin.
+
+### Skill tabla estándar
+`.agent/skills/tabla_estandar.md` — documenta el patrón GestionTable/OsDataTable para que siempre se construya igual.
 
 ## Próximas fases pendientes
 
-- [ ] Implementar Módulo Jornadas (Fase 3.5 — spec aprobado)
+- [x] ~~Implementar Módulo Jornadas (Fase 3.5)~~ ✅ 2026-03-26
 - [ ] Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
 - [ ] Push notifications FCM (Fase 4)
 - [ ] APK Android (Fase 4)
