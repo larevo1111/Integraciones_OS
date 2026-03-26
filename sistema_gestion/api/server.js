@@ -1721,6 +1721,33 @@ app.put('/api/gestion/jornadas/:id/editar', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// PUT /api/gestion/jornadas/:id/editar-admin — admin edita horas manuales y observaciones
+// Solo modifica: hora_inicio, hora_fin, observaciones (NUNCA los campos _registro)
+app.put('/api/gestion/jornadas/:id/editar-admin', requireAuth, async (req, res) => {
+  try {
+    if ((req.usuario.nivel || 1) < 7) return res.status(403).json({ error: 'Solo administradores' })
+    const [[jornada]] = await db.gestion.query(
+      'SELECT * FROM g_jornadas WHERE id = ? AND empresa = ?',
+      [req.params.id, req.empresa]
+    )
+    if (!jornada) return res.status(404).json({ error: 'Jornada no encontrada' })
+
+    const { hora_inicio, hora_fin, observaciones } = req.body
+    const sets = ['usuario_ult_modificacion = ?']
+    const params = [req.usuario.email]
+
+    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); params.push(hora_inicio ? new Date(hora_inicio) : null) }
+    if (hora_fin    !== undefined) { sets.push('hora_fin = ?');    params.push(hora_fin    ? new Date(hora_fin)    : null) }
+    if (observaciones !== undefined) { sets.push('observaciones = ?'); params.push(observaciones || null) }
+
+    params.push(req.params.id, req.empresa)
+    await db.gestion.query(`UPDATE g_jornadas SET ${sets.join(', ')} WHERE id = ? AND empresa = ?`, params)
+
+    const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [req.params.id])
+    res.json({ ok: true, jornada: updated })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // GET /api/gestion/jornadas/historial — historial con filtros y visibilidad por nivel
 app.get('/api/gestion/jornadas/historial', requireAuth, async (req, res) => {
   try {
@@ -1897,7 +1924,9 @@ app.put('/api/gestion/jornadas/:id/reabrir', requireAuth, async (req, res) => {
 // Incluye cálculos: tiempo_total_min, tiempo_pausa_min, tiempo_laborado_min
 app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
   try {
-    const fecha = req.query.fecha || new Date().toISOString().slice(0, 10)
+    const hoy   = new Date().toISOString().slice(0, 10)
+    const desde = req.query.desde || req.query.fecha || hoy
+    const hasta = req.query.hasta || req.query.fecha || hoy
 
     // Query jornadas + pausas desde gestion DB (sin cross-join)
     const [jornadas] = await db.gestion.query(`
@@ -1914,10 +1943,10 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
         END AS tiempo_total_min
       FROM g_jornadas j
       LEFT JOIN g_jornada_pausas p ON p.jornada_id = j.id
-      WHERE j.empresa = ? AND j.fecha = ?
+      WHERE j.empresa = ? AND j.fecha BETWEEN ? AND ?
       GROUP BY j.id
-      ORDER BY j.hora_inicio
-    `, [req.empresa, fecha])
+      ORDER BY j.fecha DESC, j.hora_inicio
+    `, [req.empresa, desde, hasta])
 
     // Enriquecer con nombres desde comunidad DB (pool separado, sin cross-join SQL)
     if (jornadas.length > 0) {
@@ -1939,7 +1968,30 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
       j.tiempo_laborado_min = Math.max(0, (j.tiempo_total_min || 0) - (j.tiempo_pausa_min || 0))
     })
 
-    res.json({ ok: true, fecha, jornadas })
+    // Cargar pausas de todas las jornadas del rango
+    if (jornadas.length > 0) {
+      const jornadaIds = jornadas.map(j => j.id)
+      const placeholdersPausas = jornadaIds.map(() => '?').join(',')
+      const [todasPausas] = await db.gestion.query(`
+        SELECT p.*, GROUP_CONCAT(tp.nombre ORDER BY tp.orden SEPARATOR ', ') AS tipos_nombre
+        FROM g_jornada_pausas p
+        LEFT JOIN g_jornada_pausa_tipos pt ON pt.pausa_id = p.id
+        LEFT JOIN g_tipos_pausa tp ON tp.id = pt.tipo_pausa_id
+        WHERE p.jornada_id IN (${placeholdersPausas})
+        GROUP BY p.id
+        ORDER BY p.hora_inicio
+      `, jornadaIds)
+
+      // Asignar pausas a cada jornada
+      const pausasPorJornada = {}
+      for (const p of todasPausas) {
+        if (!pausasPorJornada[p.jornada_id]) pausasPorJornada[p.jornada_id] = []
+        pausasPorJornada[p.jornada_id].push(p)
+      }
+      jornadas.forEach(j => { j.pausas = pausasPorJornada[j.id] || [] })
+    }
+
+    res.json({ ok: true, desde, hasta, jornadas })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
