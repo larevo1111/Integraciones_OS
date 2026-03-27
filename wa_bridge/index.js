@@ -317,6 +317,12 @@ async function connectToWhatsApp() {
       if (msg.key.fromMe) continue;
       if (!msg.message)   continue;
 
+      // Deduplicar: si el message_id ya está en BD, saltar (evita doble descarga en retries)
+      const [dup] = await pool.execute(
+        'SELECT id FROM wa_mensajes_entrantes WHERE message_id = ?', [msg.key.id]
+      );
+      if (dup.length) continue;
+
       const fromJid  = msg.key.remoteJid;
       const esGrupo  = fromJid.endsWith('@g.us');
       const senderJid= esGrupo ? msg.key.participant : null;
