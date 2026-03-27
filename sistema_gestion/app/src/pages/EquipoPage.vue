@@ -1,24 +1,67 @@
 <template>
   <div class="page-wrap">
     <div class="page-content">
+
+      <!-- Barra de filtros (chips) -->
+      <div class="filtros-bar-wrap">
+        <div class="filtros-bar">
+          <button
+            v-for="f in FILTROS"
+            :key="f.key"
+            class="chip"
+            :class="{ active: filtroActivo === f.key }"
+            @click="onFiltroClick(f.key)"
+          >{{ f.label }}</button>
+
+          <!-- Menú usuario -->
+          <div style="position:relative;margin-left:auto;flex-shrink:0" ref="menuUsuarioWrap">
+            <button class="chip chip-agrupar" @click="toggleMenuUsuario">
+              <span class="material-icons" style="font-size:13px">person</span>
+              {{ usuarioFiltroLabel }}
+              <span class="material-icons" style="font-size:13px">expand_more</span>
+            </button>
+            <Teleport to="body">
+              <div v-if="menuUsuarioVisible" class="dropdown-backdrop" @click="menuUsuarioVisible = false" />
+              <div v-if="menuUsuarioVisible" class="dropdown-menu-teleport" :style="dropdownStyle" @mouseleave="menuUsuarioVisible = false">
+                <div
+                  class="dropdown-item-teleport"
+                  :class="{ active: !filtroUsuario }"
+                  @click="filtroUsuario = null; menuUsuarioVisible = false; cargarEquipo()"
+                >
+                  <span class="material-icons" style="font-size:14px">{{ !filtroUsuario ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
+                  Todos
+                </div>
+                <div
+                  v-for="u in usuariosDisponibles"
+                  :key="u.email"
+                  class="dropdown-item-teleport"
+                  :class="{ active: filtroUsuario === u.email }"
+                  @click="filtroUsuario = u.email; menuUsuarioVisible = false; cargarEquipo()"
+                >
+                  <span class="material-icons" style="font-size:14px">{{ filtroUsuario === u.email ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
+                  {{ u.nombre || u.email }}
+                </div>
+              </div>
+            </Teleport>
+          </div>
+        </div>
+      </div>
+
       <GestionTable
         title="Jornadas"
-        :rows="jornadasMapeadas"
-        :columns="columnas"
+        :rows="jornadasFiltradas"
+        :columns="columnasComputed"
         :loading="cargando"
         @row-click="abrirDetalle"
       >
         <template #toolbar>
-          <!-- Preset Hoy -->
-          <button class="toolbar-btn" :class="{ 'toolbar-btn-active': esHoy }" @click.stop="setHoy">Hoy</button>
-          <!-- Desde / Hasta -->
           <div class="date-wrap">
             <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">calendar_today</span>
-            <input type="date" v-model="desde" class="date-input" @change="cargarEquipo" />
+            <input type="date" v-model="desde" class="date-input" @change="onFechaManual" />
           </div>
           <span style="color:var(--text-tertiary);font-size:12px">—</span>
           <div class="date-wrap">
-            <input type="date" v-model="hasta" class="date-input" @change="cargarEquipo" />
+            <input type="date" v-model="hasta" class="date-input" @change="onFechaManual" />
           </div>
         </template>
 
@@ -30,7 +73,7 @@
           </div>
         </template>
         <template #cell-fecha="{ row }">
-          <span class="td-mono">{{ row.fecha }}</span>
+          <span class="td-mono">{{ fmtFecha(row.fecha) }}</span>
         </template>
         <template #cell-hora_inicio="{ row }">
           <span class="td-mono">{{ formatHora(row.hora_inicio) }}</span>
@@ -65,27 +108,103 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import { api } from 'src/services/api'
-import { hoyLocal } from 'src/services/fecha'
+import { hoyLocal, localISO } from 'src/services/fecha'
 import GestionTable from 'src/components/GestionTable.vue'
 import JornadaDetallePopup from 'src/components/JornadaDetallePopup.vue'
 
 const auth         = useAuthStore()
 const jornadaStore = useJornadaStore()
 
-const hoy   = hoyLocal()
+// ── Filtros de tiempo ────────────────────────────────────
+const hoy = hoyLocal()
 const desde = ref(hoy)
 const hasta = ref(hoy)
+const filtroActivo = ref('hoy')
 
-const jornadas  = ref([])
-const cargando  = ref(false)
+const FILTROS = [
+  { key: 'hoy',    label: 'Hoy' },
+  { key: 'semana', label: 'Esta semana' },
+  { key: 'mes',    label: 'Este mes' },
+]
+
+function calcRango(key) {
+  const d = new Date()
+  if (key === 'hoy') {
+    return { d: hoy, h: hoy }
+  } else if (key === 'semana') {
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1 // lunes=0
+    const lun = new Date(d); lun.setDate(d.getDate() - dow)
+    const dom = new Date(lun); dom.setDate(lun.getDate() + 6)
+    return { d: localISO(lun), h: localISO(dom) }
+  } else if (key === 'mes') {
+    const primero = new Date(d.getFullYear(), d.getMonth(), 1)
+    const ultimo  = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+    return { d: localISO(primero), h: localISO(ultimo) }
+  }
+  return { d: hoy, h: hoy }
+}
+
+function onFiltroClick(key) {
+  filtroActivo.value = key
+  const r = calcRango(key)
+  desde.value = r.d
+  hasta.value = r.h
+  cargarEquipo()
+}
+
+function onFechaManual() {
+  filtroActivo.value = null
+  cargarEquipo()
+}
+
+// ── Filtro por usuario ────────────────────────────────────
+const filtroUsuario     = ref(null)
+const menuUsuarioVisible = ref(false)
+const menuUsuarioWrap    = ref(null)
+const dropdownStyle      = ref({})
+
+const usuariosDisponibles = computed(() => {
+  const map = {}
+  for (const j of jornadas.value) {
+    if (!map[j.usuario]) {
+      map[j.usuario] = { email: j.usuario, nombre: primerNombre(j.Nombre_Usuario) || j.usuario }
+    }
+  }
+  return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre))
+})
+
+const usuarioFiltroLabel = computed(() => {
+  if (!filtroUsuario.value) return 'Todos'
+  const u = usuariosDisponibles.value.find(u => u.email === filtroUsuario.value)
+  return u?.nombre || filtroUsuario.value
+})
+
+function toggleMenuUsuario() {
+  menuUsuarioVisible.value = !menuUsuarioVisible.value
+  if (menuUsuarioVisible.value && menuUsuarioWrap.value) {
+    nextTick(() => {
+      const el = menuUsuarioWrap.value
+      const r = el.getBoundingClientRect()
+      dropdownStyle.value = {
+        position: 'fixed',
+        top: r.bottom + 4 + 'px',
+        right: (window.innerWidth - r.right) + 'px',
+        zIndex: 9100,
+      }
+    })
+  }
+}
+
+// ── Datos ────────────────────────────────────────────────
+const jornadas   = ref([])
+const cargando   = ref(false)
 const jornadaSel = ref(null)
 
 const esAdmin = computed(() => (auth.usuario?.nivel || 1) >= 7)
-const esHoy   = computed(() => desde.value === hoy && hasta.value === hoy)
 
 const columnas = [
   { key: 'usuario',            label: 'Usuario',     visible: true  },
@@ -99,19 +218,25 @@ const columnas = [
   { key: 'num_pausas',         label: 'Pausas',      visible: false },
 ]
 
-// Jornadas con campo "usuario" como nombre para filtro por columna
-const jornadasMapeadas = computed(() => jornadas.value.map(j => ({
-  ...j,
-  _nombre_display: j.Nombre_Usuario ? primerNombre(j.Nombre_Usuario) : j.usuario,
-})))
+// Cuando el rango es > 1 día, mostrar columna fecha
+const columnasComputed = computed(() => {
+  const multi = desde.value !== hasta.value
+  return columnas.map(c => c.key === 'fecha' ? { ...c, visible: multi } : c)
+})
+
+// Filtrar por usuario seleccionado
+const jornadasFiltradas = computed(() => {
+  let list = jornadas.value
+  if (filtroUsuario.value) {
+    list = list.filter(j => j.usuario === filtroUsuario.value)
+  }
+  return list.map(j => ({
+    ...j,
+    _nombre_display: j.Nombre_Usuario ? primerNombre(j.Nombre_Usuario) : j.usuario,
+  }))
+})
 
 onMounted(cargarEquipo)
-
-function setHoy() {
-  desde.value = hoy
-  hasta.value = hoy
-  cargarEquipo()
-}
 
 async function cargarEquipo() {
   cargando.value = true
@@ -139,6 +264,12 @@ function primerNombre(nombre) {
   if (!nombre) return ''
   return nombre.split(' ')[0]
 }
+function fmtFecha(val) {
+  if (!val) return '—'
+  const s = String(val).slice(0, 10)
+  const [y, m, d] = s.split('-')
+  return `${d}/${m}/${y}`
+}
 function formatHora(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
@@ -164,19 +295,9 @@ function badgeClass(j) {
 
 <style scoped>
 .page-wrap    { display: flex; flex-direction: column; min-height: 100%; background: var(--bg-app); }
-.page-content { padding: 20px 24px; }
+.page-content { padding: 0; display: flex; flex-direction: column; }
 
-/* Toolbar extras */
-.toolbar-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 28px; padding: 0 10px; border-radius: var(--radius-md);
-  border: 1px solid var(--border-default); background: transparent;
-  font-size: 12px; font-weight: 500; color: var(--text-secondary);
-  cursor: pointer; font-family: var(--font-sans); white-space: nowrap;
-  transition: background 80ms, color 80ms;
-}
-.toolbar-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.toolbar-btn-active { background: var(--accent-muted) !important; border-color: var(--accent-border) !important; color: var(--accent) !important; }
+/* Toolbar extras (date inputs dentro de GestionTable) */
 .date-wrap {
   display: inline-flex; align-items: center; gap: 5px;
   height: 28px; padding: 0 10px; border-radius: var(--radius-md);
@@ -187,6 +308,27 @@ function badgeClass(j) {
   font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
 }
 .date-input:focus { outline: none; }
+
+/* Dropdown menu (teleported) */
+.dropdown-backdrop {
+  position: fixed; inset: 0; z-index: 9050; background: transparent;
+}
+.dropdown-menu-teleport {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px 0;
+  min-width: 160px;
+}
+.dropdown-item-teleport {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px; color: var(--text-secondary);
+  cursor: pointer; transition: background 80ms;
+}
+.dropdown-item-teleport:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.dropdown-item-teleport.active { color: var(--accent); font-weight: 500; }
 
 /* Cell renderers */
 .cell-usuario { display: flex; flex-direction: column; gap: 1px; line-height: 1.2; }
@@ -204,7 +346,6 @@ function badgeClass(j) {
 .badge-gray  { background: rgba(160,160,160,0.08); color: var(--text-tertiary); }
 
 @media (max-width: 768px) {
-  .page-content { padding: 12px 16px; }
   .u-email { display: none; }
 }
 </style>
