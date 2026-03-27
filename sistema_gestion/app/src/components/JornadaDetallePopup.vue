@@ -75,7 +75,7 @@
           <div class="sec">
             <div class="sec-header-row">
               <div class="sec-label">Pausas ({{ pausas.length }})</div>
-              <button v-if="esAdmin" class="btn-add-pausa" @click="abrirNuevaPausa">
+              <button v-if="esAdmin && editando" class="btn-add-pausa" @click="abrirNuevaPausa">
                 <span class="material-icons" style="font-size:14px">add</span>
                 Añadir pausa
               </button>
@@ -231,7 +231,7 @@ onMounted(async () => {
   if (props.esAdmin) {
     try {
       const data = await api('/api/gestion/tipos-pausa')
-      tiposPausa.value = data || []
+      tiposPausa.value = data.tipos || data || []
     } catch { /* silencio */ }
   }
 })

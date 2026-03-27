@@ -368,40 +368,27 @@ app.get('/api/gestion/tareas', async (req, res) => {
   const where  = ['t.empresa = ?', 't.parent_id IS NULL']   // excluir subtareas de la lista principal
   const params = [empresa]
 
-  // fecha_hoy viene del cliente (zona horaria local del usuario) para evitar desfase con servidor Hostinger
-  // Si no viene, fallback a CURDATE() del servidor
-  function fechaOffset(dias) {
-    if (fecha_hoy) {
-      const d = new Date(fecha_hoy + 'T00:00:00')
-      d.setDate(d.getDate() + dias)
-      return localDateCO(d)
-    }
-    return null
+  // Filtro de fecha — siempre usar fecha Colombia, NUNCA CURDATE() (Hostinger = UTC)
+  const hoyRef = fecha_hoy || localDateCO()
+  function fechaRefOffset(dias) {
+    const d = new Date(hoyRef + 'T00:00:00')
+    d.setDate(d.getDate() + dias)
+    return localDateCO(d)
   }
 
-  // Filtro de fecha
   if (filtro === 'hoy') {
-    if (fecha_hoy) { where.push('t.fecha_limite = ?'); params.push(fecha_hoy) }
-    else where.push('t.fecha_limite = CURDATE()')
+    where.push('t.fecha_limite = ?'); params.push(hoyRef)
   } else if (filtro === 'manana') {
-    const f = fechaOffset(1)
-    if (f) { where.push('t.fecha_limite = ?'); params.push(f) }
-    else where.push('t.fecha_limite = CURDATE() + INTERVAL 1 DAY')
+    where.push('t.fecha_limite = ?'); params.push(fechaRefOffset(1))
   } else if (filtro === 'ayer') {
-    const f = fechaOffset(-1)
-    if (f) { where.push('t.fecha_limite = ?'); params.push(f) }
-    else where.push('t.fecha_limite = CURDATE() - INTERVAL 1 DAY')
+    where.push('t.fecha_limite = ?'); params.push(fechaRefOffset(-1))
   } else if (filtro === 'semana') {
-    if (fecha_hoy) {
-      const d   = new Date(fecha_hoy + 'T00:00:00')
-      const dow = d.getDay() === 0 ? 6 : d.getDay() - 1  // lunes=0
-      const lun = new Date(d); lun.setDate(d.getDate() - dow)
-      const dom = new Date(lun); dom.setDate(lun.getDate() + 6)
-      where.push('t.fecha_limite BETWEEN ? AND ?')
-      params.push(localDateCO(lun), localDateCO(dom))
-    } else {
-      where.push('t.fecha_limite BETWEEN CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY AND CURDATE() + INTERVAL (6 - WEEKDAY(CURDATE())) DAY')
-    }
+    const d   = new Date(hoyRef + 'T00:00:00')
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1  // lunes=0
+    const lun = new Date(d); lun.setDate(d.getDate() - dow)
+    const dom = new Date(lun); dom.setDate(lun.getDate() + 6)
+    where.push('t.fecha_limite BETWEEN ? AND ?')
+    params.push(localDateCO(lun), localDateCO(dom))
   }
 
   // Filtros adicionales (simples)
