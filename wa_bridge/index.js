@@ -28,9 +28,7 @@ const qrTerminal = require('qrcode-terminal');
 // ── Configuración ──────────────────────────────────────────────────────────────
 const CONFIG = {
   port:           3100,
-  pythonWebhook:  process.env.WA_WEBHOOK_URL || null,  // null = solo guardar en BD
   authDir:        path.join(__dirname, 'auth'),
-  mediaDir:       path.join(__dirname, 'media'),
   empresa:        process.env.WA_EMPRESA || 'ori_sil_2',
   allowedNumbers: null,  // null = todos; o ['573001234567@s.whatsapp.net']
   reconnectDelay: 3,
@@ -41,6 +39,9 @@ const CONFIG = {
     database: 'os_whatsapp',
     charset:  'utf8mb4',
   },
+  // Cargados desde wa_config en BD al iniciar
+  mediaDir:     `/home/osserver/wa_media/${process.env.WA_EMPRESA || 'ori_sil_2'}`,
+  webhookUrl:   null,
 };
 
 // ── Logger ─────────────────────────────────────────────────────────────────────
@@ -60,6 +61,27 @@ const pool = mysql.createPool({ ...CONFIG.db, waitForConnections: true, connecti
 async function dbRun(sql, params = []) {
   const [result] = await pool.execute(sql, params);
   return result;
+}
+
+// ── Cargar configuración desde wa_config ───────────────────────────────────────
+async function cargarConfig() {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT media_dir, webhook_url, numero_vinculado FROM wa_config WHERE empresa = ? AND activo = 1',
+      [CONFIG.empresa]
+    );
+    if (rows.length) {
+      CONFIG.mediaDir   = rows[0].media_dir;
+      CONFIG.webhookUrl = rows[0].webhook_url || null;
+      log('Config cargada desde BD', { empresa: CONFIG.empresa, mediaDir: CONFIG.mediaDir });
+    } else {
+      log('Sin config en BD — usando defaults', { empresa: CONFIG.empresa, mediaDir: CONFIG.mediaDir });
+    }
+    // Asegurar que el directorio de media existe
+    if (!fs.existsSync(CONFIG.mediaDir)) fs.mkdirSync(CONFIG.mediaDir, { recursive: true });
+  } catch (e) {
+    logErr('Error cargando config desde BD', e);
+  }
 }
 
 // ── Estado global ──────────────────────────────────────────────────────────────
@@ -206,12 +228,12 @@ async function guardarSaliente(data) {
   }
 }
 
-// ── Webhook a Python/servicio externo ──────────────────────────────────────────
+// ── Webhook a servicio externo (si está configurado en wa_config) ──────────────
 async function forwardWebhook(payload) {
-  if (!CONFIG.pythonWebhook) return;
+  if (!CONFIG.webhookUrl) return;
   try {
-    await axios.post(CONFIG.pythonWebhook, payload, { timeout: 10000 });
-    log('Webhook enviado', { type: payload.tipo, from: payload.fromNumber });
+    await axios.post(CONFIG.webhookUrl, payload, { timeout: 10000 });
+    log('Webhook enviado', { tipo: payload.tipo, from: payload.fromNumber });
   } catch (err) {
     logErr('Falló webhook', err);
   }
@@ -587,4 +609,4 @@ app.get('/api/contactos', async (req, res) => {
 
 // ── Arranque ───────────────────────────────────────────────────────────────────
 app.listen(CONFIG.port, () => log(`API escuchando en puerto ${CONFIG.port}`));
-connectToWhatsApp().catch((err) => logErr('Error en connectToWhatsApp', err));
+cargarConfig().then(() => connectToWhatsApp()).catch((err) => logErr('Error en arranque', err));
