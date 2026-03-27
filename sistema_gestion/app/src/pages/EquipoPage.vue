@@ -167,15 +167,17 @@ const menuUsuarioVisible = ref(false)
 const menuUsuarioWrap    = ref(null)
 const dropdownStyle      = ref({})
 
-const usuariosDisponibles = computed(() => {
-  const map = {}
-  for (const j of jornadas.value) {
-    if (!map[j.usuario]) {
-      map[j.usuario] = { email: j.usuario, nombre: primerNombre(j.Nombre_Usuario) || j.usuario }
-    }
-  }
-  return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre))
-})
+const usuariosDisponibles = ref([])
+
+async function cargarUsuarios() {
+  try {
+    const data = await api('/api/gestion/usuarios')
+    usuariosDisponibles.value = (data.usuarios || []).map(u => ({
+      email: u.email,
+      nombre: primerNombre(u.nombre) || u.email,
+    }))
+  } catch { /* silencio */ }
+}
 
 const usuarioFiltroLabel = computed(() => {
   if (!filtroUsuario.value) return 'Todos'
@@ -236,7 +238,7 @@ const jornadasFiltradas = computed(() => {
   }))
 })
 
-onMounted(cargarEquipo)
+onMounted(() => { cargarUsuarios(); cargarEquipo() })
 
 async function cargarEquipo() {
   cargando.value = true
