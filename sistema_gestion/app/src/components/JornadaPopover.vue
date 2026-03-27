@@ -23,6 +23,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { hoyLocal } from 'src/services/fecha'
 
 const props = defineProps({
   titulo: String,
@@ -48,7 +49,7 @@ onMounted(() => {
 
 function confirmar() {
   // Construir datetime completo combinando fecha del día + hora editada por el usuario
-  const fecha = props.fecha || new Date().toISOString().slice(0, 10)
+  const fecha = props.fecha || hoyLocal()
   const datetime = `${fecha}T${horaEditable.value}:00`
   emit('confirmar', new Date(datetime).toISOString())
 }

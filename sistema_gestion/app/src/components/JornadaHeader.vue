@@ -134,6 +134,7 @@ import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import JornadaPopover from './JornadaPopover.vue'
 import PausaDialog from './PausaDialog.vue'
+import { hoyLocal } from 'src/services/fecha'
 
 const auth  = useAuthStore()
 const store = useJornadaStore()
@@ -165,7 +166,7 @@ const nombreUsuario = computed(() => {
   return n.split(' ')[0]
 })
 
-const fechaISO = computed(() => new Date().toISOString().slice(0, 10))
+const fechaISO = computed(() => hoyLocal())
 
 const fechaHoy = computed(() => {
   return new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })

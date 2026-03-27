@@ -28,6 +28,12 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const JWT_SECRET       = process.env.JWT_SECRET
 const PORT             = 9300
 
+/** Fecha YYYY-MM-DD en hora Colombia (UTC-5), sin depender de la zona del server */
+function localDateCO(d = new Date()) {
+  const y = d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' })
+  return y // en-CA ya devuelve YYYY-MM-DD
+}
+
 if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
   console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET en .env')
   process.exit(1)
@@ -368,7 +374,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
     if (fecha_hoy) {
       const d = new Date(fecha_hoy + 'T00:00:00')
       d.setDate(d.getDate() + dias)
-      return d.toISOString().slice(0, 10)
+      return localDateCO(d)
     }
     return null
   }
@@ -392,7 +398,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
       const lun = new Date(d); lun.setDate(d.getDate() - dow)
       const dom = new Date(lun); dom.setDate(lun.getDate() + 6)
       where.push('t.fecha_limite BETWEEN ? AND ?')
-      params.push(lun.toISOString().slice(0, 10), dom.toISOString().slice(0, 10))
+      params.push(localDateCO(lun), localDateCO(dom))
     } else {
       where.push('t.fecha_limite BETWEEN CURDATE() - INTERVAL WEEKDAY(CURDATE()) DAY AND CURDATE() + INTERVAL (6 - WEEKDAY(CURDATE())) DAY')
     }
@@ -1589,8 +1595,8 @@ app.delete('/api/gestion/etiquetas/:id', async (req, res) => {
 // GET /api/gestion/jornadas/hoy — jornada del día del usuario actual + pausas
 app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
   try {
-    const hoy  = new Date().toISOString().slice(0, 10)
-    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    const hoy  = localDateCO()
+    const ayer = localDateCO(new Date(Date.now() - 86400000))
     // Preferir jornada activa (sin hora_fin) de hoy o ayer (turno nocturno);
     // si no, la más reciente de hoy
     const [[jornada]] = await db.gestion.query(
@@ -1624,7 +1630,7 @@ app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
 app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
   try {
     const ahora = new Date()
-    const hoy = ahora.toISOString().slice(0, 10)
+    const hoy = localDateCO(ahora)
 
     // Verificar que no exista jornada ACTIVA hoy (sin hora_fin)
     const [[activa]] = await db.gestion.query(
@@ -1920,7 +1926,7 @@ app.put('/api/gestion/jornadas/:id/reabrir', requireAuth, async (req, res) => {
 // Incluye cálculos: tiempo_total_min, tiempo_pausa_min, tiempo_laborado_min
 app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
   try {
-    const hoy   = new Date().toISOString().slice(0, 10)
+    const hoy   = localDateCO()
     const desde = req.query.desde || req.query.fecha || hoy
     const hasta = req.query.hasta || req.query.fecha || hoy
 

@@ -226,6 +226,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
+import { hoyLocal } from 'src/services/fecha'
 import ProyectoModal from 'src/components/ProyectoModal.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
@@ -304,7 +305,7 @@ function editarProyecto(p) {
 
 async function completarProyecto(p) {
   cerrarMenuProyecto()
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyLocal()
   try {
     await api(`/api/gestion/proyectos/${p.id}`, {
       method: 'PUT',

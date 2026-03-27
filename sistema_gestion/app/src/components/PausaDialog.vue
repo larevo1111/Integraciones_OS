@@ -54,6 +54,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { hoyLocal } from 'src/services/fecha'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -102,7 +103,7 @@ function confirmar() {
 
   if (props.retroactiva) {
     if (!horaInicio.value || !horaFin.value) { errorTiempo.value = 'Completa los dos horarios'; return }
-    const fecha = props.fecha || new Date().toISOString().slice(0, 10)
+    const fecha = props.fecha || hoyLocal()
     const ini   = new Date(`${fecha}T${horaInicio.value}:00`)
     const fin   = new Date(`${fecha}T${horaFin.value}:00`)
     if (fin <= ini) { errorTiempo.value = 'La hora de fin debe ser después del inicio'; return }

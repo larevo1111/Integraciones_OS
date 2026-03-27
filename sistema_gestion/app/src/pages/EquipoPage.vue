@@ -69,13 +69,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import { api } from 'src/services/api'
+import { hoyLocal } from 'src/services/fecha'
 import GestionTable from 'src/components/GestionTable.vue'
 import JornadaDetallePopup from 'src/components/JornadaDetallePopup.vue'
 
 const auth         = useAuthStore()
 const jornadaStore = useJornadaStore()
 
-const hoy   = new Date().toISOString().slice(0, 10)
+const hoy   = hoyLocal()
 const desde = ref(hoy)
 const hasta = ref(hoy)
 
