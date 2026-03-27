@@ -76,18 +76,17 @@ async function cargarConfig() {
 
     // Leer config de wa_config
     const [rows] = await pool.execute(
-      'SELECT media_dir, webhook_url, numero_vinculado FROM wa_config WHERE empresa = ? AND activo = 1',
+      'SELECT directorio_archivos, url_webhook, numero_vinculado FROM wa_config WHERE empresa = ? AND activo = 1',
       [CONFIG.empresa]
     );
 
     if (rows.length) {
       // media_dir NULL → construir con siglas automáticamente
-      CONFIG.mediaDir   = rows[0].media_dir || mediaDirDefault;
-      CONFIG.webhookUrl = rows[0].webhook_url || null;
-      // Si el media_dir guardado aún usa el uid, actualizarlo en BD
-      if (!rows[0].media_dir) {
+      CONFIG.mediaDir   = rows[0].directorio_archivos || mediaDirDefault;
+      CONFIG.webhookUrl = rows[0].url_webhook || null;
+      if (!rows[0].directorio_archivos) {
         await pool.execute(
-          'UPDATE wa_config SET media_dir = ? WHERE empresa = ?',
+          'UPDATE wa_config SET directorio_archivos = ? WHERE empresa = ?',
           [mediaDirDefault, CONFIG.empresa]
         );
       }
@@ -142,13 +141,13 @@ function getMediaSource(body) {
 // ── BD: upsert contacto ────────────────────────────────────────────────────────
 async function upsertContacto(jid, nombre, esGrupo = false, tipo = 'entrante') {
   const numero = jidToNumber(jid);
-  const colCount = tipo === 'entrante' ? 'total_entrantes = total_entrantes + 1' : 'total_salientes = total_salientes + 1';
+  const colCount = tipo === 'entrante' ? 'mensajes_recibidos = mensajes_recibidos + 1' : 'mensajes_enviados = mensajes_enviados + 1';
   try {
     await dbRun(
-      `INSERT INTO wa_contactos (empresa, jid, numero, nombre_push, es_grupo)
+      `INSERT INTO wa_contactos (empresa, id_whatsapp, numero, nombre_perfil, es_grupo)
        VALUES (?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
-         nombre_push     = COALESCE(VALUES(nombre_push), nombre_push),
+         nombre_perfil   = COALESCE(VALUES(nombre_perfil), nombre_perfil),
          ultimo_contacto = CURRENT_TIMESTAMP,
          ${colCount}`,
       [CONFIG.empresa, jid, numero, nombre || null, esGrupo ? 1 : 0]
@@ -163,15 +162,15 @@ async function guardarEntrante(data) {
   try {
     await dbRun(
       `INSERT IGNORE INTO wa_mensajes_entrantes
-         (empresa, message_id, from_jid, from_number, from_name,
-          es_grupo, group_jid, group_name, sender_jid,
-          tipo, texto, caption,
-          media_path, media_mime, media_size_bytes, media_duracion_seg, media_filename, media_sha256,
-          latitude, longitude, location_name, location_address,
-          contact_nombre, contact_vcard,
-          reaction_emoji, reaction_target_id,
-          quoted_message_id, quoted_texto, quoted_from,
-          es_reenviado, veces_reenviado, ts_wa)
+         (empresa, id_mensaje, id_whatsapp_origen, numero_origen, nombre_origen,
+          es_grupo, id_whatsapp_grupo, nombre_grupo, id_whatsapp_remitente,
+          tipo, texto, descripcion,
+          ruta_archivo, tipo_archivo, peso_bytes, duracion_segundos, nombre_archivo, hash_archivo,
+          latitud, longitud, nombre_ubicacion, direccion_ubicacion,
+          contacto_nombre, contacto_datos,
+          reaccion_emoji, reaccion_id_mensaje,
+          respuesta_id_mensaje, respuesta_texto, respuesta_de,
+          es_reenviado, veces_reenviado, momento_wa)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         CONFIG.empresa,
@@ -218,9 +217,9 @@ async function guardarSaliente(data) {
   try {
     const [result] = await pool.execute(
       `INSERT INTO wa_mensajes_salientes
-         (empresa, message_id_wa, to_jid, to_number,
-          tipo, texto, caption, media_path, media_filename, media_mime, ptt,
-          caller_service, caller_user, status)
+         (empresa, id_mensaje, id_whatsapp_destino, numero_destino,
+          tipo, texto, descripcion, ruta_archivo, nombre_archivo, tipo_archivo, es_nota_voz,
+          servicio_origen, usuario_origen, estado)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         CONFIG.empresa,
@@ -319,7 +318,7 @@ async function connectToWhatsApp() {
 
       // Deduplicar: si el message_id ya está en BD, saltar (evita doble descarga en retries)
       const [dup] = await pool.execute(
-        'SELECT id FROM wa_mensajes_entrantes WHERE message_id = ?', [msg.key.id]
+        'SELECT id FROM wa_mensajes_entrantes WHERE id_mensaje = ?', [msg.key.id]
       );
       if (dup.length) continue;
 
@@ -607,7 +606,7 @@ app.post('/api/send/video', async (req, res) => {
 app.get('/api/mensajes', async (req, res) => {
   const { numero, limite = 50 } = req.query;
   try {
-    const cond = numero ? 'WHERE from_number = ?' : 'WHERE 1=1';
+    const cond = numero ? 'WHERE numero_origen = ?' : 'WHERE 1=1';
     const params = numero ? [numero, parseInt(limite)] : [parseInt(limite)];
     const rows = await dbRun(
       `SELECT * FROM wa_mensajes_entrantes ${cond} ORDER BY created_at DESC LIMIT ?`,
