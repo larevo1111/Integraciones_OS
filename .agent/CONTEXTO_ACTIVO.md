@@ -10,6 +10,7 @@
 | ERP Frontend | [contextos/erp_frontend.md](contextos/erp_frontend.md) | Módulo Ventas completo | Normal |
 | Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ activos | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Integración bidireccional activa | Normal |
+| WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
 ## Trabajo activo esta semana (2026-03-26)
 
@@ -35,6 +36,7 @@ MEMORY.md de Claude siempre refleja el módulo activo y su estado.
 |---|---|---|
 | `effi_data` | MariaDB local | Staging pipeline (41 tablas zeffi_* + catalogo_articulos) |
 | `ia_service_os` | MariaDB local | Servicio IA (17 tablas + 1 vista) |
+| `os_whatsapp` | MariaDB local | WA Bridge (wa_config, wa_contactos, wa_mensajes_entrantes, wa_mensajes_salientes) |
 | `espocrm` | MariaDB local | CRM (488 contactos) |
 | `nocodb_meta` | MariaDB local | Metadatos NocoDB |
 | `u768061575_os_integracion` | Hostinger | Fuente de verdad: 51 tablas (41 zeffi + 8 resumen + crm_contactos + catalogo_articulos) |
@@ -52,6 +54,7 @@ Credenciales locales: `osadmin` / `Epist2487.`
 | IA Admin | 9200 | `os-ia-admin.service` | ia.oscomunidad.com |
 | Sistema Gestión | 9300 | `os-gestion.service` | gestion.oscomunidad.com |
 | IA Service Flask | 5100 | `ia-service.service` | interno |
+| WA Bridge | 3100 | `wa-bridge.service` | interno — ver `.agent/CATALOGO_APIS.md` |
 | Effi Webhook Flask | 5050 | `effi-webhook.service` | interno |
 | EspoCRM | 8083 | Docker | crm.oscomunidad.com |
 | NocoDB | — | Docker | nocodb.oscomunidad.com |
@@ -66,6 +69,7 @@ Credenciales locales: `osadmin` / `Epist2487.`
 | `/home/osserver/docker/docker-compose.yml` | Docker compose |
 | `/etc/cloudflared/config.yml` | Cloudflare tunnel |
 | `.agent/CATALOGO_SCRIPTS.md` | Catálogo completo de scripts |
+| `.agent/CATALOGO_APIS.md` | Catálogo de todas las APIs HTTP internas (ia_service, wa_bridge) |
 | `.agent/CATALOGO_TABLAS.md` | 47+ tablas con descripciones |
 | `.agent/MANIFESTO.md` | Visión, arquitectura y reglas técnicas |
 | `.agent/manuales/ia_service_manual.md` | Manual IA service v2.7 |
