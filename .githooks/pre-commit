@@ -1,0 +1,40 @@
+#!/bin/bash
+# Pre-commit hook: bloquea patrones de timezone prohibidos
+# Solo revisa archivos staged (.js, .vue, .ts) — ignora builds y node_modules
+
+ERRORES=0
+
+# Archivos staged que son código fuente (no builds)
+ARCHIVOS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(js|vue|ts)$' | grep -v 'node_modules\|dist/\|public/assets/')
+
+if [ -z "$ARCHIVOS" ]; then
+  exit 0
+fi
+
+# Patrón 1: toISOString().slice(0, 10) — extrae fecha UTC
+if echo "$ARCHIVOS" | xargs grep -n 'toISOString()\.slice(0.*10)' 2>/dev/null | grep -v '// ok-utc' | grep -v 'NUNCA usar'; then
+  echo ""
+  echo "❌ BLOQUEADO: toISOString().slice(0,10) detectado"
+  echo "   Esto devuelve fecha UTC — después de 7pm Colombia da el día siguiente."
+  echo "   Usar: hoyLocal() (frontend) o localDateCO() (backend)"
+  echo "   Si es intencional, agregar '// ok-utc' al final de la línea."
+  echo ""
+  ERRORES=1
+fi
+
+# Patrón 2: CURDATE() en queries (Hostinger = UTC)
+if echo "$ARCHIVOS" | xargs grep -n 'CURDATE()' 2>/dev/null | grep -v '// ok-utc'; then
+  echo ""
+  echo "❌ BLOQUEADO: CURDATE() detectado en query SQL"
+  echo "   Hostinger MySQL = UTC. CURDATE() da fecha UTC, no Colombia."
+  echo "   Calcular la fecha en Node.js con localDateCO() y pasar como parámetro."
+  echo ""
+  ERRORES=1
+fi
+
+if [ "$ERRORES" -ne 0 ]; then
+  echo "Commit rechazado. Corrige los patrones de timezone antes de commitear."
+  exit 1
+fi
+
+exit 0

@@ -33,6 +33,23 @@ Antes de cualquier tarea, revisar estos archivos en orden:
 4. **Para tareas frontend**: `frontend/design-system/MANUAL_ESTILOS.md` — manual de estilos obligatorio
 5. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`
 
+## ⚠️ REGLA ABSOLUTA — TIMEZONE
+
+**Todo el sistema opera en hora Colombia (UTC-5). NUNCA usar patrones UTC para obtener fechas.**
+
+Patrones **PROHIBIDOS**:
+- `new Date().toISOString().slice(0, 10)` — devuelve fecha UTC (después de 7pm COL = día siguiente)
+- `CURDATE()` en queries a Hostinger — MySQL Hostinger = UTC puro
+- `NOW()` en queries a Hostinger para comparar fechas
+
+Patrones **CORRECTOS**:
+- **Frontend JS**: `import { hoyLocal } from 'src/services/fecha'` → `hoyLocal()`
+- **Backend Node (server.js)**: `localDateCO()` (ya definida, usa `timeZone: 'America/Bogota'`)
+- **Python**: `date.today()` (server local = Colombia)
+- **SQL timestamps**: `UTC_TIMESTAMP()` para registrar momentos (se almacenan en UTC)
+
+Un git hook en `.githooks/pre-commit` bloquea commits con los patrones prohibidos.
+
 ## Convenciones del proyecto
 
 - Scripts en `scripts/` — corren con `node` o `python3` directamente en el host (NO docker exec)
