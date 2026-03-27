@@ -1,0 +1,17 @@
+{
+  "name": "wa-bridge",
+  "version": "1.0.0",
+  "description": "WhatsApp HTTP bridge via Baileys — API aislada para OS",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "axios": "^1.7.0",
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "pino": "^9.0.0",
+    "pino-pretty": "^13.0.0"
+  }
+}

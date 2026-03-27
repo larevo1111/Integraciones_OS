@@ -1,0 +1,18 @@
+[Unit]
+Description=WA Bridge — WhatsApp HTTP API (Baileys)
+After=network.target
+
+[Service]
+Type=simple
+User=osserver
+WorkingDirectory=/home/osserver/Proyectos_Antigravity/Integraciones_OS/wa_bridge
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/osserver/Proyectos_Antigravity/Integraciones_OS/logs/wa_bridge.log
+StandardError=append:/home/osserver/Proyectos_Antigravity/Integraciones_OS/logs/wa_bridge.log
+Environment=WA_WEBHOOK_URL=http://localhost:5100/webhook/whatsapp
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

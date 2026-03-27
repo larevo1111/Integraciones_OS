@@ -789,3 +789,67 @@ node scripts/export_clientes.js
 # Ver cuántos registros hay en una tabla (tablas tienen prefijo zeffi_)
 mysql -u osadmin -pEpist2487. effi_data -e "SELECT COUNT(*) FROM zeffi_clientes;" 2>/dev/null
 ```
+
+---
+
+## 6. WA Bridge (`wa_bridge/`) — WhatsApp HTTP API
+
+### wa_bridge/index.js
+- **Propósito**: Daemon Node.js que mantiene conexión WebSocket a WhatsApp (Baileys) y expone REST API para enviar mensajes. Reenvía mensajes entrantes al webhook Python.
+- **Tipo**: daemon / API server
+- **Puerto**: 3100
+- **Systemd**:
+  ```bash
+  sudo systemctl start wa-bridge      # arrancar (primera vez escanear QR)
+  sudo systemctl status wa-bridge
+  sudo systemctl restart wa-bridge
+  journalctl -u wa-bridge -f          # logs en tiempo real
+  ```
+- **Primera vez** (vincular número): `node wa_bridge/index.js` — aparece QR en terminal. Escanear con WhatsApp → Dispositivos vinculados. Credenciales quedan en `wa_bridge/auth/` (nunca commitear).
+- **Dependencias**: Node.js, `@whiskeysockets/baileys`, express, axios, pino
+
+### Endpoints REST
+
+| Método | Ruta | Body | Acción |
+|--------|------|------|--------|
+| GET | `/api/status` | — | Estado de conexión + QR si pendiente |
+| POST | `/api/send/text` | `{to, message}` | Enviar texto |
+| POST | `/api/send/image` | `{to, filePath\|base64, caption?}` | Enviar imagen |
+| POST | `/api/send/audio` | `{to, filePath\|base64, ptt?}` | Enviar audio/nota de voz |
+| POST | `/api/send/document` | `{to, filePath\|base64, fileName?, mimetype?}` | Enviar documento |
+| POST | `/api/send/video` | `{to, filePath\|base64, caption?}` | Enviar video |
+
+`to` = número sin + (ej: `'573001234567'`).
+
+### wa_bridge/wa_bridge.py
+- **Propósito**: Cliente Python para llamar la API del bridge. También documenta el formato del webhook entrante.
+- **Uso**:
+  ```python
+  from wa_bridge.wa_bridge import wa_send_text, wa_send_image, wa_status
+  wa_send_text('573001234567', 'Hola!')
+  wa_send_image('573001234567', '/ruta/imagen.jpg', caption='Foto')
+  ```
+- **Variable de entorno**: `WA_BRIDGE_URL` (default: `http://localhost:3100`)
+
+### Webhook entrante (Python recibe)
+```json
+{
+  "from": "573001234567@s.whatsapp.net",
+  "type": "text | image | audio | video | document | sticker | location",
+  "text": "...",
+  "mediaPath": "/ruta/archivo/descargado",
+  "caption": "...",
+  "fileName": "...",
+  "latitude": 4.6,
+  "longitude": -74.1,
+  "timestamp": 1234567890,
+  "messageId": "..."
+}
+```
+URL webhook configurada en `wa-bridge.service` → `WA_WEBHOOK_URL` (default: `http://localhost:5100/webhook/whatsapp`)
+
+### Notas importantes
+- `wa_bridge/auth/` y `wa_bridge/media/` están en `.gitignore` — nunca commitear
+- Un solo número puede conectarse a un solo proceso. No correr dos instancias con el mismo número.
+- Uso interno/bajo volumen → riesgo de ban mínimo. Evitar patrones de spam.
+- Log: `logs/wa_bridge.log`
