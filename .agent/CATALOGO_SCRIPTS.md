@@ -633,6 +633,8 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 | `db.py` | Sesiones Telegram en `bot_sesiones` (MariaDB local) |
 | `tabla.py` | Formatea datasets grandes → enlace a mini app web |
 | `teclado.py` | Construcción de teclados reply e inline |
+| `superagente.py` | Super Agente — sesiones persistentes (`--resume`), `_ejecutar_claude()`, procesamiento de respuesta (tabla/aprobacion/texto) |
+| `handlers_sa.py` | Super Agente — handlers Telegram: menú conversaciones, callbacks sa_* |
 
 ```bash
 # Arrancar el bot

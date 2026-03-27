@@ -735,6 +735,12 @@ Bot Telegram
 - El prompt sistema se envía UNA vez al crear la sesión, no en cada mensaje.
 - Las sesiones se guardan como archivos `.jsonl` en `~/.claude/projects/-home-osserver-Proyectos-Antigravity-Integraciones-OS/`
 
+### Protocolo de nombres de conversación
+- Nombre generado automáticamente: **`"SA - " + primeras palabras de la pregunta`** (máx 40 chars, corte en último espacio)
+- Se inyecta al inicio del primer prompt: `f'{nombre}\n\n{prompt_sistema}'` → Claude nombra el `.jsonl` con ese texto
+- `sa_sesiones.nombre` = mismo nombre → BD y filesystem sincronizados
+- El usuario puede renombrar desde `[📋 Conversaciones]` → `[✏️ Renombrar]`
+
 ### Menú del Super Agente en Telegram
 ```
 [📝 Nueva] [📋 Conversaciones] [⚙️ Ajustes]
