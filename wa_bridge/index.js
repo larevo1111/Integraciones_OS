@@ -113,7 +113,7 @@ function formatJid(number) {
 }
 
 function jidToNumber(jid) {
-  return jid ? jid.replace('@s.whatsapp.net', '').replace('@g.us', '') : null;
+  return jid ? jid.replace(/@s\.whatsapp\.net|@g\.us|@lid/g, '') : null;
 }
 
 function mediaFilename(ext) {
@@ -316,7 +316,13 @@ async function connectToWhatsApp() {
       if (msg.key.fromMe) continue;
       if (!msg.message)   continue;
 
-      // Deduplicar: si el message_id ya está en BD, saltar (evita doble descarga en retries)
+      // Filtrar mensajes de protocolo interno (no son mensajes reales)
+      const msgTypeCheck = Object.keys(msg.message)[0];
+      if (msgTypeCheck === 'senderKeyDistributionMessage'
+        || msgTypeCheck === 'protocolMessage'
+        || msg.key.remoteJid === 'status@broadcast') continue;
+
+      // Deduplicar: si el id_mensaje ya está en BD, saltar (evita doble descarga en retries)
       const [dup] = await pool.execute(
         'SELECT id FROM wa_mensajes_entrantes WHERE id_mensaje = ?', [msg.key.id]
       );
