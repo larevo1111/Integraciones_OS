@@ -66,18 +66,36 @@ async function dbRun(sql, params = []) {
 // ── Cargar configuración desde wa_config ───────────────────────────────────────
 async function cargarConfig() {
   try {
+    // Obtener siglas de la empresa desde ia_service_os (query cross-BD)
+    const [empRows] = await pool.execute(
+      'SELECT siglas, nombre FROM ia_service_os.ia_empresas WHERE uid = ?',
+      [CONFIG.empresa]
+    );
+    const siglas = empRows.length ? empRows[0].siglas : CONFIG.empresa;
+    const mediaDirDefault = `/home/osserver/wa_media/${siglas}`;
+
+    // Leer config de wa_config
     const [rows] = await pool.execute(
       'SELECT media_dir, webhook_url, numero_vinculado FROM wa_config WHERE empresa = ? AND activo = 1',
       [CONFIG.empresa]
     );
+
     if (rows.length) {
-      CONFIG.mediaDir   = rows[0].media_dir;
+      // media_dir NULL → construir con siglas automáticamente
+      CONFIG.mediaDir   = rows[0].media_dir || mediaDirDefault;
       CONFIG.webhookUrl = rows[0].webhook_url || null;
-      log('Config cargada desde BD', { empresa: CONFIG.empresa, mediaDir: CONFIG.mediaDir });
+      // Si el media_dir guardado aún usa el uid, actualizarlo en BD
+      if (!rows[0].media_dir) {
+        await pool.execute(
+          'UPDATE wa_config SET media_dir = ? WHERE empresa = ?',
+          [mediaDirDefault, CONFIG.empresa]
+        );
+      }
     } else {
-      log('Sin config en BD — usando defaults', { empresa: CONFIG.empresa, mediaDir: CONFIG.mediaDir });
+      CONFIG.mediaDir = mediaDirDefault;
     }
-    // Asegurar que el directorio de media existe
+
+    log('Config cargada', { empresa: CONFIG.empresa, siglas, mediaDir: CONFIG.mediaDir });
     if (!fs.existsSync(CONFIG.mediaDir)) fs.mkdirSync(CONFIG.mediaDir, { recursive: true });
   } catch (e) {
     logErr('Error cargando config desde BD', e);
