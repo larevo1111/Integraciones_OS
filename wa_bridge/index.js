@@ -1,8 +1,11 @@
 /**
  * wa_bridge — WhatsApp HTTP Bridge para OS
- * Arquitectura: daemon Node.js mantiene WebSocket con WhatsApp.
- * Python (u otro servicio) llama los endpoints REST para enviar.
- * Mensajes entrantes se reenvían al webhook Python vía POST.
+ * Servicio transversal: cualquier módulo OS puede enviar/recibir WhatsApp via REST.
+ * Puerto: 3100 | BD: os_whatsapp (MariaDB local)
+ *
+ * Mensajes entrantes → guardados en wa_mensajes_entrantes + wa_contactos
+ * Mensajes enviados  → guardados en wa_mensajes_salientes
+ * Mensajes entrantes → reenviados al webhook configurado (WA_WEBHOOK_URL)
  */
 
 const {
@@ -14,27 +17,35 @@ const {
   makeCacheableSignalKeyStore,
 } = require('@whiskeysockets/baileys');
 
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const pino = require('pino');
+const express  = require('express');
+const axios    = require('axios');
+const mysql    = require('mysql2/promise');
+const fs       = require('fs');
+const path     = require('path');
+const pino     = require('pino');
+const qrTerminal = require('qrcode-terminal');
 
 // ── Configuración ──────────────────────────────────────────────────────────────
 const CONFIG = {
-  port: 3100,
-  pythonWebhook: process.env.WA_WEBHOOK_URL || 'http://localhost:5100/webhook/whatsapp',
-  authDir: path.join(__dirname, 'auth'),
-  mediaDir: path.join(__dirname, 'media'),
-  // null = acepta de todos; ['573001234567@s.whatsapp.net'] = filtro
-  allowedNumbers: null,
-  // Reintento de reconexión en segundos
+  port:           3100,
+  pythonWebhook:  process.env.WA_WEBHOOK_URL || null,  // null = solo guardar en BD
+  authDir:        path.join(__dirname, 'auth'),
+  mediaDir:       path.join(__dirname, 'media'),
+  empresa:        process.env.WA_EMPRESA || 'ori_sil_2',
+  allowedNumbers: null,  // null = todos; o ['573001234567@s.whatsapp.net']
   reconnectDelay: 3,
+  db: {
+    host:     'localhost',
+    user:     'osadmin',
+    password: 'Epist2487.',
+    database: 'os_whatsapp',
+    charset:  'utf8mb4',
+  },
 };
 
 // ── Logger ─────────────────────────────────────────────────────────────────────
 const logger = pino({ level: 'info' }, pino.destination('./wa_bridge.log'));
-const log = (msg, data = {}) => {
+const log    = (msg, data = {}) => {
   logger.info(data, msg);
   console.log(`[wa_bridge] ${msg}`, Object.keys(data).length ? data : '');
 };
@@ -43,16 +54,27 @@ const logErr = (msg, err) => {
   console.error(`[wa_bridge] ERROR ${msg}`, err?.message || err);
 };
 
+// ── Pool de BD ─────────────────────────────────────────────────────────────────
+const pool = mysql.createPool({ ...CONFIG.db, waitForConnections: true, connectionLimit: 5 });
+
+async function dbRun(sql, params = []) {
+  const [result] = await pool.execute(sql, params);
+  return result;
+}
+
 // ── Estado global ──────────────────────────────────────────────────────────────
-let sock = null;
-let connectionState = 'disconnected'; // 'disconnected' | 'connecting' | 'open'
-let qrCode = null;
+let sock            = null;
+let connectionState = 'disconnected';
+let qrCode          = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function formatJid(number) {
-  // Acepta "573001234567" o "573001234567@s.whatsapp.net"
   const clean = number.toString().replace(/[^0-9]/g, '');
   return `${clean}@s.whatsapp.net`;
+}
+
+function jidToNumber(jid) {
+  return jid ? jid.replace('@s.whatsapp.net', '').replace('@g.us', '') : null;
 }
 
 function mediaFilename(ext) {
@@ -60,7 +82,7 @@ function mediaFilename(ext) {
 }
 
 async function downloadAndSave(message, ext) {
-  const buffer = await downloadMediaMessage(message, 'buffer', {});
+  const buffer   = await downloadMediaMessage(message, 'buffer', {});
   const filePath = mediaFilename(ext);
   fs.writeFileSync(filePath, buffer);
   return filePath;
@@ -69,7 +91,7 @@ async function downloadAndSave(message, ext) {
 function getMediaSource(body) {
   if (body.filePath) return { filePath: body.filePath };
   if (body.base64) {
-    const ext = body.ext || 'bin';
+    const ext      = body.ext || 'bin';
     const filePath = mediaFilename(ext);
     fs.writeFileSync(filePath, Buffer.from(body.base64, 'base64'));
     return { filePath };
@@ -77,13 +99,121 @@ function getMediaSource(body) {
   return null;
 }
 
-// ── Webhook a Python ───────────────────────────────────────────────────────────
-async function forwardToPython(payload) {
+// ── BD: upsert contacto ────────────────────────────────────────────────────────
+async function upsertContacto(jid, nombre, esGrupo = false, tipo = 'entrante') {
+  const numero = jidToNumber(jid);
+  const colCount = tipo === 'entrante' ? 'total_entrantes = total_entrantes + 1' : 'total_salientes = total_salientes + 1';
+  try {
+    await dbRun(
+      `INSERT INTO wa_contactos (empresa, jid, numero, nombre_push, es_grupo)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         nombre_push     = COALESCE(VALUES(nombre_push), nombre_push),
+         ultimo_contacto = CURRENT_TIMESTAMP,
+         ${colCount}`,
+      [CONFIG.empresa, jid, numero, nombre || null, esGrupo ? 1 : 0]
+    );
+  } catch (e) {
+    logErr('upsertContacto', e);
+  }
+}
+
+// ── BD: guardar mensaje entrante ───────────────────────────────────────────────
+async function guardarEntrante(data) {
+  try {
+    await dbRun(
+      `INSERT IGNORE INTO wa_mensajes_entrantes
+         (empresa, message_id, from_jid, from_number, from_name,
+          es_grupo, group_jid, group_name, sender_jid,
+          tipo, texto, caption,
+          media_path, media_mime, media_size_bytes, media_duracion_seg, media_filename, media_sha256,
+          latitude, longitude, location_name, location_address,
+          contact_nombre, contact_vcard,
+          reaction_emoji, reaction_target_id,
+          quoted_message_id, quoted_texto, quoted_from,
+          es_reenviado, veces_reenviado, ts_wa)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        CONFIG.empresa,
+        data.messageId,
+        data.fromJid,
+        data.fromNumber,
+        data.fromName       || null,
+        data.esGrupo        ? 1 : 0,
+        data.groupJid       || null,
+        data.groupName      || null,
+        data.senderJid      || null,
+        data.tipo,
+        data.texto          || null,
+        data.caption        || null,
+        data.mediaPath      || null,
+        data.mediaMime      || null,
+        data.mediaSizeBytes || null,
+        data.mediaDuracion  || null,
+        data.mediaFilename  || null,
+        data.mediaSha256    || null,
+        data.latitude       || null,
+        data.longitude      || null,
+        data.locationName   || null,
+        data.locationAddress|| null,
+        data.contactNombre  || null,
+        data.contactVcard   || null,
+        data.reactionEmoji  || null,
+        data.reactionTarget || null,
+        data.quotedId       || null,
+        data.quotedTexto    || null,
+        data.quotedFrom     || null,
+        data.esReenviado    ? 1 : 0,
+        data.vecesReenviado || 0,
+        data.tsWa           || null,
+      ]
+    );
+  } catch (e) {
+    logErr('guardarEntrante', e);
+  }
+}
+
+// ── BD: guardar mensaje saliente ───────────────────────────────────────────────
+async function guardarSaliente(data) {
+  try {
+    const [result] = await pool.execute(
+      `INSERT INTO wa_mensajes_salientes
+         (empresa, message_id_wa, to_jid, to_number,
+          tipo, texto, caption, media_path, media_filename, media_mime, ptt,
+          caller_service, caller_user, status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        CONFIG.empresa,
+        data.messageIdWa  || null,
+        data.toJid,
+        data.toNumber,
+        data.tipo,
+        data.texto        || null,
+        data.caption      || null,
+        data.mediaPath    || null,
+        data.mediaFilename|| null,
+        data.mediaMime    || null,
+        data.ptt          ? 1 : 0,
+        data.callerService|| null,
+        data.callerUser   || null,
+        'sent',
+      ]
+    );
+    return result.insertId;
+  } catch (e) {
+    logErr('guardarSaliente', e);
+    return null;
+  }
+}
+
+// ── Webhook a Python/servicio externo ──────────────────────────────────────────
+async function forwardWebhook(payload) {
+  if (!CONFIG.pythonWebhook) return;
   try {
     await axios.post(CONFIG.pythonWebhook, payload, { timeout: 10000 });
-    log('Webhook enviado a Python', { type: payload.type, from: payload.from });
+    log('Webhook enviado', { type: payload.tipo, from: payload.fromNumber });
   } catch (err) {
-    logErr('Falló webhook a Python', err);
+    logErr('Falló webhook', err);
   }
 }
 
@@ -93,31 +223,30 @@ async function connectToWhatsApp() {
   qrCode = null;
 
   const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authDir);
-  const { version } = await fetchLatestBaileysVersion();
+  const { version }          = await fetchLatestBaileysVersion();
   log('Iniciando Baileys', { version });
 
   sock = makeWASocket({
     version,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
+      keys:  makeCacheableSignalKeyStore(state.keys, logger),
     },
-    printQRInTerminal: true,
-    logger: logger.child({ level: 'silent' }),
+    printQRInTerminal:          false,
+    logger:                     logger.child({ level: 'silent' }),
     generateHighQualityLinkPreview: false,
-    getMessage: async () => undefined,
+    getMessage:                 async () => undefined,
   });
 
-  // Guardar credenciales al actualizar
   sock.ev.on('creds.update', saveCreds);
 
-  // Estado de conexión
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
       qrCode = qr;
       log('QR listo — escanear con WhatsApp');
+      qrTerminal.generate(qr, { small: true });
     }
 
     if (connection === 'open') {
@@ -128,93 +257,162 @@ async function connectToWhatsApp() {
 
     if (connection === 'close') {
       connectionState = 'disconnected';
-      const code = lastDisconnect?.error?.output?.statusCode;
+      const code      = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
       logErr('Conexión cerrada', { code, loggedOut });
-
       if (!loggedOut) {
         log(`Reconectando en ${CONFIG.reconnectDelay}s...`);
         setTimeout(connectToWhatsApp, CONFIG.reconnectDelay * 1000);
       } else {
-        log('Sesión cerrada (logout). Eliminar ./auth y reiniciar para re-vincular.');
+        log('Logout detectado. Eliminar ./auth y reiniciar para re-vincular.');
       }
     }
   });
 
-  // Mensajes entrantes
+  // ── Mensajes entrantes ──────────────────────────────────────────────────────
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
 
     for (const msg of messages) {
-      if (msg.key.fromMe) continue; // ignorar mensajes propios
-      if (!msg.message) continue;
+      if (msg.key.fromMe) continue;
+      if (!msg.message)   continue;
 
-      const from = msg.key.remoteJid;
+      const fromJid  = msg.key.remoteJid;
+      const esGrupo  = fromJid.endsWith('@g.us');
+      const senderJid= esGrupo ? msg.key.participant : null;
+      const fromNumber = jidToNumber(esGrupo ? senderJid : fromJid);
+      const fromName = msg.pushName || msg.verifiedBizName || null;
 
-      // Filtro de números permitidos
-      if (CONFIG.allowedNumbers && !CONFIG.allowedNumbers.includes(from)) continue;
+      if (CONFIG.allowedNumbers && !CONFIG.allowedNumbers.includes(fromJid)) continue;
 
-      const msgType = Object.keys(msg.message)[0];
-      const payload = {
-        from,
-        fromMe: false,
+      const msgType     = Object.keys(msg.message)[0];
+      const ctx         = msg.message[msgType]?.contextInfo || msg.message.extendedTextMessage?.contextInfo || null;
+
+      // Contexto: cita y reenvío
+      const quotedId    = ctx?.stanzaId    || null;
+      const quotedFrom  = ctx?.participant || null;
+      const quotedTexto = ctx?.quotedMessage
+        ? (ctx.quotedMessage.conversation || ctx.quotedMessage.extendedTextMessage?.text || null)
+        : null;
+      const esReenviado    = ctx?.isForwarded     ? 1 : 0;
+      const vecesReenviado = ctx?.forwardingScore || 0;
+
+      const data = {
         messageId: msg.key.id,
-        timestamp: msg.messageTimestamp,
-        type: 'text',
-        text: null,
-        mediaPath: null,
-        mimetype: null,
-        caption: null,
-        latitude: null,
-        longitude: null,
+        fromJid,
+        fromNumber,
+        fromName,
+        esGrupo,
+        groupJid:   esGrupo ? fromJid    : null,
+        groupName:  null,  // Baileys no da el nombre fácil — se puede enriquecer después
+        senderJid,
+        tipo:       'text',
+        texto:      null,
+        caption:    null,
+        mediaPath:  null,
+        mediaMime:  null,
+        mediaSizeBytes: null,
+        mediaDuracion:  null,
+        mediaFilename:  null,
+        mediaSha256:    null,
+        latitude:   null,
+        longitude:  null,
+        locationName:    null,
+        locationAddress: null,
+        contactNombre:   null,
+        contactVcard:    null,
+        reactionEmoji:   null,
+        reactionTarget:  null,
+        quotedId,
+        quotedTexto,
+        quotedFrom,
+        esReenviado,
+        vecesReenviado,
+        tsWa: typeof msg.messageTimestamp === 'object'
+          ? msg.messageTimestamp.low
+          : msg.messageTimestamp,
       };
 
       try {
         if (msgType === 'conversation' || msgType === 'extendedTextMessage') {
-          payload.type = 'text';
-          payload.text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+          data.tipo  = 'text';
+          data.texto = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
         } else if (msgType === 'imageMessage') {
-          payload.type = 'image';
-          payload.mediaPath = await downloadAndSave(msg, 'jpg');
-          payload.caption = msg.message.imageMessage?.caption || null;
-          payload.mimetype = 'image/jpeg';
+          const m       = msg.message.imageMessage;
+          data.tipo     = 'image';
+          data.mediaPath= await downloadAndSave(msg, 'jpg');
+          data.caption  = m?.caption    || null;
+          data.mediaMime= m?.mimetype   || 'image/jpeg';
+          data.mediaSizeBytes = m?.fileLength || null;
+          data.mediaSha256    = m?.fileSha256 ? Buffer.from(m.fileSha256).toString('hex') : null;
 
         } else if (msgType === 'audioMessage') {
-          payload.type = 'audio';
-          payload.mediaPath = await downloadAndSave(msg, 'ogg');
-          payload.mimetype = 'audio/ogg';
+          const m       = msg.message.audioMessage;
+          data.tipo     = m?.ptt ? 'voice' : 'audio';
+          data.mediaPath= await downloadAndSave(msg, 'ogg');
+          data.mediaMime= m?.mimetype || 'audio/ogg';
+          data.mediaDuracion  = m?.seconds    || null;
+          data.mediaSizeBytes = m?.fileLength || null;
 
         } else if (msgType === 'videoMessage') {
-          payload.type = 'video';
-          payload.mediaPath = await downloadAndSave(msg, 'mp4');
-          payload.caption = msg.message.videoMessage?.caption || null;
-          payload.mimetype = 'video/mp4';
+          const m       = msg.message.videoMessage;
+          data.tipo     = 'video';
+          data.mediaPath= await downloadAndSave(msg, 'mp4');
+          data.caption  = m?.caption    || null;
+          data.mediaMime= m?.mimetype   || 'video/mp4';
+          data.mediaDuracion  = m?.seconds    || null;
+          data.mediaSizeBytes = m?.fileLength || null;
 
         } else if (msgType === 'documentMessage') {
-          const doc = msg.message.documentMessage;
-          const ext = doc.fileName?.split('.').pop() || 'bin';
-          payload.type = 'document';
-          payload.mediaPath = await downloadAndSave(msg, ext);
-          payload.fileName = doc.fileName || null;
-          payload.mimetype = doc.mimetype || 'application/octet-stream';
+          const m       = msg.message.documentMessage;
+          const ext     = m?.fileName?.split('.').pop() || 'bin';
+          data.tipo     = 'document';
+          data.mediaPath    = await downloadAndSave(msg, ext);
+          data.mediaFilename= m?.fileName  || null;
+          data.mediaMime    = m?.mimetype  || 'application/octet-stream';
+          data.mediaSizeBytes = m?.fileLength || null;
 
         } else if (msgType === 'stickerMessage') {
-          payload.type = 'sticker';
-          payload.mediaPath = await downloadAndSave(msg, 'webp');
-          payload.mimetype = 'image/webp';
+          const m       = msg.message.stickerMessage;
+          data.tipo     = 'sticker';
+          data.mediaPath= await downloadAndSave(msg, 'webp');
+          data.mediaMime= m?.mimetype || 'image/webp';
 
         } else if (msgType === 'locationMessage') {
-          payload.type = 'location';
-          payload.latitude = msg.message.locationMessage.degreesLatitude;
-          payload.longitude = msg.message.locationMessage.degreesLongitude;
+          const m       = msg.message.locationMessage;
+          data.tipo     = 'location';
+          data.latitude = m?.degreesLatitude  || null;
+          data.longitude= m?.degreesLongitude || null;
+          data.locationName    = m?.name    || null;
+          data.locationAddress = m?.address || null;
+
+        } else if (msgType === 'contactMessage') {
+          const m       = msg.message.contactMessage;
+          data.tipo     = 'contact';
+          data.contactNombre = m?.displayName || null;
+          data.contactVcard  = m?.vcard       || null;
+
+        } else if (msgType === 'reactionMessage') {
+          const m       = msg.message.reactionMessage;
+          data.tipo     = 'reaction';
+          data.reactionEmoji  = m?.text       || null;
+          data.reactionTarget = m?.key?.id    || null;
 
         } else {
-          payload.type = msgType;
+          data.tipo = msgType;
           log('Tipo de mensaje no manejado', { msgType });
         }
 
-        await forwardToPython(payload);
+        // Guardar en BD
+        await guardarEntrante(data);
+        await upsertContacto(esGrupo ? senderJid : fromJid, fromName, false, 'entrante');
+        if (esGrupo) await upsertContacto(fromJid, null, true, 'entrante');
+
+        log('Mensaje entrante guardado', { tipo: data.tipo, from: fromNumber });
+
+        // Reenviar al webhook si está configurado
+        await forwardWebhook(data);
 
       } catch (err) {
         logErr('Error procesando mensaje entrante', err);
@@ -240,102 +438,153 @@ app.get('/api/status', (req, res) => {
   res.json({ ok: true, state: connectionState, qr: qrCode });
 });
 
-// POST /api/send/text  { to, message }
+// POST /api/send/text  { to, message, caller_service?, caller_user? }
 app.post('/api/send/text', async (req, res) => {
   if (!requireConnected(res)) return;
-  const { to, message } = req.body;
+  const { to, message, caller_service, caller_user } = req.body;
   if (!to || !message) return res.status(400).json({ ok: false, error: 'to y message requeridos' });
   try {
-    const jid = formatJid(to);
-    await sock.sendMessage(jid, { text: message });
-    res.json({ ok: true, to: jid });
+    const jid    = formatJid(to);
+    const result = await sock.sendMessage(jid, { text: message });
+    await guardarSaliente({
+      messageIdWa: result?.key?.id,
+      toJid: jid, toNumber: jidToNumber(jid),
+      tipo: 'text', texto: message,
+      callerService: caller_service, callerUser: caller_user,
+    });
+    await upsertContacto(jid, null, false, 'saliente');
+    res.json({ ok: true, to: jid, message_id: result?.key?.id });
   } catch (err) {
     logErr('send/text', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/send/image  { to, filePath|base64, caption? }
+// POST /api/send/image  { to, filePath|base64, caption?, caller_service?, caller_user? }
 app.post('/api/send/image', async (req, res) => {
   if (!requireConnected(res)) return;
-  const { to, caption } = req.body;
+  const { to, caption, caller_service, caller_user } = req.body;
   const src = getMediaSource(req.body);
   if (!to || !src) return res.status(400).json({ ok: false, error: 'to y filePath/base64 requeridos' });
   try {
-    const jid = formatJid(to);
-    await sock.sendMessage(jid, {
-      image: { url: src.filePath },
-      caption: caption || '',
+    const jid    = formatJid(to);
+    const result = await sock.sendMessage(jid, { image: { url: src.filePath }, caption: caption || '' });
+    await guardarSaliente({
+      messageIdWa: result?.key?.id,
+      toJid: jid, toNumber: jidToNumber(jid),
+      tipo: 'image', caption, mediaPath: src.filePath, mediaMime: 'image/jpeg',
+      callerService: caller_service, callerUser: caller_user,
     });
-    res.json({ ok: true, to: jid });
+    await upsertContacto(jid, null, false, 'saliente');
+    res.json({ ok: true, to: jid, message_id: result?.key?.id });
   } catch (err) {
     logErr('send/image', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/send/audio  { to, filePath|base64, ptt? }
+// POST /api/send/audio  { to, filePath|base64, ptt?, caller_service?, caller_user? }
 app.post('/api/send/audio', async (req, res) => {
   if (!requireConnected(res)) return;
-  const { to, ptt = true } = req.body;
+  const { to, ptt = true, caller_service, caller_user } = req.body;
   const src = getMediaSource(req.body);
   if (!to || !src) return res.status(400).json({ ok: false, error: 'to y filePath/base64 requeridos' });
   try {
-    const jid = formatJid(to);
-    await sock.sendMessage(jid, {
-      audio: { url: src.filePath },
-      ptt: Boolean(ptt),
-      mimetype: 'audio/ogg; codecs=opus',
+    const jid    = formatJid(to);
+    const result = await sock.sendMessage(jid, {
+      audio: { url: src.filePath }, ptt: Boolean(ptt), mimetype: 'audio/ogg; codecs=opus',
     });
-    res.json({ ok: true, to: jid });
+    await guardarSaliente({
+      messageIdWa: result?.key?.id,
+      toJid: jid, toNumber: jidToNumber(jid),
+      tipo: ptt ? 'voice' : 'audio', mediaPath: src.filePath,
+      mediaMime: 'audio/ogg', ptt: Boolean(ptt),
+      callerService: caller_service, callerUser: caller_user,
+    });
+    await upsertContacto(jid, null, false, 'saliente');
+    res.json({ ok: true, to: jid, message_id: result?.key?.id });
   } catch (err) {
     logErr('send/audio', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/send/document  { to, filePath|base64, fileName?, mimetype? }
+// POST /api/send/document  { to, filePath|base64, fileName?, mimetype?, caller_service?, caller_user? }
 app.post('/api/send/document', async (req, res) => {
   if (!requireConnected(res)) return;
-  const { to, fileName, mimetype } = req.body;
+  const { to, fileName, mimetype, caller_service, caller_user } = req.body;
   const src = getMediaSource(req.body);
   if (!to || !src) return res.status(400).json({ ok: false, error: 'to y filePath/base64 requeridos' });
   try {
-    const jid = formatJid(to);
-    await sock.sendMessage(jid, {
-      document: { url: src.filePath },
-      fileName: fileName || path.basename(src.filePath),
-      mimetype: mimetype || 'application/octet-stream',
+    const jid      = formatJid(to);
+    const fname    = fileName || path.basename(src.filePath);
+    const mime     = mimetype || 'application/octet-stream';
+    const result   = await sock.sendMessage(jid, { document: { url: src.filePath }, fileName: fname, mimetype: mime });
+    await guardarSaliente({
+      messageIdWa: result?.key?.id,
+      toJid: jid, toNumber: jidToNumber(jid),
+      tipo: 'document', mediaPath: src.filePath, mediaFilename: fname, mediaMime: mime,
+      callerService: caller_service, callerUser: caller_user,
     });
-    res.json({ ok: true, to: jid });
+    await upsertContacto(jid, null, false, 'saliente');
+    res.json({ ok: true, to: jid, message_id: result?.key?.id });
   } catch (err) {
     logErr('send/document', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// POST /api/send/video  { to, filePath|base64, caption? }
+// POST /api/send/video  { to, filePath|base64, caption?, caller_service?, caller_user? }
 app.post('/api/send/video', async (req, res) => {
   if (!requireConnected(res)) return;
-  const { to, caption } = req.body;
+  const { to, caption, caller_service, caller_user } = req.body;
   const src = getMediaSource(req.body);
   if (!to || !src) return res.status(400).json({ ok: false, error: 'to y filePath/base64 requeridos' });
   try {
-    const jid = formatJid(to);
-    await sock.sendMessage(jid, {
-      video: { url: src.filePath },
-      caption: caption || '',
+    const jid    = formatJid(to);
+    const result = await sock.sendMessage(jid, { video: { url: src.filePath }, caption: caption || '' });
+    await guardarSaliente({
+      messageIdWa: result?.key?.id,
+      toJid: jid, toNumber: jidToNumber(jid),
+      tipo: 'video', caption, mediaPath: src.filePath, mediaMime: 'video/mp4',
+      callerService: caller_service, callerUser: caller_user,
     });
-    res.json({ ok: true, to: jid });
+    await upsertContacto(jid, null, false, 'saliente');
+    res.json({ ok: true, to: jid, message_id: result?.key?.id });
   } catch (err) {
     logErr('send/video', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-// ── Arranque ───────────────────────────────────────────────────────────────────
-app.listen(CONFIG.port, () => {
-  log(`API escuchando en puerto ${CONFIG.port}`);
+// GET /api/mensajes?numero=573001234567&limite=50
+app.get('/api/mensajes', async (req, res) => {
+  const { numero, limite = 50 } = req.query;
+  try {
+    const cond = numero ? 'WHERE from_number = ?' : 'WHERE 1=1';
+    const params = numero ? [numero, parseInt(limite)] : [parseInt(limite)];
+    const rows = await dbRun(
+      `SELECT * FROM wa_mensajes_entrantes ${cond} ORDER BY created_at DESC LIMIT ?`,
+      params
+    );
+    res.json({ ok: true, total: rows.length, mensajes: rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
+// GET /api/contactos
+app.get('/api/contactos', async (req, res) => {
+  try {
+    const rows = await dbRun(
+      'SELECT * FROM wa_contactos ORDER BY ultimo_contacto DESC LIMIT 200'
+    );
+    res.json({ ok: true, total: rows.length, contactos: rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Arranque ───────────────────────────────────────────────────────────────────
+app.listen(CONFIG.port, () => log(`API escuchando en puerto ${CONFIG.port}`));
 connectToWhatsApp().catch((err) => logErr('Error en connectToWhatsApp', err));

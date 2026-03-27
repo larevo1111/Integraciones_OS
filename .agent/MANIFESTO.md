@@ -462,6 +462,7 @@ Integraciones_OS/
 ├── scripts/          ← pipeline Effi (exports, imports, sync, orquestador, ia_service, telegram_bot)
 ├── frontend/         ← ERP web (menu.oscomunidad.com) — Quasar + Node API
 ├── ia-admin/         ← Panel admin del servicio IA (ia.oscomunidad.com) — Quasar + Node API
+├── wa_bridge/        ← WhatsApp HTTP Bridge (Baileys) — puerto 3100, BD os_whatsapp
 ├── espocrm-custom/   ← Customizaciones EspoCRM (PHP + JS)
 ├── docs/             ← Documentos de negocio (PDFs, DOCX, PPTX, XLSXs)
 ├── logs/             ← Logs de todos los servicios
@@ -483,6 +484,7 @@ Integraciones_OS/
 - `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
 - `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
 - `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts ejecutables (Python/JS). **Actualizar obligatoriamente al crear o modificar cualquier script.**
+- `.agent/CATALOGO_APIS.md` — **Catálogo de todas las APIs HTTP internas del ecosistema OS.** Incluye: base URL, proceso systemd, BD, endpoints, ejemplos de llamada desde Python/JS. **Actualizar al crear o modificar cualquier endpoint de cualquier servicio.**
 - `.agent/catalogo-skills.md` — Catálogo de conocimientos fundacionales. Índice de cómo se hacen las cosas.
 - `.agent/CATALOGO_REFERENCIAS.md` — **Fuentes externas e internas que informan decisiones técnicas y de IA.** Incluye: guías de Anthropic/Google, papers de text-to-SQL, referencias de Antigravity, patrones de prompting, pendientes de investigar. **Actualizar al adoptar cualquier técnica externa o al encontrar una referencia relevante.**
 - `.agent/skills/` — Skills individuales con conocimiento especializado (Ej. `.agent/skills/manejo_ia.md`).
