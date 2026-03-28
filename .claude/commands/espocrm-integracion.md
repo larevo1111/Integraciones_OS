@@ -254,10 +254,57 @@ JS (client) → POST /api/v1/ImportEffi/action/triggerImport
 
 ## Gotchas y problemas conocidos
 
+### 0. ⚠️ PERSISTENCIA DE ARCHIVOS CUSTOM — PROBLEMA CRÍTICO RESUELTO (2026-03-27)
+
+**El síntoma**: Al recrear el contenedor Docker, EspoCRM vuelve a pedir apellido como requerido y desaparecen campos custom.
+
+**La causa**: La imagen `espocrm/espocrm:latest` tiene `/var/www/html/` **vacío**. Los archivos de la app viven en `/usr/src/espocrm/` y se copian a `/var/www/html/` solo en el **primer inicio** (cuando no existe `config.php`). Al recrear el contenedor, detecta que ya está instalado y no copia nada — `custom/` queda vacío.
+
+**La solución aplicada**: Volumen nombrado `docker_espocrm_html` para `/var/www/html/` completo.
+```yaml
+# docker-compose.yml — sección espocrm
+volumes:
+  - espocrm_html:/var/www/html      # ← persiste TODA la app + custom
+  - espocrm_data:/var/www/html/data # ← config, cache, uploads
+
+volumes:
+  espocrm_html:
+    external: true   # creado manualmente, persiste entre recreaciones
+  espocrm_data:
+```
+
+**Si el volumen se pierde o hay que reconstruirlo desde cero:**
+```bash
+# 1. Poblar el volumen con los archivos de la app
+docker run --rm -v docker_espocrm_html:/var/www/html --entrypoint="" \
+  espocrm/espocrm:latest sh -c 'cp -a /usr/src/espocrm/. /var/www/html/'
+
+# 2. Iniciar el contenedor
+cd /home/osserver/docker && docker compose up -d espocrm
+
+# 3. Copiar los archivos custom del repo
+cd /home/osserver/Proyectos_Antigravity/Integraciones_OS
+docker cp espocrm-custom/Espo/Custom/Resources/. espocrm:/var/www/html/custom/Espo/Custom/Resources/
+docker cp espocrm-custom/Espo/Custom/Controllers/. espocrm:/var/www/html/custom/Espo/Custom/Controllers/
+docker cp espocrm-custom/client/. espocrm:/var/www/html/client/custom/
+
+# 4. Rebuild
+docker exec espocrm php /var/www/html/rebuild.php
+docker exec espocrm php /var/www/html/clear_cache.php
+```
+
+**Campos custom activos (Contact y Lead):**
+- `lastName`: `required: false` en entityDefs custom (el nativo lo pone `true`)
+- `firstName`: sin salutationName — usar `firstName fullWidth: true` en el layout, NO el compuesto `name`
+- `cUbicacionMaps`: campo `text`, label "Ubicación Maps", fullWidth en el layout
+- Ver entityDefs custom en `espocrm-custom/Espo/Custom/Resources/metadata/entityDefs/`
+
+---
+
 ### 1. Campos compuestos (name, address)
 - **NO sobreescribir vistas** (`recordViews.detail` / `.edit`) — es extremadamente frágil y rompe create/detail
 - La solución correcta para ocultar subcampos: **usar los subcampos individuales en el layout** en vez del campo compuesto
-- `name` → `firstName` + `lastName` (elimina salutationName)
+- `name` → usar solo `firstName` con `fullWidth: true` (oculta el apellido completamente)
 - `address` → reemplazado por campos custom `direccion` + `direccionLinea2`
 
 ### 2. rebuild.php
