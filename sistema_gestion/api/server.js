@@ -1439,6 +1439,7 @@ app.post('/api/gestion/proyectos', async (req, res) => {
   const tipoVal = tipo || 'proyecto'
   if (!ESTADOS_VALIDOS[tipoVal]) return res.status(400).json({ error: 'Tipo inválido' })
   const estadoVal = estado || ESTADOS_DEFAULT[tipoVal]
+  if (!ESTADOS_VALIDOS[tipoVal].includes(estadoVal)) return res.status(400).json({ error: `Estado '${estadoVal}' no válido para tipo '${tipoVal}'` })
 
   try {
     const [result] = await db.gestion.query(`
@@ -1483,6 +1484,14 @@ app.put('/api/gestion/proyectos/:id', async (req, res) => {
           fecha_estimada_fin, fecha_finalizacion_real, responsables, etiquetas } = req.body
 
   try {
+    // Validar estado si se está cambiando
+    if (estado !== undefined) {
+      const [[row]] = await db.gestion.query('SELECT tipo FROM g_proyectos WHERE id = ? AND empresa = ?', [req.params.id, req.empresa])
+      if (!row) return res.status(404).json({ error: 'No encontrado' })
+      const validos = ESTADOS_VALIDOS[row.tipo] || []
+      if (!validos.includes(estado)) return res.status(400).json({ error: `Estado '${estado}' no válido para tipo '${row.tipo}'` })
+    }
+
     const sets = []; const params = []
     if (nombre            !== undefined) { sets.push('nombre = ?');            params.push(nombre) }
     if (descripcion       !== undefined) { sets.push('descripcion = ?');       params.push(descripcion) }
