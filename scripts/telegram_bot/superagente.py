@@ -29,6 +29,7 @@ def _ejecutar_claude(prompt: str, session_id: str = None) -> dict:
     """Ejecuta claude -p y retorna {ok, result, session_id} parseado del JSON."""
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)
+    env.pop('ANTHROPIC_API_KEY', None)  # Forzar OAuth (plan Pro), no API key
 
     cmd = [CLAUDE_BIN, '-p', prompt, '--output-format', 'json']
     if session_id:

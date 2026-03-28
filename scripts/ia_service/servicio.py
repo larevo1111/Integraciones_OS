@@ -210,6 +210,17 @@ def consultar(
     if isinstance(pasos_del_tipo, str):
         pasos_del_tipo = json.loads(pasos_del_tipo)
 
+    # Si el usuario pide explícitamente más detalle o una tabla, forzar SQL nuevo
+    # aunque el router diga que se puede responder con el caché (que puede ser agregado).
+    _pide_detalle = ('detalle', 'desglose', 'tabla adjunta', 'tabla completa',
+                     'ver la tabla', 'dame la tabla', 'muéstrame la tabla',
+                     'muestrame la tabla', 'más datos', 'mas datos', 'todos los',
+                     'todas las', 'listado completo', 'listame', 'lístalos',
+                     'dame todo', 'cada uno', 'uno por uno')
+    if tipo == 'analisis_datos' and not requiere_sql:
+        if any(kw in pregunta.lower() for kw in _pide_detalle):
+            requiere_sql = True
+
     # Si el router decidió que no se necesita SQL nuevo, usar el caché SQL real.
     # Si no hay caché disponible, forzar SQL para no inventar datos.
     cache_sin_sql = None
