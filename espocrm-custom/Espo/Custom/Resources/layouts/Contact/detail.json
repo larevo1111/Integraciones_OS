@@ -4,10 +4,8 @@
         "rows": [
             [
                 {
-                    "name": "firstName"
-                },
-                {
-                    "name": "lastName"
+                    "name": "firstName",
+                    "fullWidth": true
                 }
             ],
             [

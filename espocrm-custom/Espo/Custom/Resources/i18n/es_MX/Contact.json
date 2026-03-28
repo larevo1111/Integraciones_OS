@@ -13,6 +13,7 @@
         "ciudadNombre": "Municipio",
         "direccion": "Dirección",
         "direccionLinea2": "Referencia / Línea 2",
-        "calificacionNegocioAmigo": "Clasificación Cliente"
+        "calificacionNegocioAmigo": "Clasificación Cliente",
+        "cUbicacionMaps": "Ubicación Maps"
     }
 }
