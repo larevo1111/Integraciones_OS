@@ -1289,6 +1289,13 @@
                 "C"
             ],
             "default": "B"
+        },
+        "lastName": {
+            "required": false,
+            "options": []
+        },
+        "firstName": {
+            "options": []
         }
     },
     "dynamicLogic": {

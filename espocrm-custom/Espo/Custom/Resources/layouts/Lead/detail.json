@@ -3,8 +3,10 @@
         "label": "Vista",
         "rows": [
             [
-                {"name": "name"},
-                {"name": "accountName"}
+                {"name": "firstName", "fullWidth": true}
+            ],
+            [
+                {"name": "accountName", "fullWidth": true}
             ],
             [
                 {"name": "emailAddress"},
@@ -37,6 +39,9 @@
             [
                 {"name": "direccion"},
                 {"name": "direccionLinea2"}
+            ],
+            [
+                {"name": "cUbicacionMaps", "fullWidth": true}
             ],
             [
                 {"name": "title"},
