@@ -69,26 +69,32 @@ def _tabla_texto(columnas: list, filas: list, titulo: str = '') -> str:
 
 
 def _limpiar_tablas_texto(texto: str) -> str:
-    """Elimina tablas markdown (pipes) del texto del LLM para que no se vean feas en Telegram."""
+    """Elimina tablas del texto del LLM: markdown (pipes), Unicode box-drawing y bloques de código con tablas."""
     import re
-    if '|' not in texto:
+    # Caracteres de dibujo de tabla Unicode
+    BOX_CHARS = '┌┐└┘├┤┬┴┼─│═║╔╗╚╝╠╣╦╩╬'
+    tiene_pipes = '|' in texto
+    tiene_box = any(c in texto for c in BOX_CHARS)
+    if not tiene_pipes and not tiene_box:
         return texto
-    # Eliminar bloques de código que contengan tablas
-    texto = re.sub(r'```[^\n]*\n[^`]*\|[^`]*```', '', texto, flags=re.DOTALL)
-    # Eliminar líneas de tabla markdown (| col1 | col2 |) y separadores (|---|---|)
+    # Eliminar bloques de código que contengan tablas (pipes o box-drawing)
+    texto = re.sub(r'```[^\n]*\n[^`]*```', '', texto, flags=re.DOTALL)
+    # Filtrar líneas de tabla
     lineas = texto.split('\n')
     limpias = []
     for linea in lineas:
         stripped = linea.strip()
-        # Línea de tabla: empieza y termina con | o es separador de tabla
+        # Línea de tabla markdown: empieza y termina con |
         if stripped.startswith('|') and stripped.endswith('|'):
             continue
-        # Líneas separadoras sueltas tipo :--- | ---:
+        # Separador markdown tipo :--- | ---:
         if re.match(r'^[\s|:\-]+$', stripped) and '|' in stripped:
+            continue
+        # Línea con box-drawing characters (tabla Unicode)
+        if any(c in stripped for c in BOX_CHARS):
             continue
         limpias.append(linea)
     resultado = '\n'.join(limpias).strip()
-    # Limpiar saltos de línea excesivos dejados por la limpieza
     resultado = re.sub(r'\n{3,}', '\n\n', resultado)
     return resultado
 
@@ -130,9 +136,15 @@ def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -
             titulo_tabla = tabla.get('titulo', '')
 
             if n_filas <= MAX_FILAS_INLINE:
-                # 1-2 filas: tabla inline (cabe bien en el chat)
-                tabla_str = _tabla_texto(columnas, filas, titulo_tabla)
-                texto = f"{texto}\n\n{tabla_str}" if texto else tabla_str
+                # 1-2 filas: el LLM ya formateó con viñetas, NO agregar tabla ASCII.
+                # Solo si el LLM no incluyó datos, generar viñetas nosotros.
+                if not any(c.lower() in texto.lower() for c in columnas[:2]):
+                    vinetas = []
+                    for f in filas:
+                        for i, c in enumerate(columnas):
+                            v = _formatear_valor(_fila_valor(f, i, c))
+                            vinetas.append(f"• *{c}*: {v}")
+                    texto = f"{texto}\n\n" + '\n'.join(vinetas) if texto else '\n'.join(vinetas)
             else:
                 # >2 filas: SIEMPRE botón "Ver tabla completa"
                 token = str(uuid.uuid4())

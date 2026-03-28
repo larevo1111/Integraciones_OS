@@ -291,11 +291,20 @@ def obtener_ejemplos_dinamicos(empresa: str, pregunta: str, n: int = 3) -> str:
         return ''
 
 
+def _normalizar(texto: str) -> str:
+    """Quita tildes y pasa a minúsculas: 'consignación' → 'consignacion'."""
+    import unicodedata
+    nfkd = unicodedata.normalize('NFKD', texto)
+    return ''.join(c for c in nfkd if not unicodedata.combining(c)).lower()
+
+
 def obtener_logica_negocio(empresa: str, pregunta: str) -> str:
     """
     Recupera fragmentos de lógica de negocio relevantes para la pregunta.
     - siempre_presente=1 → siempre se inyectan
     - otros → se inyectan si alguna keyword aparece en la pregunta
+    Matching normaliza tildes: 'producción' matchea 'produccion' y viceversa.
+    Keywords de 2 chars o menos se comparan como palabra completa (evita 'OP' en 'top').
     """
     try:
         conn = get_local_conn()
@@ -311,14 +320,20 @@ def obtener_logica_negocio(empresa: str, pregunta: str) -> str:
         if not fragmentos:
             return ''
 
-        pregunta_lower = pregunta.lower()
+        import re
+        pregunta_norm = _normalizar(pregunta)
         relevantes = []
         for f in fragmentos:
             if f.get('siempre_presente'):
                 relevantes.append(f)
                 continue
-            keywords = [k.strip().lower() for k in (f.get('keywords') or '').split(',') if k.strip()]
-            if any(kw in pregunta_lower for kw in keywords):
+            keywords = [_normalizar(k.strip()) for k in (f.get('keywords') or '').split(',') if k.strip()]
+            # Keywords cortos (≤2 chars): match palabra completa. Largos: substring.
+            if any(
+                (re.search(r'\b' + re.escape(kw) + r'\b', pregunta_norm) if len(kw) <= 2
+                 else kw in pregunta_norm)
+                for kw in keywords
+            ):
                 relevantes.append(f)
 
         if not relevantes:

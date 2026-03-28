@@ -905,13 +905,14 @@ def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generad
             f"Luego indica que puede ver el detalle completo en la tabla.\n"
         ) if tiene_tabla else (
             f"Responde la pregunta de forma directa y concisa con los datos obtenidos. "
-            f"Incluye los valores numéricos formateados.\n"
+            f"Presenta cada dato con viñetas así: • **campo**: valor\n"
+            f"Ejemplo: • **ventas_netas**: $2,914,192.00\n"
         )
         return (
             f"Pregunta del usuario: {pregunta}\n\n"
             f"Datos obtenidos de la base de datos ({n_total} registros):\n{filas_texto}\n\n"
             f"{instruccion_tabla}"
-            f"NUNCA formatees los datos como tabla markdown (con | pipes)."
+            f"REGLA ABSOLUTA: NUNCA uses tablas, cuadros, pipes (|), guiones (---), ni caracteres de dibujo (┌─┐│└┘├┤┬┴┼). Solo viñetas y texto plano."
         )
 
     return pregunta

@@ -47,20 +47,33 @@ def _ejecutar_claude(prompt: str, session_id: str = None) -> dict:
         return {'ok': False, 'error': str(e)}
 
     stdout = proc.stdout.strip()
+    stderr = (proc.stderr or '').strip()
+
     if not stdout:
-        stderr = (proc.stderr or '').strip()
+        log.error(f"[SA] claude -p sin stdout. stderr={stderr[:300]} returncode={proc.returncode}")
+        if 'credit balance' in stderr.lower():
+            return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
         return {'ok': False, 'error': stderr[:200] if stderr else 'El Super Agente no respondió.'}
 
     # claude --output-format json puede emitir múltiples líneas; la última es el resultado
     last_line = stdout.strip().split('\n')[-1]
     try:
         data = json.loads(last_line)
+        result_text = data.get('result', '')
+        # Claude a veces devuelve el error como resultado exitoso
+        if 'credit balance' in result_text.lower():
+            log.warning(f"[SA] Claude respondió con error de crédito: {result_text[:200]}")
+            return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
+        log.info(f"[SA] OK session={data.get('session_id','')} cost=${data.get('total_cost_usd',0):.4f}")
         return {
             'ok': True,
-            'result': data.get('result', ''),
+            'result': result_text,
             'session_id': data.get('session_id', ''),
         }
     except (json.JSONDecodeError, ValueError):
+        log.error(f"[SA] JSON inválido: {last_line[:300]}")
+        if 'credit balance' in last_line.lower():
+            return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
         return {'ok': False, 'error': f'Respuesta no válida: {last_line[:200]}'}
 
 
