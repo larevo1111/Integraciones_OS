@@ -1,7 +1,8 @@
 """
 Formateador de tablas para Telegram.
-- ≤2 filas: tabla ASCII inline en el chat.
-- >2 filas: SIEMPRE genera token + botón "Ver tabla completa" (mini app).
+- SIEMPRE: texto con viñetas en el mensaje del chat.
+- >2 filas: ADEMÁS adjunta botón "Ver tabla completa" (mini app).
+- NUNCA dibuja tablas ASCII/Unicode en el chat.
 """
 import uuid, json
 from db import guardar_tabla_temp
@@ -115,9 +116,9 @@ def _filas_validas(filas: list) -> list:
 def procesar_tabla(resultado: dict, pregunta: str, empresa: str = 'ori_sil_2') -> dict:
     """
     Procesa respuesta del ia_service para Telegram.
-    - Limpia tablas markdown (pipes) del texto del LLM SIEMPRE.
-    - ≤2 filas: tabla ASCII inline en el chat.
-    - >2 filas: genera token + botón "Ver tabla completa" (mini app).
+    - Limpia tablas markdown/Unicode del texto del LLM SIEMPRE.
+    - SIEMPRE muestra texto con viñetas en el chat.
+    - >2 filas: ADEMÁS genera token + botón "Ver tabla completa" (mini app).
     """
     tabla   = resultado.get('tabla')
     texto   = (resultado.get('respuesta') or '').strip()

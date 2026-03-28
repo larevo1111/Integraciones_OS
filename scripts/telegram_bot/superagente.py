@@ -1,19 +1,16 @@
 """
 superagente.py — Super Agente Claude Code para el bot de Telegram.
-Usa claude -p con --resume para mantener sesiones persistentes.
-Cada usuario puede tener múltiples conversaciones nombradas.
-Usado por: telegram_bot/handlers_sa.py
+Simplemente envía prompts a Claude Code CLI (claude -p) y devuelve la respuesta.
+Maneja sesiones persistentes con --resume y nombres de conversaciones.
+No usa API keys, no loguea — es hablar con Claude por terminal.
 """
 import json
-import logging
 import os
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ia_service.config import get_local_conn
-
-log = logging.getLogger('os_ia_bot')
 
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
 CLAUDE_BIN = '/home/osserver/.local/bin/claude'
@@ -51,7 +48,6 @@ def _ejecutar_claude(prompt: str, session_id: str = None) -> dict:
     stderr = (proc.stderr or '').strip()
 
     if not stdout:
-        log.error(f"[SA] claude -p sin stdout. stderr={stderr[:300]} returncode={proc.returncode}")
         if 'credit balance' in stderr.lower():
             return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
         return {'ok': False, 'error': stderr[:200] if stderr else 'El Super Agente no respondió.'}
@@ -61,18 +57,14 @@ def _ejecutar_claude(prompt: str, session_id: str = None) -> dict:
     try:
         data = json.loads(last_line)
         result_text = data.get('result', '')
-        # Claude a veces devuelve el error como resultado exitoso
         if 'credit balance' in result_text.lower():
-            log.warning(f"[SA] Claude respondió con error de crédito: {result_text[:200]}")
             return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
-        log.info(f"[SA] OK session={data.get('session_id','')} cost=${data.get('total_cost_usd',0):.4f}")
         return {
             'ok': True,
             'result': result_text,
             'session_id': data.get('session_id', ''),
         }
     except (json.JSONDecodeError, ValueError):
-        log.error(f"[SA] JSON inválido: {last_line[:300]}")
         if 'credit balance' in last_line.lower():
             return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
         return {'ok': False, 'error': f'Respuesta no válida: {last_line[:200]}'}
@@ -225,8 +217,6 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
     sesion = obtener_sesion_activa(usuario_id, empresa)
 
     if sesion:
-        # Sesión existente → resume directo
-        log.info(f'SA resume sesión {sesion["id"]} para {nombre_usuario}')
         resp = _ejecutar_claude(pregunta, session_id=sesion['claude_session_id'])
         if not resp.get('ok'):
             return resp
@@ -259,9 +249,6 @@ def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
                       .replace('{nivel}', str(nivel))
                       .replace('{empresa}', empresa))
 
-    # Paso 1: enviar nombre + prompt sistema → obtener session_id
-    # El nombre va al inicio para que Claude nombre la sesión con "SA - ..."
-    log.info(f'SA creando sesión "{nombre}" para {nombre_usuario}')
     prompt_con_nombre = f'{nombre}\n\n{prompt_sistema}'
     resp1 = _ejecutar_claude(prompt_con_nombre)
     if not resp1.get('ok'):
@@ -274,8 +261,6 @@ def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
     # Guardar en BD con el mismo nombre
     crear_sesion(usuario_id, empresa, session_id, nombre=nombre)
 
-    # Paso 2: enviar la pregunta con --resume
-    log.info(f'SA enviando pregunta a sesión {session_id[:8]}...')
     resp2 = _ejecutar_claude(pregunta, session_id=session_id)
     if not resp2.get('ok'):
         return resp2
