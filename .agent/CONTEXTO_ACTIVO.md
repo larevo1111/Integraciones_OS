@@ -1,5 +1,5 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-03-26
+**Actualizado**: 2026-03-28
 
 ## Módulos activos en paralelo
 
@@ -12,12 +12,13 @@
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Integración bidireccional activa | Normal |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
-## Trabajo activo esta semana (2026-03-26)
+## Trabajo activo esta semana (2026-03-28)
 
-- **Sistema Gestión — Jornadas ✅**: Módulo completo (check-in/out, pausas, turno nocturno, 6h gap, reabrir 1h, GestionTable, popup detalle, admin edit, observaciones, notificación Telegram 8pm)
-- **Sistema Gestión — Tareas ✅**: TickTick-style activo, fix mobile subtask button + contraste
-- **Sistema Gestión — Infra**: SSH tunnel auto-reconnect en db.js, UTC_TIMESTAMP fix en equipo
-- **IA Service**: Super Agente Claude Code activo en bot, mejora continua cada 6h
+- **IA Service — Depuración lógica negocio ✅**: 3 reglas duplicadas desactivadas, 3 nuevas creadas (ventas, SQL gotchas, margen), 5 keywords corregidos, 302 ejemplos SQL duplicados eliminados, 178 CURDATE() corregidos
+- **IA Service — Protección aprendizaje ✅**: `guardar_ejemplo_sql()` ahora rechaza SQL con CURDATE/NOW antes de guardar — evita ciclo vicioso
+- **Bot Telegram — Super Agente ✅**: Simplificado (sin logging, sin API key — usa OAuth Pro)
+- **Bot Telegram — Tabla adjunta ✅**: Fix `_pide_detalle` para forzar SQL nuevo cuando usuario pide "detalle/desglose"
+- **Sistema Gestión — Jornadas ✅**: Módulo completo
 - **Pendiente próximo**: Notificaciones jornada olvidada (activas vía cron 8pm L-V)
 
 ## Regla de actualización

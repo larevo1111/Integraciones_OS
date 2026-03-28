@@ -108,7 +108,7 @@ Manual completo: `.agent/manuales/ia_service_manual.md`
 
 Tablas clave:
 - `ia_agentes`, `ia_tipos_consulta`, `ia_temas`, `ia_conversaciones`, `ia_logs`, `ia_consumo_diario`
-- `ia_ejemplos_sql` (303 ejemplos con embeddings)
+- `ia_ejemplos_sql` (431 ejemplos con embeddings, 0 duplicados, 0 con CURDATE)
 - `ia_rag_documentos`, `ia_rag_fragmentos`
 - `ia_usuarios`, `ia_empresas`, `ia_usuarios_empresas`
 - `ia_config`, `ia_conexiones_bd`, `ia_esquemas`
@@ -143,23 +143,28 @@ Tablas clave:
 - Nivel 1–5: cerebras-llama ★ (default), gemini-flash, gpt-oss-120b, deepseek-chat
 - Nivel 6–7: + gemini-pro, claude-sonnet
 
-### Regla tabla bot — ABSOLUTA
-- `MAX_FILAS_INLINE = 2` — más de 2 registros → botón "Ver tabla completa" SIEMPRE
-- Solo 1-2 filas se muestran inline
-- `_limpiar_tablas_texto()` elimina pipes markdown del texto del LLM en TODAS las respuestas
-- LLM NUNCA escribe tablas markdown (prohibido en system prompt)
+### Regla tabla bot — ABSOLUTA (confirmada 2026-03-28)
+- **A**: SIEMPRE poner información en el mensaje con viñetas y texto
+- **B**: Si >2 registros → ADEMÁS adjuntar botón "Ver tabla completa" (mini app web)
+- NUNCA dibujar tablas ASCII/Unicode/markdown en el chat
+- `MAX_FILAS_INLINE = 2` en tabla.py
+- `_limpiar_tablas_texto()` elimina pipes markdown como red de seguridad
 
 ## Lógica de negocio (ia_logica_negocio)
 
-- 16 fragmentos total; 13 activos
-- `siempre_presente=1` se inyecta en toda consulta; resto filtra por keywords
-- Depurador automático cuando supera 1000 palabras (target compresión: 900 palabras)
-- Bug corregido (2026-03-22): el depurador comprime cada regla individualmente (UPDATE en BD), NUNCA borra ni desactiva
+- **16 reglas activas** (~1059 palabras totales)
+- `siempre_presente=1` (reglas 1, 32, 38) se inyectan en TODA consulta; resto por keywords
+- Depurador automático: comprime cuando >1000 palabras (target 900). NUNCA borra ni desactiva.
 
-**Fragmentos inactivos a propósito:**
-- 'Lógica de negocio consolidada' (455 palabras, superset de todos — mantener inactiva para no duplicar)
-- 'Tarifa Miembros OS' (incluida en 'Tarifas de precio')
-- 'Prioridad de costo' (duplicado de 'Manejo de costos')
+**Depuración 2026-03-28:**
+- Desactivadas 3 duplicadas (#16, #30, #31)
+- Corregidos keywords en 5 reglas (#2, #6, #8, #29, #36) para evitar falsos positivos
+- Creadas 3 reglas nuevas: #37 (métricas ventas), #38 (gotchas SQL — SP), #39 (margen/utilidad)
+- Completada regla #4 (canales faltantes), actualizada #1 (stack agentes)
+
+**Protección contra patrones prohibidos (2026-03-28):**
+- `guardar_ejemplo_sql()` ahora RECHAZA SQL con CURDATE(), NOW(), CURRENT_DATE() antes de guardar
+- Evita ciclo vicioso: LLM genera patrón prohibido → se guarda → LLM lo copia del ejemplo
 
 ## Protocolo de aprendizaje (Sócrates)
 
@@ -173,6 +178,12 @@ IA aprende lógica de negocio en tiempo real:
 - Capa 1 → bloqueo total (sin alternativa — presupuesto agotado)
 - Capa 2 o 3 → busca siguiente agente disponible respetando nivel del usuario
 - Si hay alternativa: fallback silencioso con notificación "Fallback automático: X → Y"
+
+## Detección de pedido de detalle (_pide_detalle)
+
+Cuando el tipo es `analisis_datos` y el router dice `requiere_sql=False` (reusar caché), hay una segunda verificación: si el usuario pide "detalle", "tabla adjunta", "desglose", "listado completo", etc., fuerza `requiere_sql=True` para generar SQL nuevo en lugar de reusar datos agregados del caché.
+
+Esto evita que "Dame las ventas" → 1 fila SUM → follow-up "La tabla con el detalle" → reutilice la misma 1 fila.
 
 ## SQL retry con columnas reales
 
@@ -257,11 +268,17 @@ IA aprende lógica de negocio en tiempo real:
 | `.agent/manuales/ia_service_manual.md` | Manual completo v2.7 |
 | `.agent/docs/COMPARACION_AGENTES_IA.md` | Benchmark 3 rondas, 105 llamadas |
 
-## Super Agente (activo — 2026-03-24)
+## Super Agente (activo — 2026-03-28)
 
-Claude Code corre en paralelo al ia_service como Super Agente en el bot. El usuario selecciona `🦾 Super Agente` en el menú de agentes (nivel 5+).
+Claude Code CLI corre en paralelo al ia_service. El usuario selecciona `🦾 Super Agente` en el menú.
 
-**Tablas**: `sa_sesiones`, `sa_config`, `sa_cambios` en ia_service_os.
-**Prompt**: editable desde ia.oscomunidad.com → sección "Super Agente".
-**Aprobación de código**: Claude envía mensaje privado a nivel 7 (Santi) con botones ✅/❌.
-**Próximo**: verificar en producción (E — Verificación del plan).
+**Principio**: Es algo MUY SIMPLE — solo enviar prompts a `claude -p` y devolver la respuesta. Sin API keys, sin logging.
+
+**Detalles técnicos**:
+- `superagente.py` hace `subprocess.run([claude, '-p', prompt, '--output-format', 'json'])`
+- Fuerza OAuth Pro: `env.pop('ANTHROPIC_API_KEY')` para no usar API key del .env
+- Sesiones persistentes con `--resume SESSION_ID` (5-30s vs 2min sin resume)
+- Sin logging — ni import logging ni log.info/error/warning
+- Tablas: `sa_sesiones`, `sa_config`, `sa_cambios` en ia_service_os
+- Menú propio: [📝 Nueva] [📋 Conversaciones] [⚙️ Ajustes]
+- Aprobación de código: Claude envía JSON tipo "aprobacion" → bot notifica nivel 7 con ✅/❌

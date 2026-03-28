@@ -203,9 +203,18 @@ def extraer_palabras_clave(texto: str) -> str:
     return ','.join(encontradas[:10])
 
 
+_PATRONES_SQL_PROHIBIDOS = [
+    'CURDATE()', 'CURRENT_DATE()', 'CURRENT_DATE',
+    'NOW()', 'CURRENT_TIMESTAMP()',
+]
+
+
 def guardar_ejemplo_sql(empresa: str, pregunta: str, sql: str):
     """Guarda un Q→SQL exitoso para auto-mejora progresiva del agente."""
     try:
+        sql_upper = sql.upper()
+        if any(p.upper() in sql_upper for p in _PATRONES_SQL_PROHIBIDOS):
+            return
         tablas_raw = re.findall(r'FROM\s+(\w+)|JOIN\s+(\w+)', sql, re.IGNORECASE)
         tablas = [t for par in tablas_raw for t in par if t]
         tablas_str = ','.join(set(tablas))[:500]
