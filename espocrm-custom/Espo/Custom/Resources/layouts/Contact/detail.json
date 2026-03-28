@@ -72,6 +72,12 @@
             ],
             [
                 {
+                    "name": "cUbicacionMaps",
+                    "fullWidth": true
+                }
+            ],
+            [
+                {
                     "name": "fuente"
                 },
                 {
