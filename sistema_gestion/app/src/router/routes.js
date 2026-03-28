@@ -5,18 +5,14 @@ const routes = [
     component: () => import('layouts/MainLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: '',        redirect: '/tareas' },
-      { path: 'tareas',  component: () => import('pages/TareasPage.vue') },
-      { path: 'equipo',  component: () => import('pages/TareasPage.vue'), props: { soloMias: false } },
-      { path: 'jornadas', component: () => import('pages/EquipoPage.vue') },
-      { path: 'dificultades',  component: () => import('pages/DificultadesPage.vue') },
-      { path: 'dificultades/:id', component: () => import('pages/DetalleDificultadPage.vue') },
-      { path: 'ideas',   component: () => import('pages/IdeasPage.vue') },
-      { path: 'ideas/:id', component: () => import('pages/DetalleIdeaPage.vue') },
-      { path: 'pendientes', component: () => import('pages/PendientesPage.vue') },
-      { path: 'pendientes/:id', component: () => import('pages/DetallePendientePage.vue') },
-      { path: 'informes', component: () => import('pages/InformesPage.vue') },
-      { path: 'informes/:id', component: () => import('pages/DetalleInformePage.vue') }
+      { path: '',               redirect: '/tareas' },
+      { path: 'tareas',         component: () => import('pages/TareasPage.vue') },
+      { path: 'equipo',         component: () => import('pages/TareasPage.vue'), props: { soloMias: false } },
+      { path: 'jornadas',       component: () => import('pages/EquipoPage.vue') },
+      { path: 'proyectos-tabla', component: () => import('pages/ItemsTablePage.vue'), props: { tipo: 'proyecto' } },
+      { path: 'dificultades',   component: () => import('pages/ItemsTablePage.vue'), props: { tipo: 'dificultad' } },
+      { path: 'compromisos',    component: () => import('pages/ItemsTablePage.vue'), props: { tipo: 'compromiso' } },
+      { path: 'ideas',          component: () => import('pages/ItemsTablePage.vue'), props: { tipo: 'idea' } },
     ]
   },
   { path: '/:catchAll(.*)*', redirect: '/tareas' }

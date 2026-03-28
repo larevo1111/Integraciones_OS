@@ -33,17 +33,16 @@
         </div>
 
         <!-- PROYECTOS -->
-        <div class="sidebar-section">
+        <div v-for="sec in SECCIONES_SIDEBAR" :key="sec.tipo" class="sidebar-section">
           <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
-            <span>Proyectos</span>
-            <button class="btn-icon-tiny" title="Nuevo proyecto" @click="abrirModalNuevo">
+            <span>{{ sec.label }}</span>
+            <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click="abrirPanel(sec.tipo)">
               <span class="material-icons" style="font-size:14px">add</span>
             </button>
           </div>
 
-          <!-- Lista de proyectos -->
           <div
-            v-for="p in proyectos"
+            v-for="p in itemsPorTipo(sec.tipo)"
             :key="p.id"
             class="nav-item-proyecto-wrap"
             @mouseenter="proyectoHover = p.id"
@@ -59,9 +58,8 @@
               </span>
               <span class="nav-item-label">{{ p.nombre }}</span>
               <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-              <!-- Botones en hover: ✓ completar + ⋮ menú -->
               <template v-if="proyectoHover === p.id">
-                <button class="btn-proyecto-check" title="Completar proyecto" @click.prevent.stop="completarProyecto(p)">
+                <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
                   <span class="material-icons" style="font-size:15px">check_circle_outline</span>
                 </button>
                 <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
@@ -71,52 +69,49 @@
             </RouterLink>
           </div>
 
-          <div v-if="!proyectos.length && !cargandoProyectos" class="sidebar-empty-hint">
-            Sin proyectos activos
-          </div>
-
-          <!-- Proyectos completados (acordeón) -->
-          <div v-if="proyectosCompletados.length" class="completados-wrap">
-            <div class="completados-header" @click="mostrarCompletados = !mostrarCompletados">
-              <span class="material-icons" style="font-size:14px">{{ mostrarCompletados ? 'expand_more' : 'chevron_right' }}</span>
-              Completados ({{ proyectosCompletados.length }})
-            </div>
-            <template v-if="mostrarCompletados">
-              <div
-                v-for="p in proyectosCompletados"
-                :key="p.id"
-                class="nav-item nav-item-proyecto nav-item-completado"
-              >
-                <span class="nav-item-icon">
-                  <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B', opacity: 0.5 }"></span>
-                </span>
-                <span class="nav-item-label nav-item-label-completado">{{ p.nombre }}</span>
-              </div>
-            </template>
+          <div v-if="!itemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
+            Sin {{ sec.label.toLowerCase() }}
           </div>
         </div>
 
+        <!-- Completados (todos los tipos juntos) -->
+        <div v-if="proyectosCompletados.length" class="completados-wrap" style="padding:0 8px">
+          <div class="completados-header" @click="mostrarCompletados = !mostrarCompletados">
+            <span class="material-icons" style="font-size:14px">{{ mostrarCompletados ? 'expand_more' : 'chevron_right' }}</span>
+            Completados ({{ proyectosCompletados.length }})
+          </div>
+          <template v-if="mostrarCompletados">
+            <div
+              v-for="p in proyectosCompletados"
+              :key="p.id"
+              class="nav-item nav-item-proyecto nav-item-completado"
+            >
+              <span class="nav-item-icon">
+                <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B', opacity: 0.5 }"></span>
+              </span>
+              <span class="nav-item-label nav-item-label-completado">{{ p.nombre }}</span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Tablas -->
         <div class="sidebar-section">
-          <div class="sidebar-section-label">Conocimiento</div>
-          <RouterLink to="/dificultades" class="nav-item" :class="{ active: ruta.startsWith('/dificultades') }">
+          <div class="sidebar-section-label">Tablas</div>
+          <RouterLink to="/proyectos-tabla" class="nav-item" :class="{ active: ruta === '/proyectos-tabla' }">
+            <span class="nav-item-icon material-icons">folder_open</span>
+            <span class="nav-item-label">Proyectos</span>
+          </RouterLink>
+          <RouterLink to="/dificultades" class="nav-item" :class="{ active: ruta === '/dificultades' }">
             <span class="nav-item-icon material-icons">warning_amber</span>
             <span class="nav-item-label">Dificultades</span>
           </RouterLink>
-          <RouterLink to="/ideas" class="nav-item" :class="{ active: ruta.startsWith('/ideas') }">
-            <span class="nav-item-icon material-icons">lightbulb_outline</span>
-            <span class="nav-item-label">Ideas y Hechos</span>
-          </RouterLink>
-        </div>
-
-        <div class="sidebar-section">
-          <div class="sidebar-section-label">Compromisos</div>
-          <RouterLink to="/pendientes" class="nav-item" :class="{ active: ruta.startsWith('/pendientes') }">
+          <RouterLink to="/compromisos" class="nav-item" :class="{ active: ruta === '/compromisos' }">
             <span class="nav-item-icon material-icons">task_alt</span>
-            <span class="nav-item-label">Pendientes</span>
+            <span class="nav-item-label">Compromisos</span>
           </RouterLink>
-          <RouterLink to="/informes" class="nav-item" :class="{ active: ruta.startsWith('/informes') }">
-            <span class="nav-item-icon material-icons">bar_chart</span>
-            <span class="nav-item-label">Informes</span>
+          <RouterLink to="/ideas" class="nav-item" :class="{ active: ruta === '/ideas' }">
+            <span class="nav-item-icon material-icons">lightbulb_outline</span>
+            <span class="nav-item-label">Ideas</span>
           </RouterLink>
         </div>
       </nav>
@@ -166,19 +161,29 @@
       </div>
     </div>
 
-    <!-- Modal crear/editar proyecto -->
-    <ProyectoModal
-      v-model="modalProyecto"
-      :proyecto-editar="proyectoEditando"
-      @guardado="onProyectoGuardado"
+    <!-- Panel lateral crear/editar -->
+    <ProyectoPanel
+      v-if="panelVisible"
+      :item="panelItem"
+      :tipo="panelTipo"
+      :categorias="categorias"
+      :usuarios="usuarios"
+      :etiquetas="etiquetasGlobal"
+      @cerrar="panelVisible = false"
+      @guardado="onItemGuardado"
+      @eliminado="onItemEliminado"
     />
 
-    <!-- Menú contextual ⋮ de proyecto -->
+    <!-- Menú contextual ⋮ -->
     <Teleport to="body">
       <div v-if="menuProyecto.visible" class="proyecto-ctx-menu" :style="menuProyecto.style" @click.stop>
-        <div class="ctx-item" @click="editarProyecto(menuProyecto.proyecto)">
+        <div class="ctx-item" @click="editarItem(menuProyecto.proyecto)">
           <span class="material-icons" style="font-size:15px">edit</span>
           Editar
+        </div>
+        <div class="ctx-item" @click="verTabla(menuProyecto.proyecto)">
+          <span class="material-icons" style="font-size:15px">table_chart</span>
+          Ver tabla
         </div>
         <div class="ctx-item ctx-item-warn" @click="archivarProyecto(menuProyecto.proyecto)">
           <span class="material-icons" style="font-size:15px">archive</span>
@@ -206,12 +211,12 @@
             <nav class="sidebar-nav">
               <RouterLink to="/tareas"       class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">check_circle_outline</span><span class="nav-item-label">Mis Tareas</span></RouterLink>
               <RouterLink to="/equipo"       class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">group</span><span class="nav-item-label">Equipo</span></RouterLink>
-              <div class="sidebar-section-label" style="padding:12px 16px 2px">Conocimiento</div>
+              <RouterLink to="/jornadas"     class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">schedule</span><span class="nav-item-label">Jornadas</span></RouterLink>
+              <div class="sidebar-section-label" style="padding:12px 16px 2px">Tablas</div>
+              <RouterLink to="/proyectos-tabla" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">folder_open</span><span class="nav-item-label">Proyectos</span></RouterLink>
               <RouterLink to="/dificultades" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">warning_amber</span><span class="nav-item-label">Dificultades</span></RouterLink>
-              <RouterLink to="/ideas"        class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">lightbulb_outline</span><span class="nav-item-label">Ideas y Hechos</span></RouterLink>
-              <div class="sidebar-section-label" style="padding:12px 16px 2px">Compromisos</div>
-              <RouterLink to="/pendientes"   class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">task_alt</span><span class="nav-item-label">Pendientes</span></RouterLink>
-              <RouterLink to="/informes"     class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">bar_chart</span><span class="nav-item-label">Informes</span></RouterLink>
+              <RouterLink to="/compromisos"  class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">task_alt</span><span class="nav-item-label">Compromisos</span></RouterLink>
+              <RouterLink to="/ideas"        class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">lightbulb_outline</span><span class="nav-item-label">Ideas</span></RouterLink>
             </nav>
           </aside>
         </div>
@@ -222,12 +227,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, provide, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
 import { hoyLocal } from 'src/services/fecha'
-import ProyectoModal from 'src/components/ProyectoModal.vue'
+import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
 const auth             = useAuthStore()
@@ -237,45 +242,94 @@ const sidebarCollapsed = ref(false)
 const drawerOpen       = ref(false)
 const menuUsuario      = ref(false)
 
-// Proyectos en sidebar
-const proyectos           = ref([])
+// ── Secciones del sidebar ──
+const SECCIONES_SIDEBAR = [
+  { tipo: 'proyecto',    label: 'Proyectos',    singular: 'proyecto',    icon: 'folder_open' },
+  { tipo: 'dificultad',  label: 'Dificultades', singular: 'dificultad',  icon: 'warning_amber' },
+  { tipo: 'compromiso',  label: 'Compromisos',  singular: 'compromiso',  icon: 'task_alt' },
+  { tipo: 'idea',        label: 'Ideas',        singular: 'idea',        icon: 'lightbulb_outline' },
+]
+const ESTADOS_COMPLETADO = { proyecto: 'Completado', dificultad: 'Resuelta', compromiso: 'Cumplido', idea: 'Aprobada' }
+const RUTAS_TABLA = { proyecto: '/proyectos-tabla', dificultad: '/dificultades', compromiso: '/compromisos', idea: '/ideas' }
+
+// Items en sidebar (todos los tipos activos juntos)
+const todosItems          = ref([])
 const proyectosCompletados = ref([])
 const mostrarCompletados  = ref(false)
 const cargandoProyectos   = ref(false)
 const proyectoHover       = ref(null)
 
-// Modal crear/editar
-const modalProyecto   = ref(false)
-const proyectoEditando = ref(null)
+// Panel lateral
+const panelVisible = ref(false)
+const panelItem    = ref(null)
+const panelTipo    = ref('proyecto')
+
+// Datos compartidos para el panel
+const categorias     = ref([])
+const usuarios       = ref([])
+const etiquetasGlobal = ref([])
 
 // Menú contextual ⋮
 const menuProyecto = ref({ visible: false, proyecto: null, style: {} })
 
+function itemsPorTipo(tipo) {
+  return todosItems.value.filter(p => p.tipo === tipo)
+}
+
+// Alias para compatibilidad template (completados no filtran por tipo)
+const proyectos = todosItems // renombrado internamente
+
 async function cargarProyectos() {
   cargandoProyectos.value = true
   try {
-    const [activos, completados] = await Promise.all([
-      api('/api/gestion/proyectos?estado=Activo'),
-      api('/api/gestion/proyectos?estado=Completado')
+    const [activos, resueltos] = await Promise.all([
+      api('/api/gestion/proyectos'),
+      Promise.resolve({ proyectos: [] }) // completados se cargan aparte si hay
     ])
-    proyectos.value            = activos.proyectos    || []
-    proyectosCompletados.value = completados.proyectos || []
+    const all = activos.proyectos || []
+    // Separar activos de completados/resueltos/cumplidos/aprobados
+    const estadosCompletados = Object.values(ESTADOS_COMPLETADO)
+    todosItems.value          = all.filter(p => !estadosCompletados.includes(p.estado) && p.estado !== 'Archivado' && p.estado !== 'Cerrada' && p.estado !== 'Cancelado' && p.estado !== 'Descartada')
+    proyectosCompletados.value = all.filter(p => estadosCompletados.includes(p.estado))
   } catch {} finally { cargandoProyectos.value = false }
 }
 
-function abrirModalNuevo() {
-  proyectoEditando.value = null
-  modalProyecto.value = true
+async function cargarDatosPanel() {
+  try {
+    const [cats, usrs, etqs] = await Promise.all([
+      api('/api/gestion/categorias'),
+      api('/api/gestion/usuarios'),
+      api('/api/gestion/etiquetas'),
+    ])
+    categorias.value     = cats.categorias || cats || []
+    usuarios.value       = usrs.usuarios   || usrs || []
+    etiquetasGlobal.value = etqs.etiquetas  || etqs || []
+  } catch {}
 }
 
-function onProyectoGuardado(p) {
+function abrirPanel(tipo, item = null) {
+  panelTipo.value = tipo
+  panelItem.value = item
+  panelVisible.value = true
+  if (!categorias.value.length) cargarDatosPanel()
+}
+
+provide('abrirPanelItem', abrirPanel)
+
+function onItemGuardado(p) {
   if (p._accion === 'creado') {
-    proyectos.value.push(p)
+    todosItems.value.push(p)
     router.push({ path: '/tareas', query: { proyecto_id: p.id } })
   } else {
-    const idx = proyectos.value.findIndex(x => x.id === p.id)
-    if (idx !== -1) proyectos.value[idx] = { ...proyectos.value[idx], ...p }
+    const idx = todosItems.value.findIndex(x => x.id === p.id)
+    if (idx !== -1) todosItems.value[idx] = { ...todosItems.value[idx], ...p }
   }
+  panelVisible.value = false
+}
+
+function onItemEliminado(p) {
+  todosItems.value = todosItems.value.filter(x => x.id !== p.id)
+  if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
 }
 
 function abrirMenuProyecto(event, proyecto) {
@@ -297,22 +351,28 @@ function cerrarMenuProyecto() {
   menuProyecto.value.visible = false
 }
 
-function editarProyecto(p) {
+function editarItem(p) {
   cerrarMenuProyecto()
-  proyectoEditando.value = p
-  modalProyecto.value = true
+  abrirPanel(p.tipo || 'proyecto', p)
 }
 
-async function completarProyecto(p) {
+function verTabla(p) {
+  cerrarMenuProyecto()
+  const ruta = RUTAS_TABLA[p.tipo || 'proyecto'] || '/proyectos-tabla'
+  router.push(ruta)
+}
+
+async function completarItem(p) {
   cerrarMenuProyecto()
   const hoy = hoyLocal()
+  const estadoFinal = ESTADOS_COMPLETADO[p.tipo || 'proyecto']
   try {
     await api(`/api/gestion/proyectos/${p.id}`, {
       method: 'PUT',
-      body: JSON.stringify({ estado: 'Completado', fecha_finalizacion_real: hoy })
+      body: JSON.stringify({ estado: estadoFinal, fecha_finalizacion_real: hoy })
     })
-    proyectos.value = proyectos.value.filter(x => x.id !== p.id)
-    proyectosCompletados.value.unshift({ ...p, estado: 'Completado', fecha_finalizacion_real: hoy })
+    todosItems.value = todosItems.value.filter(x => x.id !== p.id)
+    proyectosCompletados.value.unshift({ ...p, estado: estadoFinal, fecha_finalizacion_real: hoy })
     if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
   } catch (e) { console.error(e) }
 }
@@ -324,19 +384,17 @@ async function archivarProyecto(p) {
       method: 'PUT',
       body: JSON.stringify({ estado: 'Archivado' })
     })
-    proyectos.value = proyectos.value.filter(x => x.id !== p.id)
-    if (String(route.query.proyecto_id) === String(p.id)) {
-      router.push('/tareas')
-    }
+    todosItems.value = todosItems.value.filter(x => x.id !== p.id)
+    if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
   } catch (e) { console.error(e) }
 }
 
 async function eliminarProyecto(p) {
   cerrarMenuProyecto()
-  if (!confirm(`¿Eliminar "${p.nombre}"? Las tareas quedarán sin proyecto.`)) return
+  if (!confirm(`¿Eliminar "${p.nombre}"? Las tareas quedarán sin asignar.`)) return
   try {
     await api(`/api/gestion/proyectos/${p.id}`, { method: 'DELETE' })
-    proyectos.value = proyectos.value.filter(x => x.id !== p.id)
+    todosItems.value = todosItems.value.filter(x => x.id !== p.id)
     if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
   } catch (e) { console.error(e) }
 }
@@ -344,13 +402,13 @@ async function eliminarProyecto(p) {
 const ruta = computed(() => route.path)
 
 const TITULOS = {
-  '/tareas':       'Mis Tareas',
-  '/equipo':       'Equipo',
-  '/jornadas':     'Jornadas',
-  '/dificultades': 'Dificultades',
-  '/ideas':        'Ideas y Hechos',
-  '/pendientes':   'Pendientes',
-  '/informes':     'Informes'
+  '/tareas':          'Mis Tareas',
+  '/equipo':          'Equipo',
+  '/jornadas':        'Jornadas',
+  '/proyectos-tabla': 'Proyectos',
+  '/dificultades':    'Dificultades',
+  '/compromisos':     'Compromisos',
+  '/ideas':           'Ideas',
 }
 const tituloRuta = computed(() => {
   for (const [path, titulo] of Object.entries(TITULOS)) {

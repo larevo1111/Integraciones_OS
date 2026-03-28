@@ -174,7 +174,11 @@ POST /api/gestion/tipos-pausa               — crear tipo (admin)
 ### Infraestructura
 - **SSH tunnel auto-reconnect** (`db.js`): TCP server permanente, solo sshClient se recrea al detectar `close`. Retry 5s → 15s si falla.
 - **UTC_TIMESTAMP()**: SIEMPRE usar en lugar de NOW() — Hostinger MySQL corre UTC+5 pero datos se almacenan UTC.
-- **Notificación jornada abierta**: `scripts/notif_jornadas_abiertas.py` — cron 8pm L-V, SSH tunnel → Hostinger → Telegram individual + resumen admin.
+- **Notificación jornada abierta**: `scripts/notif_jornadas_abiertas.py` — cron 8pm todos los días, SSH tunnel → Hostinger → WhatsApp individual + resumen admin por WhatsApp.
+  - Jornadas: consulta `g_jornadas` en `os_gestion`
+  - Usuarios/teléfonos: consulta `sys_usuarios` en `os_comunidad` (NUNCA ia_service_os)
+  - WhatsApp: wa_bridge API en `localhost:3100`
+  - Admin: Santiago (573022921455)
 
 ### Skill tabla estándar
 `.agent/skills/tabla_estandar.md` — documenta el patrón GestionTable/OsDataTable para que siempre se construya igual.

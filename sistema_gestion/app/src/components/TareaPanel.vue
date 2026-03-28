@@ -66,10 +66,11 @@
       <div class="field-row">
         <span class="field-label">Proyecto</span>
         <ProyectoSelector
+          ref="proyectoSelectorRef"
           :model-value="tarea.proyecto_id"
           :proyectos="proyectos"
           @update:model-value="actualizar('proyecto_id', $event)"
-          @proyecto-creado="p => $emit('proyecto-creado', p)"
+          @crear-item="tipo => $emit('crear-item', tipo)"
         />
       </div>
       <div class="field-row" style="align-items:flex-start">
@@ -292,7 +293,7 @@ const props = defineProps({
   proyectos:  { type: Array, default: () => [] },
   etiquetas:  { type: Array, default: () => [] }
 })
-const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'proyecto-creado', 'abrir-padre'])
+const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre'])
 
 // Breadcrumb subtarea
 const padreNombre = ref('')

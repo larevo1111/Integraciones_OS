@@ -96,7 +96,7 @@
           <ProyectoSelector
             v-model="qaProyectoId"
             :proyectos="proyectos"
-            @proyecto-creado="p => proyectos.push(p)"
+            @crear-item="tipo => abrirPanelItem(tipo)"
           />
           <EtiquetasSelector
             v-model="qaEtiquetas"
@@ -227,7 +227,7 @@
         @cerrar="tareaSeleccionada = null"
         @actualizada="onTareaActualizada"
         @eliminar="eliminar"
-        @proyecto-creado="p => proyectos.push(p)"
+        @crear-item="tipo => abrirPanelItem(tipo)"
         @abrir-padre="abrirPadre"
         class="d-desktop-only"
       />
@@ -268,7 +268,7 @@
               @cerrar="tareaSeleccionada = null"
               @actualizada="onTareaActualizada"
               @eliminar="eliminar"
-              @proyecto-creado="p => proyectos.push(p)"
+              @crear-item="tipo => abrirPanelItem(tipo)"
               @abrir-padre="abrirPadre"
             />
           </div>
@@ -415,7 +415,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
@@ -435,6 +435,7 @@ import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
 
 const auth  = useAuthStore()
 const route = useRoute()
+const abrirPanelItem = inject('abrirPanelItem', () => {})
 
 // Detección mobile (≤768px) — controla bottom sheet vs panel lateral
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)

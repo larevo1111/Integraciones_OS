@@ -368,7 +368,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
   const where  = ['t.empresa = ?', 't.parent_id IS NULL']   // excluir subtareas de la lista principal
   const params = [empresa]
 
-  // Filtro de fecha — siempre usar fecha Colombia, NUNCA CURDATE() (Hostinger = UTC)
+  // Filtro de fecha — siempre usar fecha Colombia via localDateCO()
   const hoyRef = fecha_hoy || localDateCO()
   function fechaRefOffset(dias) {
     const d = new Date(hoyRef + 'T00:00:00')
@@ -1361,10 +1361,12 @@ app.delete('/api/gestion/informes/:id', async (req, res) => {
 // ─── PROYECTOS ────────────────────────────────────────────────────
 
 // GET /api/gestion/proyectos — lista proyectos de la empresa
+// Query params: ?tipo=proyecto|dificultad|compromiso|idea  ?estado=Activo|...
 app.get('/api/gestion/proyectos', async (req, res) => {
-  const { estado } = req.query
+  const { estado, tipo } = req.query
   const where  = ['p.empresa = ?']
   const params = [req.empresa]
+  if (tipo)   { where.push('p.tipo = ?');   params.push(tipo) }
   if (estado) { where.push('p.estado = ?'); params.push(estado) }
 
   try {
@@ -1422,21 +1424,31 @@ app.get('/api/gestion/proyectos/:id', async (req, res) => {
 })
 
 // POST /api/gestion/proyectos
+const ESTADOS_DEFAULT = { proyecto: 'Activo', dificultad: 'Abierta', compromiso: 'Pendiente', idea: 'Nueva' }
+const ESTADOS_VALIDOS = {
+  proyecto:    ['Activo', 'Completado', 'Archivado'],
+  dificultad:  ['Abierta', 'En progreso', 'Resuelta', 'Cerrada'],
+  compromiso:  ['Pendiente', 'En progreso', 'Cumplido', 'Cancelado'],
+  idea:        ['Nueva', 'En evaluación', 'Aprobada', 'Descartada'],
+}
 app.post('/api/gestion/proyectos', async (req, res) => {
   const { nombre, descripcion, color, categoria_id, prioridad, estado,
-          fecha_estimada_fin, responsables, etiquetas } = req.body
+          fecha_estimada_fin, responsables, etiquetas, tipo } = req.body
 
-  if (!nombre) return res.status(400).json({ error: 'Falta nombre del proyecto' })
+  if (!nombre) return res.status(400).json({ error: 'Falta nombre' })
+  const tipoVal = tipo || 'proyecto'
+  if (!ESTADOS_VALIDOS[tipoVal]) return res.status(400).json({ error: 'Tipo inválido' })
+  const estadoVal = estado || ESTADOS_DEFAULT[tipoVal]
 
   try {
     const [result] = await db.gestion.query(`
       INSERT INTO g_proyectos
-        (empresa, nombre, descripcion, color, categoria_id, prioridad, estado,
+        (empresa, tipo, nombre, descripcion, color, categoria_id, prioridad, estado,
          fecha_estimada_fin, usuario_creador, usuario_ult_modificacion)
-      VALUES (?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
     `, [
-      req.empresa, nombre, descripcion||null, color||'#607D8B',
-      categoria_id||null, prioridad||'Media', estado||'Activo',
+      req.empresa, tipoVal, nombre, descripcion||null, color||'#607D8B',
+      categoria_id||null, prioridad||'Media', estadoVal,
       fecha_estimada_fin||null, req.usuario.email, req.usuario.email
     ])
 
@@ -1837,6 +1849,49 @@ app.post('/api/gestion/jornadas/:id/pausas/iniciar', requireAuth, async (req, re
     `, [result.insertId])
 
     res.status(201).json({ ok: true, pausa })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/jornadas/:id/pausas/:pausaId/editar — editar pausa (admin)
+app.put('/api/gestion/jornadas/:id/pausas/:pausaId/editar', requireAuth, async (req, res) => {
+  try {
+    const [[pausa]] = await db.gestion.query(
+      'SELECT p.* FROM g_jornada_pausas p JOIN g_jornadas j ON j.id = p.jornada_id WHERE p.id = ? AND j.id = ? AND j.empresa = ?',
+      [req.params.pausaId, req.params.id, req.empresa]
+    )
+    if (!pausa) return res.status(404).json({ error: 'Pausa no encontrada' })
+
+    const { hora_inicio, hora_fin, observaciones, tipos } = req.body
+
+    // Actualizar campos editables (NUNCA _registro)
+    const sets = []
+    const vals = []
+    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); vals.push(hora_inicio ? new Date(hora_inicio) : null) }
+    if (hora_fin !== undefined)    { sets.push('hora_fin = ?');    vals.push(hora_fin ? new Date(hora_fin) : null) }
+    if (observaciones !== undefined) { sets.push('observaciones = ?'); vals.push(observaciones || null) }
+    sets.push('usuario_ult_modificacion = ?'); vals.push(req.usuario.email)
+    vals.push(pausa.id)
+
+    await db.gestion.query(`UPDATE g_jornada_pausas SET ${sets.join(', ')} WHERE id = ?`, vals)
+
+    // Actualizar tipos si se enviaron
+    if (tipos && Array.isArray(tipos) && tipos.length) {
+      await db.gestion.query('DELETE FROM g_jornada_pausa_tipos WHERE pausa_id = ? AND empresa = ?', [pausa.id, req.empresa])
+      const tipoVals = tipos.map(tipoId => [pausa.id, tipoId, req.empresa, req.usuario.email])
+      await db.gestion.query('INSERT INTO g_jornada_pausa_tipos (pausa_id, tipo_pausa_id, empresa, usuario_creador) VALUES ?', [tipoVals])
+    }
+
+    // Retornar pausa actualizada
+    const [[updated]] = await db.gestion.query(`
+      SELECT p.*, GROUP_CONCAT(tp.nombre ORDER BY tp.orden SEPARATOR ', ') AS tipos_nombre
+      FROM g_jornada_pausas p
+      LEFT JOIN g_jornada_pausa_tipos pt ON pt.pausa_id = p.id
+      LEFT JOIN g_tipos_pausa tp ON tp.id = pt.tipo_pausa_id
+      WHERE p.id = ?
+      GROUP BY p.id
+    `, [pausa.id])
+
+    res.json({ ok: true, pausa: updated })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 

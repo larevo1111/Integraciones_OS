@@ -337,6 +337,18 @@ updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CUR
 
 
 
+### ⚠️ REGLA ABSOLUTA: FUENTE DE VERDAD DE USUARIOS Y EMPRESAS
+
+**`sys_usuarios` y `sys_empresa` en `u768061575_os_comunidad` (Hostinger) son la ÚNICA fuente de verdad para datos de usuarios y empresas.**
+
+- Nombres, emails, teléfonos, estado → siempre de `sys_usuarios`
+- Empresas → siempre de `sys_empresa`
+- Relación usuario↔empresa → `sys_usuarios_empresas`
+- **NUNCA consultar `ia_usuarios` (ia_service_os) para datos de usuarios** — esa tabla es solo para config del servicio IA (telegram_id, agente preferido, etc.)
+- Columnas clave de `sys_usuarios`: `Email` (E mayúscula), `Nombre_Usuario`, `telefono`, `estado` ('Activo')
+
+**Aplica a:** scripts Python, endpoints Node.js, cualquier servicio que necesite datos de usuarios.
+
 ### ⚠️ REGLA ABSOLUTA: VERIFICAR CREDENCIALES Y COLUMNAS ANTES DE IMPLEMENTAR
 
 **Esta regla nació de 4+ errores consecutivos en la misma sesión (2026-03-16).**

@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.16.12",
+    "@tiptap/extension-link": "^3.21.0",
+    "@tiptap/extension-placeholder": "^3.21.0",
+    "@tiptap/starter-kit": "^3.21.0",
+    "@tiptap/vue-3": "^3.21.0",
     "pinia": "^2.1.7",
     "quasar": "^2.16.4",
     "vue": "^3.4.29",
