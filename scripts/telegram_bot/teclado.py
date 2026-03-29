@@ -40,6 +40,7 @@ AGENTES = [
     ('🧠 Gemini Pro (premium)',         'agente:gemini-pro',      6),
     ('🤖 Claude Sonnet (premium)',      'agente:claude-sonnet',   6),
     ('🦾 Super Agente (Claude Code)',   'agente:superagente',     5),
+    ('🧩 Super Agente (OpenCode)',      'agente:superagente-oc',  5),
 ]
 
 

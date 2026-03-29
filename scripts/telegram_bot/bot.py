@@ -19,7 +19,9 @@ from telegram.ext import (
 from telegram.constants import ParseMode, ChatAction
 
 import api_ia, db, tabla as tabla_mod, whisper as whisper_mod, superagente as sa_mod
+import superagente_oc as saoc_mod
 import handlers_sa
+import handlers_sa_oc
 from teclado import REPLY_KB, reply_kb, inline_ajustes, MAX_INLINE, teclado_compartir_telefono, AGENTES
 
 logging.basicConfig(
@@ -39,6 +41,7 @@ TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 
 # Set de user_ids que forzaron "Nueva conversación" — el próximo mensaje crea sesión
 SA_FORZAR_NUEVA = set()
+SAOC_FORZAR_NUEVA = set()
 
 NOMBRES_AGENTES = {
     'gemini-flash':      'Gemini Flash ⚡',
@@ -49,6 +52,7 @@ NOMBRES_AGENTES = {
     'deepseek-chat':     'DeepSeek Chat 💡',
     'automático':        'Automático 🔀',
     'superagente':       'Super Agente 🦾',
+    'superagente-oc':    'Super Agente OC 🧩',
     'ollama-qwen-coder': 'Qwen Coder 🏠',
     'ollama-qwen-14b':   'Qwen 14B 🏠',
     'ollama-qwen-7b':    'Qwen 7B 🏠',
@@ -446,6 +450,58 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
         )
         return
 
+    # ── Modo Super Agente OpenCode (bypass ia_service) ────────────────────
+    if agente_slug == 'superagente-oc':
+        uid = str(user.id)
+        empresa_sa = sesion.get('empresa', 'ori_sil_2')
+
+        # Botón "📝 Nueva" → marcar flag y pedir primera pregunta
+        if texto == '📝 Nueva':
+            SAOC_FORZAR_NUEVA.add(uid)
+            await update.message.reply_text(
+                '🆕 *Nueva conversación OpenCode*\nEscribí tu primera pregunta.',
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=handlers_sa_oc.teclado_saoc()
+            )
+            return
+
+        # Botón "📋 Conversaciones" → listar
+        if texto == '📋 Conversaciones':
+            await handlers_sa_oc.listar_conversaciones_msg(
+                update, saoc_mod, uid, empresa_sa
+            )
+            return
+
+        # Si el usuario pidió "Nueva conversación", forzar creación
+        if uid in SAOC_FORZAR_NUEVA:
+            SAOC_FORZAR_NUEVA.discard(uid)
+            await update.effective_chat.send_action(ChatAction.TYPING)
+            resultado = saoc_mod.nueva_conversacion(
+                pregunta=texto, usuario_id=uid,
+                nombre_usuario=nombre, nivel=nivel,
+                empresa=empresa_sa
+            )
+            if not resultado.get('ok'):
+                await update.message.reply_text(
+                    f'😔 {resultado.get("error", "Error.")}',
+                    reply_markup=handlers_sa_oc.teclado_saoc()
+                )
+                return
+            await handlers_sa_oc.manejar_superagente_oc(
+                update, saoc_mod,
+                sesion=sesion, nombre=nombre, nivel=nivel,
+                empresa=empresa_sa, pregunta=texto,
+                resultado_previo=resultado
+            )
+            return
+
+        await handlers_sa_oc.manejar_superagente_oc(
+            update, saoc_mod,
+            sesion=sesion, nombre=nombre, nivel=nivel,
+            empresa=empresa_sa, pregunta=texto
+        )
+        return
+
     # Llamar ia_service
     resultado = api_ia.consultar(
         pregunta=texto,
@@ -544,6 +600,29 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         empresa  = sesion.get('empresa', 'ori_sil_2')
         await handlers_sa.manejar_superagente(
             update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
+            sesion=sesion, nombre=nombre_u, nivel=nivel,
+            empresa=empresa, pregunta=prompt
+        )
+        return
+
+    # Super Agente OpenCode: guardar imagen en /tmp y pasarla como ruta
+    if sesion.get('agente_preferido') == 'superagente-oc':
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        foto    = update.message.photo[-1]
+        archivo = await foto.get_file()
+        ts      = int(__import__('time').time())
+        ruta    = f'/tmp/saoc_foto_{user.id}_{ts}.jpg'
+        await archivo.download_to_drive(ruta)
+        caption = (update.message.caption or '').strip()
+        if caption:
+            prompt = f'{caption}\n\n[Se envía imagen adjunta en: {ruta} — revisala como parte del mensaje]'
+        else:
+            prompt = f'[Se envía imagen adjunta en: {ruta} — revisala como parte del mensaje]'
+        nombre_u = sesion.get('nombre') or _nombre(user)
+        nivel    = sesion.get('nivel', 1)
+        empresa  = sesion.get('empresa', 'ori_sil_2')
+        await handlers_sa_oc.manejar_superagente_oc(
+            update, saoc_mod,
             sesion=sesion, nombre=nombre_u, nivel=nivel,
             empresa=empresa, pregunta=prompt
         )
@@ -682,12 +761,25 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 '🦾 Modo Super Agente activo.',
                 reply_markup=handlers_sa.teclado_sa()
             )
+        elif agente == 'superagente-oc':
+            await query.edit_message_text(
+                f'✅ Agente cambiado a *{NOMBRES_AGENTES.get(agente, agente)}*\n\n'
+                'Ya puedes hacer tu próxima consulta.',
+                parse_mode=ParseMode.MARKDOWN
+            )
+            await query.message.reply_text(
+                '🧩 Modo Super Agente OpenCode activo.',
+                reply_markup=handlers_sa_oc.teclado_saoc()
+            )
         else:
             await query.edit_message_text(
                 f'✅ Agente cambiado a *{NOMBRES_AGENTES.get(agente, agente)}*\n\n'
                 'Ya puedes hacer tu próxima consulta.',
                 parse_mode=ParseMode.MARKDOWN
             )
+
+    elif data.startswith('saoc_'):
+        await handlers_sa_oc.handle_saoc_callback(query, user, nivel, _nombre(user), saoc_mod)
 
     elif data.startswith('sa_'):
         await handlers_sa.handle_sa_callback(query, user, nivel, _nombre(user), sa_mod)
