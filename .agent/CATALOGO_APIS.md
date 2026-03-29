@@ -80,9 +80,6 @@ data = resp.json()
 
 ### Agentes disponibles
 
-**Catálogo completo**: `.agent/docs/CATALOGO_AGENTES.md`
-
-**Cloud:**
 | slug | Modelo | Mejor para |
 |------|--------|------------|
 | `gemini-flash` | gemini-2.5-flash | Análisis SQL, docs largos (default analítico) |
@@ -92,15 +89,6 @@ data = resp.json()
 | `gemini-pro` | gemini-2.5-pro | Análisis complejos (nivel 6+) |
 | `claude-sonnet` | claude-sonnet-4-6 | Documentos premium (nivel 6+) |
 | `deepseek-chat` | deepseek-chat | Respaldo |
-
-**Locales (Ollama — GPU, costo $0):**
-| slug | Modelo | Mejor para |
-|------|--------|------------|
-| `ollama-qwen-coder` | qwen2.5-coder:14b | SQL, código |
-| `ollama-qwen-14b` | qwen2.5:14b | Conversación, español |
-| `ollama-qwen-7b` | qwen2.5:7b | Router versátil, tareas rápidas |
-| `ollama-deepseek-r1` | deepseek-r1:14b | Razonamiento paso a paso |
-| `ollama-llama-3b` | llama3.2:3b | Router ultra liviano |
 
 ---
 
@@ -216,67 +204,6 @@ El bridge hace POST a `WA_WEBHOOK_URL` por cada mensaje entrante:
 **Proceso**: systemd `os-gestion.service`
 **Propósito**: App de tareas y jornadas del equipo.
 **Nota**: API interna del sistema — ver `.agent/contextos/sistema_gestion.md` para endpoints completos.
-
----
-
-## 5. Ollama — Modelos IA Locales
-
-**Base URL**: `http://localhost:11434`
-**URL pública**: `ollama.oscomunidad.com`
-**Proceso**: systemd `ollama.service`
-**Hardware**: NVIDIA RTX 3060 12GB VRAM, CUDA 13.1
-**Propósito**: Modelos de IA locales (costo $0). 5 modelos instalados.
-
-### Cómo llamarlo desde Python
-
-```python
-import requests
-
-# API OpenAI-compatible (recomendada — misma que usa ia_service)
-resp = requests.post('http://localhost:11434/v1/chat/completions', json={
-    'model': 'qwen2.5-coder:14b',
-    'messages': [{'role': 'user', 'content': '¿Cuánto es 2+2?'}],
-})
-data = resp.json()
-print(data['choices'][0]['message']['content'])
-
-# API nativa Ollama (más simple para prompts directos)
-resp = requests.post('http://localhost:11434/api/generate', json={
-    'model': 'qwen2.5-coder:14b',
-    'prompt': 'Escribe una query SQL...',
-    'stream': False,
-})
-print(resp.json()['response'])
-```
-
-### Endpoints
-
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/tags` | Lista modelos instalados |
-| GET | `/api/ps` | Modelos cargados en VRAM |
-| POST | `/api/generate` | Generar texto (API nativa) |
-| POST | `/api/chat` | Chat con historial (API nativa) |
-| POST | `/v1/chat/completions` | Chat OpenAI-compatible |
-| POST | `/api/pull` | Descargar modelo nuevo |
-| DELETE | `/api/delete` | Eliminar modelo |
-
-### Modelos instalados
-
-| modelo | Tamaño | VRAM | Mejor para |
-|--------|--------|------|------------|
-| `qwen2.5-coder:14b` | 9.0 GB | ~9 GB | SQL, código |
-| `qwen2.5:14b` | 9.0 GB | ~9 GB | Conversación, español |
-| `qwen2.5:7b` | 4.7 GB | ~4.7 GB | Router, tareas rápidas |
-| `deepseek-r1:14b` | 9.0 GB | ~9 GB | Razonamiento |
-| `llama3.2:3b` | 2.0 GB | ~2.8 GB | Router ultra liviano |
-
-### Notas operativas
-
-- Solo un modelo de 14B cabe en VRAM a la vez (~9 GB de 12 GB disponibles)
-- `llama3.2:3b` puede correr simultáneo con cualquier 14B
-- Ollama carga/descarga modelos automáticamente (timeout 5 min inactividad)
-- Gestión: `ollama list`, `ollama ps`, `ollama pull <modelo>`, `ollama rm <modelo>`
 
 ---
 

@@ -496,6 +496,7 @@ Integraciones_OS/
 - `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
 - `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
 - `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts ejecutables (Python/JS). **Actualizar obligatoriamente al crear o modificar cualquier script.**
+- `.agent/CATALOGO_AGENTES.md` — **Catálogo de todos los agentes IA del ecosistema OS** (cloud + locales Ollama). Incluye: modelo, proveedor, costo, capacidades, credenciales, notas. **Actualizar al agregar, modificar o desactivar cualquier agente.**
 - `.agent/CATALOGO_APIS.md` — **Catálogo de todas las APIs HTTP internas del ecosistema OS.** Incluye: base URL, proceso systemd, BD, endpoints, ejemplos de llamada desde Python/JS. **Actualizar al crear o modificar cualquier endpoint de cualquier servicio.**
 - `.agent/catalogo-skills.md` — Catálogo de conocimientos fundacionales. Índice de cómo se hacen las cosas.
 - `.agent/CATALOGO_REFERENCIAS.md` — **Fuentes externas e internas que informan decisiones técnicas y de IA.** Incluye: guías de Anthropic/Google, papers de text-to-SQL, referencias de Antigravity, patrones de prompting, pendientes de investigar. **Actualizar al adoptar cualquier técnica externa o al encontrar una referencia relevante.**

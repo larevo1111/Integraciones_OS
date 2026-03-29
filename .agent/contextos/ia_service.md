@@ -35,11 +35,8 @@ resultado = consultar(
 # Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id, tema, empresa
 ```
 
-## Agentes activos (2026-03-28)
+## Agentes activos (2026-03-22)
 
-**Catálogo completo**: `.agent/docs/CATALOGO_AGENTES.md`
-
-### Cloud (APIs externas)
 | slug | modelo | Estado | Nivel min | Costo input/M |
 |---|---|---|---|---|
 | groq-llama | llama-3.3-70b-versatile | ✅ Router principal | 1 | $0.00 |
@@ -53,17 +50,6 @@ resultado = consultar(
 | deepseek-reasoner | deepseek-reasoner | ✅ Admin only | 7 | $0.55 |
 | gemini-image | gemini-2.5-flash-image | ✅ Imágenes | 1 | $52.00 |
 | gemma-router | gemma-3-27b-it | ❌ Desactivado (activo=0) | — | $0.00 |
-
-### Locales (Ollama — GPU RTX 3060 12GB, costo $0)
-| slug | modelo | VRAM | Mejor para |
-|---|---|---|---|
-| ollama-qwen-coder | qwen2.5-coder:14b | ~9 GB | SQL, código |
-| ollama-qwen-14b | qwen2.5:14b | ~9 GB | Conversación, español |
-| ollama-qwen-7b | qwen2.5:7b | ~4.7 GB | Router versátil |
-| ollama-deepseek-r1 | deepseek-r1:14b | ~9 GB | Razonamiento |
-| ollama-llama-3b | llama3.2:3b | ~2.8 GB | Router ultra liviano |
-
-API local: `http://localhost:11434/v1` | Externa: `https://ollama.oscomunidad.com`
 
 **⚠️ cerebras-llama tiene 8,192 tokens máx de entrada** — NO sirve para `analisis_datos` (DDL = 28K-37K tokens). Solo para tareas con prompt pequeño.
 
