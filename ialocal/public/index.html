@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>IA Local — Origen Silvestre</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -41,9 +41,14 @@
     #app {
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      height: 100dvh;
+      height: 100vh; /* fallback navegadores sin dvh */
       max-width: 820px;
       margin: 0 auto;
+    }
+
+    @supports (height: 100dvh) {
+      #app { height: 100dvh; }
     }
 
     /* ─── Header ─────────────────────────────────────── */
@@ -264,6 +269,11 @@
     .msg-bubble pre:hover .copy-btn { opacity: 1; }
     .copy-btn:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
 
+    /* En táctil no hay hover — mostrar siempre */
+    @media (hover: none) {
+      .copy-btn { opacity: 0.7; }
+    }
+
     /* ─── Typing indicator ───────────────────────────── */
     .typing-dots {
       display: inline-flex;
@@ -304,6 +314,7 @@
     /* ─── Input area ─────────────────────────────────── */
     .input-area {
       padding: 12px 16px;
+      padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       border-top: 1px solid var(--border);
       background: var(--bg-app);
       flex-shrink: 0;
@@ -374,11 +385,15 @@
 
     /* ─── Responsive ─────────────────────────────────── */
     @media (max-width: 600px) {
-      header { padding: 10px 12px; }
+      header { padding: 10px 12px; flex-wrap: wrap; }
+      .header-controls { width: 100%; justify-content: space-between; }
       #chat { padding: 14px 12px; }
-      .input-area { padding: 10px 12px; }
+      .input-area { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
       .msg { max-width: 92%; }
-      select#model-select { max-width: 140px; font-size: 12px; }
+      select#model-select { max-width: none; flex: 1; font-size: 13px; }
+      /* 16px evita auto-zoom en iOS al enfocar el input */
+      #input { font-size: 16px; }
+      .input-hint { display: none; }
     }
   </style>
 </head>
