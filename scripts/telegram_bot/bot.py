@@ -535,11 +535,10 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ruta    = f'/tmp/sa_foto_{user.id}_{ts}.jpg'
         await archivo.download_to_drive(ruta)
         caption = (update.message.caption or '').strip()
-        prompt  = f'El usuario envió una imagen. Está guardada en: {ruta}\nLeé el archivo con tu herramienta Read para verla.'
         if caption:
-            prompt += f'\n\nMensaje del usuario sobre la imagen: {caption}'
+            prompt = f'{caption}\n\n[Se envía imagen adjunta en: {ruta} — revisala como parte del mensaje]'
         else:
-            prompt += '\n\nNo envió mensaje adicional. Describí qué ves en la imagen y preguntá si necesita algo específico.'
+            prompt = f'[Se envía imagen adjunta en: {ruta} — revisala como parte del mensaje]'
         nombre_u = sesion.get('nombre') or _nombre(user)
         nivel    = sesion.get('nivel', 1)
         empresa  = sesion.get('empresa', 'ori_sil_2')
