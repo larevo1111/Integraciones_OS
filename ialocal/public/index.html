@@ -14,6 +14,7 @@
       --bg-chat: #141418;
       --bg-input: #1c1c1e;
       --bg-code: #0d0d0f;
+      --bg-sidebar: #111113;
       --accent: #5e6ad2;
       --accent-hover: #6e7ae2;
       --text-primary: #ededef;
@@ -25,6 +26,10 @@
       --radius-input: 8px;
       --font-sans: 'Inter', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --sidebar-w: 260px;
+      --green: #4ade80;
+      --yellow: #facc15;
+      --red: #ef4444;
     }
 
     html, body {
@@ -35,31 +40,151 @@
       font-size: 14px;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;
     }
 
-    /* ─── Layout ─────────────────────────────────────── */
-    #app {
+    /* ─── Layout principal ───────────────────────────── */
+    #layout {
       display: flex;
-      flex-direction: column;
       height: 100dvh;
-      height: 100vh; /* fallback navegadores sin dvh */
-      max-width: 820px;
-      margin: 0 auto;
+      height: 100vh;
     }
 
     @supports (height: 100dvh) {
-      #app { height: 100dvh; }
+      #layout { height: 100dvh; }
+    }
+
+    /* ─── Sidebar ────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .sidebar-header h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    #new-chat-btn {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-input);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #new-chat-btn:hover { background: var(--accent-hover); }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .sidebar-list::-webkit-scrollbar { width: 4px; }
+    .sidebar-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+    .sidebar-group-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 12px 14px 4px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      cursor: pointer;
+      transition: background 0.1s;
+      gap: 8px;
+      position: relative;
+    }
+
+    .sidebar-item:hover { background: rgba(255,255,255,0.04); }
+    .sidebar-item.active { background: rgba(94,106,210,0.12); }
+
+    .sidebar-item-title {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-item-model {
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .sidebar-item .delete-btn {
+      opacity: 0;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      transition: opacity 0.1s, color 0.1s;
+      flex-shrink: 0;
+    }
+
+    .sidebar-item:hover .delete-btn { opacity: 1; }
+    .sidebar-item .delete-btn:hover { color: var(--red); }
+
+    /* ─── Main area ──────────────────────────────────── */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
     }
 
     /* ─── Header ─────────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
       gap: 12px;
+    }
+
+    #sidebar-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
     }
 
     .logo {
@@ -80,7 +205,8 @@
       flex-shrink: 0;
     }
 
-    .header-controls {
+    .header-right {
+      margin-left: auto;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -103,29 +229,60 @@
       text-overflow: ellipsis;
     }
 
-    select#model-select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
+    select#model-select:focus { outline: none; border-color: var(--accent); }
 
-    .btn-ghost {
-      background: transparent;
+    /* ─── Context bar ────────────────────────────────── */
+    #context-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-app);
+      flex-shrink: 0;
+      font-size: 12px;
       color: var(--text-secondary);
-      border: 1px solid var(--border-input);
-      border-radius: var(--radius-input);
-      padding: 6px 12px;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
     }
 
-    .btn-ghost:hover {
-      color: var(--text-primary);
-      border-color: rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.04);
+    #context-bar.visible { display: flex; }
+
+    .context-track {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
     }
+
+    .context-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.3s, background 0.3s;
+      background: var(--green);
+    }
+
+    .context-fill.warn { background: var(--yellow); }
+    .context-fill.danger { background: var(--red); }
+
+    #context-label { white-space: nowrap; min-width: 90px; }
+
+    #compact-btn {
+      display: none;
+      background: rgba(239,68,68,0.15);
+      color: var(--red);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: var(--radius-input);
+      padding: 3px 10px;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    #compact-btn:hover { background: rgba(239,68,68,0.25); }
+    #compact-btn.visible { display: block; }
 
     /* ─── Chat area ──────────────────────────────────── */
     #chat {
@@ -154,16 +311,8 @@
       padding: 40px 20px;
     }
 
-    .welcome h2 {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .welcome p {
-      font-size: 14px;
-      max-width: 360px;
-    }
+    .welcome h2 { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+    .welcome p { font-size: 14px; max-width: 360px; }
 
     /* ─── Mensajes ───────────────────────────────────── */
     .msg {
@@ -180,7 +329,7 @@
     }
 
     .msg.user { align-self: flex-end; }
-    .msg.assistant { align-self: flex-start; }
+    .msg.assistant, .msg.resumen { align-self: flex-start; }
 
     .msg-label {
       font-size: 11px;
@@ -213,10 +362,19 @@
       border-bottom-left-radius: 4px;
     }
 
-    /* ─── Markdown en respuestas ─────────────────────── */
+    .msg.resumen .msg-bubble {
+      background: rgba(94,106,210,0.08);
+      border: 1px dashed rgba(94,106,210,0.3);
+      color: var(--text-secondary);
+      border-bottom-left-radius: 4px;
+      font-size: 13px;
+    }
+
+    .msg.resumen .msg-label { color: var(--accent); }
+
+    /* ─── Markdown ───────────────────────────────────── */
     .msg-bubble p { margin: 0 0 8px; }
     .msg-bubble p:last-child { margin-bottom: 0; }
-
     .msg-bubble strong { font-weight: 600; }
 
     .msg-bubble code {
@@ -244,10 +402,7 @@
       line-height: 1.5;
     }
 
-    .msg-bubble ul, .msg-bubble ol {
-      margin: 4px 0 8px 20px;
-    }
-
+    .msg-bubble ul, .msg-bubble ol { margin: 4px 0 8px 20px; }
     .msg-bubble li { margin-bottom: 2px; }
 
     .copy-btn {
@@ -269,26 +424,17 @@
     .msg-bubble pre:hover .copy-btn { opacity: 1; }
     .copy-btn:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
 
-    /* En táctil no hay hover — mostrar siempre */
     @media (hover: none) {
       .copy-btn { opacity: 0.7; }
     }
 
-    /* ─── Typing indicator ───────────────────────────── */
-    .typing-dots {
-      display: inline-flex;
-      gap: 4px;
-      padding: 4px 0;
-    }
-
+    /* ─── Typing dots ────────────────────────────────── */
+    .typing-dots { display: inline-flex; gap: 4px; padding: 4px 0; }
     .typing-dots span {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
+      width: 6px; height: 6px; border-radius: 50%;
       background: var(--text-secondary);
       animation: blink 1.2s infinite;
     }
-
     .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
     .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
 
@@ -320,11 +466,7 @@
       flex-shrink: 0;
     }
 
-    .input-row {
-      display: flex;
-      gap: 8px;
-      align-items: flex-end;
-    }
+    .input-row { display: flex; gap: 8px; align-items: flex-end; }
 
     #input {
       flex: 1;
@@ -343,11 +485,7 @@
       transition: border-color 0.15s;
     }
 
-    #input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
+    #input:focus { outline: none; border-color: var(--accent); }
     #input::placeholder { color: var(--text-muted); }
 
     #send-btn {
@@ -366,16 +504,8 @@
     }
 
     #send-btn:hover { background: var(--accent-hover); }
-
-    #send-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    #send-btn svg {
-      width: 18px;
-      height: 18px;
-    }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #send-btn svg { width: 18px; height: 18px; }
 
     .input-hint {
       font-size: 11px;
@@ -383,74 +513,134 @@
       padding: 4px 4px 0;
     }
 
+    /* ─── Overlay (móvil) ────────────────────────────── */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 90;
+    }
+
     /* ─── Responsive ─────────────────────────────────── */
-    @media (max-width: 600px) {
-      header { padding: 10px 12px; flex-wrap: wrap; }
-      .header-controls { width: 100%; justify-content: space-between; }
+    @media (max-width: 768px) {
+      #sidebar {
+        position: fixed;
+        left: 0; top: 0; bottom: 0;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+
+      #sidebar.open { transform: translateX(0); }
+      #sidebar.open ~ #sidebar-overlay { display: block; }
+
+      #sidebar-toggle { display: block; }
+
+      header { padding: 10px 12px; }
       #chat { padding: 14px 12px; }
       .input-area { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
       .msg { max-width: 92%; }
-      select#model-select { max-width: none; flex: 1; font-size: 13px; }
-      /* 16px evita auto-zoom en iOS al enfocar el input */
+      select#model-select { max-width: 160px; font-size: 12px; }
       #input { font-size: 16px; }
       .input-hint { display: none; }
+
+      .sidebar-item .delete-btn { opacity: 0.6; }
     }
   </style>
 </head>
 <body>
-  <div id="app">
-    <header>
-      <div class="logo">
-        <span class="logo-dot"></span>
-        IA Local OS
+  <div id="layout">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <h3>Conversaciones</h3>
+        <button id="new-chat-btn">+ Nuevo chat</button>
       </div>
-      <div class="header-controls">
-        <select id="model-select">
-          <option value="">Cargando modelos...</option>
-        </select>
-        <button class="btn-ghost" id="new-chat-btn">Nuevo chat</button>
+      <div class="sidebar-list" id="sidebar-list">
+        <!-- Se llena dinámicamente -->
       </div>
-    </header>
+    </aside>
 
-    <div id="chat">
-      <div class="welcome" id="welcome">
-        <h2>IA Local — Origen Silvestre</h2>
-        <p>Selecciona un modelo y escribe tu pregunta. Las respuestas se generan localmente con Ollama.</p>
-      </div>
-    </div>
+    <div id="sidebar-overlay"></div>
 
-    <div id="status-bar"></div>
+    <!-- Main -->
+    <div id="main">
+      <header>
+        <button id="sidebar-toggle">&#9776;</button>
+        <div class="logo">
+          <span class="logo-dot"></span>
+          IA Local OS
+        </div>
+        <div class="header-right">
+          <select id="model-select">
+            <option value="">Cargando modelos...</option>
+          </select>
+        </div>
+      </header>
 
-    <div class="input-area">
-      <div class="input-row">
-        <textarea id="input" rows="1" placeholder="Escribe tu mensaje..." autofocus></textarea>
-        <button id="send-btn" title="Enviar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </button>
+      <div id="context-bar">
+        <span id="context-label">0 / 32K</span>
+        <div class="context-track">
+          <div class="context-fill" id="context-fill" style="width: 0%"></div>
+        </div>
+        <button id="compact-btn">Compactar</button>
       </div>
-      <div class="input-hint">Enter enviar &middot; Shift+Enter nueva línea</div>
+
+      <div id="chat">
+        <div class="welcome" id="welcome">
+          <h2>IA Local — Origen Silvestre</h2>
+          <p>Selecciona un modelo y escribe tu pregunta. Las respuestas se generan localmente con Ollama.</p>
+        </div>
+      </div>
+
+      <div id="status-bar"></div>
+
+      <div class="input-area">
+        <div class="input-row">
+          <textarea id="input" rows="1" placeholder="Escribe tu mensaje..." autofocus></textarea>
+          <button id="send-btn" title="Enviar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div class="input-hint">Enter enviar &middot; Shift+Enter nueva línea</div>
+      </div>
     </div>
   </div>
 
 <script>
-// ─── State ──────────────────────────────────────────────────────────
-let messages = []
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let conversacionId = null
+let messages = []          // mensajes para enviar a Ollama (visibles)
 let streaming = false
 let currentModel = ''
 let abortCtrl = null
+let modelContextLimits = {} // modelo → context_length
 
-const $chat      = document.getElementById('chat')
-const $input     = document.getElementById('input')
-const $sendBtn   = document.getElementById('send-btn')
-const $modelSel  = document.getElementById('model-select')
-const $newChat   = document.getElementById('new-chat-btn')
-const $welcome   = document.getElementById('welcome')
-const $status    = document.getElementById('status-bar')
+const $ = id => document.getElementById(id)
+const $chat       = $('chat')
+const $input      = $('input')
+const $sendBtn    = $('send-btn')
+const $modelSel   = $('model-select')
+const $newChat    = $('new-chat-btn')
+const $status     = $('status-bar')
+const $sidebar    = $('sidebar')
+const $sidebarList = $('sidebar-list')
+const $overlay    = $('sidebar-overlay')
+const $toggle     = $('sidebar-toggle')
+const $ctxBar     = $('context-bar')
+const $ctxLabel   = $('context-label')
+const $ctxFill    = $('context-fill')
+const $compactBtn = $('compact-btn')
 
-// ─── Load models ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODELS
+// ═══════════════════════════════════════════════════════════════════
 async function loadModels() {
   try {
     const res = await fetch('/api/tags')
@@ -472,6 +662,23 @@ async function loadModels() {
     })
 
     currentModel = models[0].name
+
+    // Cargar context limits para cada modelo
+    for (const m of models) {
+      try {
+        const info = await fetch('/api/show', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: m.name })
+        }).then(r => r.json())
+        const ctxParam = info.model_info && Object.entries(info.model_info)
+          .find(([k]) => k.includes('context_length'))
+        modelContextLimits[m.name] = ctxParam ? ctxParam[1] : 32768
+      } catch {
+        modelContextLimits[m.name] = 32768
+      }
+    }
+
     checkLoadedModel()
   } catch (e) {
     $modelSel.innerHTML = '<option value="">Error al cargar</option>'
@@ -485,7 +692,6 @@ async function checkLoadedModel() {
     const data = await res.json()
     if (data.models && data.models.length > 0) {
       const loaded = data.models[0].name
-      // Select the loaded model if available
       const opts = Array.from($modelSel.options)
       const match = opts.find(o => o.value === loaded)
       if (match) {
@@ -497,42 +703,220 @@ async function checkLoadedModel() {
   } catch {}
 }
 
-$modelSel.addEventListener('change', () => {
-  currentModel = $modelSel.value
+$modelSel.addEventListener('change', () => { currentModel = $modelSel.value })
+
+function getContextMax() {
+  return modelContextLimits[currentModel] || 32768
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════════
+$toggle.addEventListener('click', () => $sidebar.classList.toggle('open'))
+$overlay.addEventListener('click', () => $sidebar.classList.remove('open'))
+
+async function loadConversaciones() {
+  try {
+    const convs = await fetch('/api/conversaciones').then(r => r.json())
+    renderSidebar(convs)
+  } catch {}
+}
+
+function renderSidebar(convs) {
+  $sidebarList.innerHTML = ''
+  if (convs.length === 0) {
+    $sidebarList.innerHTML = '<div style="padding:20px 14px;color:var(--text-muted);font-size:13px;text-align:center">Sin conversaciones</div>'
+    return
+  }
+
+  const groups = groupByDate(convs)
+  for (const [label, items] of groups) {
+    const gl = document.createElement('div')
+    gl.className = 'sidebar-group-label'
+    gl.textContent = label
+    $sidebarList.appendChild(gl)
+
+    for (const c of items) {
+      const div = document.createElement('div')
+      div.className = 'sidebar-item' + (c.id === conversacionId ? ' active' : '')
+      div.innerHTML = `
+        <span class="sidebar-item-title">${esc(c.titulo)}</span>
+        <span class="sidebar-item-model">${c.modelo.split(':')[0]}</span>
+        <button class="delete-btn" data-id="${c.id}" title="Eliminar">&times;</button>
+      `
+      div.addEventListener('click', e => {
+        if (e.target.classList.contains('delete-btn')) return
+        loadConversacion(c.id)
+        $sidebar.classList.remove('open')
+      })
+      div.querySelector('.delete-btn').addEventListener('click', async e => {
+        e.stopPropagation()
+        if (!confirm('¿Eliminar esta conversación?')) return
+        await fetch(`/api/conversaciones/${c.id}`, { method: 'DELETE' })
+        if (c.id === conversacionId) startNewChat()
+        loadConversaciones()
+      })
+      $sidebarList.appendChild(div)
+    }
+  }
+}
+
+function groupByDate(convs) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7)
+
+  const groups = new Map()
+  for (const c of convs) {
+    const d = new Date(c.updated_at)
+    let label
+    if (d >= today) label = 'Hoy'
+    else if (d >= yesterday) label = 'Ayer'
+    else if (d >= weekAgo) label = 'Esta semana'
+    else label = 'Anteriores'
+
+    if (!groups.has(label)) groups.set(label, [])
+    groups.get(label).push(c)
+  }
+  return groups
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LOAD / NEW CONVERSATION
+// ═══════════════════════════════════════════════════════════════════
+async function loadConversacion(id) {
+  try {
+    const data = await fetch(`/api/conversaciones/${id}`).then(r => r.json())
+    conversacionId = data.id
+    currentModel = data.modelo
+    messages = []
+
+    // Seleccionar modelo en dropdown
+    const opts = Array.from($modelSel.options)
+    const match = opts.find(o => o.value === data.modelo)
+    if (match) $modelSel.value = data.modelo
+
+    // Renderizar mensajes
+    $chat.innerHTML = ''
+    for (const m of data.mensajes) {
+      const role = m.rol === 'usuario' ? 'user' : (m.rol === 'resumen' ? 'resumen' : 'assistant')
+      appendMessage(role, m.contenido, m.rol === 'resumen' ? 'Resumen del contexto' : null)
+
+      // Construir array para Ollama
+      if (m.rol === 'resumen') {
+        messages.push({ role: 'system', content: `Contexto previo de la conversación:\n${m.contenido}` })
+      } else {
+        messages.push({ role: m.rol === 'usuario' ? 'user' : 'assistant', content: m.contenido })
+      }
+    }
+
+    updateContextBar(data.tokens_usados, data.contexto_max)
+    loadConversaciones()
+    $input.focus()
+  } catch (e) {
+    showStatus('Error al cargar conversación', true)
+  }
+}
+
+function startNewChat() {
+  if (streaming && abortCtrl) abortCtrl.abort()
+  conversacionId = null
+  messages = []
+  streaming = false
+  $chat.innerHTML = `
+    <div class="welcome">
+      <h2>IA Local — Origen Silvestre</h2>
+      <p>Selecciona un modelo y escribe tu pregunta. Las respuestas se generan localmente con Ollama.</p>
+    </div>
+  `
+  hideContextBar()
+  hideStatus()
+  $input.focus()
+  updateSendBtn()
+  loadConversaciones()
+}
+
+$newChat.addEventListener('click', () => {
+  startNewChat()
+  $sidebar.classList.remove('open')
 })
 
-// ─── Status bar ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// CONTEXT BAR
+// ═══════════════════════════════════════════════════════════════════
+function updateContextBar(tokensUsados, contextoMax) {
+  if (!conversacionId) return hideContextBar()
+
+  $ctxBar.classList.add('visible')
+  const pct = Math.min(100, (tokensUsados / contextoMax) * 100)
+
+  const usadosK = tokensUsados >= 1000 ? (tokensUsados / 1000).toFixed(1) + 'K' : tokensUsados
+  const maxK = contextoMax >= 1000 ? (contextoMax / 1000).toFixed(0) + 'K' : contextoMax
+  $ctxLabel.textContent = `${usadosK} / ${maxK}`
+
+  $ctxFill.style.width = pct + '%'
+  $ctxFill.className = 'context-fill' + (pct > 80 ? ' danger' : pct > 60 ? ' warn' : '')
+
+  $compactBtn.classList.toggle('visible', pct > 80)
+}
+
+function hideContextBar() {
+  $ctxBar.classList.remove('visible')
+  $compactBtn.classList.remove('visible')
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPACTAR
+// ═══════════════════════════════════════════════════════════════════
+$compactBtn.addEventListener('click', async () => {
+  if (!conversacionId || streaming) return
+
+  $compactBtn.textContent = 'Compactando...'
+  $compactBtn.disabled = true
+
+  try {
+    const result = await fetch(`/api/conversaciones/${conversacionId}/compactar`, {
+      method: 'POST'
+    }).then(r => r.json())
+
+    if (result.error) {
+      showStatus(`Error: ${result.error}`, true)
+      return
+    }
+
+    showStatus(`Compactado: ${result.mensajes_compactados} mensajes resumidos`, false)
+
+    // Recargar la conversación para mostrar el resumen
+    await loadConversacion(conversacionId)
+  } catch (e) {
+    showStatus('Error al compactar', true)
+  } finally {
+    $compactBtn.textContent = 'Compactar'
+    $compactBtn.disabled = false
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════
+// STATUS
+// ═══════════════════════════════════════════════════════════════════
 function showStatus(text, isError) {
   $status.textContent = text
   $status.style.color = isError ? '#e54545' : 'var(--text-muted)'
   $status.classList.add('visible')
 }
 
-function hideStatus() {
-  $status.classList.remove('visible')
-}
+function hideStatus() { $status.classList.remove('visible') }
 
-// ─── New chat ───────────────────────────────────────────────────────
-$newChat.addEventListener('click', () => {
-  if (streaming && abortCtrl) abortCtrl.abort()
-  messages = []
-  streaming = false
-  $chat.innerHTML = ''
-  $chat.appendChild($welcome.cloneNode(true))
-  $welcome = $chat.querySelector('.welcome')
-  hideStatus()
-  $input.focus()
-  updateSendBtn()
-})
-
-// ─── Auto-resize textarea ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// INPUT
+// ═══════════════════════════════════════════════════════════════════
 $input.addEventListener('input', () => {
   $input.style.height = 'auto'
   $input.style.height = Math.min($input.scrollHeight, 160) + 'px'
   updateSendBtn()
 })
 
-// ─── Send on Enter ──────────────────────────────────────────────────
 $input.addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
@@ -546,21 +930,53 @@ function updateSendBtn() {
   $sendBtn.disabled = streaming || !$input.value.trim()
 }
 
-// ─── Send message ───────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// SEND MESSAGE
+// ═══════════════════════════════════════════════════════════════════
 async function sendMessage() {
   const text = $input.value.trim()
   if (!text || streaming || !currentModel) return
 
-  // Hide welcome
+  // Remove welcome
   const wel = $chat.querySelector('.welcome')
   if (wel) wel.remove()
 
-  // Add user message
+  // Si no hay conversación activa, crear una
+  if (!conversacionId) {
+    try {
+      const ctxMax = getContextMax()
+      const res = await fetch('/api/conversaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelo: currentModel, contexto_max: ctxMax })
+      }).then(r => r.json())
+      conversacionId = res.id
+      updateContextBar(0, ctxMax)
+    } catch (e) {
+      showStatus('Error al crear conversación', true)
+      return
+    }
+  }
+
+  // Guardar mensaje de usuario en BD
   messages.push({ role: 'user', content: text })
   appendMessage('user', text)
   $input.value = ''
   $input.style.height = 'auto'
   updateSendBtn()
+
+  const saveUser = fetch('/api/mensajes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversacion_id: conversacionId, rol: 'usuario', contenido: text })
+  }).then(r => r.json()).then(data => {
+    if (data.titulo && data.titulo !== 'Nueva conversación') {
+      loadConversaciones()
+    }
+    if (data.tokens_usados !== undefined) {
+      updateContextBar(data.tokens_usados, data.contexto_max)
+    }
+  }).catch(() => {})
 
   // Start streaming
   streaming = true
@@ -582,10 +998,7 @@ async function sendMessage() {
       signal: abortCtrl.signal
     })
 
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(err || `HTTP ${res.status}`)
-    }
+    if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -609,12 +1022,9 @@ async function sendMessage() {
             scrollToBottom()
           }
           if (json.done) {
-            const dur = json.total_duration
-              ? (json.total_duration / 1e9).toFixed(1) + 's'
-              : ''
+            const dur = json.total_duration ? (json.total_duration / 1e9).toFixed(1) + 's' : ''
             const tps = json.eval_count && json.eval_duration
-              ? (json.eval_count / (json.eval_duration / 1e9)).toFixed(1) + ' tok/s'
-              : ''
+              ? (json.eval_count / (json.eval_duration / 1e9)).toFixed(1) + ' tok/s' : ''
             const parts = [dur, tps].filter(Boolean)
             showStatus(parts.length ? parts.join(' · ') : '', false)
           }
@@ -622,19 +1032,15 @@ async function sendMessage() {
       }
     }
 
-    // Process remaining buffer
     if (buffer.trim()) {
       try {
         const json = JSON.parse(buffer)
-        if (json.message && json.message.content) {
-          fullResponse += json.message.content
-        }
+        if (json.message && json.message.content) fullResponse += json.message.content
       } catch {}
     }
   } catch (e) {
-    if (e.name === 'AbortError') {
-      fullResponse += '\n\n*[Generación cancelada]*'
-    } else {
+    if (e.name === 'AbortError') fullResponse += '\n\n*[Generación cancelada]*'
+    else {
       fullResponse = `Error: ${e.message}`
       showStatus(`Error: ${e.message}`, true)
     }
@@ -643,6 +1049,23 @@ async function sendMessage() {
   bubble.innerHTML = renderMarkdown(fullResponse || '*Sin respuesta*')
   addCopyButtons(bubble)
   messages.push({ role: 'assistant', content: fullResponse })
+
+  // Guardar respuesta en BD
+  await saveUser
+  if (conversacionId && fullResponse) {
+    try {
+      const data = await fetch('/api/mensajes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversacion_id: conversacionId, rol: 'asistente', contenido: fullResponse })
+      }).then(r => r.json())
+      if (data.tokens_usados !== undefined) {
+        updateContextBar(data.tokens_usados, data.contexto_max)
+      }
+    } catch {}
+    loadConversaciones()
+  }
+
   streaming = false
   abortCtrl = null
   updateSendBtn()
@@ -650,19 +1073,22 @@ async function sendMessage() {
   $input.focus()
 }
 
-// ─── Append message to chat ─────────────────────────────────────────
-function appendMessage(role, content) {
+// ═══════════════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function appendMessage(role, content, labelOverride) {
   const div = document.createElement('div')
   div.className = `msg ${role}`
 
   const label = document.createElement('div')
   label.className = 'msg-label'
-  label.textContent = role === 'user' ? 'Tú' : currentModel
+  label.textContent = labelOverride || (role === 'user' ? 'Tú' : (role === 'resumen' ? 'Resumen del contexto' : currentModel))
 
   const bubble = document.createElement('div')
   bubble.className = 'msg-bubble'
   if (content) {
-    bubble.innerHTML = role === 'user' ? escapeHtml(content) : renderMarkdown(content)
+    bubble.innerHTML = role === 'user' ? esc(content) : renderMarkdown(content)
+    if (role !== 'user') addCopyButtons(bubble)
   }
 
   div.appendChild(label)
@@ -673,58 +1099,34 @@ function appendMessage(role, content) {
 }
 
 function scrollToBottom() {
-  requestAnimationFrame(() => {
-    $chat.scrollTop = $chat.scrollHeight
-  })
+  requestAnimationFrame(() => { $chat.scrollTop = $chat.scrollHeight })
 }
 
-// ─── Markdown renderer (basic) ──────────────────────────────────────
 function renderMarkdown(text) {
   if (!text) return ''
-
-  // Code blocks
-  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return `<pre><code class="lang-${lang || 'text'}">${escapeHtml(code.trim())}</code></pre>`
-  })
-
-  // Inline code
+  text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code class="lang-${lang || 'text'}">${esc(code.trim())}</code></pre>`)
   text = text.replace(/`([^`]+)`/g, '<code>$1</code>')
-
-  // Bold
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-
-  // Italic
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>')
-
-  // Unordered lists
   text = text.replace(/^[-*] (.+)$/gm, '<li>$1</li>')
   text = text.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-
-  // Ordered lists
   text = text.replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-
-  // Paragraphs (lines separated by blank lines)
   text = text.replace(/\n{2,}/g, '</p><p>')
   text = text.replace(/\n/g, '<br>')
-
-  // Wrap in paragraph if not starting with block element
   if (!text.startsWith('<pre>') && !text.startsWith('<ul>') && !text.startsWith('<ol>')) {
     text = `<p>${text}</p>`
   }
-
-  // Clean empty paragraphs
   text = text.replace(/<p>\s*<\/p>/g, '')
-
   return text
 }
 
-function escapeHtml(s) {
-  const div = document.createElement('div')
-  div.textContent = s
-  return div.innerHTML
+function esc(s) {
+  const d = document.createElement('div')
+  d.textContent = s
+  return d.innerHTML
 }
 
-// ─── Copy buttons for code blocks ───────────────────────────────────
 function addCopyButtons(container) {
   container.querySelectorAll('pre').forEach(pre => {
     if (pre.querySelector('.copy-btn')) return
@@ -742,8 +1144,11 @@ function addCopyButtons(container) {
   })
 }
 
-// ─── Init ───────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
 loadModels()
+loadConversaciones()
 updateSendBtn()
 </script>
 </body>
