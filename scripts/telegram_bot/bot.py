@@ -526,11 +526,27 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not sesion:
         return
 
-    # Super Agente no soporta imágenes
+    # Super Agente: guardar imagen en /tmp y pasarla como ruta en el prompt
     if sesion.get('agente_preferido') == 'superagente':
-        await update.message.reply_text(
-            '🦾 El Super Agente no procesa imágenes. Escribí tu pregunta en texto.',
-            reply_markup=handlers_sa.teclado_sa()
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        foto    = update.message.photo[-1]
+        archivo = await foto.get_file()
+        ts      = int(__import__('time').time())
+        ruta    = f'/tmp/sa_foto_{user.id}_{ts}.jpg'
+        await archivo.download_to_drive(ruta)
+        caption = (update.message.caption or '').strip()
+        prompt  = f'El usuario envió una imagen. Está guardada en: {ruta}\nLeé el archivo con tu herramienta Read para verla.'
+        if caption:
+            prompt += f'\n\nMensaje del usuario sobre la imagen: {caption}'
+        else:
+            prompt += '\n\nNo envió mensaje adicional. Describí qué ves en la imagen y preguntá si necesita algo específico.'
+        nombre_u = sesion.get('nombre') or _nombre(user)
+        nivel    = sesion.get('nivel', 1)
+        empresa  = sesion.get('empresa', 'ori_sil_2')
+        await handlers_sa.manejar_superagente(
+            update, sa_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
+            sesion=sesion, nombre=nombre_u, nivel=nivel,
+            empresa=empresa, pregunta=prompt
         )
         return
 
