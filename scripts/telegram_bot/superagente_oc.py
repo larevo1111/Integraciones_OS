@@ -192,7 +192,7 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
     if not resp.get('ok'):
         return resp
 
-    return {'ok': True, 'tipo': 'texto', 'contenido': resp['result']}
+    return _procesar_respuesta(resp['result'])
 
 
 def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
@@ -206,7 +206,41 @@ def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
 
     crear_sesion(usuario_id, empresa, oc_session_id='', nombre=nombre)
 
-    return {'ok': True, 'tipo': 'texto', 'contenido': resp['result']}
+    return _procesar_respuesta(resp['result'])
+
+
+# ── Procesar respuesta ───────────────────────────────────────────────────────
+
+def _procesar_respuesta(result_text: str) -> dict:
+    """Parsea la respuesta de OpenCode y retorna dict tipado."""
+    data = _extraer_json(result_text)
+    if data:
+        tipo = data.get('tipo')
+        if tipo == 'tabla':
+            filas = data.get('filas', [])
+            columnas = data.get('columnas', [])
+            if filas and isinstance(filas[0], dict):
+                data['filas'] = [[str(f.get(c, '')) for c in columnas] for f in filas]
+            return {'ok': True, 'tipo': 'tabla', 'contenido': data}
+
+    return {'ok': True, 'tipo': 'texto', 'contenido': result_text}
+
+
+def _extraer_json(texto: str) -> dict | None:
+    """Extrae JSON de tipo tabla del texto de OpenCode."""
+    import re
+    texto = re.sub(r'```(?:json)?\s*', '', texto).replace('```', '').strip()
+    inicio = texto.find('{')
+    fin = texto.rfind('}')
+    if inicio == -1 or fin == -1:
+        return None
+    try:
+        data = json.loads(texto[inicio:fin + 1])
+        if isinstance(data, dict) and data.get('tipo') == 'tabla':
+            return data
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return None
 
 
 def _generar_nombre(pregunta: str, max_len: int = 40) -> str:

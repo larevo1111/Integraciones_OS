@@ -28,7 +28,8 @@ def teclado_saoc():
 
 # ── Handler principal de mensajes ────────────────────────────────────────────
 
-async def manejar_superagente_oc(update: Update, saoc_mod,
+async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
+                                  inline_datos_fn, inline_solo_nuevo_fn,
                                   sesion: dict, nombre: str, nivel: int,
                                   empresa: str, pregunta: str,
                                   resultado_previo: dict = None):
@@ -65,7 +66,31 @@ async def manejar_superagente_oc(update: Update, saoc_mod,
         )
         return
 
-    # Texto plano (OpenCode no retorna tablas/aprobaciones como Claude)
+    tipo = resultado['tipo']
+
+    if tipo == 'tabla':
+        data = resultado['contenido']
+        res_fake = {
+            'ok': True,
+            'respuesta': data.get('texto', ''),
+            'tabla': {
+                'columnas': data.get('columnas', []),
+                'filas': data.get('filas', []),
+                'titulo': data.get('titulo', ''),
+            }
+        }
+        info = tabla_mod.procesar_tabla(res_fake, pregunta, empresa)
+        kb = inline_datos_fn(info['token'], info['n_filas']) if info['token'] else inline_solo_nuevo_fn()
+        try:
+            await update.message.reply_text(
+                info['texto'] + '\n\n_🧩 Super Agente OpenCode_',
+                parse_mode=ParseMode.MARKDOWN, reply_markup=kb
+            )
+        except Exception:
+            await update.message.reply_text(info['texto'], reply_markup=kb)
+        return
+
+    # Texto plano
     try:
         await update.message.reply_text(
             str(resultado['contenido']) + '\n\n_🧩 Super Agente OpenCode_',

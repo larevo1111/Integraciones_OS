@@ -488,7 +488,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
                 )
                 return
             await handlers_sa_oc.manejar_superagente_oc(
-                update, saoc_mod,
+                update, saoc_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
                 sesion=sesion, nombre=nombre, nivel=nivel,
                 empresa=empresa_sa, pregunta=texto,
                 resultado_previo=resultado
@@ -496,7 +496,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
             return
 
         await handlers_sa_oc.manejar_superagente_oc(
-            update, saoc_mod,
+            update, saoc_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
             sesion=sesion, nombre=nombre, nivel=nivel,
             empresa=empresa_sa, pregunta=texto
         )
@@ -622,7 +622,7 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         nivel    = sesion.get('nivel', 1)
         empresa  = sesion.get('empresa', 'ori_sil_2')
         await handlers_sa_oc.manejar_superagente_oc(
-            update, saoc_mod,
+            update, saoc_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
             sesion=sesion, nombre=nombre_u, nivel=nivel,
             empresa=empresa, pregunta=prompt
         )
