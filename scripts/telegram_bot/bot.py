@@ -49,6 +49,11 @@ NOMBRES_AGENTES = {
     'deepseek-chat':     'DeepSeek Chat 💡',
     'automático':        'Automático 🔀',
     'superagente':       'Super Agente 🦾',
+    'ollama-qwen-coder': 'Qwen Coder 🏠',
+    'ollama-qwen-14b':   'Qwen 14B 🏠',
+    'ollama-qwen-7b':    'Qwen 7B 🏠',
+    'ollama-deepseek-r1': 'DeepSeek R1 🏠',
+    'ollama-llama-3b':   'Llama 3B 🏠',
 }
 
 ICONOS_AGENTES = {
@@ -62,6 +67,11 @@ ICONOS_AGENTES = {
     'gemma-router':      '🔀',
     'gpt-oss-120b':      '🧪',
     'cerebras-llama':    '🔥',
+    'ollama-qwen-coder': '🏠',
+    'ollama-qwen-14b':   '🏠',
+    'ollama-qwen-7b':    '🏠',
+    'ollama-deepseek-r1': '🏠',
+    'ollama-llama-3b':   '🏠',
 }
 
 
@@ -474,7 +484,8 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
     # Pie con agente usado
     agente_usado = resultado.get('agente', '')
     icono = ICONOS_AGENTES.get(agente_usado, '🤖')
-    pie   = f'\n\n_{icono} {agente_usado}_' if agente_usado else ''
+    nombre_agente = NOMBRES_AGENTES.get(agente_usado, agente_usado)
+    pie   = f'\n\n_{icono} {nombre_agente}_' if agente_usado else ''
 
     MAX_LEN = 4000
     texto_enviar = texto_resp + pie
@@ -565,7 +576,8 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     kb     = _inline_datos(token, n_filas) if (token or n_filas > 0) else _inline_solo_nuevo()
     agente_usado = resultado.get('agente', '')
-    pie    = f'\n\n_{ICONOS_AGENTES.get(agente_usado,"🤖")} {agente_usado}_' if agente_usado else ''
+    nombre_ag = NOMBRES_AGENTES.get(agente_usado, agente_usado)
+    pie    = f'\n\n_{ICONOS_AGENTES.get(agente_usado,"🤖")} {nombre_ag}_' if agente_usado else ''
 
     try:
         await update.message.reply_text(

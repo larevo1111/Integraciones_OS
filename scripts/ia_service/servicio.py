@@ -916,8 +916,13 @@ def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generad
             f"Luego indica que puede ver el detalle completo en la tabla.\n"
         ) if tiene_tabla else (
             f"Responde la pregunta de forma directa y concisa con los datos obtenidos. "
-            f"Presenta cada dato con viñetas así: • **campo**: valor\n"
-            f"Ejemplo: • **ventas_netas**: $2,914,192.00\n"
+            f"Presenta cada dato con viñetas así: • **Nombre legible**: valor formateado\n"
+            f"IMPORTANTE: traduce los nombres de columna a español legible. "
+            f"Ejemplos: fin_ventas_netas_sin_iva → Ventas netas, cto_utilidad_bruta → Utilidad bruta, "
+            f"vol_unidades_vendidas → Unidades vendidas, margen_utilidad_pct → Margen de utilidad, "
+            f"vol_num_facturas → Facturas, cat_num_referencias → Referencias. "
+            f"Formatea cifras con separador de miles y signo $ donde aplique. "
+            f"Porcentajes con símbolo %. NO repitas el mismo dato con nombre diferente.\n"
         )
         return (
             f"Pregunta del usuario: {pregunta}\n\n"
