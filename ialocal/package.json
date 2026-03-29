@@ -1,0 +1,12 @@
+{
+  "name": "ialocal",
+  "version": "1.0.0",
+  "description": "Chat UI para Ollama — IA Local OS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
