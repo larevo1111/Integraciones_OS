@@ -392,7 +392,7 @@ const filteredRows = computed(() => {
     const fv = f.val.trim()
     if (!fv) return true
     const raw = row[key]
-    const rawNum = parseFloat(String(raw ?? '').replace(',', '.'))
+    const rawNum = parseNum(raw)
     const fNum  = parseFloat(fv)
     const val   = String(raw ?? '').toLowerCase()
     switch (f.op) {
@@ -427,7 +427,7 @@ const sortedRows = computed(() => {
   if (!sortKey.value) return filteredRows.value
   return [...filteredRows.value].sort((a, b) => {
     const av = a[sortKey.value], bv = b[sortKey.value]
-    const n  = v => parseFloat(String(v ?? '').replace(',', '.'))
+    const n  = v => parseNum(v)
     const r  = isNaN(n(av)) ? String(av ?? '').localeCompare(String(bv ?? '')) : n(av) - n(bv)
     return sortDir.value === 'asc' ? r : -r
   })
@@ -454,7 +454,7 @@ const activeAggregateCount = computed(() => Object.keys(columnAggregates.value).
 const hasAggregates        = computed(() => activeAggregateCount.value > 0)
 
 function computeAggregate(key, aggType, rows) {
-  const vals = rows.map(r => parseFloat(String(r[key] ?? '').replace(/,/g, ''))).filter(n => !isNaN(n))
+  const vals = rows.map(r => parseNum(r[key])).filter(n => !isNaN(n))
   if (!vals.length) return null
   if (aggType === 'sum') return vals.reduce((a, b) => a + b, 0)
   if (aggType === 'avg') return vals.reduce((a, b) => a + b, 0) / vals.length
@@ -500,6 +500,10 @@ const groupedRows = computed(() => {
 const displayRows = computed(() => groupedRows.value || sortedRows.value)
 
 // ── Detectar numérico ──────────────────────────────────
+function _stripNumFmt(s) {
+  // Limpia formatos COP/US: "$1.234.567", "1,234,567", "45.2%", "-$500"
+  return s.replace(/[$%]/g, '').replace(/\./g, '').replace(/,/g, '.').trim()
+}
 function isNumericKey(key) {
   const sample = allRows.value.slice(0, 8)
   if (!sample.length) return false
@@ -508,8 +512,8 @@ function isNumericKey(key) {
     if (v === null || v === undefined || v === '') return true
     const s = String(v).trim()
     if (s === '') return true
-    // Soporta números formateados con coma de miles: "69,800" → "69800"
-    return !isNaN(Number(s.replace(/,/g, '')))
+    const clean = _stripNumFmt(s)
+    return clean !== '' && !isNaN(Number(clean))
   })
 }
 function isNumeric(key) {
@@ -527,10 +531,15 @@ function fmtNum(n) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
+function parseNum(val) {
+  if (val === null || val === undefined || val === '' || val === '—') return NaN
+  const clean = _stripNumFmt(String(val))
+  return clean === '' ? NaN : parseFloat(clean)
+}
 function formatCell(val, col) {
-  if (val === null || val === undefined || val === '—') return val === '—' ? '—' : '—'
+  if (val === null || val === undefined || val === '—') return '—'
   if (col && isNumeric(col.key)) {
-    const n = parseFloat(String(val).replace(/,/g, ''))
+    const n = parseNum(val)
     if (!isNaN(n)) return fmtNum(n)
   }
   return val
