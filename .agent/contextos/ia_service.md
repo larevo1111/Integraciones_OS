@@ -1,5 +1,5 @@
 # Contexto: Servicio IA — ia_service_os
-**Actualizado**: 2026-03-24
+**Actualizado**: 2026-03-30
 
 ## Scope y propósito
 
@@ -35,7 +35,7 @@ resultado = consultar(
 # Devuelve: ok, conversacion_id, respuesta, formato, tabla, sql, agente, tokens, costo_usd, log_id, tema, empresa
 ```
 
-## Agentes activos (2026-03-22)
+## Agentes activos (2026-03-30)
 
 | slug | modelo | Estado | Nivel min | Costo input/M |
 |---|---|---|---|---|
@@ -50,8 +50,15 @@ resultado = consultar(
 | deepseek-reasoner | deepseek-reasoner | ✅ Admin only | 7 | $0.55 |
 | gemini-image | gemini-2.5-flash-image | ✅ Imágenes | 1 | $52.00 |
 | gemma-router | gemma-3-27b-it | ❌ Desactivado (activo=0) | — | $0.00 |
+| ollama-qwen-coder | qwen2.5-coder:14b | ✅ Local Ollama (default bot) | 1 | $0.00 |
+| ollama-qwen-14b | qwen2.5:14b | ✅ Local Ollama | 1 | $0.00 |
+| ollama-qwen-7b | qwen2.5:7b | ✅ Local Ollama | 1 | $0.00 |
+| ollama-deepseek-r1 | deepseek-r1:14b | ✅ Local Ollama | 1 | $0.00 |
+| ollama-llama-3b | llama3.2:3b | ✅ Local Ollama | 1 | $0.00 |
+| ollama-vision | llama3.2-vision:11b | ✅ Local Ollama | 1 | $0.00 |
 
 **⚠️ cerebras-llama tiene 8,192 tokens máx de entrada** — NO sirve para `analisis_datos` (DDL = 28K-37K tokens). Solo para tareas con prompt pequeño.
+**⚠️ Ollama: solo 1 modelo 14B en VRAM a la vez (~9GB RTX 3060 12GB)**. Warmup automático desde servicio.py.
 
 ## Tipos de consulta — configuración DEFINITIVA (2026-03-22)
 
@@ -139,9 +146,9 @@ Tablas clave:
 | Santiago | +573214550933 | 7 (admin total) |
 | Jen | +572307085143 | 5 |
 
-### Agentes disponibles según nivel
-- Nivel 1–5: cerebras-llama ★ (default), gemini-flash, gpt-oss-120b, deepseek-chat
-- Nivel 6–7: + gemini-pro, claude-sonnet
+### Agentes disponibles en bot (simplificado 2026-03-30)
+- Nivel 1+: Qwen Coder 14B (Local / Rápido) — ollama-qwen-coder
+- Nivel 5+: Super Agente Claude Code, Super Agente OpenCode
 
 ### Regla tabla bot — ABSOLUTA (confirmada 2026-03-28)
 - **A**: SIEMPRE poner información en el mensaje con viñetas y texto
@@ -268,9 +275,9 @@ Esto evita que "Dame las ventas" → 1 fila SUM → follow-up "La tabla con el d
 | `.agent/manuales/ia_service_manual.md` | Manual completo v2.7 |
 | `.agent/docs/COMPARACION_AGENTES_IA.md` | Benchmark 3 rondas, 105 llamadas |
 
-## Super Agente (activo — 2026-03-28)
+## Super Agente Claude (activo — 2026-03-30)
 
-Claude Code CLI corre en paralelo al ia_service. El usuario selecciona `🦾 Super Agente` en el menú.
+Claude Code CLI corre en paralelo al ia_service. El usuario selecciona `🦾 Super Agente (Claude Code)` en el menú.
 
 **Principio**: Es algo MUY SIMPLE — solo enviar prompts a `claude -p` y devolver la respuesta. Sin API keys, sin logging.
 
@@ -280,5 +287,47 @@ Claude Code CLI corre en paralelo al ia_service. El usuario selecciona `🦾 Sup
 - Sesiones persistentes con `--resume SESSION_ID` (5-30s vs 2min sin resume)
 - Sin logging — ni import logging ni log.info/error/warning
 - Tablas: `sa_sesiones`, `sa_config`, `sa_cambios` en ia_service_os
-- Menú propio: [📝 Nueva] [📋 Conversaciones] [⚙️ Ajustes]
+- Menú propio: [📝 Nueva] [📋 Conversaciones] [⚙️ Ajustes] + [🔄 Actualizar datos] (nivel ≥5)
 - Aprobación de código: Claude envía JSON tipo "aprobacion" → bot notifica nivel 7 con ✅/❌
+- **Timeout: 1200s (20 minutos)**
+
+## Super Agente OpenCode (activo — 2026-03-30)
+
+OpenCode CLI (MiMo V2) como segundo super agente. Seleccionar `🧩 Super Agente (OpenCode)`.
+
+**Detalles técnicos**:
+- `superagente_oc.py` + `handlers_sa_oc.py` — misma arquitectura que SA Claude
+- **Multi-modelo**: texto → MiMo V2 Pro (default), imágenes → MiMo V2 Omni (flag `-m opencode/mimo-v2-omni-free`)
+- Sesiones compartidas entre texto e imágenes con `--session`
+- Imágenes se guardan en `/home/osserver/Proyectos_Antigravity/sa_opencode/uploads/`
+- Teclado propio con [🔄 Actualizar datos] para nivel ≥5
+- **Timeout: 1200s (20 minutos)**
+
+## Menú agentes bot (simplificado — 2026-03-30)
+
+Solo 3 opciones en `teclado.py`:
+1. `🏠 Qwen Coder 14B (Local / Rápido)` — agente:ollama-qwen-coder, nivel 1
+2. `🦾 Super Agente (Claude Code)` — agente:superagente, nivel 5
+3. `🧩 Super Agente (OpenCode)` — agente:superagente-oc, nivel 5
+
+Los demás agentes cloud siguen activos en ia_service pero no aparecen en el bot.
+
+## Ollama — pre-flight warmup (2026-03-30)
+
+Antes de cada llamada a un agente Ollama (`localhost:11434`), `_warmup_ollama()` en servicio.py:
+1. Verifica que Ollama responde (`/api/ps`)
+2. Si no responde → `sudo systemctl start ollama.service`
+3. Si el modelo no está en VRAM → lo precarga con `POST /api/generate` (prompt vacío, keep_alive 10m)
+4. Si todo falla → retorna error limpio sin activar fallback innecesario
+
+Esto evita que el cold-start de Ollama (~10s para cargar 14B en VRAM) cause timeout y active fallback a agentes cloud.
+
+## Detección de período actual (_periodo_actual — 2026-03-30)
+
+Keywords ampliados para forzar SQL fresco (evitar caché con datos viejos):
+`este mes, mes actual, esta semana, semana actual, hoy, de hoy, ventas del mes, ventas de este, ventas del, dame las ventas, las ventas, cuánto llevamos, cuanto llevamos, cómo vamos, como vamos, lo que va, cuánto hemos vendido, cuanto hemos vendido, facturado`
+
+## Fixes systemd bot (2026-03-30)
+
+- `KillMode=process` en os-telegram-bot.service — solo mata proceso principal, no subprocesos (pipeline sobrevive restart)
+- `Wants=ia-service.service` (antes `Requires`) — bot no muere si ia-service se reinicia

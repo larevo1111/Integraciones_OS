@@ -1,5 +1,5 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-03-28
+**Actualizado**: 2026-03-30
 
 ## Módulos activos en paralelo
 
@@ -12,13 +12,14 @@
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Integración bidireccional activa | Normal |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
-## Trabajo activo esta semana (2026-03-28)
+## Trabajo activo esta semana (2026-03-30)
 
-- **IA Service — Depuración lógica negocio ✅**: 3 reglas duplicadas desactivadas, 3 nuevas creadas (ventas, SQL gotchas, margen), 5 keywords corregidos, 302 ejemplos SQL duplicados eliminados, 178 CURDATE() corregidos
-- **IA Service — Protección aprendizaje ✅**: `guardar_ejemplo_sql()` ahora rechaza SQL con CURDATE/NOW antes de guardar — evita ciclo vicioso
-- **Bot Telegram — Super Agente ✅**: Simplificado (sin logging, sin API key — usa OAuth Pro)
-- **Bot Telegram — Tabla adjunta ✅**: Fix `_pide_detalle` para forzar SQL nuevo cuando usuario pide "detalle/desglose"
-- **Sistema Gestión — Jornadas ✅**: Módulo completo
+- **Bot Telegram — Super Agente OpenCode ✅**: Nuevo agente SAOC con multi-modelo (MiMo V2 Pro texto + Omni visión)
+- **Bot Telegram — Menú simplificado ✅**: Solo 3 agentes: Qwen Local, SA Claude, SA OpenCode
+- **Bot Telegram — Timeouts ✅**: SA Claude y SAOC ambos a 1200s (20 min)
+- **Bot Telegram — Fix systemd ✅**: KillMode=process (pipeline sobrevive restart) + Wants ia-service (bot no muere si ia-service reinicia)
+- **IA Service — Warmup Ollama ✅**: Pre-flight check antes de llamar agentes locales. Detecta Ollama caído, modelo frío, y precarga automáticamente
+- **IA Service — Keywords período actual ✅**: Ampliados para forzar SQL fresco en más consultas de ventas
 - **Pendiente próximo**: Notificaciones jornada olvidada (activas vía cron 8pm L-V)
 
 ## Regla de actualización
