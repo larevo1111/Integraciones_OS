@@ -17,7 +17,7 @@ from ia_service.config import get_local_conn
 
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/sa_opencode'
 OC_BIN = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
-TIMEOUT_OC = 300  # segundos
+TIMEOUT_OC = 1200  # segundos (20 minutos)
 MODEL_VISION = 'opencode/mimo-v2-omni-free'
 
 
