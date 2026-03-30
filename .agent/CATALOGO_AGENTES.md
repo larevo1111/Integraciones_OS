@@ -217,34 +217,111 @@ Ollama carga/descarga modelos de VRAM automáticamente (timeout 5 min inactivida
 
 ## Herramientas locales de IA (no LLMs)
 
-### Whisper — Transcripción de audio
-- **Instalado**: 2026-03-28, `openai-whisper` v20250625 vía pip
-- **Comando**: `whisper audio.mp3 --model medium --language Spanish`
-- **Modelos**: tiny / base / small / **medium** (~2GB VRAM, recomendado) / large-v3
-- **VRAM**: medium ~2GB — puede correr simultáneo con un LLM de 7B
-- **Desde Python**: `import whisper; m = whisper.load_model("medium"); m.transcribe("audio.mp3")`
-- **Formatos entrada**: mp3, mp4, wav, m4a, ogg, flac y cualquier formato que soporte ffmpeg
-- **Idiomas**: 99 idiomas detectados automáticamente
-- **Puerto**: ninguno — se llama como librería/CLI directamente
+### Chat UI Ollama — ialocal
+- **Qué hace**: Interfaz web para conversar con cualquier modelo Ollama. Guarda todas las conversaciones y mensajes en BD. Sidebar con historial agrupado por fecha. Botón "Compactar" que resume mensajes viejos cuando el contexto supera el 80%, liberando espacio sin perder información.
+- **Instalado**: 2026-03-28 en `ialocal/` del repo
+- **Servicio systemd**: `os-ialocal.service` — activo y habilitado (arranca con el sistema)
+- **Puerto**: 9500
+- **URL externa**: `https://ialocal.oscomunidad.com`
+- **VRAM**: 0 — es solo un proxy. El VRAM lo consume el modelo Ollama que se use.
+- **BD**: `ia_local` (MariaDB local, usuario `osadmin`). Tablas: `conversaciones` + `mensajes`.
+- **Ejecutar / gestionar**:
+```bash
+sudo systemctl status os-ialocal.service   # ver estado
+sudo systemctl restart os-ialocal.service  # reiniciar
+sudo journalctl -u os-ialocal.service -f   # ver logs en vivo
+```
+- **API interna** (para integrar desde otros servicios):
+```bash
+# Proxy a Ollama — formato nativo
+curl http://localhost:9500/api/chat \
+  -d '{"model":"qwen2.5-coder:14b","messages":[{"role":"user","content":"Hola"}],"stream":false}'
 
-### ComfyUI — Generación de imágenes y video
+# Listar conversaciones guardadas
+curl http://localhost:9500/api/conversaciones
+
+# Crear conversación nueva
+curl -X POST http://localhost:9500/api/conversaciones \
+  -H "Content-Type: application/json" \
+  -d '{"modelo":"qwen2.5:14b","contexto_max":32768}'
+```
+
+---
+
+### Whisper — Transcripción de audio
+- **Qué hace**: Transcribe audio a texto. Detecta idioma automáticamente. Soporta 99 idiomas. Usa GPU cuando está disponible.
+- **Instalado**: 2026-03-28, `openai-whisper` v20250625 vía pip
+- **Servicio systemd**: ninguno — se llama como CLI o librería Python directamente
+- **VRAM**:
+  - `tiny` / `base` / `small`: <1 GB — pueden correr con cualquier LLM
+  - `medium` (~2 GB): **recomendado** — puede correr simultáneo con un LLM de 7B
+  - `large-v3` (~5 GB): alta calidad — liberar modelos 14B antes de usar
+- **Ejecutar desde terminal**:
+```bash
+# Transcripción básica (español)
+whisper audio.mp3 --model medium --language Spanish
+
+# Sin especificar idioma (detección automática)
+whisper audio.mp3 --model medium
+
+# Salida en formato SRT (subtítulos)
+whisper audio.mp3 --model medium --output_format srt
+
+# Formatos soportados: mp3, mp4, wav, m4a, ogg, flac, mkv, avi, mov...
+```
+- **Desde Python**:
+```python
+import whisper
+modelo = whisper.load_model("medium")
+resultado = modelo.transcribe("audio.mp3", language="es")
+print(resultado["text"])
+```
+- **Ver qué modelo hay cargado en VRAM**: `nvidia-smi` (aparece como proceso python3)
+
+---
+
+### ComfyUI — Generación de imágenes con FLUX.1
+- **Qué hace**: Genera imágenes a partir de texto (text-to-image). Interfaz web con nodos visuales. Soporta workflows complejos (img2img, inpainting, upscaling). Modelo actual: FLUX.1-schnell (generación rápida, ~4 pasos).
 - **Instalado**: 2026-03-28 en `/home/osserver/ComfyUI/`
+- **Servicio systemd**: `os-comfyui.service` — activo y habilitado (arranca con el sistema)
 - **Puerto**: 8188
-- **Servicio systemd**: `os-comfyui.service` — **activo y habilitado** (arranca con el sistema)
-- **URL externa**: `https://comfyui.oscomunidad.com` (requiere agregar CNAME en Cloudflare dashboard)
-- **VRAM necesaria**: FLUX.1 GGUF Q4 ~10-11GB total (UNet + T5 + CLIP + VAE)
-- **API**: `POST http://localhost:8188/prompt` con workflow JSON
-- **⚠️ Nota VRAM**: NO corre simultáneo con un LLM de 14B. Antes de generar imágenes, liberar Ollama: `ollama stop <modelo>`.
+- **URL externa**: `https://comfyui.oscomunidad.com` (pendiente CNAME en Cloudflare dashboard)
+- **VRAM**: ~10–11 GB al generar (carga UNet 6.4GB + T5 4.6GB + CLIP + VAE). **NO corre simultáneo con ningún LLM de 14B.**
+- **⚠️ Antes de generar imágenes**: liberar modelos Ollama con `ollama stop <modelo>` (o esperar 5 min de inactividad).
+- **Ejecutar / gestionar**:
+```bash
+sudo systemctl status os-comfyui.service   # ver estado
+sudo systemctl restart os-comfyui.service  # reiniciar
+sudo journalctl -u os-comfyui.service -f   # ver logs en vivo
+
+# Ver VRAM en tiempo real
+watch -n1 nvidia-smi
+```
+- **Uso**: Abrir `http://localhost:8188` → cargar workflow → conectar nodos UNet (GGUF), T5, CLIP, VAE, KSampler → Queue Prompt.
 
 **Modelos FLUX.1-schnell instalados** (en `/home/osserver/ComfyUI/models/`):
-| Archivo | Carpeta | Tamaño | Función |
-|---|---|---|---|
-| `flux1-schnell-Q4_K_S.gguf` | `unet/` | 6.4 GB | Modelo principal (UNet cuantizado) |
-| `t5xxl_fp8_e4m3fn.safetensors` | `clip/` | 4.6 GB | Text encoder T5 fp8 |
-| `clip_l.safetensors` | `clip/` | 235 MB | CLIP-L text encoder |
-| `ae.safetensors` | `vae/` | 9.4 MB | VAE TAEF1 (compresión imagen) |
+| Archivo | Carpeta | Tamaño en disco | Función | VRAM |
+|---|---|---|---|---|
+| `flux1-schnell-Q4_K_S.gguf` | `unet/` | 6.4 GB | Modelo principal (UNet cuantizado Q4) | ~6 GB |
+| `t5xxl_fp8_e4m3fn.safetensors` | `clip/` | 4.6 GB | Text encoder T5 XXL fp8 | ~4 GB |
+| `clip_l.safetensors` | `clip/` | 235 MB | CLIP-L text encoder | <1 GB |
+| `ae.safetensors` | `vae/` | 9.4 MB | VAE TAEF1 (compresión/decompresión latente) | <1 GB |
 
-**Nodo custom requerido**: `ComfyUI-GGUF` (instalado en `ComfyUI/custom_nodes/ComfyUI-GGUF/`). Necesario para cargar archivos `.gguf`.
+**Nodo custom**: `ComfyUI-GGUF` en `ComfyUI/custom_nodes/ComfyUI-GGUF/` — imprescindible para cargar `.gguf`.
+
+- **API** (para integrar desde otros servicios):
+```bash
+# Encolar un prompt (requiere workflow JSON completo)
+curl -X POST http://localhost:8188/prompt \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": { ... workflow JSON ... }}'
+
+# Ver cola actual
+curl http://localhost:8188/queue
+
+# Ver historial de generaciones
+curl http://localhost:8188/history
+```
 
 ---
 
