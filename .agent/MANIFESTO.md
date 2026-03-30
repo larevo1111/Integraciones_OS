@@ -242,6 +242,12 @@ No se puede construir sin entender qué quiere Santi. No se debe generar código
 3. Solo entonces ejecutar — ir tildando `[x]` a medida que se completa cada paso
 4. Al terminar: mover el archivo a `.agent/planes/completados/` y actualizar el contexto del módulo
 
+**⚠️ REGLA SOBRE PLANES — NUNCA BORRAR:**
+Los planes NUNCA se eliminan. Un plan completado es un registro histórico.
+- `.agent/planes/actuales/` → plan activo en ejecución
+- `.agent/planes/completados/` → plan finalizado (mover aquí, agregar `**Estado**: ✅ Completado — YYYY-MM-DD`)
+- `/home/osserver/.claude/plans/` → planes del sistema Claude Code (EnterPlanMode). Al completarse: actualizar `**Estado**` a `Completado — fecha`. NUNCA eliminar.
+
 **Consecuencias si no se cumple:**
 - Tareas quedan a medias sin registro de qué faltó
 - En la siguiente sesión no hay forma de saber el estado real
