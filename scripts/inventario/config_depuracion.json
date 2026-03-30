@@ -1,0 +1,21 @@
+{
+  "_descripcion": "Reglas de depuración para inventario físico OS. Cualquier script de inventario lee este archivo para saber qué artículos excluir del conteo.",
+  "_actualizado": "2026-03-30",
+
+  "excluir_sin_gestion_stock": true,
+  "excluir_sin_categoria": true,
+
+  "excluir_categorias": [
+    {"patron": "T999%", "razon": "Productos que no se usan (obsoletos)"},
+    {"patron": "XMATERIAL%", "razon": "Material de apoyo ventas POP — no se inventaría"},
+    {"patron": "GASTOS%", "razon": "Gastos — no son artículos físicos"},
+    {"patron": "T05%", "razon": "Activos fijos, moldes, herramientas y consumibles — no van en inventario físico"}
+  ],
+
+  "_notas": [
+    "T05.02 A.F. MOLDES: son activos fijos, no se inventarían con producto",
+    "T05.03 HERRAMIENTAS: activos fijos",
+    "T05.06 CONSUMIBLES PRODUCCION Y VENTAS: amonio cuaternario, batas, gorros — son consumibles, no inventariables",
+    "Si se necesita agregar una exclusión nueva, agregar entrada en excluir_categorias con patrón SQL LIKE y razón"
+  ]
+}

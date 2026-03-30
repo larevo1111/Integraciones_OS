@@ -111,6 +111,10 @@ Stock actual por articulo con columnas de stock por bodega.
 - Las 81 OPs generadas vigentes SI tienen movimientos en trazabilidad con formato numerico
 - Para el Modulo 2 (ajuste OPs) usamos directamente `zeffi_materiales` y `zeffi_articulos_producidos`
 
+### Depuración de artículos para inventario físico
+Reglas en `scripts/inventario/config_depuracion.json`. De 489 vigentes → **300 inventariables** (6,313 uds).
+Excluidos: sin gestión stock (104), T999 obsoletos (70), POP (4), Gastos (62), T05 activos/moldes/consumibles (11), sin categoría (3).
+
 ### Cantidad en trazabilidad usa coma decimal
 - Campo `cantidad` es TEXT con formato "1000,00" o "-23,00"
 - Para operar: `CAST(REPLACE(cantidad, ',', '.') AS DECIMAL(12,2))`
