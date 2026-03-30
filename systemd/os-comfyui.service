@@ -1,0 +1,15 @@
+[Unit]
+Description=ComfyUI — Generación de imágenes y video local (FLUX, SDXL)
+After=network.target
+
+[Service]
+Type=simple
+User=osserver
+WorkingDirectory=/home/osserver/ComfyUI
+ExecStart=/usr/bin/python3 main.py --listen 0.0.0.0 --port 8188 --cuda-device 0
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

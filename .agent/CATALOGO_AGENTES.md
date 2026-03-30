@@ -139,7 +139,7 @@
 **Software**: Ollama v0.18.3, CUDA 13.1, driver 590.48
 **Servicio**: systemd `ollama.service` (arranca con el sistema, habilitado)
 **API**: `http://localhost:11434` (nativa) / `http://localhost:11434/v1` (OpenAI-compatible)
-**Acceso externo**: `https://ollama.oscomunidad.com` (Cloudflare Tunnel — pendiente CNAME en dashboard)
+**Acceso externo**: `https://ialocal.oscomunidad.com` (Cloudflare Tunnel — pendiente CNAME en dashboard)
 **Credenciales**: no requiere — campo `api_key = 'ollama'` en BD (placeholder, el campo es NOT NULL)
 **Costo**: $0 total — hardware propio
 **Formato API en BD**: `openai` (usa el proveedor `openai_compat.py` existente)
@@ -187,19 +187,56 @@ Ollama carga/descarga modelos de VRAM automáticamente (timeout 5 min inactivida
 - **Modelo Ollama**: `deepseek-r1:14b`
 - **Tamaño disco**: 9.0 GB
 - **VRAM**: ~9 GB
-- **Contexto**: 32K tokens
+- **Contexto**: 131K tokens (pero en 12GB VRAM, contexto largo degrada rendimiento)
 - **Capacidades**: razonamiento, sql, codigo
 - **Mejor para**: Razonamiento paso a paso (chain-of-thought). Muestra su proceso de pensamiento. Destilado del R1 completo.
 - **Terminal**: `ollama run deepseek-r1:14b`
 
-### 16. ollama-llama-3b — Llama 3.2 3B
+### 16. ollama-vision — Llama 3.2 Vision 11B
+- **Modelo Ollama**: `llama3.2-vision:11b`
+- **Tamaño disco**: 7.8 GB
+- **VRAM**: ~8 GB
+- **Contexto**: 32K tokens
+- **Capacidades**: vision (análisis de imágenes, OCR, screenshots, gráficos)
+- **Mejor para**: Entender imágenes, leer texto en fotos, interpretar gráficos, describir capturas de pantalla.
+- **Terminal**: `ollama run llama3.2-vision:11b`
+- **Nota**: Enviar imágenes como base64 en el campo `images[]` de la API.
+
+### 17. ollama-llama-3b — Llama 3.2 3B
 - **Modelo Ollama**: `llama3.2:3b`
 - **Tamaño disco**: 2.0 GB
 - **VRAM**: ~2.8 GB
-- **Contexto**: 8K tokens
+- **Contexto**: 131K tokens (teórico, en la práctica limitado por VRAM)
 - **Capacidades**: enrutamiento
 - **Mejor para**: Router ultra liviano. Puede correr simultáneo con cualquier 14B.
 - **Terminal**: `ollama run llama3.2:3b`
+
+---
+
+---
+
+## Herramientas locales de IA (no LLMs)
+
+### Whisper — Transcripción de audio
+- **Instalado**: 2026-03-28, `openai-whisper` v20250625 vía pip
+- **Comando**: `whisper audio.mp3 --model medium --language Spanish`
+- **Modelos**: tiny / base / small / **medium** (~2GB VRAM, recomendado) / large-v3
+- **VRAM**: medium ~2GB — puede correr simultáneo con un LLM de 7B
+- **Desde Python**: `import whisper; m = whisper.load_model("medium"); m.transcribe("audio.mp3")`
+- **Formatos entrada**: mp3, mp4, wav, m4a, ogg, flac y cualquier formato que soporte ffmpeg
+- **Idiomas**: 99 idiomas detectados automáticamente
+- **Puerto**: ninguno — se llama como librería/CLI directamente
+
+### ComfyUI — Generación de imágenes y video
+- **Instalado**: 2026-03-28 en `/home/osserver/ComfyUI/`
+- **Puerto**: 8188
+- **Servicio systemd**: `os-comfyui.service` (NO activo por defecto — se activa manualmente)
+- **Modelos de imagen**: SDXL, FLUX.1 Dev (descargar en `ComfyUI/models/checkpoints/`)
+- **VRAM necesaria**: SDXL ~6GB | FLUX.1 cuantizado ~10-12GB
+- **Iniciar manualmente**: `sudo systemctl start os-comfyui` → acceder en `localhost:8188`
+- **API**: `POST http://localhost:8188/prompt` con workflow JSON
+- **Nota**: NO corre simultáneo con un LLM de 14B (VRAM insuficiente). Liberar Ollama primero con `ollama stop <modelo>`.
+- **Modelos pendientes de descargar**: SDXL 1.0 (~7GB) o FLUX.1-dev (~24GB en bf16, ~12GB cuantizado)
 
 ---
 
@@ -227,7 +264,7 @@ Si `agente` es `null`, el sistema elige automáticamente según el tipo de consu
 
 ### Desde fuera de la red
 ```bash
-curl https://ollama.oscomunidad.com/v1/chat/completions \
+curl https://ialocal.oscomunidad.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen2.5-coder:14b","messages":[{"role":"user","content":"Hola"}]}'
 ```
@@ -260,6 +297,7 @@ Todas las keys están en la tabla `ia_agentes` de la BD `ia_service_os`. No hay 
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-03-28 | Whisper instalado (openai-whisper v20250625). ComfyUI instalado en /home/osserver/ComfyUI. llama3.2-vision:11b agregado a Ollama (7.8GB). |
 | 2026-03-28 | Ollama v0.18.3 instalado. 5 modelos locales (qwen-coder 14B, qwen 14B, qwen 7B, deepseek-r1 14B, llama 3B). Borrado text-generation-webui + Mistral 7B v0.1 (27 GB liberados). |
 | 2026-03-20 | Benchmark 3 rondas, 105 llamadas. cerebras-llama promovido a default respuesta. |
 | 2026-03-17 | gpt-oss-120b agregado (reemplazo Maverick en Groq). |
