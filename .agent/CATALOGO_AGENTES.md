@@ -230,13 +230,21 @@ Ollama carga/descarga modelos de VRAM automáticamente (timeout 5 min inactivida
 ### ComfyUI — Generación de imágenes y video
 - **Instalado**: 2026-03-28 en `/home/osserver/ComfyUI/`
 - **Puerto**: 8188
-- **Servicio systemd**: `os-comfyui.service` (NO activo por defecto — se activa manualmente)
-- **Modelos de imagen**: SDXL, FLUX.1 Dev (descargar en `ComfyUI/models/checkpoints/`)
-- **VRAM necesaria**: SDXL ~6GB | FLUX.1 cuantizado ~10-12GB
-- **Iniciar manualmente**: `sudo systemctl start os-comfyui` → acceder en `localhost:8188`
+- **Servicio systemd**: `os-comfyui.service` — **activo y habilitado** (arranca con el sistema)
+- **URL externa**: `https://comfyui.oscomunidad.com` (requiere agregar CNAME en Cloudflare dashboard)
+- **VRAM necesaria**: FLUX.1 GGUF Q4 ~10-11GB total (UNet + T5 + CLIP + VAE)
 - **API**: `POST http://localhost:8188/prompt` con workflow JSON
-- **Nota**: NO corre simultáneo con un LLM de 14B (VRAM insuficiente). Liberar Ollama primero con `ollama stop <modelo>`.
-- **Modelos pendientes de descargar**: SDXL 1.0 (~7GB) o FLUX.1-dev (~24GB en bf16, ~12GB cuantizado)
+- **⚠️ Nota VRAM**: NO corre simultáneo con un LLM de 14B. Antes de generar imágenes, liberar Ollama: `ollama stop <modelo>`.
+
+**Modelos FLUX.1-schnell instalados** (en `/home/osserver/ComfyUI/models/`):
+| Archivo | Carpeta | Tamaño | Función |
+|---|---|---|---|
+| `flux1-schnell-Q4_K_S.gguf` | `unet/` | 6.4 GB | Modelo principal (UNet cuantizado) |
+| `t5xxl_fp8_e4m3fn.safetensors` | `clip/` | 4.6 GB | Text encoder T5 fp8 |
+| `clip_l.safetensors` | `clip/` | 235 MB | CLIP-L text encoder |
+| `ae.safetensors` | `vae/` | 9.4 MB | VAE TAEF1 (compresión imagen) |
+
+**Nodo custom requerido**: `ComfyUI-GGUF` (instalado en `ComfyUI/custom_nodes/ComfyUI-GGUF/`). Necesario para cargar archivos `.gguf`.
 
 ---
 
@@ -263,11 +271,16 @@ curl -s http://localhost:5100/ia/consultar -d '{
 Si `agente` es `null`, el sistema elige automáticamente según el tipo de consulta (ver configuración en `.agent/contextos/ia_service.md`).
 
 ### Desde fuera de la red
+`ialocal.oscomunidad.com` → **Chat UI web** (puerto 9500). Acceder desde el navegador.
+
+Para usar la API desde fuera con cURL (el Chat UI proxea a Ollama con formato nativo):
 ```bash
-curl https://ialocal.oscomunidad.com/v1/chat/completions \
+curl https://ialocal.oscomunidad.com/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"model":"qwen2.5-coder:14b","messages":[{"role":"user","content":"Hola"}]}'
+  -d '{"model":"qwen2.5-coder:14b","messages":[{"role":"user","content":"Hola"}],"stream":false}'
 ```
+
+Para imágenes: `comfyui.oscomunidad.com` → **ComfyUI web** (puerto 8188). Requiere CNAME en Cloudflare.
 
 ### Gestión de modelos Ollama
 ```bash
@@ -297,6 +310,7 @@ Todas las keys están en la tabla `ia_agentes` de la BD `ia_service_os`. No hay 
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-03-29 | FLUX.1-schnell-Q4_K_S.gguf descargado (6.4GB). ComfyUI habilitado como servicio permanente (os-comfyui.service). comfyui.oscomunidad.com agregado al túnel Cloudflare (pendiente CNAME en dashboard). |
 | 2026-03-28 | Whisper instalado (openai-whisper v20250625). ComfyUI instalado en /home/osserver/ComfyUI. llama3.2-vision:11b agregado a Ollama (7.8GB). |
 | 2026-03-28 | Ollama v0.18.3 instalado. 5 modelos locales (qwen-coder 14B, qwen 14B, qwen 7B, deepseek-r1 14B, llama 3B). Borrado text-generation-webui + Mistral 7B v0.1 (27 GB liberados). |
 | 2026-03-20 | Benchmark 3 rondas, 105 llamadas. cerebras-llama promovido a default respuesta. |
