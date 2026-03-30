@@ -247,12 +247,12 @@ def _extraer_json(texto: str) -> dict | None:
 
 
 def _generar_nombre(pregunta: str, max_len: int = 40) -> str:
-    """Genera nombre de sesión: 'SAOC - ' + pregunta truncada."""
+    """Genera nombre de sesión: 'SAOC_' + pregunta truncada."""
     texto = pregunta.strip()
     if len(texto) <= max_len:
-        return f'SAOC - {texto}'
+        return f'SAOC_{texto}'
     truncado = texto[:max_len]
     ultimo_espacio = truncado.rfind(' ')
     if ultimo_espacio > 10:
         truncado = truncado[:ultimo_espacio]
-    return f'SAOC - {truncado}'
+    return f'SAOC_{truncado}'
