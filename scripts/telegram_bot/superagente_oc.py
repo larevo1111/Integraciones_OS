@@ -5,9 +5,12 @@ Maneja sesiones persistentes con --session/--continue y nombres de conversacione
 No usa API keys — modelos gratuitos de OpenCode.
 """
 import json
+import logging
 import os
 import subprocess
 import sys
+
+log = logging.getLogger('os_ia_bot')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ia_service.config import get_local_conn
@@ -63,6 +66,7 @@ def _ejecutar_opencode(prompt: str, session_id: str = None) -> dict:
 
     result_text = ''.join(text_parts).strip()
     if not result_text:
+        log.warning(f'SAOC sin texto. stdout={stdout[:500]}')
         return {'ok': False, 'error': 'El Super Agente OpenCode no respondió.'}
 
     return {
