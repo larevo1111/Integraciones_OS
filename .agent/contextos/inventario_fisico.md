@@ -112,8 +112,9 @@ Stock actual por articulo con columnas de stock por bodega.
 - Para el Modulo 2 (ajuste OPs) usamos directamente `zeffi_materiales` y `zeffi_articulos_producidos`
 
 ### Depuración de artículos para inventario físico
-Reglas en `scripts/inventario/config_depuracion.json`. De 489 vigentes → **300 inventariables** (6,313 uds).
-Excluidos: sin gestión stock (104), T999 obsoletos (70), POP (4), Gastos (62), T05 activos/moldes/consumibles (11), sin categoría (3).
+Reglas en `scripts/inventario/config_depuracion.json`. De 489 vigentes → **300 inventariables**.
+Excluidos (189): sin gestión stock (104), T999 obsoletos (70), T05 activos/moldes/consumibles (11), POP (4).
+Script: `scripts/inventario/depurar_inventario.py` → guarda en `os_inventario.inv_articulos`.
 
 ### Cantidad en trazabilidad usa coma decimal
 - Campo `cantidad` es TEXT con formato "1000,00" o "-23,00"
@@ -154,10 +155,26 @@ Para cada OP con estado='Generada' AND vigencia='Vigente':
 
 - `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — Manual completo de tablas y logicas de produccion e inventario en Effi
 
+## Infraestructura implementada
+
+### BD `os_inventario` (MariaDB local)
+Dedicada al subproyecto de inventario físico.
+
+| Tabla | Descripción | Registros |
+|---|---|---|
+| `inv_articulos` | Artículos clasificados (inventariable/excluido + razón) | 489 |
+
+### Scripts
+| Script | Descripción |
+|---|---|
+| `scripts/inventario/config_depuracion.json` | Reglas de exclusión (patrones SQL LIKE) |
+| `scripts/inventario/depurar_inventario.py` | Lee config, clasifica artículos, guarda en inv_articulos |
+
 ## Decisiones pendientes
 
+- [x] BD de inventario: `os_inventario` (MariaDB local)
+- [x] Depuración: Python puro (reglas deterministas en JSON)
 - [ ] Stack del backend: Flask o FastAPI (o endpoint en ia_service existente?)
 - [ ] Stack del frontend: modulo nuevo en sistema_gestion o app independiente?
-- [ ] BD de conteos: tabla nueva en effi_data o en otra BD?
 - [ ] Offline-first: localStorage o IndexedDB?
 - [ ] Puerto/dominio para la app de conteo
