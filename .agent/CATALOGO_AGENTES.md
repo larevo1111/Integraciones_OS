@@ -215,7 +215,63 @@ Ollama carga/descarga modelos de VRAM automáticamente (timeout 5 min inactivida
 
 ---
 
-## Herramientas locales de IA (no LLMs)
+## Modelos locales de audio e imagen
+
+### 18. whisper-medium — Transcripción de audio
+- **Modelo**: `medium` de OpenAI Whisper
+- **Framework**: `openai-whisper` v20250625 (instalado con pip)
+- **Archivo en disco**: `/home/osserver/.cache/whisper/medium.pt` (1.42 GB)
+- **VRAM**: ~2 GB al procesar — puede correr simultáneo con un LLM de 7B
+- **Capacidades**: transcripción de voz a texto, 99 idiomas, detección automática de idioma, timestamps por segmento
+- **Mejor para**: transcribir audios de WhatsApp, reuniones, notas de voz en español
+- **Cómo usar**:
+```bash
+# Desde terminal
+whisper audio.mp3 --model medium --language Spanish
+
+# Desde Python
+import whisper
+m = whisper.load_model("medium")
+resultado = m.transcribe("audio.mp3", language="es")
+print(resultado["text"])
+```
+- **Formatos soportados**: mp3, mp4, wav, m4a, ogg, flac, mkv, avi, mov (cualquier formato ffmpeg)
+- **Sin servicio HTTP** — se llama como librería o CLI. Pendiente crear wrapper API para integrarlo al bot.
+- **Otros modelos disponibles**: `tiny` (<1GB), `small` (~1GB), `large-v3` (~5GB, mayor calidad). Se descargan automáticamente en `~/.cache/whisper/` al primer uso.
+
+---
+
+### 19. flux1-schnell — Generación de imágenes
+- **Modelo**: FLUX.1-schnell de Black Forest Labs, cuantizado Q4_K_S
+- **Framework**: ComfyUI (instalado en `/home/osserver/ComfyUI/`, servicio `os-comfyui.service`)
+- **Puerto**: 8188 | **URL**: `localhost:8188` / `comfyui.oscomunidad.com` (pendiente CNAME)
+- **VRAM**: ~10–11 GB al generar (carga todos los componentes juntos)
+- **Capacidades**: texto → imagen, alta calidad, ~4 pasos de difusión (rápido), resoluciones hasta 1024×1024
+- **Mejor para**: generar imágenes fotorrealistas o artísticas desde una descripción en texto
+- **⚠️ VRAM**: NO corre simultáneo con ningún LLM de 14B. Liberar Ollama antes: `ollama stop <modelo>`
+- **Componentes instalados** en `/home/osserver/ComfyUI/models/`:
+
+| Componente | Archivo | Tamaño |
+|---|---|---|
+| UNet (modelo principal) | `unet/flux1-schnell-Q4_K_S.gguf` | 6.4 GB |
+| Text encoder T5 | `clip/t5xxl_fp8_e4m3fn.safetensors` | 4.6 GB |
+| Text encoder CLIP-L | `clip/clip_l.safetensors` | 235 MB |
+| VAE | `vae/ae.safetensors` | 9.4 MB |
+
+- **Nodo custom requerido**: `ComfyUI-GGUF` en `ComfyUI/custom_nodes/ComfyUI-GGUF/` (para cargar `.gguf`)
+- **Cómo usar**: abrir `localhost:8188` → cargar workflow con nodos UNet GGUF + T5 + CLIP + KSampler → Queue Prompt
+- **API**:
+```bash
+# Encolar generación (requiere workflow JSON completo)
+curl -X POST http://localhost:8188/prompt -H "Content-Type: application/json" -d '{"prompt":{...}}'
+# Ver cola
+curl http://localhost:8188/queue
+```
+- **Sin integración con bot/ia_service** — pendiente crear wrapper. Actualmente solo accesible vía UI web.
+
+---
+
+## Servicios locales (no modelos IA)
 
 ### Chat UI Ollama — ialocal
 - **Qué hace**: Interfaz web para conversar con cualquier modelo Ollama. Guarda todas las conversaciones y mensajes en BD. Sidebar con historial agrupado por fecha. Botón "Compactar" que resume mensajes viejos cuando el contexto supera el 80%, liberando espacio sin perder información.
