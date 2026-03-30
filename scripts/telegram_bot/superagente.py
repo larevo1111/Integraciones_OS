@@ -17,7 +17,7 @@ CLAUDE_BIN = '/home/osserver/.local/bin/claude'
 CLAUDE_SESSIONS_DIR = os.path.expanduser(
     '~/.claude/projects/-home-osserver-Proyectos-Antigravity-Integraciones-OS'
 )
-TIMEOUT_CLAUDE = 300  # segundos
+TIMEOUT_CLAUDE = 1200  # segundos (20 minutos)
 
 
 # ── Ejecutar Claude ──────────────────────────────────────────────────────────
