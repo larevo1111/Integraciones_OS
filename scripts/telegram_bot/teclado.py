@@ -27,20 +27,9 @@ MAX_INLINE = 5
 
 # Todos los agentes seleccionables: (label, callback_data, nivel_minimo)
 AGENTES = [
-    ('✨ Gemini Flash Lite ★ recomendado', 'agente:gemini-flash-lite', 1),
-    ('🔥 Gemini Flash (premium)',        'agente:gemini-flash',     1),
-    ('⚡ Cerebras Llama',                'agente:cerebras-llama',   1),
-    ('🧪 GPT-OSS 120B (análisis)',       'agente:gpt-oss-120b',    1),
-    ('💡 DeepSeek Chat (económico)',     'agente:deepseek-chat',    1),
-    ('🏠 Qwen Coder 14B (local)',       'agente:ollama-qwen-coder', 1),
-    ('🏠 Qwen 14B (local)',             'agente:ollama-qwen-14b',  1),
-    ('🏠 Qwen 7B (local)',              'agente:ollama-qwen-7b',   1),
-    ('🏠 DeepSeek R1 14B (local)',      'agente:ollama-deepseek-r1', 1),
-    ('🏠 Llama 3B (local)',             'agente:ollama-llama-3b',  1),
-    ('🧠 Gemini Pro (premium)',         'agente:gemini-pro',      6),
-    ('🤖 Claude Sonnet (premium)',      'agente:claude-sonnet',   6),
-    ('🦾 Super Agente (Claude Code)',   'agente:superagente',     5),
-    ('🧩 Super Agente (OpenCode)',      'agente:superagente-oc',  5),
+    ('🏠 Qwen Coder 14B (Local / Rápido)', 'agente:ollama-qwen-coder', 1),
+    ('🦾 Super Agente (Claude Code)',       'agente:superagente',       5),
+    ('🧩 Super Agente (OpenCode)',          'agente:superagente-oc',    5),
 ]
 
 
