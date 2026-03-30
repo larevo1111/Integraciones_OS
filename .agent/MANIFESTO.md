@@ -511,6 +511,8 @@ Integraciones_OS/
 - `.agent/skills/` — Skills individuales con conocimiento especializado (Ej. `.agent/skills/manejo_ia.md`).
 - `.agent/planes/` — Especificaciones de construcción técnica para las features (Ej. `.agent/planes/bot_telegram.md`).
 - `.agent/docs/` — Informes y documentación externa.
+- `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — **Manual completo de producción e inventarios en Effi.** Tablas, campos, estados de OPs, trazabilidad, lógica de signos, relaciones entre tablas, reconstrucción de stock a fecha, ajuste por OPs generadas.
+- `.agent/contextos/inventario_fisico.md` — Contexto del subproyecto de inventario físico vs teórico.
 
 ### Protocolo de documentación de scripts
 Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
