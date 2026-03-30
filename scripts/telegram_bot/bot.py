@@ -624,7 +624,7 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await handlers_sa_oc.manejar_superagente_oc(
             update, saoc_mod, tabla_mod, _inline_datos, _inline_solo_nuevo,
             sesion=sesion, nombre=nombre_u, nivel=nivel,
-            empresa=empresa, pregunta=prompt
+            empresa=empresa, pregunta=prompt, con_imagen=True
         )
         return
 

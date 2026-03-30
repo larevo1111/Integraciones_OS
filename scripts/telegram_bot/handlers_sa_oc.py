@@ -32,7 +32,8 @@ async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
                                   inline_datos_fn, inline_solo_nuevo_fn,
                                   sesion: dict, nombre: str, nivel: int,
                                   empresa: str, pregunta: str,
-                                  resultado_previo: dict = None):
+                                  resultado_previo: dict = None,
+                                  con_imagen: bool = False):
     """Procesa texto en modo Super Agente OpenCode."""
     from telegram.constants import ChatAction
     user = update.effective_user
@@ -57,6 +58,7 @@ async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
         resultado = saoc_mod.consultar(
             pregunta=pregunta, usuario_id=uid,
             nombre_usuario=nombre, nivel=nivel, empresa=empresa,
+            con_imagen=con_imagen,
         )
 
     if not resultado.get('ok'):
