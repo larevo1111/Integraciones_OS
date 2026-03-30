@@ -221,8 +221,10 @@ def consultar(
     # porque el pipeline pudo haber actualizado los datos desde la última consulta.
     _periodo_actual = ('este mes', 'mes actual', 'esta semana', 'semana actual',
                        'hoy', 'de hoy', 'ventas del mes', 'ventas de este',
+                       'ventas del', 'dame las ventas', 'las ventas',
                        'cuánto llevamos', 'cuanto llevamos', 'cómo vamos',
-                       'como vamos', 'lo que va')
+                       'como vamos', 'lo que va', 'cuánto hemos vendido',
+                       'cuanto hemos vendido', 'facturado')
     if tipo == 'analisis_datos' and not requiere_sql:
         preg_lower = pregunta.lower()
         if any(kw in preg_lower for kw in _pide_detalle):
