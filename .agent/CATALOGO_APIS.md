@@ -207,6 +207,72 @@ El bridge hace POST a `WA_WEBHOOK_URL` por cada mensaje entrante:
 
 ---
 
+## 5. Bot Telegram — Tablas temporales (envío directo)
+
+**Propósito**: Enviar tablas grandes (>16 filas) directamente al usuario de Telegram, sin pasar por el flujo normal del bot (que tiene límite de 4096 chars por mensaje).
+
+### Cuándo usar
+- Cuando el JSON de la tabla supera ~3500 chars (aprox. >20 filas)
+- El flujo normal del SA (devolver JSON `tipo: tabla`) funciona solo para tablas chicas (<20 filas)
+
+### Cómo funciona
+1. Guardar la tabla en `bot_tablas_temp` (BD `ia_service_os`)
+2. Enviar mensaje por API de Telegram con botón inline que apunta a la mini app
+
+### Ejemplo Python completo
+
+```python
+import json, uuid, pymysql, requests
+
+TOKEN = '8687381276:AAG1Ctrf8rjFItrrbxlgOGFZw-prNc2NCF4'
+TABLA_BASE_URL = 'https://menu.oscomunidad.com/bot/tabla'
+
+def enviar_tabla_telegram(chat_id: str, titulo: str, texto: str,
+                          columnas: list, filas: list,
+                          empresa: str = 'ori_sil_2'):
+    """Guarda tabla en BD y envía botón 'Ver tabla completa' por Telegram."""
+    token = str(uuid.uuid4())
+
+    # 1. Guardar en BD
+    conn = pymysql.connect(host='127.0.0.1', user='osadmin',
+                           password='Epist2487.', database='ia_service_os')
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO bot_tablas_temp (token, empresa, pregunta, columnas, filas)
+            VALUES (%s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE filas=VALUES(filas), created_at=NOW()
+        """, (token, empresa, titulo,
+              json.dumps(columnas), json.dumps(filas)))
+        conn.commit()
+    conn.close()
+
+    # 2. Enviar mensaje con botón
+    url = f'{TABLA_BASE_URL}?token={token}'
+    kb = {'inline_keyboard': [[
+        {'text': f'📊 Ver tabla completa ({len(filas)} filas)', 'url': url}
+    ]]}
+    requests.post(f'https://api.telegram.org/bot{TOKEN}/sendMessage', json={
+        'chat_id': chat_id,
+        'text': f'{texto}\n\n_🦾 Super Agente_',
+        'parse_mode': 'Markdown',
+        'reply_markup': kb
+    })
+```
+
+### Datos clave
+
+| Concepto | Valor |
+|----------|-------|
+| BD | `ia_service_os` |
+| Tabla | `bot_tablas_temp` |
+| Campos | `token` (UUID), `empresa`, `pregunta`, `columnas` (JSON), `filas` (JSON) |
+| Mini app URL | `https://menu.oscomunidad.com/bot/tabla?token={token}` |
+| Bot token | `8687381276:AAG...` (env `TELEGRAM_BOT_TOKEN`) |
+| Chat ID Santi | `6833317403` |
+| Chat ID Jen | `1469595705` |
+
+---
+
 ## Cómo agregar un servicio nuevo
 
 1. Crear sección con número siguiente
