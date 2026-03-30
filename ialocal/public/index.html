@@ -507,6 +507,135 @@
     #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     #send-btn svg { width: 18px; height: 18px; }
 
+    /* ─── Botones multimodal ──────────────────────────── */
+    .input-actions {
+      display: flex;
+      gap: 4px;
+      align-items: flex-end;
+    }
+
+    .action-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border-input);
+      color: var(--text-secondary);
+      border-radius: var(--radius-input);
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+      font-size: 18px;
+    }
+
+    .action-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+    .action-btn.recording { background: rgba(239,68,68,0.15); color: var(--red); border-color: var(--red); animation: pulse 1.5s infinite; }
+    .action-btn.hidden { display: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* ─── Preview adjuntos ─────────────────────────────── */
+    .attachment-preview {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-input);
+    }
+
+    .attachment-preview.visible { display: flex; }
+
+    .attachment-preview img {
+      max-height: 80px;
+      max-width: 120px;
+      border-radius: 6px;
+      object-fit: cover;
+    }
+
+    .attachment-preview .att-info {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .attachment-preview .att-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    .attachment-preview .att-remove:hover { color: var(--red); }
+
+    /* ─── Imagen en bubble ──────────────────────────────── */
+    .msg-bubble img.chat-img {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 8px;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+
+    .msg-bubble img.chat-img:hover { opacity: 0.9; }
+
+    .msg-bubble .img-download {
+      display: inline-block;
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+      margin-top: 4px;
+    }
+
+    .msg-bubble .img-download:hover { text-decoration: underline; }
+
+    /* ─── Generando imagen indicator ──────────────────── */
+    .generating-img {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .generating-img .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── VRAM indicator ────────────────────────────────── */
+    .vram-indicator {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .vram-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .vram-dot.warn { background: var(--yellow); }
+    .vram-dot.danger { background: var(--red); }
+
     .input-hint {
       font-size: 11px;
       color: var(--text-muted);
@@ -597,7 +726,18 @@
       <div id="status-bar"></div>
 
       <div class="input-area">
+        <!-- Preview de imagen adjuntada -->
+        <div class="attachment-preview" id="attachment-preview">
+          <img id="att-img" src="" alt="preview">
+          <span class="att-info" id="att-info">imagen.jpg</span>
+          <button class="att-remove" id="att-remove" title="Quitar">&times;</button>
+        </div>
         <div class="input-row">
+          <div class="input-actions">
+            <button class="action-btn" id="mic-btn" title="Grabar audio">&#127908;</button>
+            <button class="action-btn" id="img-btn" title="Adjuntar imagen">&#128247;</button>
+            <button class="action-btn hidden" id="audio-file-btn" title="Subir archivo de audio">&#127925;</button>
+          </div>
           <textarea id="input" rows="1" placeholder="Escribe tu mensaje..." autofocus></textarea>
           <button id="send-btn" title="Enviar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -606,7 +746,10 @@
             </svg>
           </button>
         </div>
-        <div class="input-hint">Enter enviar &middot; Shift+Enter nueva línea</div>
+        <div class="input-hint">Enter enviar &middot; Shift+Enter nueva línea &middot; &#127908; micrófono &middot; &#128247; imagen</div>
+        <!-- Input ocultos para file uploads -->
+        <input type="file" id="img-file-input" accept="image/*" style="display:none">
+        <input type="file" id="audio-file-input" accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm" style="display:none">
       </div>
     </div>
   </div>
@@ -621,6 +764,10 @@ let streaming = false
 let currentModel = ''
 let abortCtrl = null
 let modelContextLimits = {} // modelo → context_length
+let attachedImage = null   // { b64: string, name: string }  — imagen adjuntada pendiente
+let mediaRecorder = null
+let audioChunks = []
+let isRecording = false
 
 const $ = id => document.getElementById(id)
 const $chat       = $('chat')
@@ -637,6 +784,20 @@ const $ctxBar     = $('context-bar')
 const $ctxLabel   = $('context-label')
 const $ctxFill    = $('context-fill')
 const $compactBtn = $('compact-btn')
+const $micBtn     = $('mic-btn')
+const $imgBtn     = $('img-btn')
+const $audioFileBtn = $('audio-file-btn')
+const $attPreview = $('attachment-preview')
+const $attImg     = $('att-img')
+const $attInfo    = $('att-info')
+const $attRemove  = $('att-remove')
+const $imgFileInput   = $('img-file-input')
+const $audioFileInput = $('audio-file-input')
+
+// ¿Es modelo de generación de imagen?
+function isImageGenModel(model) { return model === 'flux1-schnell' }
+// ¿Es modelo de visión?
+function isVisionModel(model) { return model && model.includes('vision') }
 
 // ═══════════════════════════════════════════════════════════════════
 // MODELS
@@ -660,6 +821,12 @@ async function loadModels() {
       opt.textContent = m.name
       $modelSel.appendChild(opt)
     })
+
+    // Inyectar flux1-schnell como modelo de generación de imágenes
+    const fluxOpt = document.createElement('option')
+    fluxOpt.value = 'flux1-schnell'
+    fluxOpt.textContent = '🎨 flux1-schnell (imágenes)'
+    $modelSel.appendChild(fluxOpt)
 
     currentModel = models[0].name
 
@@ -703,7 +870,30 @@ async function checkLoadedModel() {
   } catch {}
 }
 
-$modelSel.addEventListener('change', () => { currentModel = $modelSel.value })
+$modelSel.addEventListener('change', () => {
+  currentModel = $modelSel.value
+  updateInputUI()
+})
+
+function updateInputUI() {
+  const isImg = isImageGenModel(currentModel)
+  const isVis = isVisionModel(currentModel)
+
+  // Imagen: siempre visible para visión, oculto para generación
+  $imgBtn.classList.toggle('hidden', isImg)
+
+  // Placeholder cambia según modo
+  if (isImg) {
+    $input.placeholder = 'Describe la imagen que quieres generar...'
+  } else if (isVis) {
+    $input.placeholder = 'Adjunta una imagen y haz tu pregunta...'
+  } else {
+    $input.placeholder = 'Escribe tu mensaje...'
+  }
+
+  // Limpiar adjunto si se cambia de modelo visión a otro
+  if (!isVis && attachedImage) clearAttachment()
+}
 
 function getContextMax() {
   return modelContextLimits[currentModel] || 32768
@@ -898,6 +1088,107 @@ $compactBtn.addEventListener('click', async () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════
+// MICRÓFONO — Grabar audio y transcribir
+// ═══════════════════════════════════════════════════════════════════
+
+$micBtn.addEventListener('click', async () => {
+  if (isRecording) {
+    // Parar grabación
+    mediaRecorder.stop()
+    return
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    audioChunks = []
+    mediaRecorder = new MediaRecorder(stream)
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data)
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop())
+      isRecording = false
+      $micBtn.classList.remove('recording')
+      $micBtn.innerHTML = '&#127908;'
+
+      const blob = new Blob(audioChunks, { type: 'audio/webm' })
+      await transcribir(blob, 'grabacion.webm')
+    }
+
+    mediaRecorder.start()
+    isRecording = true
+    $micBtn.classList.add('recording')
+    $micBtn.innerHTML = '&#9209;'
+    showStatus('Grabando... click para detener', false)
+  } catch (e) {
+    showStatus('No se pudo acceder al micrófono', true)
+  }
+})
+
+// Subir archivo de audio
+$audioFileBtn.addEventListener('click', () => $audioFileInput.click())
+$audioFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  await transcribir(file, file.name)
+  $audioFileInput.value = ''
+})
+
+async function transcribir(blob, nombre) {
+  showStatus(`Transcribiendo "${nombre}"...`, false)
+  $micBtn.disabled = true
+
+  try {
+    const form = new FormData()
+    form.append('audio', blob, nombre)
+
+    const res = await fetch('/api/transcribir', { method: 'POST', body: form })
+    const data = await res.json()
+
+    if (data.ok && data.texto) {
+      $input.value = ($input.value ? $input.value + ' ' : '') + data.texto
+      $input.dispatchEvent(new Event('input'))
+      showStatus(`Transcripción lista (${data.texto.length} chars)`, false)
+    } else {
+      showStatus(`Error: ${data.error || 'sin texto'}`, true)
+    }
+  } catch (e) {
+    showStatus(`Error al transcribir: ${e.message}`, true)
+  } finally {
+    $micBtn.disabled = false
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADJUNTAR IMAGEN (Visión)
+// ═══════════════════════════════════════════════════════════════════
+
+$imgBtn.addEventListener('click', () => $imgFileInput.click())
+
+$imgFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    const b64 = reader.result.split(',')[1]
+    attachedImage = { b64, name: file.name, dataUrl: reader.result }
+    $attImg.src = reader.result
+    $attInfo.textContent = file.name
+    $attPreview.classList.add('visible')
+  }
+  reader.readAsDataURL(file)
+  $imgFileInput.value = ''
+})
+
+$attRemove.addEventListener('click', clearAttachment)
+
+function clearAttachment() {
+  attachedImage = null
+  $attPreview.classList.remove('visible')
+  $attImg.src = ''
+  $attInfo.textContent = ''
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // STATUS
 // ═══════════════════════════════════════════════════════════════════
 function showStatus(text, isError) {
@@ -937,6 +1228,10 @@ async function sendMessage() {
   const text = $input.value.trim()
   if (!text || streaming || !currentModel) return
 
+  // Detectar modo
+  const isImg = isImageGenModel(currentModel)
+  const hasImage = attachedImage !== null
+
   // Remove welcome
   const wel = $chat.querySelector('.welcome')
   if (wel) wel.remove()
@@ -944,43 +1239,101 @@ async function sendMessage() {
   // Si no hay conversación activa, crear una
   if (!conversacionId) {
     try {
-      const ctxMax = getContextMax()
+      const ctxMax = isImg ? 0 : getContextMax()
       const res = await fetch('/api/conversaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelo: currentModel, contexto_max: ctxMax })
+        body: JSON.stringify({ modelo: currentModel, contexto_max: ctxMax || 32768 })
       }).then(r => r.json())
       conversacionId = res.id
-      updateContextBar(0, ctxMax)
+      if (!isImg) updateContextBar(0, ctxMax)
     } catch (e) {
       showStatus('Error al crear conversación', true)
       return
     }
   }
 
-  // Guardar mensaje de usuario en BD
-  messages.push({ role: 'user', content: text })
-  appendMessage('user', text)
+  // Mostrar mensaje del usuario (con imagen adjuntada si hay)
+  const userContent = hasImage
+    ? `${text}\n\n<img class="chat-img" src="${attachedImage.dataUrl}" alt="imagen adjuntada">`
+    : text
+  appendMessage('user', userContent, null, !hasImage)
+
+  // Construir mensaje para Ollama
+  const ollamaMsg = { role: 'user', content: text }
+  if (hasImage) ollamaMsg.images = [attachedImage.b64]
+  messages.push(ollamaMsg)
+
+  const savedImage = attachedImage
+  clearAttachment()
   $input.value = ''
   $input.style.height = 'auto'
   updateSendBtn()
 
+  // Guardar en BD
   const saveUser = fetch('/api/mensajes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversacion_id: conversacionId, rol: 'usuario', contenido: text })
+    body: JSON.stringify({ conversacion_id: conversacionId, rol: 'usuario', contenido: text + (savedImage ? ' [imagen adjuntada]' : '') })
   }).then(r => r.json()).then(data => {
-    if (data.titulo && data.titulo !== 'Nueva conversación') {
-      loadConversaciones()
-    }
-    if (data.tokens_usados !== undefined) {
-      updateContextBar(data.tokens_usados, data.contexto_max)
-    }
+    if (data.titulo && data.titulo !== 'Nueva conversación') loadConversaciones()
+    if (data.tokens_usados !== undefined) updateContextBar(data.tokens_usados, data.contexto_max)
   }).catch(() => {})
 
-  // Start streaming
   streaming = true
   updateSendBtn()
+
+  // ─── FLUJO GENERACIÓN DE IMAGEN ─────────────────────────────
+  if (isImg) {
+    const assistantEl = appendMessage('assistant', '')
+    const bubble = assistantEl.querySelector('.msg-bubble')
+    bubble.innerHTML = '<div class="generating-img"><div class="spinner"></div>Generando imagen con FLUX.1-schnell... (esto puede tardar ~1 min)</div>'
+    showStatus('Liberando VRAM y generando imagen...', false)
+
+    try {
+      const res = await fetch('/api/generar-imagen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: text, width: 768, height: 768 })
+      })
+      const data = await res.json()
+
+      if (data.ok && data.imagen_b64) {
+        const imgSrc = `data:${data.mime};base64,${data.imagen_b64}`
+        bubble.innerHTML = `
+          <img class="chat-img" src="${imgSrc}" alt="${esc(text)}" onclick="window.open(this.src)">
+          <a class="img-download" href="${imgSrc}" download="ialocal_${Date.now()}.png">Descargar imagen</a>
+        `
+        showStatus('Imagen generada', false)
+        messages.push({ role: 'assistant', content: '[Imagen generada]' })
+
+        // Guardar en BD
+        await saveUser
+        if (conversacionId) {
+          await fetch('/api/mensajes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversacion_id: conversacionId, rol: 'asistente', contenido: `[Imagen generada: "${text}"]` })
+          }).catch(() => {})
+          loadConversaciones()
+        }
+      } else {
+        bubble.innerHTML = renderMarkdown(`**Error al generar imagen:** ${data.error || 'desconocido'}`)
+        showStatus('Error en generación', true)
+      }
+    } catch (e) {
+      bubble.innerHTML = renderMarkdown(`**Error:** ${e.message}`)
+      showStatus(`Error: ${e.message}`, true)
+    }
+
+    streaming = false
+    updateSendBtn()
+    scrollToBottom()
+    $input.focus()
+    return
+  }
+
+  // ─── FLUJO TEXTO / VISIÓN (streaming) ───────────────────────
   const assistantEl = appendMessage('assistant', '')
   const bubble = assistantEl.querySelector('.msg-bubble')
   bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>'
@@ -1076,7 +1429,7 @@ async function sendMessage() {
 // ═══════════════════════════════════════════════════════════════════
 // RENDER HELPERS
 // ═══════════════════════════════════════════════════════════════════
-function appendMessage(role, content, labelOverride) {
+function appendMessage(role, content, labelOverride, escapeUser = true) {
   const div = document.createElement('div')
   div.className = `msg ${role}`
 
@@ -1087,7 +1440,11 @@ function appendMessage(role, content, labelOverride) {
   const bubble = document.createElement('div')
   bubble.className = 'msg-bubble'
   if (content) {
-    bubble.innerHTML = role === 'user' ? esc(content) : renderMarkdown(content)
+    if (role === 'user') {
+      bubble.innerHTML = escapeUser ? esc(content) : content
+    } else {
+      bubble.innerHTML = renderMarkdown(content)
+    }
     if (role !== 'user') addCopyButtons(bubble)
   }
 
@@ -1150,6 +1507,7 @@ function addCopyButtons(container) {
 loadModels()
 loadConversaciones()
 updateSendBtn()
+updateInputUI()
 </script>
 </body>
 </html>

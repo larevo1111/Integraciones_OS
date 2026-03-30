@@ -236,7 +236,8 @@ resultado = m.transcribe("audio.mp3", language="es")
 print(resultado["text"])
 ```
 - **Formatos soportados**: mp3, mp4, wav, m4a, ogg, flac, mkv, avi, mov (cualquier formato ffmpeg)
-- **Sin servicio HTTP** — se llama como librería o CLI. Pendiente crear wrapper API para integrarlo al bot.
+- **Integrado en ialocal** (Chat UI): botón 🎤 graba audio → transcribe → llena input. Endpoint: `POST /api/transcribir` (multipart con campo `audio`).
+- **Ruta binaria**: `/home/osserver/.local/bin/whisper` (importante para systemd que no tiene `~/.local/bin` en PATH).
 - **Otros modelos disponibles**: `tiny` (<1GB), `small` (~1GB), `large-v3` (~5GB, mayor calidad). Se descargan automáticamente en `~/.cache/whisper/` al primer uso.
 
 ---
@@ -256,7 +257,7 @@ print(resultado["text"])
 | UNet (modelo principal) | `unet/flux1-schnell-Q4_K_S.gguf` | 6.4 GB |
 | Text encoder T5 | `clip/t5xxl_fp8_e4m3fn.safetensors` | 4.6 GB |
 | Text encoder CLIP-L | `clip/clip_l.safetensors` | 235 MB |
-| VAE | `vae/ae.safetensors` | 9.4 MB |
+| VAE | `vae/flux-vae-bf16.safetensors` | 160 MB |
 
 - **Nodo custom requerido**: `ComfyUI-GGUF` en `ComfyUI/custom_nodes/ComfyUI-GGUF/` (para cargar `.gguf`)
 - **Cómo usar**: abrir `localhost:8188` → cargar workflow con nodos UNet GGUF + T5 + CLIP + KSampler → Queue Prompt
@@ -267,7 +268,8 @@ curl -X POST http://localhost:8188/prompt -H "Content-Type: application/json" -d
 # Ver cola
 curl http://localhost:8188/queue
 ```
-- **Sin integración con bot/ia_service** — pendiente crear wrapper. Actualmente solo accesible vía UI web.
+- **Integrado en ialocal** (Chat UI): seleccionar `🎨 flux1-schnell (imágenes)` en el dropdown → escribir prompt → genera imagen en el chat. Endpoint: `POST /api/generar-imagen` (JSON con `prompt`, `width`, `height`).
+- **Nota**: el TAEF1 VAE (ae.safetensors, 9.4MB) NO funciona con VAELoader. Se usa `flux-vae-bf16.safetensors` (160MB) de Kijai/flux-fp8.
 
 ---
 
@@ -443,6 +445,7 @@ Todas las keys están en la tabla `ia_agentes` de la BD `ia_service_os`. No hay 
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-03-30 | ialocal multimodal: integración de whisper-medium (audio→texto), llama3.2-vision (imágenes→análisis) y flux1-schnell (texto→imagen) en Chat UI. flux-vae-bf16.safetensors reemplaza ae.safetensors (TAEF1 no funciona con VAELoader). |
 | 2026-03-29 | FLUX.1-schnell-Q4_K_S.gguf descargado (6.4GB). ComfyUI habilitado como servicio permanente (os-comfyui.service). comfyui.oscomunidad.com agregado al túnel Cloudflare (pendiente CNAME en dashboard). |
 | 2026-03-28 | Whisper instalado (openai-whisper v20250625). ComfyUI instalado en /home/osserver/ComfyUI. llama3.2-vision:11b agregado a Ollama (7.8GB). |
 | 2026-03-28 | Ollama v0.18.3 instalado. 5 modelos locales (qwen-coder 14B, qwen 14B, qwen 7B, deepseek-r1 14B, llama 3B). Borrado text-generation-webui + Mistral 7B v0.1 (27 GB liberados). |

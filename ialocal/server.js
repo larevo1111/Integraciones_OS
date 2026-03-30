@@ -4,20 +4,29 @@
  * Chat UI para modelos Ollama locales
  * Proxy: /api/chat, /api/tags, /api/ps, /api/show → Ollama localhost:11434
  * Persistencia: conversaciones + mensajes en MariaDB ia_local
+ * Multimodal: transcripción (Whisper), visión (Ollama), generación imágenes (ComfyUI+FLUX)
  */
 
 const express = require('express')
 const path    = require('path')
 const http    = require('http')
+const fs      = require('fs')
 const mysql   = require('mysql2/promise')
+const multer  = require('multer')
+const { execFile } = require('child_process')
 
-const PORT        = 9500
-const OLLAMA_HOST = 'localhost'
-const OLLAMA_PORT = 11434
+const PORT          = 9500
+const OLLAMA_HOST   = 'localhost'
+const OLLAMA_PORT   = 11434
+const COMFYUI_HOST  = 'localhost'
+const COMFYUI_PORT  = 8188
 
 const app = express()
-app.use(express.json({ limit: '2mb' }))
+app.use(express.json({ limit: '10mb' }))
 app.use(express.static(path.join(__dirname, 'public')))
+
+// Multer para uploads de audio
+const upload = multer({ dest: '/tmp/ialocal-uploads/', limits: { fileSize: 25 * 1024 * 1024 } })
 
 // ─── CORS ──────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -351,6 +360,253 @@ app.post('/api/conversaciones/:id/compactar', async (req, res) => {
     })
   } catch (e) {
     console.error('[Compactar error]', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════
+// TRANSCRIPCIÓN DE AUDIO (Whisper)
+// ═══════════════════════════════════════════════════════════════════
+
+app.post('/api/transcribir', upload.single('audio'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió archivo de audio' })
+
+  const audioPath = req.file.path
+  const lang = req.body.language || 'Spanish'
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      execFile('/home/osserver/.local/bin/whisper', [audioPath, '--model', 'medium', '--language', lang, '--output_format', 'txt', '--output_dir', '/tmp/ialocal-uploads/'], { timeout: 120000 }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr || err.message))
+        // Whisper genera archivo .txt con el mismo nombre
+        const txtPath = audioPath + '.txt'
+        fs.readFile(txtPath, 'utf-8', (e, data) => {
+          if (e) return reject(new Error('No se pudo leer la transcripción'))
+          // Limpiar archivos temporales
+          fs.unlink(audioPath, () => {})
+          fs.unlink(txtPath, () => {})
+          resolve(data.trim())
+        })
+      })
+    })
+
+    res.json({ ok: true, texto: result })
+  } catch (e) {
+    fs.unlink(audioPath, () => {})
+    console.error('[Whisper error]', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════
+// VRAM STATUS
+// ═══════════════════════════════════════════════════════════════════
+
+app.get('/api/vram', async (req, res) => {
+  try {
+    // Modelos Ollama cargados
+    const ps = await ollamaJSON('/api/ps')
+    const ollamaModels = (ps.models || []).map(m => ({
+      nombre: m.name,
+      vram_mb: Math.round((m.size_vram || 0) / 1024 / 1024)
+    }))
+
+    // GPU info via nvidia-smi
+    const gpuInfo = await new Promise((resolve) => {
+      execFile('nvidia-smi', ['--query-gpu=memory.used,memory.free,memory.total', '--format=csv,noheader,nounits'], (err, stdout) => {
+        if (err) return resolve(null)
+        const [used, free, total] = stdout.trim().split(', ').map(Number)
+        resolve({ used_mb: used, free_mb: free, total_mb: total })
+      })
+    })
+
+    res.json({ ollama: ollamaModels, gpu: gpuInfo })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════
+// GENERACIÓN DE IMÁGENES (ComfyUI + FLUX.1-schnell)
+// ═══════════════════════════════════════════════════════════════════
+
+// Parar todos los modelos Ollama de VRAM
+async function pararOllama() {
+  try {
+    const ps = await ollamaJSON('/api/ps')
+    for (const m of (ps.models || [])) {
+      await new Promise((resolve) => {
+        execFile('ollama', ['stop', m.name], { timeout: 10000 }, () => resolve())
+      })
+    }
+  } catch {}
+}
+
+// Hacer request HTTP a ComfyUI
+function comfyuiRequest(ruta, method = 'GET', body = null) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: COMFYUI_HOST,
+      port: COMFYUI_PORT,
+      path: ruta,
+      method,
+      headers: { 'Content-Type': 'application/json' }
+    }
+    const req = http.request(opts, res => {
+      let data = ''
+      res.on('data', c => data += c)
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)) }
+        catch { resolve(data) }
+      })
+    })
+    req.on('error', reject)
+    if (body) req.write(JSON.stringify(body))
+    req.end()
+  })
+}
+
+// Obtener imagen generada como buffer
+function comfyuiGetImage(filename, subfolder, type) {
+  return new Promise((resolve, reject) => {
+    const qs = `filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder || '')}&type=${encodeURIComponent(type || 'output')}`
+    http.get(`http://${COMFYUI_HOST}:${COMFYUI_PORT}/view?${qs}`, res => {
+      const chunks = []
+      res.on('data', c => chunks.push(c))
+      res.on('end', () => resolve(Buffer.concat(chunks)))
+      res.on('error', reject)
+    }).on('error', reject)
+  })
+}
+
+app.post('/api/generar-imagen', async (req, res) => {
+  const { prompt, width, height } = req.body
+  if (!prompt) return res.status(400).json({ error: 'Se requiere un prompt' })
+
+  const w = width || 768
+  const h = height || 768
+
+  try {
+    // 1. Parar modelos Ollama para liberar VRAM
+    await pararOllama()
+
+    // 2. Armar workflow FLUX.1-schnell con GGUF
+    const workflow = {
+      "1": {
+        "class_type": "UnetLoaderGGUF",
+        "inputs": { "unet_name": "flux1-schnell-Q4_K_S.gguf" }
+      },
+      "2": {
+        "class_type": "DualCLIPLoaderGGUF",
+        "inputs": {
+          "clip_name1": "clip_l.safetensors",
+          "clip_name2": "t5xxl_fp8_e4m3fn.safetensors",
+          "type": "flux"
+        }
+      },
+      "3": {
+        "class_type": "VAELoader",
+        "inputs": { "vae_name": "flux-vae-bf16.safetensors" }
+      },
+      "4": {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+          "text": prompt,
+          "clip": ["2", 0]
+        }
+      },
+      "5": {
+        "class_type": "EmptySD3LatentImage",
+        "inputs": { "width": w, "height": h, "batch_size": 1 }
+      },
+      "6": {
+        "class_type": "RandomNoise",
+        "inputs": { "noise_seed": Math.floor(Math.random() * 2**32) }
+      },
+      "7": {
+        "class_type": "BasicScheduler",
+        "inputs": {
+          "scheduler": "simple",
+          "steps": 4,
+          "denoise": 1.0,
+          "model": ["1", 0]
+        }
+      },
+      "8": {
+        "class_type": "KSamplerSelect",
+        "inputs": { "sampler_name": "euler" }
+      },
+      "9": {
+        "class_type": "BasicGuider",
+        "inputs": {
+          "model": ["1", 0],
+          "conditioning": ["4", 0]
+        }
+      },
+      "10": {
+        "class_type": "SamplerCustomAdvanced",
+        "inputs": {
+          "noise": ["6", 0],
+          "guider": ["9", 0],
+          "sampler": ["8", 0],
+          "sigmas": ["7", 0],
+          "latent_image": ["5", 0]
+        }
+      },
+      "11": {
+        "class_type": "VAEDecode",
+        "inputs": {
+          "samples": ["10", 0],
+          "vae": ["3", 0]
+        }
+      },
+      "12": {
+        "class_type": "SaveImage",
+        "inputs": {
+          "filename_prefix": "ialocal",
+          "images": ["11", 0]
+        }
+      }
+    }
+
+    // 3. Encolar en ComfyUI
+    const queueResult = await comfyuiRequest('/prompt', 'POST', { prompt: workflow })
+    const promptId = queueResult.prompt_id
+
+    if (!promptId) {
+      return res.status(500).json({ error: 'ComfyUI no aceptó el prompt', detail: JSON.stringify(queueResult) })
+    }
+
+    // 4. Esperar a que termine (polling)
+    let imagen = null
+    for (let i = 0; i < 120; i++) {
+      await new Promise(r => setTimeout(r, 2000))
+
+      const history = await comfyuiRequest(`/history/${promptId}`)
+      if (history[promptId]) {
+        const outputs = history[promptId].outputs
+        // Buscar nodo SaveImage (nodo "12")
+        const saveNode = outputs['12']
+        if (saveNode && saveNode.images && saveNode.images.length > 0) {
+          const img = saveNode.images[0]
+          const buffer = await comfyuiGetImage(img.filename, img.subfolder, img.type)
+          imagen = buffer.toString('base64')
+          break
+        }
+        // Si hubo error
+        if (history[promptId].status?.status_str === 'error') {
+          return res.status(500).json({ error: 'ComfyUI reportó error al generar' })
+        }
+      }
+    }
+
+    if (!imagen) {
+      return res.status(504).json({ error: 'Timeout esperando imagen de ComfyUI' })
+    }
+
+    res.json({ ok: true, imagen_b64: imagen, mime: 'image/png' })
+  } catch (e) {
+    console.error('[ComfyUI error]', e.message)
     res.status(500).json({ error: e.message })
   }
 })
