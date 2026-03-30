@@ -49,7 +49,7 @@ def llamar(agente: dict, mensajes: list, temperatura: float = 0.3, max_tokens: i
 
     t0 = time.time()
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp = requests.post(url, headers=headers, json=payload, timeout=900)
         resp.raise_for_status()
         data = resp.json()
 

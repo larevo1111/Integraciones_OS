@@ -31,7 +31,7 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str = None,
                                   headers={'Content-Type': 'application/json'},
                                   method='POST')
     try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
+        with urllib.request.urlopen(req, timeout=900) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         return {'ok': False, 'error': f'HTTP {e.code}: {e.read().decode()[:200]}',

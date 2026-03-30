@@ -105,7 +105,7 @@ def consultar(
         }
     """
     t_inicio = time.time()
-    MAX_PIPELINE_SEG = 30  # timeout total del pipeline
+    MAX_PIPELINE_SEG = 900  # timeout total del pipeline (15 min)
     pasos_ejecutados = []
 
     # ── 0. Rate limit por usuario (sliding window in-memory) ─────────
@@ -217,8 +217,17 @@ def consultar(
                      'muestrame la tabla', 'más datos', 'mas datos', 'todos los',
                      'todas las', 'listado completo', 'listame', 'lístalos',
                      'dame todo', 'cada uno', 'uno por uno')
+    # Preguntas sobre períodos actuales SIEMPRE deben consultar datos frescos
+    # porque el pipeline pudo haber actualizado los datos desde la última consulta.
+    _periodo_actual = ('este mes', 'mes actual', 'esta semana', 'semana actual',
+                       'hoy', 'de hoy', 'ventas del mes', 'ventas de este',
+                       'cuánto llevamos', 'cuanto llevamos', 'cómo vamos',
+                       'como vamos', 'lo que va')
     if tipo == 'analisis_datos' and not requiere_sql:
-        if any(kw in pregunta.lower() for kw in _pide_detalle):
+        preg_lower = pregunta.lower()
+        if any(kw in preg_lower for kw in _pide_detalle):
+            requiere_sql = True
+        elif any(kw in preg_lower for kw in _periodo_actual):
             requiere_sql = True
 
     # Si el router decidió que no se necesita SQL nuevo, usar el caché SQL real.
