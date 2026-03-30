@@ -53,7 +53,7 @@ def inline_ajustes(agente_actual: str = None, nivel: int = 1) -> InlineKeyboardM
     for label, data, nivel_min in AGENTES:
         if nivel < nivel_min:
             continue
-        prefix = '✓ ' if agente_actual and agente_actual in data else ''
+        prefix = '✓ ' if agente_actual and data == f'agente:{agente_actual}' else ''
         filas.append([InlineKeyboardButton(prefix + label, callback_data=data)])
 
     filas.append([
