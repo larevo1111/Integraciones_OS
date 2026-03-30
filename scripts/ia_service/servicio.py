@@ -9,7 +9,12 @@ Módulos auxiliares (extraídos para separación de responsabilidades):
   - utilidades_sql.py:  columnas reales, fecha máxima, cobertura tablas
 """
 import json
+import logging
+import subprocess
 import time
+
+import requests
+
 from .config import get_local_conn
 from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
 from .proveedores import openai_compat, google, anthropic_prov
@@ -890,14 +895,78 @@ def _cargar_tipo(slug: str) -> dict | None:
         conn.close()
 
 
+_OLLAMA_BASE = 'http://localhost:11434'
+_log = logging.getLogger('ia_service')
+
+
+def _warmup_ollama(modelo_id: str) -> bool:
+    """
+    Pre-flight check para Ollama: verifica que el servicio esté activo y el
+    modelo cargado en VRAM. Si no está cargado, envía un request de precarga.
+    Retorna True si Ollama está listo, False si no se pudo activar.
+    """
+    # 1. Verificar que Ollama responde
+    try:
+        r = requests.get(f'{_OLLAMA_BASE}/api/ps', timeout=3)
+        r.raise_for_status()
+        modelos_cargados = [m['name'] for m in r.json().get('models', [])]
+    except Exception:
+        # Ollama no responde — intentar levantar el servicio
+        _log.warning('Ollama no responde, intentando iniciar servicio...')
+        try:
+            subprocess.run(
+                ['sudo', 'systemctl', 'start', 'ollama.service'],
+                timeout=10, capture_output=True,
+            )
+            time.sleep(2)
+            r = requests.get(f'{_OLLAMA_BASE}/api/ps', timeout=3)
+            r.raise_for_status()
+            modelos_cargados = [m['name'] for m in r.json().get('models', [])]
+        except Exception as e:
+            _log.error(f'No se pudo iniciar Ollama: {e}')
+            return False
+
+    # 2. Verificar si el modelo ya está en VRAM
+    if modelo_id in modelos_cargados:
+        return True
+
+    # 3. Precargar modelo (request mínimo que lo sube a VRAM)
+    _log.info(f'Precargando modelo Ollama: {modelo_id}')
+    try:
+        requests.post(
+            f'{_OLLAMA_BASE}/api/generate',
+            json={'model': modelo_id, 'prompt': '', 'keep_alive': '10m'},
+            timeout=30,
+        )
+        _log.info(f'Modelo {modelo_id} precargado en VRAM')
+        return True
+    except Exception as e:
+        _log.warning(f'Error precargando {modelo_id}: {e}')
+        return False
+
+
+def _es_ollama(agente: dict) -> bool:
+    """Detecta si un agente usa Ollama por su endpoint."""
+    return 'localhost:11434' in (agente.get('endpoint_url') or '')
+
+
 def _llamar_agente(agente: dict, mensajes: list, temperatura: float = 0.3, max_tokens: int = 4096) -> dict:
     """Despacha la llamada al proveedor correcto según api_formato."""
+    # Pre-flight check para agentes Ollama (evitar cold-start → fallback)
+    if _es_ollama(agente):
+        if not _warmup_ollama(agente.get('modelo_id', '')):
+            return {
+                'ok': False, 'texto': '', 'tokens_in': 0, 'tokens_out': 0,
+                'latencia_ms': 0,
+                'error': 'Ollama no está disponible. Intenta de nuevo en unos segundos.',
+            }
+
     fmt = agente.get('api_formato', 'openai')
     if fmt == 'google':
         return google.llamar(agente, mensajes, temperatura, max_tokens)
     elif fmt == 'anthropic':
         return anthropic_prov.llamar(agente, mensajes, temperatura, max_tokens)
-    else:  # openai (Groq, DeepSeek)
+    else:  # openai (Groq, DeepSeek, Ollama)
         return openai_compat.llamar(agente, mensajes, temperatura, max_tokens)
 
 
