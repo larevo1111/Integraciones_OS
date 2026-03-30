@@ -20,10 +20,10 @@ TIMEOUT_OC = 300  # segundos
 # ── Ejecutar OpenCode ────────────────────────────────────────────────────────
 
 def _ejecutar_opencode(prompt: str, session_id: str = None) -> dict:
-    """Ejecuta opencode run y retorna {ok, result, session_id}."""
-    cmd = [OC_BIN, 'run', prompt]
+    """Ejecuta opencode run --format json y retorna {ok, result, session_id}."""
+    cmd = [OC_BIN, 'run', '--format', 'json', prompt]
     if session_id:
-        cmd += ['--session', session_id, '--continue']
+        cmd += ['--session', session_id]
 
     try:
         proc = subprocess.run(
@@ -43,30 +43,32 @@ def _ejecutar_opencode(prompt: str, session_id: str = None) -> dict:
     if not stdout:
         return {'ok': False, 'error': stderr[:200] if stderr else 'El Super Agente OpenCode no respondió.'}
 
-    # Limpiar códigos ANSI de la salida
-    import re
-    clean = re.sub(r'\x1b\[[0-9;]*m', '', stdout)
-    # Quitar línea de header "> build · modelo"
-    lines = clean.strip().split('\n')
-    content_lines = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith('> ') and '·' in stripped:
-            continue  # skip header line
-        if stripped.startswith('→ Read') or stripped.startswith('→ '):
-            continue  # skip tool usage lines
-        if stripped.startswith('$ '):
-            continue  # skip command execution lines
-        content_lines.append(line)
+    # Parsear líneas JSON — extraer textos y session_id
+    text_parts = []
+    sid = ''
+    for line in stdout.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not sid and event.get('sessionID'):
+            sid = event['sessionID']
+        etype = event.get('type', '')
+        part = event.get('part', {})
+        if etype == 'text' and part.get('text'):
+            text_parts.append(part['text'])
 
-    result_text = '\n'.join(content_lines).strip()
+    result_text = ''.join(text_parts).strip()
     if not result_text:
-        result_text = clean.strip()
+        return {'ok': False, 'error': 'El Super Agente OpenCode no respondió.'}
 
     return {
         'ok': True,
         'result': result_text,
-        'session_id': '',  # OpenCode no retorna session_id en run mode
+        'session_id': sid,
     }
 
 
@@ -179,32 +181,33 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
               nivel: int, empresa: str) -> dict:
     """
     Consulta al Super Agente OpenCode.
-    Cada mensaje es un prompt independiente (opencode run).
-    Si hay sesión activa, usa --session + --continue.
+    Si hay sesión activa, usa --session para continuar la conversación.
+    Si no hay sesión, crea una nueva.
     """
     sesion = obtener_sesion_activa(usuario_id, empresa)
 
     if sesion and sesion.get('oc_session_id'):
         resp = _ejecutar_opencode(pregunta, session_id=sesion['oc_session_id'])
+        if not resp.get('ok'):
+            return resp
+        return _procesar_respuesta(resp['result'])
     else:
-        resp = _ejecutar_opencode(pregunta)
-
-    if not resp.get('ok'):
-        return resp
-
-    return _procesar_respuesta(resp['result'])
+        # Sin sesión → crear nueva
+        return nueva_conversacion(pregunta, usuario_id, nombre_usuario, nivel, empresa)
 
 
 def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
                        nivel: int, empresa: str) -> dict:
-    """Fuerza creación de una conversación nueva."""
+    """Fuerza creación de una conversación nueva (sin --session)."""
     nombre = _generar_nombre(pregunta)
 
     resp = _ejecutar_opencode(pregunta)
     if not resp.get('ok'):
         return resp
 
-    crear_sesion(usuario_id, empresa, oc_session_id='', nombre=nombre)
+    # Guardar session_id de OpenCode para poder continuar
+    oc_sid = resp.get('session_id', '')
+    crear_sesion(usuario_id, empresa, oc_session_id=oc_sid, nombre=nombre)
 
     return _procesar_respuesta(resp['result'])
 
