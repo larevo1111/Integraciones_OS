@@ -611,7 +611,7 @@ async def handle_foto(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         foto    = update.message.photo[-1]
         archivo = await foto.get_file()
         ts      = int(__import__('time').time())
-        ruta    = f'/tmp/saoc_foto_{user.id}_{ts}.jpg'
+        ruta    = f'/home/osserver/Proyectos_Antigravity/sa_opencode/uploads/foto_{user.id}_{ts}.jpg'
         await archivo.download_to_drive(ruta)
         caption = (update.message.caption or '').strip()
         if caption:
