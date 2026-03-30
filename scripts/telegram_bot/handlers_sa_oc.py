@@ -17,13 +17,13 @@ _esperando_renombrar_oc = {}
 
 # ── Teclado del Super Agente OpenCode ────────────────────────────────────────
 
-def teclado_saoc():
+def teclado_saoc(nivel: int = 1):
     """Teclado reply inferior del Super Agente OpenCode."""
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton('📝 Nueva'), KeyboardButton('📋 Conversaciones'),
-          KeyboardButton('⚙️ Ajustes')]],
-        resize_keyboard=True
-    )
+    filas = [[KeyboardButton('📝 Nueva'), KeyboardButton('📋 Conversaciones'),
+              KeyboardButton('⚙️ Ajustes')]]
+    if nivel >= 5:
+        filas.append([KeyboardButton('🔄 Actualizar datos')])
+    return ReplyKeyboardMarkup(filas, resize_keyboard=True)
 
 
 # ── Handler principal de mensajes ────────────────────────────────────────────
@@ -45,7 +45,7 @@ async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
         saoc_mod.renombrar_conversacion(sesion_id, pregunta[:100])
         await update.message.reply_text(
             f'✅ Conversación renombrada a: *{pregunta[:100]}*',
-            parse_mode=ParseMode.MARKDOWN, reply_markup=teclado_saoc()
+            parse_mode=ParseMode.MARKDOWN, reply_markup=teclado_saoc(nivel)
         )
         return
 
@@ -64,7 +64,7 @@ async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
     if not resultado.get('ok'):
         await update.message.reply_text(
             f'😔 {resultado.get("error", "Error en el Super Agente OpenCode.")}',
-            reply_markup=teclado_saoc()
+            reply_markup=teclado_saoc(nivel)
         )
         return
 
@@ -96,11 +96,11 @@ async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
     try:
         await update.message.reply_text(
             str(resultado['contenido']) + '\n\n_🧩 Super Agente OpenCode_',
-            parse_mode=ParseMode.MARKDOWN, reply_markup=teclado_saoc()
+            parse_mode=ParseMode.MARKDOWN, reply_markup=teclado_saoc(nivel)
         )
     except Exception:
         await update.message.reply_text(
-            str(resultado['contenido']), reply_markup=teclado_saoc()
+            str(resultado['contenido']), reply_markup=teclado_saoc(nivel)
         )
 
 

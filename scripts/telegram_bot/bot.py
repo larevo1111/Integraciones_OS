@@ -461,7 +461,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
             await update.message.reply_text(
                 '🆕 *Nueva conversación OpenCode*\nEscribí tu primera pregunta.',
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=handlers_sa_oc.teclado_saoc()
+                reply_markup=handlers_sa_oc.teclado_saoc(nivel)
             )
             return
 
@@ -484,7 +484,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
             if not resultado.get('ok'):
                 await update.message.reply_text(
                     f'😔 {resultado.get("error", "Error.")}',
-                    reply_markup=handlers_sa_oc.teclado_saoc()
+                    reply_markup=handlers_sa_oc.teclado_saoc(nivel)
                 )
                 return
             await handlers_sa_oc.manejar_superagente_oc(
@@ -769,7 +769,7 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             await query.message.reply_text(
                 '🧩 Modo Super Agente OpenCode activo.',
-                reply_markup=handlers_sa_oc.teclado_saoc()
+                reply_markup=handlers_sa_oc.teclado_saoc(nivel)
             )
         else:
             await query.edit_message_text(
