@@ -140,7 +140,8 @@
             <td class="td td-center"><span class="status-dot" :class="claseDot(a)"></span></td>
             <td class="td cell-id">{{ a.id_effi }}</td>
             <td class="td cell-articulo">
-              <span>{{ a.nombre }}</span>
+              <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ a.grupo || 'MP' }}</span>
+              <span class="articulo-nombre">{{ a.nombre }}</span>
               <span v-if="a.unidad" class="unit-tag">{{ a.unidad }}</span>
             </td>
             <td class="td cell-categoria">{{ a.categoria }}</td>
@@ -154,7 +155,7 @@
                   <button class="stepper-btn stepper-down" @click="ajustarConteo(a, -1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">remove</span>
                   </button>
-                  <input class="count-input" :class="claseInput(a)" type="number" inputmode="numeric" placeholder="—" :value="a.inventario_fisico" @change="onConteoConValidacion(a, $event)">
+                  <input class="count-input" :class="claseInput(a)" type="text" inputmode="decimal" placeholder="—" :value="displayConteo(a)" @blur="onConteoConValidacion(a, $event)" @keyup.enter="$event.target.blur()">
                   <button class="stepper-btn stepper-up" @click="ajustarConteo(a, 1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">add</span>
                   </button>
@@ -524,7 +525,7 @@ function debounceSearch() { clearTimeout(searchTimeout); searchTimeout = setTime
 
 // ── Conteo ──
 async function onConteo(articulo, event) {
-  const valor = parseFloat(event.target.value)
+  const valor = parseDecimal(event.target.value)
   if (isNaN(valor)) return
   const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -538,8 +539,8 @@ async function onConteo(articulo, event) {
 }
 
 function onConteoConValidacion(articulo, event) {
-  const valor = parseFloat(event.target.value)
-  if (isNaN(valor)) return
+  const valor = parseDecimal(event.target.value)
+  if (isNaN(valor)) { event.target.value = displayConteo(articulo); return }
   if (valor === 0) { onConteo(articulo, event); return }
 
   const min = articulo.rango_min
@@ -662,6 +663,13 @@ function verFoto(a) {
 }
 
 // ── Helpers visuales ──
+function parseDecimal(str) {
+  if (str == null || str === '') return NaN
+  return parseFloat(String(str).replace(',', '.'))
+}
+function displayConteo(a) {
+  return a.inventario_fisico != null ? a.inventario_fisico : ''
+}
 function fmtNum(n) { return n != null ? Math.round(n) : '—' }
 function clasesFila(a) { return a.estado === 'contado' ? (a.diferencia === 0 ? 'row-ok' : 'row-diff') : '' }
 function claseDot(a) { if (a.estado === 'pendiente') return 'dot-pending'; if (a.diferencia === 0) return 'dot-ok'; return Math.abs(a.diferencia) >= 10 ? 'dot-critical' : 'dot-warning' }
@@ -857,7 +865,14 @@ onUnmounted(() => clearInterval(clockInterval))
 
 .cell-id { font-size: 12px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; }
 .cell-articulo { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
-.unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
+.grupo-tag { font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
+.grupo-mp { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.grupo-pp { background: rgba(168,85,247,0.15); color: #c084fc; }
+.grupo-pt { background: rgba(34,197,94,0.15); color: #4ade80; }
+.grupo-ins { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.grupo-ds { background: rgba(107,114,128,0.15); color: #9ca3af; }
+.articulo-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.08); color: var(--text-secondary); flex-shrink: 0; }
 .cell-categoria { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 
 /* CONTEO CELL */
@@ -986,8 +1001,9 @@ onUnmounted(() => clearInterval(clockInterval))
   .diff-badge { font-size: 9px; min-width: 22px; padding: 1px 3px; }
 
   /* Artículo: letra más chica, wrap */
-  .cell-articulo { font-size: 11px; white-space: normal; line-height: 1.2; }
-  .unit-tag { font-size: 7px; padding: 0 3px; }
+  .cell-articulo { font-size: 11px; white-space: normal; line-height: 1.2; flex-wrap: wrap; }
+  .grupo-tag { font-size: 6px; padding: 0 2px; }
+  .unit-tag { font-size: 6px; padding: 0 2px; }
 
   /* Status dot más chico */
   .status-dot { width: 6px; height: 6px; }

@@ -145,7 +145,7 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         SELECT c.id, c.id_effi, c.cod_barras, c.nombre, c.categoria, c.bodega,
                c.inventario_teorico, c.inventario_fisico, c.diferencia,
                c.costo_promedio, c.estado, c.contado_por, c.fecha_conteo, c.notas, c.foto,
-               r.unidad, r.rango_min, r.rango_max, r.factor_error
+               r.grupo, r.unidad, r.rango_min, r.rango_max, r.factor_error
         FROM inv_conteos c
         LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
         WHERE c.fecha_inventario = %s AND c.excluido = 0

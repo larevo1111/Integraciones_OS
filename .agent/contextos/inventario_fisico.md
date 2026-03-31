@@ -157,24 +157,97 @@ Para cada OP con estado='Generada' AND vigencia='Vigente':
 
 ## Infraestructura implementada
 
+### App web — `inv.oscomunidad.com`
+App independiente de conteo de inventario físico. Separada de sistema_gestion.
+
+- **Frontend**: Vue 3 + Vite (sin Quasar). Diseño OS dark mode, responsive web+móvil.
+- **Backend**: FastAPI (Python) en puerto 9401. Systemd: `os-inventario-api.service`.
+- **Auth**: Google OAuth (mismo Client ID que gestión) → JWT compartido con gestión.
+- **Subdominio**: `inv.oscomunidad.com` → cloudflared → localhost:9401.
+
 ### BD `os_inventario` (MariaDB local)
-Dedicada al subproyecto de inventario físico.
 
 | Tabla | Descripción | Registros |
 |---|---|---|
-| `inv_articulos` | Artículos clasificados (inventariable/excluido + razón) | 489 |
+| `inv_conteos` | Conteos por artículo+bodega+fecha. Una fila por cada combinación. | ~500/inventario |
+| `inv_rangos` | Unidad, grupo (MP/PP/PT/INS/DS), rango min/max, factor_error por artículo | 489 |
+| `inv_auditorias` | Historial de cambios: conteo, edición, nota, foto. Quién, cuándo, valor anterior/nuevo. | acumulativa |
+
+### Grupos de artículos (campo `grupo` en `inv_rangos`)
+
+| Grupo | Nombre | Lógica de clasificación | Artículos |
+|---|---|---|---|
+| **MP** | Materia Prima | T01.xx que NO aparece en `zeffi_articulos_producidos` | 190 |
+| **PP** | Producto en Proceso | Cualquier artículo producido en una OP (cruce con `zeffi_articulos_producidos`) | 45 |
+| **PT** | Producto Terminado | Categoría TPT.xx (venta directa) | 80 |
+| **INS** | Insumos | Categoría T03.xx (envases, tapas, etiquetas, bolsas, cajas) | 142 |
+| **DS** | Desarrollo | Categoría DESARROLLO DE PRODUCTO (no en producción aún) | 32 |
+
+### Unidades (campo `unidad` en `inv_rangos`)
+
+| Unidad | Detección | Artículos | Error típico |
+|---|---|---|---|
+| **KG** | Nombre contiene KG, KILO, KL | 71 | Poner gramos (x1000) |
+| **GRS** | Nombre contiene GRS, GRAMOS, G | 198 | — |
+| **UND** | Sin unidad en nombre, o explícito | 218 | — |
+| **LT** | Nombre contiene LT, LITRO | 2 | Poner ml (x1000) |
+
+### Validación de rango (detección errores de unidades)
+
+- Cada artículo tiene `rango_min` y `rango_max` en `inv_rangos` (calculados de stock histórico)
+- `factor_error`: 1000 para KG y LT (error kg↔g, lt↔ml)
+- Al ingresar valor fuera de rango: modal de alerta con sugerencia de corrección
+- **0 siempre permitido** (no dispara alerta)
+- Decimales: acepta punto y coma como separador. Input `type="text"` con `inputmode="decimal"`
+- Si usuario confirma valor fuera de rango: se guarda pero queda en auditoría
 
 ### Scripts
+
 | Script | Descripción |
 |---|---|
 | `scripts/inventario/config_depuracion.json` | Reglas de exclusión (patrones SQL LIKE) |
-| `scripts/inventario/depurar_inventario.py` | Lee config, clasifica artículos, guarda en inv_articulos |
+| `scripts/inventario/depurar_inventario.py` | Clasifica artículos y genera filas por bodega en `inv_conteos` |
+| `scripts/inventario/calcular_rangos.py` | Genera `inv_rangos` (unidad, grupo, rangos) cruzando con OPs |
+| `scripts/inventario/api.py` | FastAPI backend (puerto 9401). Sirve API + frontend estático |
 
-## Decisiones pendientes
+### Archivos frontend
 
-- [x] BD de inventario: `os_inventario` (MariaDB local)
+| Archivo | Descripción |
+|---|---|
+| `inventario/frontend/src/App.vue` | Componente único: login, tabla, filtros, modales |
+| `inventario/frontend/src/styles.css` | Variables CSS del design system OS |
+| `inventario/static/` | Build de producción (servido por FastAPI) |
+| `inventario/fotos/` | Fotos capturadas durante conteo |
+
+### Funcionalidades implementadas
+
+- Login con Google OAuth (mismo sistema que gestión)
+- Tabla con popups de filtro/ordenamiento por columna (patrón GestionTable)
+- Chips de filtro: Todos/Pendientes/Contados/Diferencias
+- Chips de bodega: solo las que tienen stock + botón (+) para más bodegas
+- Panel lateral retráctil para seleccionar entre inventarios (fechas)
+- Stepper +/- para ajuste rápido de conteo
+- Tags de grupo (MP/PP/PT/INS/DS) y unidad (KG/GRS/UND/LT) por artículo
+- Validación de rango con alerta y sugerencia de corrección
+- Mini menú (⋮) con: Agregar nota / Tomar foto / Ver foto
+- Auditoría completa: cada conteo, edición, nota y foto queda registrado
+- Responsive: desktop, tablet, móvil
+
+## Decisiones tomadas
+
+- [x] BD: `os_inventario` (MariaDB local)
 - [x] Depuración: Python puro (reglas deterministas en JSON)
-- [ ] Stack del backend: Flask o FastAPI (o endpoint en ia_service existente?)
-- [ ] Stack del frontend: modulo nuevo en sistema_gestion o app independiente?
-- [ ] Offline-first: localStorage o IndexedDB?
-- [ ] Puerto/dominio para la app de conteo
+- [x] Backend: FastAPI (Python) en puerto 9401
+- [x] Frontend: Vue 3 + Vite, app independiente (NO dentro de sistema_gestion)
+- [x] Auth: Google OAuth, JWT compartido con gestión
+- [x] Dominio: `inv.oscomunidad.com`
+- [x] Grupos: MP/PP/PT/INS/DS (detectados automáticamente cruzando con OPs)
+- [x] Validación unidades: determinista (sin IA), rangos en tabla `inv_rangos`
+
+## Pendiente
+
+- [ ] Offline-first (Service Worker, IndexedDB)
+- [ ] Módulo 1: Foto de inventario a fecha (reconstrucción desde trazabilidad)
+- [ ] Módulo 2: Ajuste por OPs generadas (81 OPs vigentes no ejecutadas)
+- [ ] Módulo 5: Verificación inconsistencias (comparar físico vs teórico)
+- [ ] Módulo 6: Informe final
