@@ -524,25 +524,12 @@ let searchTimeout
 function debounceSearch() { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => cargarArticulos(), 300) }
 
 // ── Conteo ──
-async function onConteo(articulo, event) {
-  const valor = parseDecimal(event.target.value)
-  if (isNaN(valor)) return
-  // Actualizar ANTES del await para que Vue no borre el input
-  articulo.inventario_fisico = valor
-  articulo.estado = 'contado'
-  const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
-    method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inventario_fisico: valor, contado_por: usuario.value })
-  }).then(r => r.json())
-  articulo.diferencia = res.diferencia
-  cargarResumen()
-  cargarBodegas()
-}
-
 function onConteoConValidacion(articulo, event) {
   const valor = parseDecimal(event.target.value)
   if (isNaN(valor)) { event.target.value = displayConteo(articulo); return }
-  if (valor === 0) { onConteo(articulo, event); return }
+
+  // 0 siempre permitido
+  if (valor === 0) { guardarConteo(articulo, valor); return }
 
   const min = articulo.rango_min
   const max = articulo.rango_max
@@ -566,28 +553,11 @@ function onConteoConValidacion(articulo, event) {
     return
   }
 
-  onConteo(articulo, event)
+  guardarConteo(articulo, valor)
 }
 
-function confirmarAlerta() {
-  if (!alertaRango.value) return
-  onConteoDirecto(alertaRango.value.articulo, alertaRango.value.valor)
-  alertaRango.value = null
-}
-
-function corregirAlerta() {
-  if (!alertaRango.value?.sugerencia) return
-  onConteoDirecto(alertaRango.value.articulo, alertaRango.value.sugerencia)
-  alertaRango.value = null
-}
-
-function ajustarConteo(articulo, delta) {
-  const actual = articulo.inventario_fisico != null ? articulo.inventario_fisico : (articulo.inventario_teorico || 0)
-  const nuevo = Math.max(0, actual + delta)
-  onConteoDirecto(articulo, nuevo)
-}
-
-async function onConteoDirecto(articulo, valor) {
+async function guardarConteo(articulo, valor) {
+  // Actualizar inmediatamente en memoria para que Vue no borre el input
   articulo.inventario_fisico = valor
   articulo.estado = 'contado'
   const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
@@ -597,6 +567,24 @@ async function onConteoDirecto(articulo, valor) {
   articulo.diferencia = res.diferencia
   cargarResumen()
   cargarBodegas()
+}
+
+function confirmarAlerta() {
+  if (!alertaRango.value) return
+  guardarConteo(alertaRango.value.articulo, alertaRango.value.valor)
+  alertaRango.value = null
+}
+
+function corregirAlerta() {
+  if (!alertaRango.value?.sugerencia) return
+  guardarConteo(alertaRango.value.articulo, alertaRango.value.sugerencia)
+  alertaRango.value = null
+}
+
+function ajustarConteo(articulo, delta) {
+  const actual = articulo.inventario_fisico != null ? articulo.inventario_fisico : (articulo.inventario_teorico || 0)
+  const nuevo = Math.max(0, actual + delta)
+  guardarConteo(articulo, nuevo)
 }
 
 // ── Notas ──
