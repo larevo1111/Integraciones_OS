@@ -1320,14 +1320,14 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Tabla: layout fijo, sin scroll horizontal */
   .inv-table-container { overflow-x: hidden; }
   .inv-table { table-layout: fixed; width: 100%; }
-  /* Columnas: ocultar ID, redistribuir */
-  .col-id { width: 0; }
-  .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
+  /* Columnas: ID invisible (width 0), todas visibles */
   .col-status { width: 16px; }
+  .col-id { width: 0; }
   .col-articulo { width: auto; }
-  .col-categoria { width: 80px; }
-  .col-conteo { width: 120px; }
+  .col-categoria { width: 70px; }
+  .col-conteo { width: 115px; }
   .inv-table-container { overflow-x: hidden; }
+  .inv-table td:nth-child(2), .inv-table th:nth-child(2) { padding: 0; font-size: 0; border: none; }
   .inv-table td { padding: 0 2px; height: 36px; overflow: hidden; }
   .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
 
