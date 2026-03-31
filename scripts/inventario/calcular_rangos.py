@@ -20,15 +20,15 @@ def detectar_unidad(nombre):
 
     # Gramos
     if re.search(r'\bGRS?\b|\bGRAMOS?\b|\b\d+\s*GRS?\b|\b\d+\s*G\b', n):
-        return 'UND', None  # productos empacados en gramos = se cuentan por unidad
+        return 'GRS', None
 
     # Litros
     if re.search(r'\bLT\b|\bLITRO\b|\bLTS\b|\bX\s*LT\b', n):
-        return 'LT', 1000  # error típico: poner ml en vez de lt
+        return 'LT', 1000
 
     # ML
     if re.search(r'\bML\b|\bMILILITROS?\b', n):
-        return 'UND', None  # empacados en ml = por unidad
+        return 'ML', None
 
     # Unidad explícita
     if re.search(r'\bUNIDAD\b|\bUND\b|\bX\s*UND\b', n):
@@ -41,12 +41,11 @@ def detectar_unidad(nombre):
 def calcular_rango_por_unidad(unidad, stock_actual):
     """Calcula rangos razonables según la unidad."""
     if unidad == 'KG':
-        # Productos a granel en kilos
         return (0.1, max(200, stock_actual * 3))
     elif unidad == 'LT':
         return (0.1, max(200, stock_actual * 3))
     else:
-        # UND: productos empacados, siempre enteros
+        # GRS, ML, UND: productos empacados, enteros
         return (1, max(500, stock_actual * 3))
 
 

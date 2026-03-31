@@ -141,7 +141,7 @@
             <td class="td cell-id">{{ a.id_effi }}</td>
             <td class="td cell-articulo">
               <span>{{ a.nombre }}</span>
-              <span v-if="a.unidad && a.unidad !== 'UND'" class="unit-tag">{{ a.unidad }}</span>
+              <span v-if="a.unidad" class="unit-tag">{{ a.unidad }}</span>
             </td>
             <td class="td cell-categoria">{{ a.categoria }}</td>
             <td class="td">
