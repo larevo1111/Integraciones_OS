@@ -1315,30 +1315,33 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Tabla: layout fijo, sin scroll horizontal */
   .inv-table-container { overflow-x: hidden; }
   .inv-table { table-layout: fixed; width: 100%; }
-  /* Ocultar ID y categoría: ancho 0 + display none */
+  /* Ocultar solo ID */
   .inv-table col:nth-child(2) { width: 0; }
   .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
-  .inv-table col:nth-child(4) { width: 0; }
-  .cell-categoria-desktop, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
-  /* Anchos fijos: dot 18px, artículo resto, conteo 120px */
-  .inv-table col:nth-child(1) { width: 18px; }
+  /* Anchos: dot 16px, artículo auto, categoría 28%, conteo 115px */
+  .inv-table { table-layout: fixed; width: 100%; }
+  .inv-table col:nth-child(1) { width: 16px; }
   .inv-table col:nth-child(3) { width: auto; }
-  .inv-table col:nth-child(5) { width: 120px; }
-  .inv-table td { padding: 0 3px; height: auto; vertical-align: middle; }
-  .inv-table th { padding: 0 3px; font-size: 9px; height: 26px; }
+  .inv-table col:nth-child(4) { width: 28%; }
+  .inv-table col:nth-child(5) { width: 115px; }
+  .inv-table td { padding: 0 3px; vertical-align: middle; }
+  .inv-table th { padding: 0 3px; font-size: 8px; height: 26px; }
 
-  /* Artículo: 2 líneas */
+  /* Artículo: wrap, sin línea 2 (categoría tiene su columna) */
   .cell-articulo { padding: 3px 0; overflow: hidden; }
-  .articulo-line1 { font-size: 11px; gap: 3px; flex-wrap: nowrap; overflow: hidden; }
-  .articulo-line2 { display: block; font-size: 9px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-  .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
-  .grupo-tag { font-size: 7px; padding: 1px 3px; flex-shrink: 0; }
-  .unit-tag { font-size: 7px; padding: 1px 3px; flex-shrink: 0; }
+  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: wrap; }
+  .articulo-line2 { display: none; }
+  .articulo-nombre { overflow: hidden; text-overflow: ellipsis; }
+  .grupo-tag { font-size: 7px; padding: 1px 3px; }
+  .unit-tag { font-size: 7px; padding: 1px 3px; }
 
-  /* Conteo: ultra compacto */
+  /* Categoría: wrap, pequeña */
+  .cell-categoria-desktop { font-size: 9px; white-space: normal; line-height: 1.2; word-break: break-word; }
+
+  /* Conteo: compacto */
   .teorico-block { display: none; }
   .stepper-btn { width: 20px; height: 26px; }
-  .count-input { width: 36px; height: 26px; font-size: 12px; }
+  .count-input { width: 34px; height: 26px; font-size: 12px; }
   .conteo-cell { gap: 1px; }
   .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
   .contador-chip { display: none; }
@@ -1346,7 +1349,7 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Status dot */
   .status-dot { width: 6px; height: 6px; }
 
-  /* Menú y FAB */
+  /* Menú */
   .action-btn { width: 18px; height: 18px; }
 
   /* Modales */
