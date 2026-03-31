@@ -248,7 +248,10 @@
                     <span class="material-icons" style="font-size:12px">add</span>
                   </button>
                 </div>
-                <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
+                <div class="diff-col">
+                  <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
+                  <span v-if="a.contado_por" class="contado-por">{{ inicialesDe(a.contado_por) }}</span>
+                </div>
                 <div class="action-menu-wrap">
                   <button class="action-btn" :class="{ 'has-note': a.notas || a.foto }" @click.stop="toggleMenu(a.id)">
                     <span class="material-icons" style="font-size:16px">more_vert</span>
@@ -949,6 +952,10 @@ function parseDecimal(str) {
 function displayConteo(a) {
   return a.inventario_fisico != null ? a.inventario_fisico : ''
 }
+function inicialesDe(nombre) {
+  if (!nombre) return ''
+  return nombre.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase()
+}
 function fmtNum(n) { return n != null ? Math.round(n) : '—' }
 function clasesFila(a) { return a.estado === 'contado' ? (a.diferencia === 0 ? 'row-ok' : 'row-diff') : '' }
 function claseDot(a) { if (a.estado === 'pendiente') return 'dot-pending'; if (a.diferencia === 0) return 'dot-ok'; return Math.abs(a.diferencia) >= 10 ? 'dot-critical' : 'dot-warning' }
@@ -1201,6 +1208,8 @@ onUnmounted(() => clearInterval(clockInterval))
 .badge-warning { background: rgba(245,158,11,0.12); color: #fbbf24; }
 .badge-error { background: rgba(248,113,113,0.12); color: #f87171; }
 .badge-empty { color: var(--text-tertiary); }
+.diff-col { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 32px; }
+.contado-por { font-size: 8px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; letter-spacing: 0.3px; }
 
 .action-menu-wrap { position: relative; }
 .action-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer; border-radius: 4px; }
