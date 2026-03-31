@@ -3,6 +3,36 @@
     <div class="pp-overlay" @click.self="$emit('cerrar')">
       <aside class="pp-panel" :class="{ 'pp-mobile': esMobile }">
 
+        <!-- ═══ SUB-PANEL: Detalle tarea ═══ -->
+        <template v-if="tareaAbierta">
+          <div class="pp-header">
+            <button class="pp-btn-icon" @click="cerrarSubTarea" title="Volver">
+              <span class="material-icons" style="font-size:18px">arrow_back</span>
+            </button>
+            <span class="pp-header-tipo">Tarea</span>
+            <div style="display:flex;gap:4px;margin-left:auto">
+              <button class="pp-btn-icon" @click="$emit('cerrar')">
+                <span class="material-icons" style="font-size:18px">close</span>
+              </button>
+            </div>
+          </div>
+          <div class="pp-subtarea-wrap">
+            <TareaPanel
+              :tarea="tareaAbierta"
+              :usuarios="usuarios"
+              :categorias="categorias"
+              :proyectos="[]"
+              :etiquetas="etiquetas"
+              @cerrar="cerrarSubTarea"
+              @actualizada="onSubTareaActualizada"
+              @crear-item="() => {}"
+              @abrir-padre="() => {}"
+            />
+          </div>
+        </template>
+
+        <!-- ═══ CONTENIDO PRINCIPAL: Proyecto/Dificultad/etc ═══ -->
+        <template v-else>
         <!-- Header -->
         <div class="pp-header">
           <span class="pp-header-tipo">{{ LABELS[tipoLocal].singular }}</span>
@@ -138,7 +168,7 @@
           <div v-if="item?.id" class="pp-section">
             <span class="pp-section-label">Tareas vinculadas ({{ tareasVinculadas.length }})</span>
             <div v-if="!tareasVinculadas.length" class="pp-empty">Sin tareas vinculadas</div>
-            <div v-for="t in tareasVinculadas" :key="t.id" class="pp-tarea-link">
+            <div v-for="t in tareasVinculadas" :key="t.id" class="pp-tarea-link" @click="abrirSubTarea(t)">
               <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">
                 {{ t.estado === 'Completada' ? 'check_circle' : 'radio_button_unchecked' }}
               </span>
@@ -160,6 +190,7 @@
             {{ guardando ? 'Creando...' : `Crear ${LABELS[tipoLocal].singular.toLowerCase()}` }}
           </button>
         </div>
+        </template>
       </aside>
     </div>
   </Teleport>
@@ -172,6 +203,7 @@ import CategoriaSelector from './CategoriaSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import EtiquetasSelector from './EtiquetasSelector.vue'
 import TipTapEditor from './TipTapEditor.vue'
+import TareaPanel from './TareaPanel.vue'
 
 const props = defineProps({
   item:        { type: Object, default: null },     // null = crear nuevo
@@ -212,6 +244,25 @@ const esMobile = ref(false)
 const guardando = ref(false)
 const tituloRef = ref(null)
 const tareasVinculadas = ref([])
+const tareaAbierta = ref(null)
+
+async function abrirSubTarea(t) {
+  // Cargar detalle completo de la tarea
+  try {
+    const data = await api(`/api/gestion/tareas/${t.id}`)
+    tareaAbierta.value = data.tarea || t
+  } catch { tareaAbierta.value = t }
+}
+
+function cerrarSubTarea() {
+  tareaAbierta.value = null
+}
+
+function onSubTareaActualizada(tareaActualizada) {
+  // Actualizar en la lista de tareas vinculadas
+  const idx = tareasVinculadas.value.findIndex(x => x.id === tareaActualizada.id)
+  if (idx !== -1) tareasVinculadas.value[idx] = { ...tareasVinculadas.value[idx], ...tareaActualizada }
+}
 
 const form = ref({
   nombre: '',
@@ -467,8 +518,20 @@ function fmtFecha(iso) {
 .pp-tarea-link {
   display: flex; align-items: center; gap: 6px;
   padding: 4px 0; font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; border-radius: var(--radius-sm);
+  transition: background 80ms;
 }
+.pp-tarea-link:hover { background: var(--bg-row-hover); }
 .pp-tarea-done { text-decoration: line-through; color: var(--text-tertiary); }
+
+/* Sub-panel tarea embebido */
+.pp-subtarea-wrap {
+  flex: 1; overflow-y: auto;
+}
+.pp-subtarea-wrap :deep(.tarea-panel) {
+  width: 100%; min-width: 100%;
+  border-left: none; height: 100%;
+}
 
 /* Auditoría */
 .pp-audit {
