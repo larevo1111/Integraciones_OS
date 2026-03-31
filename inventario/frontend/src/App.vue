@@ -627,6 +627,75 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-nota-textarea:focus { border-color: var(--accent); }
 .inv-btn-primary { background: var(--accent); color: #000; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; }
 .inv-btn-primary:hover { background: var(--accent-hover); }
+
+/* ═══ TABLET (≤1024px) ═══ */
+@media (max-width: 1024px) {
+  .inv-panel.open { width: 220px; }
+  .inv-progress-wrap { width: 180px; }
+  .inv-table col:nth-child(4) { width: 140px; }
+  .inv-table col:nth-child(5) { width: 240px; }
+}
+
+/* ═══ MÓVIL (≤768px) ═══ */
+@media (max-width: 768px) {
+  /* Panel: overlay full width */
+  .inv-panel.open { position: fixed; z-index: 30; width: 280px; height: 100vh; box-shadow: 8px 0 40px rgba(0,0,0,0.6); }
+
+  /* Header: compacto */
+  .inv-header { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .inv-header-right { width: 100%; justify-content: space-between; }
+  .inv-progress-wrap { flex: 1; width: auto; }
+  .inv-clock { font-size: 10px; }
+  .inv-user-name { font-size: 12px; }
+  .inv-title { font-size: 11px; }
+
+  /* Toolbar */
+  .inv-toolbar { padding: 6px 12px; }
+  .inv-btn-scan span:last-child { display: none; }
+  .inv-btn-scan { padding: 0 8px; }
+
+  /* Filtros: scroll horizontal */
+  .inv-filters-row { padding: 6px 12px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .inv-filters-row::-webkit-scrollbar { display: none; }
+  .inv-bodegas-label { display: none; }
+
+  /* Tabla: ocultar categoría, ajustar anchos */
+  .inv-table col:nth-child(4) { width: 0; }
+  .inv-table .cell-categoria { display: none; }
+  .inv-table th:nth-child(4) { display: none; }
+  .inv-table td:nth-child(4) { display: none; }
+  .inv-table col:nth-child(2) { width: 44px; }
+  .inv-table col:nth-child(5) { width: 200px; }
+  .inv-table td { padding: 0 8px; height: 48px; }
+  .inv-table th { padding: 0 8px; }
+
+  /* Conteo: más compacto */
+  .teorico-label { font-size: 8px; }
+  .teorico-value { font-size: 12px; }
+  .count-input { width: 48px; height: 36px; font-size: 16px; }
+  .conteo-cell { gap: 6px; }
+
+  /* Modales: casi full width */
+  .inv-modal { width: calc(100vw - 24px); margin: 12px; }
+  .inv-modal-sm { width: calc(100vw - 24px); }
+
+  /* FAB: más grande para touch */
+  .inv-fab { width: 52px; height: 52px; bottom: 20px; right: 16px; }
+}
+
+/* ═══ MÓVIL PEQUEÑO (≤480px) ═══ */
+@media (max-width: 480px) {
+  .inv-header-left .inv-avatar { display: none; }
+  .inv-progress-text { font-size: 11px; }
+  .inv-table col:nth-child(2) { width: 0; }
+  .inv-table .cell-id { display: none; }
+  .inv-table th:nth-child(2) { display: none; }
+  .inv-table td:nth-child(2) { display: none; }
+  .cell-articulo { font-size: 12px; }
+  .count-input { width: 44px; height: 40px; font-size: 18px; }
+  .diff-badge { font-size: 10px; min-width: 28px; }
+  .inv-search-input { font-size: 16px; }
+}
 </style>
 
 <!-- POPUP COLUMNA — sin scoped (Teleport to body) -->
