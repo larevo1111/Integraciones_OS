@@ -202,11 +202,11 @@
     <div class="inv-table-container">
       <table class="inv-table">
         <colgroup>
-          <col style="width:32px">
-          <col style="width:60px">
-          <col>
-          <col style="width:200px">
-          <col style="width:270px">
+          <col class="col-status">
+          <col class="col-id">
+          <col class="col-articulo">
+          <col class="col-categoria">
+          <col class="col-conteo">
         </colgroup>
         <thead>
           <tr>
@@ -1147,6 +1147,11 @@ onUnmounted(() => clearInterval(clockInterval))
 /* TABLE */
 .inv-table-container { flex: 1; overflow: auto; }
 .inv-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.col-status { width: 32px; }
+.col-id { width: 60px; }
+.col-articulo { width: auto; }
+.col-categoria { width: 200px; }
+.col-conteo { width: 270px; }
 .inv-table thead { position: sticky; top: 0; z-index: 5; }
 
 .th { text-align: left; padding: 0 12px; height: 36px; font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-default); background: var(--bg-card, #1c1c1e); position: sticky; top: 0; z-index: 5; cursor: pointer; user-select: none; white-space: nowrap; transition: color 80ms; }
@@ -1271,8 +1276,8 @@ onUnmounted(() => clearInterval(clockInterval))
 @media (max-width: 1024px) {
   .inv-panel.open { width: 220px; }
   .inv-progress-wrap { width: 180px; }
-  .inv-table col:nth-child(4) { width: 140px; }
-  .inv-table col:nth-child(5) { width: 240px; }
+  .col-categoria { width: 140px; }
+  .col-conteo { width: 240px; }
 }
 
 /* ═══ MÓVIL (≤768px) ═══ */
@@ -1315,36 +1320,34 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Tabla: layout fijo, sin scroll horizontal */
   .inv-table-container { overflow-x: hidden; }
   .inv-table { table-layout: fixed; width: 100%; }
-  /* Ocultar solo ID */
-  .inv-table col:nth-child(2) { width: 0; }
+  /* Columnas: ocultar ID, redistribuir */
+  .col-id { width: 0; }
   .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
-  /* Anchos fijos */
-  .inv-table { table-layout: fixed; width: 100%; }
-  .inv-table col:nth-child(1) { width: 16px; }
-  .inv-table col:nth-child(3) { width: 38%; }
-  .inv-table col:nth-child(4) { width: 22%; }
-  .inv-table col:nth-child(5) { width: 40%; }
-  .inv-table td { padding: 0 2px; height: 38px; vertical-align: middle; overflow: hidden; }
+  .col-status { width: 16px; }
+  .col-articulo { width: auto; }
+  .col-categoria { width: 80px; }
+  .col-conteo { width: 120px; }
+  .inv-table-container { overflow-x: hidden; }
+  .inv-table td { padding: 0 2px; height: 36px; overflow: hidden; }
   .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
 
-  /* Artículo: 1 línea, truncar */
-  .cell-articulo { overflow: hidden; }
-  .articulo-line1 { font-size: 10px; gap: 2px; flex-wrap: nowrap; overflow: hidden; }
+  /* Artículo: inline, truncar nombre */
+  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: nowrap; overflow: hidden; }
   .articulo-line2 { display: none; }
   .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .grupo-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
 
-  /* Categoría: 1 línea truncada */
+  /* Categoría: truncar */
   .cell-categoria-desktop { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* Conteo: compacto */
+  /* Conteo */
   .teorico-block { display: none; }
   .stepper-btn { width: 20px; height: 26px; }
   .count-input { width: 34px; height: 26px; font-size: 11px; }
   .conteo-cell { gap: 1px; }
   .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
-  .contador-chip { font-size: 6px; padding: 0 2px; }
+  .contador-chip { font-size: 6px; }
   .status-dot { width: 6px; height: 6px; }
   .action-btn { width: 16px; height: 16px; }
 
