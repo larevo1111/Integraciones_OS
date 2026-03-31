@@ -1315,13 +1315,15 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Tabla: layout fijo, sin scroll horizontal */
   .inv-table-container { overflow-x: hidden; }
   .inv-table { table-layout: fixed; width: 100%; }
-  /* Ocultar ID y categoría desktop */
-  .inv-table col:nth-child(2), .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
-  .inv-table col:nth-child(4), .cell-categoria-desktop, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
-  /* Anchos fijos: dot 20px, artículo resto, conteo 125px */
-  .inv-table col:nth-child(1) { width: 20px; }
+  /* Ocultar ID y categoría: ancho 0 + display none */
+  .inv-table col:nth-child(2) { width: 0; }
+  .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
+  .inv-table col:nth-child(4) { width: 0; }
+  .cell-categoria-desktop, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
+  /* Anchos fijos: dot 18px, artículo resto, conteo 120px */
+  .inv-table col:nth-child(1) { width: 18px; }
   .inv-table col:nth-child(3) { width: auto; }
-  .inv-table col:nth-child(5) { width: 125px; }
+  .inv-table col:nth-child(5) { width: 120px; }
   .inv-table td { padding: 0 3px; height: auto; vertical-align: middle; }
   .inv-table th { padding: 0 3px; font-size: 9px; height: 26px; }
 
