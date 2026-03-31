@@ -103,12 +103,14 @@ POST /api/gestion/tareas/:id/iniciar   — inicia cronómetro. Cierra sesiones a
 POST /api/gestion/tareas/:id/detener   — detiene cronómetro, calcula duración y acumula tiempo_real_min
 ```
 
-### Proyectos
+### Proyectos / Dificultades / Compromisos / Ideas (tabla unificada g_proyectos)
 ```
-GET  /api/gestion/proyectos        — lista. ?estado=Activo para solo activos. retorna tareas_pendientes
-POST /api/gestion/proyectos        — crear proyecto {nombre, color?}
-PUT  /api/gestion/proyectos/:id    — actualizar {nombre, color, descripcion, estado}
+GET  /api/gestion/proyectos        — ?tipo=proyecto|dificultad|compromiso|idea &estado=. retorna tareas_pendientes, responsables, etiquetas
+POST /api/gestion/proyectos        — {nombre, tipo, estado?, color?, prioridad?, categoria_id?, responsables:[], etiquetas:[]}
+                                     Valida estado vs tipo. Default: proyecto=Activo, dificultad=Abierta, compromiso=Pendiente, idea=Nueva
+PUT  /api/gestion/proyectos/:id    — actualizar (valida estado vs tipo consultando BD). Quick-edit: cada campo se guarda individualmente
 DELETE /api/gestion/proyectos/:id  — desancla tareas (proyecto_id=NULL) y elimina
+PUT  /api/gestion/jornadas/:id/pausas/:pausaId/editar — editar pausa individual
 ```
 
 ### Etiquetas
@@ -136,16 +138,12 @@ GET  /api/gestion/op/:id           — detalle de una OP específica
 | `g_categorias_perfiles` | Junction: qué categorías ve cada perfil |
 | `g_usuarios_config` | Config por usuario (tema, FCM token, perfil) |
 | `g_tareas` | Tareas centrales — empresa, titulo, estado, prioridad, responsable, id_op, proyecto_id |
-| `g_proyectos` | Proyectos por empresa — nombre, color, descripcion, estado (Activo/Archivado) |
+| `g_proyectos` | Tabla unificada: proyectos, dificultades, compromisos, ideas (campo `tipo`). Estados validados por tipo. |
 | `g_proyectos_responsables` | Junction: proyectos × usuarios |
 | `g_etiquetas` | Etiquetas libres por empresa — nombre, color |
 | `g_etiquetas_tareas` | Junction: etiquetas × tareas |
 | `g_etiquetas_proyectos` | Junction: etiquetas × proyectos |
 | `g_tarea_tiempo` | Sesiones de cronómetro (inicio/fin/duración) |
-| `g_dificultades` | Banco de dificultades y estrategias |
-| `g_ideas_hechos` | Ideas y hechos relevantes del equipo |
-| `g_pendientes` | Pendientes y compromisos |
-| `g_informes` | Informes semanales/mensuales |
 
 ---
 

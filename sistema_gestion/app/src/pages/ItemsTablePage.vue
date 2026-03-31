@@ -198,4 +198,8 @@ onMounted(() => { cargar(); cargarDatos() })
   color: var(--text-primary); font-size: 12px; font-family: var(--font-sans);
 }
 .filtro-select:focus { outline: none; border-color: var(--accent); }
+@media (max-width: 600px) {
+  .filtro-select { font-size: 11px; padding: 0 4px; }
+  .btn-crear { padding: 0 8px; font-size: 11px; }
+}
 </style>

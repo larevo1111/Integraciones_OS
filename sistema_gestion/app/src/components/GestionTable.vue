@@ -481,6 +481,14 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
 }
 
+@media (max-width: 768px) {
+  .table-toolbar { height: auto; min-height: 44px; flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+  .toolbar-right { flex-wrap: wrap; gap: 6px; }
+  .os-table { font-size: 12px; }
+  .th { padding: 0 8px; font-size: 10px; }
+  .td { padding: 6px 8px; }
+}
+
 /* POPUP COLUMNA (global — Teleport) */
 </style>
 

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="pp-overlay" @click.self="$emit('cerrar')">
-      <aside class="pp-panel" :class="{ 'pp-mobile': esMobile }">
+      <aside class="pp-panel">
 
         <!-- ═══ SUB-PANEL: Detalle tarea ═══ -->
         <template v-if="tareaAbierta">
@@ -240,7 +240,6 @@ const COLORES = ['#ef4444','#f97316','#eab308','#22c55e','#00C853','#14b8a6','#3
 
 const tipoLocal = computed(() => props.item?.tipo || props.tipo)
 const estadosDisponibles = computed(() => ESTADOS[tipoLocal.value] || ESTADOS.proyecto)
-const esMobile = ref(false)
 const guardando = ref(false)
 const tituloRef = ref(null)
 const tareasVinculadas = ref([])
@@ -307,7 +306,6 @@ function initForm() {
 watch(() => props.item, initForm, { immediate: true })
 
 onMounted(async () => {
-  esMobile.value = window.innerWidth <= 768
   await nextTick()
   if (tituloRef.value) { autoGrow({ target: tituloRef.value }); tituloRef.value.focus() }
   if (props.item?.id) cargarTareas()
@@ -419,15 +417,6 @@ function fmtFecha(iso) {
   from { transform: translateX(100%); }
   to   { transform: none; }
 }
-.pp-panel.pp-mobile {
-  width: 100%;
-  height: auto; max-height: 95vh;
-  border-left: none;
-  border-top: 1px solid var(--border-default);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  position: fixed; bottom: 0; left: 0; right: 0;
-}
-.pp-panel.pp-mobile ~ .pp-overlay { align-items: flex-end; }
 
 /* Header */
 .pp-header {
@@ -576,5 +565,10 @@ function fmtFecha(iso) {
   }
   .pp-field-label { width: 90px; }
   .pp-titulo { font-size: 16px; }
+  .pp-chips { gap: 6px; }
+  .pp-chip { padding: 4px 12px; font-size: 12px; }
+  .pp-subtarea-wrap { max-height: 70vh; overflow-y: auto; }
+  .pp-subtarea-wrap :deep(.tarea-panel) { min-width: 100%; }
+  .pp-tarea-link { padding: 6px 4px; }
 }
 </style>

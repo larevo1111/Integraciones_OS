@@ -39,7 +39,7 @@ Hostinger NO permite compartir usuario MySQL entre BDs — cada BD tiene su prop
 | `g_usuarios_config` | Configuración por usuario |
 | `g_perfiles` | Perfiles de usuario |
 | `g_categorias_perfiles` | Relación categorías-perfiles |
-| `g_proyectos` | Proyectos con nombre y color |
+| `g_proyectos` | Items unificados: proyectos, dificultades, compromisos, ideas (campo `tipo`) |
 | `g_proyectos_responsables` | Relación proyectos-usuarios |
 | `g_etiquetas` | Etiquetas de la empresa |
 | `g_etiquetas_tareas` | Relación etiquetas-tareas |
@@ -112,9 +112,9 @@ PUT  /api/gestion/tareas/:id              — actualizar (acepta proyecto_id, et
 POST /api/gestion/tareas/:id/completar   — completa con tiempo_real_min opcional
 POST /api/gestion/tareas/:id/iniciar     — inicia cronómetro
 PUT  /api/gestion/tareas/:id/pausar      — pausa cronómetro
-GET  /api/gestion/proyectos              — ?estado=Activo. retorna tareas_pendientes
-POST /api/gestion/proyectos              — crear {nombre, color?}
-PUT  /api/gestion/proyectos/:id          — actualizar
+GET  /api/gestion/proyectos              — ?tipo=&estado=. retorna tareas_pendientes, responsables, etiquetas
+POST /api/gestion/proyectos              — crear {nombre, tipo, estado?, color?, ...} (valida estado vs tipo)
+PUT  /api/gestion/proyectos/:id          — actualizar (valida estado vs tipo en BD antes de aplicar)
 DELETE /api/gestion/proyectos/:id        — desancla tareas y elimina
 GET/POST/PUT/DELETE /api/gestion/etiquetas/:id  — CRUD etiquetas por empresa
 GET  /api/gestion/ops                    — OPs pendientes vigentes. Acepta ?q=
@@ -183,10 +183,46 @@ POST /api/gestion/tipos-pausa               — crear tipo (admin)
 ### Skill tabla estándar
 `.agent/skills/tabla_estandar.md` — documenta el patrón GestionTable/OsDataTable para que siempre se construya igual.
 
+## Módulo Proyectos/Dificultades/Compromisos/Ideas — ✅ IMPLEMENTADO (2026-03-31)
+
+Tabla `g_proyectos` unificada con campo `tipo` (proyecto, dificultad, compromiso, idea).
+Cada tipo tiene estados propios validados en backend:
+
+| Tipo | Estados | Default |
+|---|---|---|
+| proyecto | Activo, Completado, Archivado | Activo |
+| dificultad | Abierta, En progreso, Resuelta, Cerrada | Abierta |
+| compromiso | Pendiente, En progreso, Cumplido, Cancelado | Pendiente |
+| idea | Nueva, En evaluación, Aprobada, Descartada | Nueva |
+
+### Componentes
+
+- **ProyectoPanel** — panel lateral derecho (500px desktop, bottom sheet móvil). Campos: título, estado chips, prioridad, color, categoría, responsable, etiquetas, fecha, Desarrollo (TipTap rich text). Quick-edit: cada campo guarda al cambiar sin cerrar el panel.
+- **Sub-panel tarea** — clic en tarea vinculada abre TareaPanel embebido dentro del ProyectoPanel con ← Volver.
+- **ProyectoSelector** — en tareas, muestra items agrupados por tipo con botones "Nuevo...".
+- **ItemsTablePage** — página tabla reutilizable con `tipo` como prop. Filtros en toolbar: estado, prioridad, categoría + botón Nuevo. GestionTable con slots para cell renderers. Vue Router `watch props.tipo` para recargar al navegar.
+- **Sidebar** — 4 secciones (Proyectos, Dificultades, Compromisos, Ideas) con botones [+] y menú ⋮ (Editar, Ver tabla, Archivar, Eliminar). Sección "Tablas" con links a páginas tabla.
+- **Drawer móvil** — incluye links a tablas de cada tipo.
+- **TipTapEditor** — @tiptap/vue-3 + StarterKit + Link + Placeholder. Toolbar: bold, italic, h2, h3, listas, blockquote, code. Debounce 1s.
+
+### Endpoints API
+
+```
+GET  /api/gestion/proyectos          — ?tipo=&estado= (retorna todos los tipos si sin filtro)
+GET  /api/gestion/proyectos/:id      — detalle con responsables y etiquetas
+POST /api/gestion/proyectos          — crear {nombre, tipo, estado?, ...} (valida estado vs tipo)
+PUT  /api/gestion/proyectos/:id      — actualizar (valida estado vs tipo)
+DELETE /api/gestion/proyectos/:id    — desancla tareas y elimina
+PUT  /api/gestion/jornadas/:id/pausas/:pausaId/editar — editar pausa individual
+```
+
+### Archivos eliminados
+ProyectoModal.vue, DetalleDificultadPage, DetalleIdeaPage, DetallePendientePage, DetalleInformePage, DificultadesPage, IdeasPage, PendientesPage, InformesPage — todos reemplazados por ProyectoPanel + ItemsTablePage.
+
 ## Próximas fases pendientes
 
 - [x] ~~Implementar Módulo Jornadas (Fase 3.5)~~ ✅ 2026-03-26
-- [ ] Módulos secundarios: Dificultades, Ideas, Pendientes, Informes
+- [x] ~~Módulo Proyectos/Dificultades/Compromisos/Ideas~~ ✅ 2026-03-31
 - [ ] Push notifications FCM (Fase 4)
 - [ ] APK Android (Fase 4)
 
