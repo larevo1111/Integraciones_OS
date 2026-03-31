@@ -248,10 +248,7 @@
                     <span class="material-icons" style="font-size:12px">add</span>
                   </button>
                 </div>
-                <div class="diff-col">
-                  <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
-                  <span v-if="a.contado_por" class="contado-por">{{ inicialesDe(a.contado_por) }}</span>
-                </div>
+                <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
                 <div class="action-menu-wrap">
                   <button class="action-btn" :class="{ 'has-note': a.notas || a.foto }" @click.stop="toggleMenu(a.id)">
                     <span class="material-icons" style="font-size:16px">more_vert</span>
@@ -1183,7 +1180,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .grupo-ins { background: rgba(245,158,11,0.15); color: #fbbf24; }
 .grupo-ds { background: rgba(107,114,128,0.15); color: #9ca3af; }
 .articulo-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.08); color: var(--text-secondary); flex-shrink: 0; }
+.unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
 .cell-categoria { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 
 /* CONTEO CELL */
