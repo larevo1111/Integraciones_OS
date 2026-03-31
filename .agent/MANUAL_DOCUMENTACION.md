@@ -211,3 +211,91 @@ Los archivos en `memory/` son cargados por Claude Code en cada sesión. Organiza
 | Dejar planes en actuales/ después de completarlos | Ruido en carpeta de trabajo activo | Mover a completados/ inmediatamente |
 | Crear un skill sin haberlo documentado en catalogo-skills.md | Skill invisible para futuras sesiones | Agregar al catálogo al crear el skill |
 | Módulo "estable" con prioridad Alta en CONTEXTO_ACTIVO.md | Confusión sobre qué priorizar | Bajar prioridad a Normal o marcar como estable |
+
+---
+
+## Procedimiento de depuración — "depúrame todo"
+
+> Cuando Santi dice **"depúrame todo"**, **"limpia la documentación"** o equivalente, ejecutar este procedimiento completo sin pedir confirmación. Nada se borra — todo se organiza, sincroniza y actualiza.
+
+### Lo que hace una depuración
+
+**NUNCA se borra**: contextos/, planes/, skills, manuales, docs/.
+**SÍ se organiza**: versiones desincronizadas, rutas huérfanas, duplicados, planes mal ubicados, referencias rotas.
+
+---
+
+### Checklist de depuración (ejecutar en orden)
+
+#### 1. MEMORY.md — verificar que es un mapa, no un dump
+- [ ] Contar líneas: si supera 200, mover el exceso a archivos topic en `memory/` y dejar solo el puntero
+- [ ] Verificar que todos los módulos listados coinciden con el estado real en `CONTEXTO_ACTIVO.md`
+- [ ] Verificar que los skills listados existen realmente en `.claude/commands/`
+- [ ] Verificar que los links a feedback_*.md apuntan a archivos que existen
+
+#### 2. catalogo-skills.md — sincronizar con la realidad
+- [ ] Listar archivos reales en `.claude/commands/` y compararlos con la tabla del catálogo
+- [ ] Skills en el repo pero no en el catálogo → agregar entrada
+- [ ] Entradas en el catálogo que no tienen archivo → marcar como "(pendiente)" o eliminar la entrada
+- [ ] Verificar versiones de manuales referenciados (ej: ia_service_manual.md)
+
+#### 3. planes/ — mover completados a su lugar
+- [ ] Revisar `.agent/planes/actuales/` — todo plan con `Estado: Completado` o `Estado: ✅` → mover a `completados/`
+- [ ] Revisar `.agent/planes/completados/` — verificar que todos tienen `Estado: ✅ Completado` al inicio
+
+#### 4. CATALOGO_SCRIPTS.md — verificar existencia de scripts
+- [ ] Para cada script documentado en la sección de Orquestadores, verificar que el archivo existe en `scripts/`
+- [ ] Si un script fue eliminado o renombrado → actualizar la entrada (no borrar, solo corregir)
+
+#### 5. CATALOGO_VISTAS.md — verificar rutas activas
+- [ ] Para cada ruta marcada como ✅, verificar que el componente Vue existe en el directorio correspondiente
+- [ ] Rutas implementadas que no están en el catálogo → agregar
+
+#### 6. contextos/*.md — actualizar fechas
+- [ ] Para cada contexto, verificar que la fecha de actualización refleja el trabajo más reciente
+- [ ] Si un módulo pasó de Activo a Estable (sin trabajo reciente >30 días) → proponer a Santi cambiar estado
+
+#### 7. CONTEXTO_ACTIVO.md — limpiar trabajo pasado
+- [ ] La sección "Trabajo activo esta semana" debe reflejar la semana real actual
+- [ ] Trabajo completado hace más de 2 semanas → mover a la sección "Trabajo reciente" o eliminar de esa sección
+- [ ] Verificar que todos los módulos de la tabla tienen su archivo de contexto
+
+#### 8. docs/ — eliminar duplicados
+- [ ] Verificar que no hay dos archivos con el mismo contenido (el diagnóstico de 2026-03-31 ya eliminó CATALOGO_AGENTES.md de docs/)
+- [ ] Informes en `informes/` con más de 90 días → archivar en `informes/archivados/` (no borrar)
+
+---
+
+### Salida esperada al terminar una depuración
+
+Al finalizar, reportar a Santi:
+
+```
+## Depuración completada — [fecha]
+
+### Cambios realizados
+- N planes movidos de actuales/ a completados/
+- N entradas de catalogo-skills.md actualizadas
+- N inconsistencias de MEMORY.md corregidas
+- N rutas nuevas agregadas a CATALOGO_VISTAS.md
+- ...
+
+### Estado post-depuración
+- MEMORY.md: N líneas (< 200 ✅ / > 200 ⚠️)
+- planes/actuales/: N archivos activos
+- Skills: N skills en .claude/commands/
+- Sin duplicados detectados
+
+### Sin cambios (todo OK)
+- [lista de archivos que se revisaron y están bien]
+```
+
+---
+
+### Qué NO hace la depuración
+
+- No modifica archivos Python, JS ni de configuración del sistema
+- No elimina ningún contexto, plan, skill ni manual
+- No cambia el estado de módulos activos (solo propone si detecta inactividad >30 días)
+- No toca `.env` ni credenciales
+- No modifica el código fuente del proyecto
