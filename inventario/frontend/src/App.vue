@@ -239,7 +239,7 @@
             <td class="td">
               <div class="conteo-cell">
                 <div class="teorico-block">
-                  <span class="teorico-label">Teórico</span>
+                  <span class="teorico-label">Teo</span>
                   <span class="teorico-value">{{ fmtNum(a.inventario_teorico) }}</span>
                 </div>
                 <div class="stepper">
@@ -1153,7 +1153,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .col-id { width: 60px; }
 .col-articulo { width: auto; }
 .col-categoria { width: 200px; }
-.col-conteo { width: 270px; }
+.col-conteo { width: 280px; }
 .inv-table thead { position: sticky; top: 0; z-index: 5; }
 
 .th { text-align: left; padding: 0 12px; height: 36px; font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-default); background: var(--bg-card, #1c1c1e); position: sticky; top: 0; z-index: 5; cursor: pointer; user-select: none; white-space: nowrap; transition: color 80ms; }
@@ -1199,9 +1199,9 @@ onUnmounted(() => clearInterval(clockInterval))
 
 /* CONTEO CELL */
 .conteo-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; height: 44px; }
-.teorico-block { display: flex; flex-direction: column; align-items: flex-end; min-width: 40px; }
-.teorico-label { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
-.teorico-value { font-size: 13px; color: var(--text-secondary); font-family: 'Fragment Mono', monospace; font-weight: 500; }
+.teorico-block { display: flex; flex-direction: column; align-items: flex-end; min-width: 30px; }
+.teorico-label { font-size: 8px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.3px; }
+.teorico-value { font-size: 12px; color: var(--text-secondary); font-family: 'Fragment Mono', monospace; font-weight: 500; }
 .stepper { display: flex; align-items: center; gap: 0; }
 .stepper-btn { width: 24px; height: 32px; border: 1px solid var(--border-default); background: transparent; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.08s; }
 .stepper-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
