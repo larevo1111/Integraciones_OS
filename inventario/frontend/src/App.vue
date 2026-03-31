@@ -1346,7 +1346,7 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Conteo: stepper + input + badge + dots */
   .teorico-block { display: none; }
   .stepper-btn { width: 20px; height: 26px; }
-  .count-input { width: 32px; height: 26px; font-size: 11px; }
+  .count-input { width: 32px; height: 26px; font-size: 9px; }
   .conteo-cell { gap: 1px; }
   .diff-col { flex-direction: column; gap: 0; align-items: center; }
   .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
