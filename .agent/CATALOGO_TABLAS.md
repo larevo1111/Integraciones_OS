@@ -111,19 +111,68 @@ Maestro de proveedores registrados en Effi.
 
 ### zeffi_produccion_encabezados
 Órdenes de producción — cada fila es una orden de fabricación con su estado y valores.
-**Usar para**: producción del período, órdenes en proceso, costo de producción.
+
+**Campos clave**: `id_orden` (numérico secuencial, ej: 1985), `estado` ("Generada" / "Procesada"), `vigencia` ("Vigente" / "Anulado"), `fecha_de_creacion`, `fecha_inicial`, `fecha_final`.
+
+**Estados**:
+- `Generada` + `Vigente` (85 actualmente): OP creada pero NO ejecutada físicamente. **Effi ya descontó materiales y sumó productos al inventario aunque la producción no haya ocurrido.**
+- `Procesada` + `Vigente` (1,024): OP ejecutada y confirmada — efecto real.
+- `Generada` + `Anulado` (890): anuladas, su efecto fue revertido en trazabilidad.
+- `Procesada` + `Anulado` (95): procesadas luego anuladas.
+
+**Importante**: Effi registra el impacto en inventario al *crear* la OP, no al procesarla. Por eso las OPs "Generada" generan una discrepancia entre el inventario Effi y la realidad física.
+
+**Usar para**: producción del período, OPs pendientes de ejecutar, costo de producción.
+
+### zeffi_cambios_estado
+Historial de TODOS los cambios de estado de OPs con timestamp exacto. **Tabla crítica para determinar el estado de una OP en una fecha histórica.**
+
+**Campos clave**: `id_orden`, `nuevo_estado` ("Generada" / "Procesada"), `f_cambio_de_estado` (timestamp del cambio), `vigencia`.
+
+**Comportamiento crítico — leer antes de usar**:
+- **NO registra el estado inicial**. Una OP recién creada empieza en "Generada" sin ningún registro en esta tabla. El primer registro aparece solo cuando alguien cambia el estado.
+- Para saber el estado de una OP en una fecha: buscar el último registro con `f_cambio_de_estado <= fecha`. Si no hay registro → la OP estaba en estado inicial = "Generada".
+
+```sql
+-- ¿En qué estado estaba la OP X al corte del 31/03?
+SELECT nuevo_estado
+FROM zeffi_cambios_estado
+WHERE id_orden = 'X'
+  AND f_cambio_de_estado <= '2026-03-31 23:59:59'
+ORDER BY f_cambio_de_estado DESC, _pk DESC
+LIMIT 1;
+-- Sin filas → 'Generada' (estado inicial)
+```
+
+**Usar para**: auditoría de producción, reconstruir el estado de OPs en fechas históricas, calcular inventario teórico a fecha de corte.
+
+### zeffi_materiales
+Materias primas consumidas por cada OP. Una fila por cada material en cada OP.
+
+**Campos clave**: `id_orden`, `cod_material`, `descripcion_material`, `cantidad` (TEXT con coma decimal, ej: "10,500"), `costo_ud`, `bodega`, `vigencia`.
+
+**Valores de vigencia** (diferente a "Vigente"/"Anulado"):
+- `"Orden vigente"` → la OP está vigente (1,109 OPs, 4,509 filas)
+- `"Orden anulada"` → la OP fue anulada (985 OPs, 4,211 filas)
+
+**Para inventario teórico**: filtrar `vigencia = 'Orden vigente'` para OPs en estado "Generada". Estas materias primas fueron descontadas por Effi prematuramente — hay que sumarlas de vuelta al stock teórico.
+
+**Usar para**: consumo de materiales por OP, relación materia prima → producto terminado, ajuste de inventario teórico.
 
 ### zeffi_articulos_producidos
-Artículos terminados que resultaron de una orden de producción.
-**Usar para**: qué se fabricó, cantidades producidas por referencia.
+Artículos terminados que resultan de una OP. Una fila por cada producto en cada OP.
+
+**Campos clave**: `id_orden`, `cod_articulo`, `descripcion_articulo_producido`, `cantidad` (TEXT con coma decimal), `bodega`, `vigencia`.
+
+**Valores de vigencia**: igual que `zeffi_materiales` — "Orden vigente" / "Orden anulada".
+
+**Para inventario teórico**: filtrar `vigencia = 'Orden vigente'` para OPs en estado "Generada". Estos productos fueron sumados por Effi prematuramente — hay que restarlos del stock teórico.
+
+**Usar para**: qué se fabricó, cantidades producidas por referencia, ajuste de inventario teórico.
 
 ### zeffi_costos_produccion
 Costos asociados a cada orden de producción (mano de obra, insumos indirectos, etc.).
 **Usar para**: costo real de fabricación, análisis de costos de producción.
-
-### zeffi_materiales
-Materias primas/materiales consumidos en cada orden de producción.
-**Usar para**: consumo de materiales, relación materia prima → producto terminado.
 
 ### zeffi_otros_costos
 Otros costos cargados a órdenes de producción (costos indirectos, fletes, etc.).
@@ -172,11 +221,25 @@ Catálogo completo de artículos con stock desagregado por bodega/punto de consi
 
 ### zeffi_trazabilidad
 Historial completo de todos los movimientos de inventario: ventas, compras, producción, ajustes, traslados. La tabla más completa para trazabilidad de artículos.
-**Usar para**: historial de movimientos de un artículo, cuándo entró/salió stock, trazabilidad completa por período.
 
-### zeffi_cambios_estado
-Historial de cambios de estado de órdenes de producción. Cada fila registra cuándo y quién cambió el estado, con los valores financieros en ese momento.
-**Usar para**: auditoría de producción, tiempos en cada estado, historial completo de una orden de producción.
+**Campos clave**: `id_articulo`, `articulo`, `transaccion` (ej: "ORDEN DE PRODUCCIÓN: 1985"), `tipo_de_movimiento`, `vigencia_de_transaccion`, `cantidad` (TEXT con coma decimal), `bodega`, `fecha`.
+
+**Dos tipos de movimiento** (solo estos dos):
+- `"Creación de transacción"` → movimiento original
+- `"Anulación de transacción"` → reversa de un movimiento anulado, con signo ya invertido
+
+**Signos de cantidad**: positivo = ingreso a bodega, negativo = egreso.
+
+**Para reconstruir stock a fecha histórica**:
+```sql
+stock_en_corte = stock_actual - SUM(CAST(REPLACE(cantidad,',','.') AS DECIMAL(12,2)))
+                  WHERE fecha > 'fecha_corte 23:59:59'
+```
+Usar TODOS los registros (no filtrar por tipo ni vigencia) — las anulaciones tienen signo ya invertido y se auto-cancelan matemáticamente.
+
+**Tipos de transacción más frecuentes**: ORDEN DE PRODUCCIÓN (6,357), FACTURA DE VENTA (5,400), TRASLADO DE INVENTARIO (4,488), REMISIÓN DE VENTA (2,017), AJUSTE DE INVENTARIO (1,107).
+
+**Usar para**: historial de movimientos de un artículo, cuándo entró/salió stock, trazabilidad completa por período, reconstrucción de stock en fecha histórica.
 
 ---
 
@@ -258,5 +321,10 @@ Catálogo de municipios de Colombia con código DANE, nombre y departamento.
 | Cartera pendiente de cobro | `zeffi_cuentas_por_cobrar` |
 | Compras a proveedores | `zeffi_facturas_compra_encabezados` |
 | Producción del período | `zeffi_produccion_encabezados` |
+| OPs pendientes de ejecutar | `zeffi_produccion_encabezados` WHERE estado='Generada' AND vigencia='Vigente' |
+| Estado de una OP en fecha histórica | `zeffi_cambios_estado` (último registro antes de la fecha) |
+| Materiales consumidos por una OP | `zeffi_materiales` |
+| Productos generados por una OP | `zeffi_articulos_producidos` |
+| Inventario teórico a fecha de corte | Ver lógica en `.agent/contextos/inventario_fisico.md §Inventario Teórico` |
 | Datos de un cliente | `zeffi_clientes` |
 | Datos de un vendedor | `zeffi_empleados` |

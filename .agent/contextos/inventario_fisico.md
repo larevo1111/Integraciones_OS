@@ -108,7 +108,7 @@ Stock actual por articulo con columnas de stock por bodega.
 - `zeffi_produccion_encabezados.id_orden` = numerico secuencial (ej: 1985, 2088)
 - `zeffi_trazabilidad.transaccion` = "ORDEN DE PRODUCCION: 2088" (ID numerico coincide)
 - **Excepcion**: entre feb 2025 hubo un periodo donde usaron formato "PPAL-NNN" (718 a 761, 179 registros). Antes y despues, ID numerico puro.
-- Las 81 OPs generadas vigentes SI tienen movimientos en trazabilidad con formato numerico
+- Las 85 OPs generadas vigentes SI tienen movimientos en trazabilidad con formato numerico
 - Para el Modulo 2 (ajuste OPs) usamos directamente `zeffi_materiales` y `zeffi_articulos_producidos`
 
 ### Depuración de artículos para inventario físico
@@ -119,22 +119,105 @@ Script: `scripts/inventario/depurar_inventario.py` → guarda en `os_inventario.
 ### Cantidad en trazabilidad usa coma decimal
 - Campo `cantidad` es TEXT con formato "1000,00" o "-23,00"
 - Para operar: `CAST(REPLACE(cantidad, ',', '.') AS DECIMAL(12,2))`
+- Lo mismo aplica para campos `cantidad` en `zeffi_materiales` y `zeffi_articulos_producidos`
 
-### Reconstruccion de stock a fecha
-```
-stock_a_fecha = stock_actual - SUM(movimientos desde fecha_objetivo+1 hasta hoy)
-```
-Solo considerar registros con:
-- `vigencia_de_transaccion = 'Transaccion vigente'`
-- `tipo_de_movimiento = 'Creacion de transaccion'`
-(Ignorar anulaciones — si una transaccion se anulo, ya no es vigente)
+---
 
-### Ajuste por OPs generadas
+## Inventario Teórico a Fecha de Corte — Logica completa (verificada 2026-03-31)
+
+### Formula
+
 ```
-Para cada OP con estado='Generada' AND vigencia='Vigente':
-  stock_ajustado[materia_prima] += cantidad_material    (devolver lo descontado por Effi)
-  stock_ajustado[prod_terminado] -= cantidad_producida  (quitar lo cargado por Effi)
+Inventario teórico en fecha_corte =
+  stock_actual (zeffi_inventario, hoy)
+  − movimientos_netos_post_corte (trazabilidad entre fecha_corte+1 y hoy)
+  + materiales de OPs con estado='Generada' al corte (zeffi_materiales)
+  − productos de OPs con estado='Generada' al corte (zeffi_articulos_producidos)
 ```
+
+Agrupado por `cod_articulo` (suma de todas las bodegas).
+
+### Por qué cada termino
+
+**Termino 1 — stock actual**: punto de partida. Es lo que Effi reporta hoy.
+
+**Termino 2 — trazabilidad post-corte**: "rebobinar" el tiempo. Si entre el corte y hoy entraron 20 unidades por una compra, hay que restarlas para reconstruir el stock del corte.
+
+**Terminos 3 y 4 — ajuste OPs generadas**: Effi registra el efecto de una OP en el momento de *crearla* (no de ejecutarla). Para una OP "Generada" al corte, Effi ya descontó materiales y sumó productos — pero fisicamente esa produccion no habia ocurrido. Hay que revertir ese efecto.
+
+### Comportamiento de trazabilidad verificado
+
+- Solo dos `tipo_de_movimiento` posibles: `"Creación de transacción"` y `"Anulación de transacción"`
+- Las "Anulacion" tienen signos YA invertidos (ej: creacion=-27.55, anulacion=+27.55)
+- **Para la suma post-corte: usar TODOS los registros** — creaciones y anulaciones se cancelan solas matematicamente
+- Formula SQL: `SUM(CAST(REPLACE(cantidad, ',', '.') AS DECIMAL(12,2)))` sobre `fecha > fecha_corte`
+- No filtrar por `vigencia_de_transaccion` — las anuladas se auto-cancelan
+
+### Como determinar el estado de una OP en una fecha historica
+
+Tabla clave: `zeffi_cambios_estado`
+
+**Comportamiento critico**: esta tabla NO registra el estado inicial. Una OP recien creada empieza en "Generada" sin ningun registro en esta tabla. Solo aparece cuando cambia de estado.
+
+```sql
+-- Estado de una OP en fecha_corte:
+SELECT nuevo_estado
+FROM zeffi_cambios_estado
+WHERE id_orden = 'X'
+  AND f_cambio_de_estado <= 'fecha_corte 23:59:59'
+ORDER BY f_cambio_de_estado DESC, _pk DESC
+LIMIT 1;
+-- Si no retorna filas → estado = 'Generada' (estado inicial por defecto)
+```
+
+**OPs generadas al corte** = OPs que cumplen:
+1. `zeffi_produccion_encabezados.fecha_de_creacion <= fecha_corte` (existian al corte)
+2. `vigencia = 'Vigente'` (no anuladas — ver limitacion abajo)
+3. Ultimo registro en `zeffi_cambios_estado` antes del corte = 'Generada' O no tiene ningun registro
+
+**Limitacion**: OPs que estaban vigentes al corte pero fueron anuladas *despues* no aparecen en `zeffi_produccion_encabezados` con vigencia='Vigente'. Para estas, la trazabilidad post-corte ya captura el efecto de la anulacion (termino 2), por lo que el error se minimiza.
+
+### Vigencias en zeffi_materiales y zeffi_articulos_producidos
+
+- `vigencia = 'Orden vigente'` → OPs actualmente vigentes (1,109 OPs, 4,509 filas de materiales)
+- `vigencia = 'Orden anulada'` → OPs anuladas (985 OPs, 4,211 filas)
+- Para el calculo teorico actual: filtrar `vigencia = 'Orden vigente'`
+- El campo NO dice "Vigente" sino "Orden vigente" — diferencia critica en el WHERE
+
+### Numeros verificados al 31 de marzo 2026
+
+| Dato | Valor |
+|---|---|
+| OPs generadas vigentes al corte | **85** |
+| Filas de materiales de esas OPs | **320** |
+| Filas de productos de esas OPs | **149** |
+| Movimientos trazabilidad post-corte | **0** (el corte es hoy) |
+
+### Tabla de resultado: inv_teorico (nueva, en os_inventario)
+
+```sql
+CREATE TABLE inv_teorico (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  fecha_corte DATE NOT NULL,
+  cod_articulo VARCHAR(50) NOT NULL,
+  nombre_articulo VARCHAR(255),
+  stock_effi DECIMAL(12,2),          -- stock actual de zeffi_inventario
+  ajuste_trazabilidad DECIMAL(12,2), -- resta de movimientos post-corte
+  ajuste_ops_materiales DECIMAL(12,2), -- suma de materiales OPs generadas
+  ajuste_ops_productos DECIMAL(12,2),  -- resta de productos OPs generadas
+  stock_teorico DECIMAL(12,2),       -- resultado final
+  ops_incluidas TEXT,                -- JSON con IDs de OPs usadas
+  calculado_en DATETIME,
+  UNIQUE KEY uk_corte_articulo (fecha_corte, cod_articulo)
+);
+```
+
+### Script y endpoint
+
+- Script: `scripts/inventario/calcular_inventario_teorico.py --fecha YYYY-MM-DD`
+- Endpoint: `POST /api/inventarios/:fecha/calcular-teorico`
+- Boton en frontend: "Actualizar datos teóricos" (nivel supervisor+)
+- Plan completo: `.agent/planes/inventario_teorico.md`
 
 ---
 
