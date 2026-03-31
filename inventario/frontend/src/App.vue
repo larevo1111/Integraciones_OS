@@ -48,7 +48,7 @@
           </div>
         </div>
         <div class="inv-header-right">
-          <div class="inv-clock">{{ reloj }}</div>
+          <div class="inv-clock" id="inv-clock"></div>
           <div class="inv-progress-wrap">
             <div class="inv-progress-track">
               <div class="inv-progress-ok" :style="{ width: pctOk + '%' }"></div>
@@ -338,7 +338,6 @@ const resumen = ref({})
 const busqueda = ref('')
 const filtroActivo = ref(null)
 const cargando = ref(false)
-const reloj = ref('')
 const mostrarAgregar = ref(false)
 const busquedaAgregar = ref('')
 const resultadosAgregar = ref([])
@@ -362,16 +361,18 @@ const columns = [
   { key: 'categoria', label: 'Categoría' },
 ]
 
-// ── Reloj ──
+// ── Reloj (DOM directo, sin reactivity para no re-renderizar la tabla) ──
 let clockInterval
 function actualizarReloj() {
+  const el = document.getElementById('inv-clock')
+  if (!el) return
   const now = new Date()
   const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
   const h = String(now.getHours()).padStart(2,'0')
   const m = String(now.getMinutes()).padStart(2,'0')
   const s = String(now.getSeconds()).padStart(2,'0')
-  reloj.value = `${dias[now.getDay()]} ${now.getDate()} ${meses[now.getMonth()]} ${now.getFullYear()} · ${h}:${m}:${s}`
+  el.textContent = `${dias[now.getDay()]} ${now.getDate()} ${meses[now.getMonth()]} ${now.getFullYear()} · ${h}:${m}:${s}`
 }
 
 const fechaDisplay = computed(() => {
