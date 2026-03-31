@@ -221,19 +221,26 @@
                     <span class="material-icons" style="font-size:14px">add</span>
                   </button>
                 </div>
-                <RouterLink
+                <div
                   v-for="p in itemsPorTipo(sec.tipo)"
                   :key="p.id"
-                  :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                  class="nav-item nav-item-proyecto"
-                  @click="drawerOpen=false"
+                  class="nav-item-proyecto-wrap"
                 >
-                  <span class="nav-item-icon">
-                    <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
-                  </span>
-                  <span class="nav-item-label">{{ p.nombre }}</span>
-                  <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                </RouterLink>
+                  <RouterLink
+                    :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                    class="nav-item nav-item-proyecto"
+                    @click="drawerOpen=false"
+                  >
+                    <span class="nav-item-icon">
+                      <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
+                    </span>
+                    <span class="nav-item-label">{{ p.nombre }}</span>
+                    <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
+                    <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuProyecto($event, p)">
+                      <span class="material-icons" style="font-size:16px">more_vert</span>
+                    </button>
+                  </RouterLink>
+                </div>
                 <div v-if="!itemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
                   Sin {{ sec.label.toLowerCase() }}
                 </div>
@@ -508,6 +515,8 @@ onMounted(() => {
   transition: background 80ms, color 80ms;
 }
 .btn-proyecto-menu:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.btn-mobile-always { opacity: 0.5; }
+.btn-mobile-always:active { opacity: 1; background: var(--bg-row-hover); }
 
 /* Acordeón completados */
 .completados-wrap { margin-top: 4px; }
