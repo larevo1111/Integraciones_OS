@@ -14,6 +14,7 @@ Patrones técnicos reutilizables y reglas de negocio obligatorias. Aplican a cua
 | **Integridad de Datos** | `.agent/skills/integridad_datos.md` | 8 checks universales para verificar cualquier tabla/vista resumen: muestreo manual, suma total vs fuente, unicidad PK, porcentajes, comparativos year_ant/mes_ant, NULLs. | **Obligatorio** antes de dar por terminado cualquier script de agregación o resumen. |
 | **Desarrollo Python** | `.agent/skills/desarrollo_python.md` | Límites de líneas (400/archivo, 80/función), regla de 1 responsabilidad, estructura estándar de módulos, prevención de duplicados, checklist pre-commit. Inventario actual de tamaños. | **Obligatorio** antes de escribir o modificar cualquier código Python. Nació del refactor de servicio.py (1,756→1,028 líneas). |
 | **Inventario Físico** | `.agent/skills/inventario.md` | App inv.oscomunidad.com: BD os_inventario, scripts depuración/rangos, API FastAPI, grupos MP/PP/PT/INS/DS, validación unidades, auditoría, políticas de acceso. | Contexto detallado en `.agent/contextos/inventario_fisico.md`. |
+| **Sistema Gestión** | `.agent/skills/sistema_gestion.md` | App gestion.oscomunidad.com: Tareas+Jornadas+Proyectos. Vue+Quasar+Express, BD Hostinger, 3 pools MySQL. | 30+ endpoints, 15 tablas, cronómetro, multi-selección, cascada estados. |
 
 ---
 
@@ -31,6 +32,8 @@ Skills en formato slash-command (`/nombre`). Claude Code las carga con la herram
 | `/espocrm-integracion` | `.claude/commands/espocrm-integracion.md` | Flujo de sincronía bidireccional Effi ↔ EspoCRM: campos custom, normalización de ciudades, mapeos. |
 | `/tabla-vista` | `.claude/commands/tabla-vista.md` | Diseño de vistas de tablas en el ERP. |
 | `/menu-erp` | `.claude/commands/menu-erp.md` | Diseño y estructura del menú del ERP. |
+| `/sistema-gestion` | `.claude/commands/sistema-gestion.md` | App Gestión OS: Tareas, Jornadas, Proyectos. Endpoints, BD, componentes, reglas. |
+| `/inventario-fisico` | `.claude/commands/inventario-fisico.md` | App Inventario Físico: conteo, rangos, auditoría, grupos, FastAPI. |
 
 ---
 
@@ -41,8 +44,9 @@ Guías de referencia para humanos y agentes. Más extensos que las skills — co
 |--------|---------|-----------|
 | **Estilos Frontend** | `frontend/design-system/MANUAL_ESTILOS.md` | Fuente de verdad única del diseño visual: colores, tipografía, espaciado, componentes, CSS variables. **Leer obligatoriamente antes de cualquier tarea de UI.** |
 | **Testing y QA** | `.agent/INSTRUCCIONES_TESTING.md` | Política completa de QA: roles, herramientas, protocolo de screenshots, ciclo de vida de bugs, checklist por módulo. **Leer antes de cualquier sesión de QA.** |
-| **Servicio IA — Manual completo** | `.agent/manuales/ia_service_manual.md` | 24 secciones: arquitectura, 8 capas de contexto, tipos, agentes, RAG, roles, gestor admin. v2.8. |
+| **Servicio IA — Manual completo** | `.agent/manuales/ia_service_manual.md` | 24 secciones: arquitectura, 8 capas de contexto, tipos, agentes, RAG, roles, gestor admin. v2.9. |
 | **Comparación de Agentes IA** | `.agent/docs/COMPARACION_AGENTES_IA.md` | Benchmark 3 rondas (105 llamadas) comparando 5 agentes en rol SQL y respuesta. Incluye decisión aplicada y cómo re-ejecutar. |
+| **Manual de Documentación** | `.agent/MANUAL_DOCUMENTACION.md` | Cómo mantener la documentación del proyecto: jerarquía, reglas de tamaño, ciclo de vida de módulos, flujo de actualización. |
 
 ---
 

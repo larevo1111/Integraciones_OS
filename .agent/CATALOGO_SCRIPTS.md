@@ -33,6 +33,37 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 
 ---
 
+## Pipeline completo — 18 pasos en orden
+
+> Referencia rápida. El detalle de cada script está en las secciones de abajo.
+
+| Paso | Script | Lenguaje | Descripción |
+|---|---|---|---|
+| **1** | `export_all.sh` (26 export_*.js) | Bash/Node | Exporta 26 módulos de Effi a `/exports/` vía Playwright |
+| **2** | `import_all.js` | Node | XLSX → TRUNCATE + INSERT en effi_data local (39 tablas) |
+| **3a** | `calcular_resumen_ventas.py` | Python | Resumen mensual facturas → `resumen_ventas_facturas_mes` |
+| **3b** | `calcular_resumen_ventas_canal.py` | Python | Facturas por canal → `resumen_ventas_facturas_canal_mes` |
+| **3c** | `calcular_resumen_ventas_cliente.py` | Python | Facturas por cliente → `resumen_ventas_facturas_cliente_mes` |
+| **3d** | `calcular_resumen_ventas_producto.py` | Python | Facturas por producto → `resumen_ventas_facturas_producto_mes` |
+| **4a** | `calcular_resumen_ventas_remisiones_mes.py` | Python | Resumen mensual remisiones → `resumen_ventas_remisiones_mes` |
+| **4b** | `calcular_resumen_ventas_remisiones_canal_mes.py` | Python | Remisiones por canal → `resumen_ventas_remisiones_canal_mes` |
+| **4c** | `calcular_resumen_ventas_remisiones_cliente_mes.py` | Python | Remisiones por cliente → `resumen_ventas_remisiones_cliente_mes` |
+| **4d** | `calcular_resumen_ventas_remisiones_producto_mes.py` | Python | Remisiones por producto → `resumen_ventas_remisiones_producto_mes` |
+| **4e** | `sync_catalogo_articulos.py` | Python | Detecta artículos nuevos → INSERT en `catalogo_articulos` |
+| **4f** | `asignar_grupo_producto.py --groq` | Python | Asigna grupo a artículos sin grupo (regex + Groq fallback) |
+| **5** | `sync_hostinger.py` | Python | effi_data + resumen + catalogo → Hostinger (~50 tablas) |
+| **6b** | `sync_espocrm_marketing.py` | Python | Sincroniza enums dinámicos a EspoCRM Contact |
+| **6c** | `sync_espocrm_contactos.py` | Python | Upsert clientes Effi → Contact en EspoCRM |
+| **6d** | `sync_espocrm_to_hostinger.py` | Python | EspoCRM Contact → `crm_contactos` en Hostinger |
+| **7a** | `generar_plantilla_import_effi.py` | Python | Contactos CRM pendientes → XLSX plantilla Effi (condicional) |
+| **7b** | `import_clientes_effi.js` | Node/Playwright | Sube XLSX a Effi vía formulario masivo (condicional: solo si 7a generó) |
+
+**Orquestador**: `python3 scripts/orquestador.py --forzar`
+**Horario**: Lun–Sáb 06:00–20:00 cada 2h (systemd timer `effi-pipeline.timer`)
+**Notificaciones**: email siempre + Telegram en error
+
+---
+
 ## 1. Orquestadores y Scripts Maestros
 
 ### orquestador.py
