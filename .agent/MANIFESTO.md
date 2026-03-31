@@ -497,6 +497,49 @@ Integraciones_OS/
 
 **Nota:** `ia_service/` y `telegram_bot/` viven dentro de `scripts/` por razones históricas. En el futuro, si crecen mucho, se pueden migrar a raíz — no es urgente.
 
+### ⚠️ REGLA: ALMACENAMIENTO DE ARCHIVOS SUBIDOS — DIRECTORIO UNIFICADO
+
+**Ruta raíz:** `/home/osserver/subidos/`
+
+Todo archivo subido por usuarios (imágenes, documentos, audio, etc.) va aquí. Cada módulo tiene su subdirectorio.
+
+```
+/home/osserver/subidos/
+├── gestion/          ← Sistema Gestión (proyectos, dificultades, tareas)
+├── inventario/       ← Fotos de inventario físico (futuro — migrar desde inventario/fotos/)
+├── ia/               ← Archivos procesados por IA (audio, imágenes generadas)
+└── erp/              ← ERP web (futuro)
+```
+
+**Política de nombres (obligatoria):**
+
+```
+{modulo}/{tipo}/{id}_{slug}/{YYYYMMDD}-{HHMMSS}_{hash6}.{ext}
+```
+
+| Segmento | Ejemplo | Regla |
+|---|---|---|
+| `modulo` | `gestion` | Nombre del módulo |
+| `tipo` | `proyecto`, `dificultad`, `tarea` | Tipo de entidad |
+| `id_slug` | `42_problema-proveedor` | ID numérico + nombre slugificado (max 40 chars, sin tildes, lowercase, guiones) |
+| `timestamp` | `20260331-152045` | Fecha-hora Colombia al momento de subir |
+| `hash6` | `a3f1b2` | 6 chars aleatorios (evita colisión si suben 2 archivos en el mismo segundo) |
+| `ext` | `jpg`, `png`, `webp`, `pdf` | Extensión original del archivo |
+
+**Ejemplo real completo:**
+```
+/home/osserver/subidos/gestion/dificultad/42_problema-proveedor/20260331-152045_a3f1b2.jpg
+```
+
+**Reglas de implementación:**
+1. **BD guarda solo la ruta relativa** desde `/home/osserver/subidos/` → `gestion/dificultad/42_problema-proveedor/20260331-152045_a3f1b2.jpg`
+2. **Nunca guardar la ruta absoluta** en BD — si cambia el servidor, solo se actualiza la raíz
+3. **El servidor sirve los archivos** como estáticos vía Express (o Nginx si se necesita más rendimiento)
+4. **Límite de tamaño:** 10 MB por archivo (imágenes). Validar en backend antes de guardar.
+5. **Formatos permitidos:** jpg, jpeg, png, webp, gif, pdf. Validar MIME type, no solo extensión.
+6. **Crear directorio del item** al subir el primer archivo (`mkdir -p` en el endpoint)
+7. **Futuro:** cuando el ERP nuevo entre en producción, migrar a Cloudflare R2 siguiendo la skill `OS_ERP_INTEGRADO/.agent/skills/multimedia_r2.md`. La ruta relativa en BD no cambia — solo cambia dónde se almacena físicamente.
+
 ---
 
 ## 11. ESTRUCTURA DE MEMORIA
