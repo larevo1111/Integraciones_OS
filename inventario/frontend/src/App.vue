@@ -1179,7 +1179,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .grupo-pt { background: rgba(34,197,94,0.15); color: #4ade80; }
 .grupo-ins { background: rgba(245,158,11,0.15); color: #fbbf24; }
 .grupo-ds { background: rgba(107,114,128,0.15); color: #9ca3af; }
-.articulo-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.articulo-nombre { overflow: hidden; text-overflow: ellipsis; }
 .unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
 .cell-categoria { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 
