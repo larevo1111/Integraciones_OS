@@ -1344,9 +1344,9 @@ onUnmounted(() => clearInterval(clockInterval))
   .articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.25; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
 
-  /* Categoría: solo tag grupo (MP, PT...) */
+  /* Categoría: texto wrap, multilinea */
   .cell-categoria { text-align: center; }
-  .grupo-tag { font-size: 7px; }
+  .grupo-tag { font-size: 6px; white-space: normal; word-break: break-all; line-height: 1.2; display: inline-block; }
 
   /* Conteo: stepper + input + badge + dots */
   .teorico-block { display: none; }
