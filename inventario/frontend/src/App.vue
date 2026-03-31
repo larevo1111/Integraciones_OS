@@ -234,7 +234,7 @@
               </div>
             </td>
             <td class="td cell-categoria" :title="grupoNombre(a.grupo)">
-              <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ a.grupo || 'MP' }}</span>
+              <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ grupoCorto(a.grupo) }}</span>
             </td>
             <td class="td">
               <div class="conteo-cell">
@@ -539,7 +539,7 @@ const mostrarListaBodegas = ref(false)
 const columns = [
   { key: 'id_effi', label: 'ID' },
   { key: 'nombre', label: 'Artículo' },
-  { key: 'categoria', label: 'Categoría' },
+  { key: 'grupo', label: 'Categ' },
 ]
 
 // ── Reloj (DOM directo, sin reactivity para no re-renderizar la tabla) ──
@@ -640,7 +640,10 @@ const sortedRows = computed(() => {
     const av = a[sortKey.value], bv = b[sortKey.value]
     const n = v => parseFloat(String(v).replace(',', '.'))
     const r = isNaN(n(av)) ? String(av ?? '').localeCompare(String(bv ?? '')) : n(av) - n(bv)
-    return sortDir.value === 'asc' ? r : -r
+    const primary = sortDir.value === 'asc' ? r : -r
+    // Segundo nivel: siempre alfabético por nombre
+    if (primary === 0) return String(a.nombre ?? '').localeCompare(String(b.nombre ?? ''))
+    return primary
   })
 })
 
@@ -960,7 +963,9 @@ function inicialesDe(nombre) {
   return nombre.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase()
 }
 const GRUPO_NOMBRES = { MP: 'Materia Prima', PP: 'Producto en Proceso', PT: 'Producto Terminado', INS: 'Insumos', DS: 'Desarrollo', DES: 'Desperdicio', NM: 'No Matriculado' }
+const GRUPO_CORTOS = { MP: 'M.Prima', PP: 'Proceso', PT: 'P.Term', INS: 'Insumo', DS: 'Desarr', DES: 'Desper', NM: 'NoMatr' }
 function grupoNombre(g) { return GRUPO_NOMBRES[g] || g || '' }
+function grupoCorto(g) { return GRUPO_CORTOS[g] || g || '' }
 function fmtNum(n) { return n != null ? Math.round(n) : '—' }
 function clasesFila(a) { return a.estado === 'contado' ? (a.diferencia === 0 ? 'row-ok' : 'row-diff') : '' }
 function claseDot(a) { if (a.estado === 'pendiente') return 'dot-pending'; if (a.diferencia === 0) return 'dot-ok'; return Math.abs(a.diferencia) >= 10 ? 'dot-critical' : 'dot-warning' }
