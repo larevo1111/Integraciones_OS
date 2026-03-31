@@ -116,7 +116,7 @@ async function subirArchivo(file) {
   try {
     const resp = await fetch('/api/gestion/upload', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('gestion_token')}` },
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('gestion_jwt')}` },
       body: formData,
     })
     const data = await resp.json()

@@ -549,7 +549,7 @@ function fmtFecha(iso) {
 @media (max-width: 768px) {
   .pp-overlay { align-items: flex-end; }
   .pp-panel {
-    width: 100%; height: auto; max-height: 95vh;
+    width: 100%; height: 88vh; max-height: 88vh;
     border-left: none; border-top: 1px solid var(--border-default);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     animation: pp-slide-up 180ms ease-out;
