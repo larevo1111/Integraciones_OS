@@ -43,26 +43,40 @@ def calcular_rango_por_unidad(unidad, stock_actual):
         return (1, max(500, stock_actual * 3))
 
 
-def detectar_grupo(articulo_id, categoria, ids_producidos):
+def detectar_grupo(articulo_id, nombre, categoria, ids_producidos):
     """Determina el grupo del artículo.
 
-    Reglas:
-    1. TPT.xx → PT (producto terminado para venta)
-    2. T03.xx → INS (insumos de empaque)
-    3. DESARROLLO DE PRODUCTO → DS
-    4. Si fue producido en una OP → PP (producto en proceso)
-    5. El resto → MP (materia prima)
+    Grupos:
+      MP  = Materia Prima
+      PP  = Producto en Proceso (producido en OPs)
+      PT  = Producto Terminado (TPT.xx)
+      INS = Insumos (T03.xx)
+      DS  = Desarrollo (DESARROLLO DE PRODUCTO)
+      DES = Desperdicio
+      NM  = No Matriculado
     """
+    nom = (nombre or '').upper()
     cat = (categoria or '').upper()
 
+    # Desperdicio
+    if 'DESPERDICIO' in nom or 'DESPERDI' in nom:
+        return 'DES'
+    # No matriculado
+    if cat.startswith('NO MATRICULADO') or (articulo_id or '').startswith('NM-'):
+        return 'NM'
+    # Producto terminado
     if cat.startswith('TPT'):
         return 'PT'
+    # Insumos
     if cat.startswith('T03'):
         return 'INS'
+    # Desarrollo
     if 'DESARROLLO' in cat:
         return 'DS'
+    # Producto en proceso (producido en OPs)
     if articulo_id in ids_producidos:
         return 'PP'
+    # Materia prima
     return 'MP'
 
 
@@ -94,7 +108,7 @@ def main():
         unidad, factor = detectar_unidad(a['nombre'])
         stock = float(a['stock'] or 0)
         rango_min, rango_max = calcular_rango_por_unidad(unidad, stock)
-        grupo = detectar_grupo(a['id'], a['categoria'], ids_producidos)
+        grupo = detectar_grupo(a['id'], a['nombre'], a['categoria'], ids_producidos)
         rangos.append((
             a['id'], a['nombre'], grupo, unidad, rango_min, rango_max, stock, factor
         ))
@@ -121,7 +135,7 @@ def main():
     print(f"Rangos generados: {len(rangos)} artículos")
     print(f"\nGrupos:")
     for g, n in sorted(grupos.items(), key=lambda x: -x[1]):
-        nombres = {'MP': 'Materia Prima', 'PP': 'Producto en Proceso', 'PT': 'Producto Terminado', 'INS': 'Insumos', 'DS': 'Desarrollo'}
+        nombres = {'MP': 'Materia Prima', 'PP': 'Producto en Proceso', 'PT': 'Producto Terminado', 'INS': 'Insumos', 'DS': 'Desarrollo', 'DES': 'Desperdicio', 'NM': 'No Matriculado'}
         print(f"  {g} ({nombres.get(g, g)}): {n}")
     print(f"\nUnidades:")
     for u, n in sorted(unidades.items(), key=lambda x: -x[1]):
