@@ -886,7 +886,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .stepper-btn:active { background: var(--accent-muted); color: var(--accent); }
 .stepper-down { border-radius: 4px 0 0 4px; border-right: none; }
 .stepper-up { border-radius: 0 4px 4px 0; border-left: none; }
-.count-input { width: 52px; height: 32px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 0; color: var(--text-primary); font-size: 14px; font-weight: 500; font-family: 'Fragment Mono', monospace; text-align: center; outline: none; -moz-appearance: textfield; }
+.count-input { width: 60px; height: 32px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 0; color: var(--text-primary); font-size: 13px; font-weight: 500; font-family: 'Fragment Mono', monospace; text-align: center; outline: none; -moz-appearance: textfield; }
 .count-input::-webkit-inner-spin-button, .count-input::-webkit-outer-spin-button { -webkit-appearance: none; }
 .count-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,200,83,0.15); }
 .input-ok { border-color: var(--color-ok); background: rgba(34,197,94,0.06); }
@@ -996,7 +996,7 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Conteo */
   .teorico-block { display: none; }
   .stepper-btn { width: 24px; height: 32px; }
-  .count-input { width: 40px; height: 32px; font-size: 14px; }
+  .count-input { width: 50px; height: 32px; font-size: 13px; }
   .conteo-cell { gap: 2px; }
   .diff-badge { font-size: 9px; min-width: 22px; padding: 1px 3px; }
 
