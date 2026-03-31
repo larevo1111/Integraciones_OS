@@ -149,9 +149,25 @@
                 </div>
                 <input class="count-input" :class="claseInput(a)" type="number" inputmode="numeric" placeholder="—" :value="a.inventario_fisico" @change="onConteo(a, $event)">
                 <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
-                <button class="action-btn" :class="{ 'has-note': a.notas }" @click.stop="abrirNotas(a)">
-                  <span class="material-icons" style="font-size:16px">more_vert</span>
-                </button>
+                <div class="action-menu-wrap">
+                  <button class="action-btn" :class="{ 'has-note': a.notas || a.foto }" @click.stop="toggleMenu(a.id)">
+                    <span class="material-icons" style="font-size:16px">more_vert</span>
+                  </button>
+                  <div v-if="menuAbierto === a.id" class="action-menu" @click.stop>
+                    <div class="action-menu-item" @click="abrirNotas(a); menuAbierto = null">
+                      <span class="material-icons" style="font-size:14px">edit_note</span>
+                      <span>{{ a.notas ? 'Editar nota' : 'Agregar nota' }}</span>
+                    </div>
+                    <div class="action-menu-item" @click="tomarFoto(a); menuAbierto = null">
+                      <span class="material-icons" style="font-size:14px">photo_camera</span>
+                      <span>Tomar foto</span>
+                    </div>
+                    <div v-if="a.foto" class="action-menu-item" @click="verFoto(a); menuAbierto = null">
+                      <span class="material-icons" style="font-size:14px">image</span>
+                      <span>Ver foto</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </td>
           </tr>
@@ -243,6 +259,23 @@
         </div>
       </div>
     </div>
+
+    <!-- MODAL VER FOTO -->
+    <div v-if="mostrarFoto" class="inv-overlay" @click.self="mostrarFoto = false">
+      <div class="inv-modal">
+        <div class="inv-modal-header">
+          <span>Foto — {{ articuloFoto?.nombre }}</span>
+          <button class="action-btn" @click="mostrarFoto = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body" style="padding:0">
+          <img :src="API + '/api/inventario/fotos/' + articuloFoto?.foto" class="inv-foto-preview">
+        </div>
+      </div>
+    </div>
+
+    <!-- INPUT OCULTO PARA CÁMARA -->
+    <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="onFotoCapturada">
+
   </div>
 </template>
 
@@ -278,6 +311,11 @@ const mostrarNotas = ref(false)
 const articuloNota = ref(null)
 const textoNota = ref('')
 const panelAbierto = ref(false)
+const menuAbierto = ref(null)
+const mostrarFoto = ref(false)
+const articuloFoto = ref(null)
+const fotoInput = ref(null)
+const articuloParaFoto = ref(null)
 const fechasInventario = ref([])
 const mostrarListaBodegas = ref(false)
 
@@ -471,7 +509,7 @@ async function guardarNota() {
   if (!articuloNota.value) return
   await fetch(API + `/api/inventario/articulos/${articuloNota.value.id}/nota`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ notas: textoNota.value })
+    body: JSON.stringify({ notas: textoNota.value, usuario: usuario.value })
   })
   articuloNota.value.notas = textoNota.value
   cerrarNotas()
@@ -493,6 +531,39 @@ async function agregarArticulo(art) {
   })
   mostrarAgregar.value = false; busquedaAgregar.value = ''; resultadosAgregar.value = []
   cargarArticulos(); cargarResumen(); cargarBodegas()
+}
+
+// ── Menú acciones ──
+function toggleMenu(id) { menuAbierto.value = menuAbierto.value === id ? null : id }
+
+// ── Fotos ──
+function tomarFoto(a) {
+  articuloParaFoto.value = a
+  fotoInput.value?.click()
+}
+
+async function onFotoCapturada(event) {
+  const file = event.target.files[0]
+  if (!file || !articuloParaFoto.value) return
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('usuario', usuario.value)
+
+  const res = await fetch(API + `/api/inventario/articulos/${articuloParaFoto.value.id}/foto`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  }).then(r => r.json())
+
+  articuloParaFoto.value.foto = res.foto
+  articuloParaFoto.value = null
+  event.target.value = ''
+}
+
+function verFoto(a) {
+  articuloFoto.value = a
+  mostrarFoto.value = true
 }
 
 // ── Helpers visuales ──
@@ -573,7 +644,7 @@ async function cargarDatos() {
 
 onMounted(async () => {
   actualizarReloj(); clockInterval = setInterval(actualizarReloj, 1000)
-  document.addEventListener('click', () => { mostrarListaBodegas.value = false })
+  document.addEventListener('click', () => { mostrarListaBodegas.value = false; menuAbierto.value = null })
 
   if (verificarSesion()) {
     await cargarDatos()
@@ -710,9 +781,14 @@ onUnmounted(() => clearInterval(clockInterval))
 .badge-error { background: rgba(248,113,113,0.12); color: #f87171; }
 .badge-empty { color: var(--text-tertiary); }
 
+.action-menu-wrap { position: relative; }
 .action-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer; border-radius: 4px; }
 .action-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
 .action-btn.has-note { color: var(--accent); }
+.action-menu { position: absolute; right: 0; top: calc(100% + 4px); background: var(--bg-card, #1c1c1e); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,0.6); min-width: 160px; z-index: 100; padding: 4px; animation: popup-col-in 80ms ease-out; }
+.action-menu-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.action-menu-item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+.inv-foto-preview { width: 100%; max-height: 60vh; object-fit: contain; display: block; border-radius: 0 0 8px 8px; }
 
 /* FAB */
 .inv-fab { position: fixed; bottom: 24px; right: 24px; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #000; border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(0,200,83,0.4); display: flex; align-items: center; justify-content: center; z-index: 20; }

@@ -2,8 +2,8 @@
 API FastAPI para inventario físico OS.
 Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
 """
-import os, jwt
-from fastapi import FastAPI, HTTPException, Request, Depends
+import os, jwt, uuid, shutil
+from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -15,6 +15,7 @@ import pymysql
 app = FastAPI(title="Inventario OS", version="1.0")
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'inventario', 'static')
+FOTOS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'inventario', 'fotos')
 JWT_SECRET = '30e4cfa02643f4f05b846aab50974c7a5df85b1f05c990b3fe64e297538adbc2'
 
 
@@ -60,6 +61,14 @@ def db_execute(db_config, sql, params=None):
         affected = cur.rowcount
     conn.close()
     return affected
+
+
+def registrar_auditoria(conteo_id, accion, usuario, valor_anterior=None, valor_nuevo=None, detalle=None):
+    db_execute(DB_INV, """
+        INSERT INTO inv_auditorias (conteo_id, accion, usuario, valor_anterior, valor_nuevo, detalle)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (conteo_id, accion, usuario, str(valor_anterior) if valor_anterior is not None else None,
+          str(valor_nuevo) if valor_nuevo is not None else None, detalle))
 
 
 # === ENDPOINTS ===
@@ -135,7 +144,7 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
     sql = """
         SELECT id, id_effi, cod_barras, nombre, categoria, bodega,
                inventario_teorico, inventario_fisico, diferencia,
-               costo_promedio, estado, contado_por, fecha_conteo, notas
+               costo_promedio, estado, contado_por, fecha_conteo, notas, foto
         FROM inv_conteos
         WHERE fecha_inventario = %s AND excluido = 0
     """
@@ -177,12 +186,18 @@ class ConteoUpdate(BaseModel):
 @app.put("/api/inventario/articulos/{id}/conteo")
 def registrar_conteo(id: int, data: ConteoUpdate):
     """Registra el conteo físico de un artículo."""
-    rows = db_query(DB_INV, "SELECT inventario_teorico FROM inv_conteos WHERE id = %s", (id,))
+    rows = db_query(DB_INV, "SELECT inventario_teorico, inventario_fisico, contado_por FROM inv_conteos WHERE id = %s", (id,))
     if not rows:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
 
-    teorico = float(rows[0]['inventario_teorico'] or 0)
+    anterior = rows[0]
+    teorico = float(anterior['inventario_teorico'] or 0)
+    fisico_anterior = anterior['inventario_fisico']
     diferencia = data.inventario_fisico - teorico
+
+    accion = 'edicion' if fisico_anterior is not None else 'conteo'
+    registrar_auditoria(id, accion, data.contado_por, fisico_anterior, data.inventario_fisico,
+                        f"Contado por {anterior['contado_por']}" if accion == 'edicion' and anterior['contado_por'] else None)
 
     db_execute(DB_INV, """
         UPDATE inv_conteos
@@ -199,13 +214,41 @@ def registrar_conteo(id: int, data: ConteoUpdate):
 
 class NotaUpdate(BaseModel):
     notas: str
+    usuario: Optional[str] = 'sistema'
 
 
 @app.put("/api/inventario/articulos/{id}/nota")
 def actualizar_nota(id: int, data: NotaUpdate):
     """Agrega o actualiza nota de un artículo."""
+    rows = db_query(DB_INV, "SELECT notas FROM inv_conteos WHERE id = %s", (id,))
+    anterior = rows[0]['notas'] if rows else None
     db_execute(DB_INV, "UPDATE inv_conteos SET notas = %s WHERE id = %s", (data.notas, id))
+    registrar_auditoria(id, 'nota', data.usuario, anterior, data.notas)
     return {"ok": True}
+
+
+@app.post("/api/inventario/articulos/{id}/foto")
+async def subir_foto(id: int, usuario: str = Form(...), file: UploadFile = File(...)):
+    """Sube una foto para un artículo."""
+    ext = os.path.splitext(file.filename)[1] or '.jpg'
+    nombre = f"{id}_{uuid.uuid4().hex[:8]}{ext}"
+    ruta = os.path.join(FOTOS_DIR, nombre)
+
+    with open(ruta, 'wb') as f:
+        shutil.copyfileobj(file.file, f)
+
+    db_execute(DB_INV, "UPDATE inv_conteos SET foto = %s WHERE id = %s", (nombre, id))
+    registrar_auditoria(id, 'foto', usuario, None, nombre)
+    return {"ok": True, "foto": nombre}
+
+
+@app.get("/api/inventario/fotos/{nombre}")
+def obtener_foto(nombre: str):
+    """Sirve una foto."""
+    ruta = os.path.join(FOTOS_DIR, nombre)
+    if not os.path.exists(ruta):
+        raise HTTPException(status_code=404, detail="Foto no encontrada")
+    return FileResponse(ruta)
 
 
 class ArticuloAgregar(BaseModel):
