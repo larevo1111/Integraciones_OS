@@ -17,6 +17,10 @@
           <option value="">Prioridad</option>
           <option v-for="p in ['Baja','Media','Alta','Urgente']" :key="p" :value="p">{{ p }}</option>
         </select>
+        <select v-model="filtroCategoria" class="filtro-select">
+          <option value="">Categoría</option>
+          <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+        </select>
         <button class="btn-crear" @click="abrirCrear">
           <span class="material-icons" style="font-size:14px">add</span>
           Nuevo
@@ -103,11 +107,13 @@ const etiquetas  = ref([])
 
 const filtroEstado    = ref('')
 const filtroPrioridad = ref('')
+const filtroCategoria = ref('')
 
 const filasFiltradas = computed(() => {
   let result = items.value
   if (filtroEstado.value)    result = result.filter(i => i.estado === filtroEstado.value)
   if (filtroPrioridad.value) result = result.filter(i => i.prioridad === filtroPrioridad.value)
+  if (filtroCategoria.value) result = result.filter(i => i.categoria_id === filtroCategoria.value)
   return result
 })
 
@@ -168,11 +174,12 @@ function onEliminado(p) {
 watch(() => props.tipo, () => {
   filtroEstado.value = ''
   filtroPrioridad.value = ''
+  filtroCategoria.value = ''
   panelVisible.value = false
   cargar()
 })
 
-onMounted(() => { cargar() })
+onMounted(() => { cargar(); cargarDatos() })
 </script>
 
 <style scoped>
