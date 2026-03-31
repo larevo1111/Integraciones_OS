@@ -15,6 +15,7 @@ Patrones técnicos reutilizables y reglas de negocio obligatorias. Aplican a cua
 | **Desarrollo Python** | `.agent/skills/desarrollo_python.md` | Límites de líneas (400/archivo, 80/función), regla de 1 responsabilidad, estructura estándar de módulos, prevención de duplicados, checklist pre-commit. Inventario actual de tamaños. | **Obligatorio** antes de escribir o modificar cualquier código Python. Nació del refactor de servicio.py (1,756→1,028 líneas). |
 | **Inventario Físico** | `.agent/skills/inventario.md` | App inv.oscomunidad.com: BD os_inventario, scripts depuración/rangos, API FastAPI, grupos MP/PP/PT/INS/DS, validación unidades, auditoría, políticas de acceso. | Contexto detallado en `.agent/contextos/inventario_fisico.md`. |
 | **Sistema Gestión** | `.agent/skills/sistema_gestion.md` | App gestion.oscomunidad.com: Tareas+Jornadas+Proyectos. Vue+Quasar+Express, BD Hostinger, 3 pools MySQL. | 30+ endpoints, 15 tablas, cronómetro, multi-selección, cascada estados. |
+| **Maquetación CSS** | `.agent/skills/maquetacion.md` | Reglas de layout responsive, table-layout: fixed, Vue reactivity + inputs, presupuesto de píxeles, validación con Playwright. 10 reglas + checklist pre-deploy. | **Obligatorio** antes de cualquier tarea de CSS responsive o layout de tablas. Nació del inventario físico (10+ iteraciones perdidas). |
 
 ---
 
