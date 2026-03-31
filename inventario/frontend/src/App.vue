@@ -527,13 +527,14 @@ function debounceSearch() { clearTimeout(searchTimeout); searchTimeout = setTime
 async function onConteo(articulo, event) {
   const valor = parseDecimal(event.target.value)
   if (isNaN(valor)) return
+  // Actualizar ANTES del await para que Vue no borre el input
+  articulo.inventario_fisico = valor
+  articulo.estado = 'contado'
   const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ inventario_fisico: valor, contado_por: usuario.value })
   }).then(r => r.json())
-  articulo.inventario_fisico = valor
   articulo.diferencia = res.diferencia
-  articulo.estado = 'contado'
   cargarResumen()
   cargarBodegas()
 }
@@ -587,13 +588,13 @@ function ajustarConteo(articulo, delta) {
 }
 
 async function onConteoDirecto(articulo, valor) {
+  articulo.inventario_fisico = valor
+  articulo.estado = 'contado'
   const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
     method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ inventario_fisico: valor, contado_por: usuario.value })
   }).then(r => r.json())
-  articulo.inventario_fisico = valor
   articulo.diferencia = res.diferencia
-  articulo.estado = 'contado'
   cargarResumen()
   cargarBodegas()
 }
