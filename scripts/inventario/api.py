@@ -2,8 +2,8 @@
 API FastAPI para inventario físico OS.
 Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
 """
-import os
-from fastapi import FastAPI, HTTPException
+import os, jwt
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -15,6 +15,22 @@ import pymysql
 app = FastAPI(title="Inventario OS", version="1.0")
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'inventario', 'static')
+JWT_SECRET = '30e4cfa02643f4f05b846aab50974c7a5df85b1f05c990b3fe64e297538adbc2'
+
+
+def verificar_jwt(request: Request):
+    """Valida el JWT del header Authorization."""
+    auth = request.headers.get('authorization', '')
+    token = auth[7:] if auth.startswith('Bearer ') else None
+    if not token:
+        raise HTTPException(status_code=401, detail='No autenticado')
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail='Token expirado')
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail='Token inválido')
 
 app.add_middleware(
     CORSMiddleware,

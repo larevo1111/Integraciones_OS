@@ -1,5 +1,18 @@
 <template>
-  <div class="inv-app" :class="{ 'panel-open': panelAbierto }">
+  <!-- LOGIN -->
+  <div v-if="!autenticado" class="inv-login">
+    <div class="inv-login-card">
+      <div class="inv-login-logo">I</div>
+      <h1 class="inv-login-title">Inventario OS</h1>
+      <p class="inv-login-subtitle">Conteo de inventario físico</p>
+      <div id="google-signin-btn" class="inv-login-btn-wrap"></div>
+      <p v-if="loginError" class="inv-login-error">{{ loginError }}</p>
+      <p v-if="loginCargando" class="inv-login-loading">Autenticando...</p>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div v-else class="inv-app" :class="{ 'panel-open': panelAbierto }">
 
     <!-- SIDE PANEL RETRÁCTIL — Inventarios -->
     <aside class="inv-panel" :class="{ open: panelAbierto }">
@@ -237,7 +250,16 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 
 const API = window.location.origin
+const AUTH_API = 'https://gestion.oscomunidad.com'
+const GOOGLE_CLIENT_ID = '290093919454-j2l1el0p624v65cada556pdc3r2gm6k7.apps.googleusercontent.com'
+const KEY_JWT = 'inv_jwt'
+const KEY_USUARIO = 'inv_usuario'
 const FECHA = ref('2026-03-30')
+
+// Auth
+const autenticado = ref(false)
+const loginError = ref('')
+const loginCargando = ref(false)
 
 const usuario = ref('Santiago')
 const iniciales = ref('SS')
@@ -390,7 +412,11 @@ function clearColumn(key) {
 }
 
 // ── API ──
-async function fetchApi(path) { return (await fetch(API + path)).json() }
+function authHeaders() {
+  const t = localStorage.getItem(KEY_JWT)
+  return t ? { 'Authorization': `Bearer ${t}` } : {}
+}
+async function fetchApi(path) { return (await fetch(API + path, { headers: authHeaders() })).json() }
 
 async function cargarFechas() { fechasInventario.value = await fetchApi('/api/inventario/fechas') }
 async function cargarBodegas() { bodegas.value = await fetchApi(`/api/inventario/bodegas/todas?fecha=${FECHA.value}`) }
@@ -477,15 +503,98 @@ function claseInput(a) { if (a.inventario_fisico == null) return ''; if (a.difer
 function claseBadge(a) { if (a.estado === 'pendiente') return 'badge-empty'; if (a.diferencia === 0) return 'badge-ok'; return Math.abs(a.diferencia) >= 10 ? 'badge-error' : 'badge-warning' }
 function textoBadge(a) { if (a.estado === 'pendiente') return '—'; if (a.diferencia === 0) return 'OK'; return (a.diferencia > 0 ? '+' : '') + Math.round(a.diferencia) }
 
+// ── Auth ──
+function initGoogleSignIn() {
+  const checkGoogle = setInterval(() => {
+    if (window.google?.accounts?.id) {
+      clearInterval(checkGoogle)
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: onGoogleCallback,
+        ux_mode: 'popup'
+      })
+      window.google.accounts.id.renderButton(
+        document.getElementById('google-signin-btn'),
+        { theme: 'filled_black', size: 'large', width: 280, text: 'continue_with', locale: 'es' }
+      )
+    }
+  }, 100)
+}
+
+async function onGoogleCallback(response) {
+  loginCargando.value = true
+  loginError.value = ''
+  try {
+    const res = await fetch(AUTH_API + '/api/gestion/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_token: response.credential })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Error de autenticación')
+
+    localStorage.setItem(KEY_JWT, data.token)
+    localStorage.setItem(KEY_USUARIO, JSON.stringify(data.usuario))
+    establecerUsuario(data.usuario)
+    autenticado.value = true
+    await nextTick()
+    await cargarDatos()
+  } catch (e) {
+    loginError.value = e.message
+  } finally {
+    loginCargando.value = false
+  }
+}
+
+function establecerUsuario(u) {
+  if (u?.nombre) {
+    usuario.value = u.nombre
+    iniciales.value = u.nombre.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase()
+  }
+}
+
+function verificarSesion() {
+  const token = localStorage.getItem(KEY_JWT)
+  const usr = localStorage.getItem(KEY_USUARIO)
+  if (token && usr) {
+    try {
+      const u = JSON.parse(usr)
+      establecerUsuario(u)
+      autenticado.value = true
+      return true
+    } catch {}
+  }
+  return false
+}
+
+async function cargarDatos() {
+  await cargarFechas(); await cargarBodegas(); await cargarResumen(); await cargarArticulos()
+}
+
 onMounted(async () => {
   actualizarReloj(); clockInterval = setInterval(actualizarReloj, 1000)
   document.addEventListener('click', () => { mostrarListaBodegas.value = false })
-  await cargarFechas(); await cargarBodegas(); await cargarResumen(); await cargarArticulos()
+
+  if (verificarSesion()) {
+    await cargarDatos()
+  } else {
+    nextTick(() => initGoogleSignIn())
+  }
 })
 onUnmounted(() => clearInterval(clockInterval))
 </script>
 
 <style scoped>
+/* LOGIN */
+.inv-login { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg-app); }
+.inv-login-card { background: var(--bg-card, #1c1c1e); border: 1px solid var(--border-default); border-radius: 12px; padding: 40px 36px; text-align: center; width: 360px; box-shadow: 0 20px 80px rgba(0,0,0,0.5); }
+.inv-login-logo { width: 48px; height: 48px; border-radius: 12px; background: var(--accent-muted); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; margin: 0 auto 16px; }
+.inv-login-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.inv-login-subtitle { font-size: 13px; color: var(--text-secondary); margin-bottom: 28px; }
+.inv-login-btn-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
+.inv-login-error { color: var(--color-error); font-size: 12px; margin-top: 8px; }
+.inv-login-loading { color: var(--text-tertiary); font-size: 12px; margin-top: 8px; }
+
 .inv-app { display: flex; height: 100vh; overflow: hidden; }
 .inv-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
