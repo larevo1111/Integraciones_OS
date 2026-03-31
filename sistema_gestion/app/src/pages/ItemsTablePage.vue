@@ -1,33 +1,27 @@
 <template>
   <div class="items-page">
-    <!-- Header -->
-    <div class="items-header">
-      <h2 class="items-title">{{ CONFIG[tipo].title }}</h2>
-      <button class="btn-crear" @click="abrirCrear">
-        <span class="material-icons" style="font-size:15px">add</span>
-        {{ CONFIG[tipo].btnCrear }}
-      </button>
-    </div>
-
-    <!-- Filtros -->
-    <div class="items-filtros">
-      <select v-model="filtroEstado" class="filtro-select">
-        <option value="">Todos los estados</option>
-        <option v-for="e in CONFIG[tipo].estados" :key="e" :value="e">{{ e }}</option>
-      </select>
-      <select v-model="filtroPrioridad" class="filtro-select">
-        <option value="">Todas las prioridades</option>
-        <option v-for="p in ['Baja','Media','Alta','Urgente']" :key="p" :value="p">{{ p }}</option>
-      </select>
-    </div>
-
     <!-- Tabla -->
     <GestionTable
+      :title="CONFIG[tipo].title"
       :columns="columnas"
       :rows="filasFiltradas"
       :loading="cargando"
       @row-click="abrirDetalle"
     >
+      <template #toolbar>
+        <select v-model="filtroEstado" class="filtro-select">
+          <option value="">Estado</option>
+          <option v-for="e in CONFIG[tipo].estados" :key="e" :value="e">{{ e }}</option>
+        </select>
+        <select v-model="filtroPrioridad" class="filtro-select">
+          <option value="">Prioridad</option>
+          <option v-for="p in ['Baja','Media','Alta','Urgente']" :key="p" :value="p">{{ p }}</option>
+        </select>
+        <button class="btn-crear" @click="abrirCrear">
+          <span class="material-icons" style="font-size:14px">add</span>
+          Nuevo
+        </button>
+      </template>
       <template #cell-nombre="{ row, value }">
         <div style="display:flex;align-items:center;gap:6px">
           <span :style="`width:8px;height:8px;border-radius:50%;background:${row.color||'#607D8B'};flex-shrink:0`" />
@@ -183,35 +177,18 @@ onMounted(() => { cargar() })
 
 <style scoped>
 .items-page { padding: 0; }
-.items-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px 8px;
-}
-.items-title {
-  font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0;
-}
 .btn-crear {
   display: inline-flex; align-items: center; gap: 4px;
-  height: 32px; padding: 0 14px; border-radius: var(--radius-md);
+  height: 28px; padding: 0 12px; border-radius: var(--radius-md);
   border: none; background: #fff; color: #111;
   font-size: 12px; font-weight: 600; cursor: pointer;
   font-family: var(--font-sans);
 }
 .btn-crear:hover { background: #e8e8e8; }
-
-.items-filtros {
-  display: flex; gap: 8px; padding: 4px 20px 12px; flex-wrap: wrap;
-}
 .filtro-select {
   height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
   border: 1px solid var(--border-default); background: var(--bg-card);
   color: var(--text-primary); font-size: 12px; font-family: var(--font-sans);
 }
 .filtro-select:focus { outline: none; border-color: var(--accent); }
-
-@media (max-width: 600px) {
-  .items-header { padding: 12px 14px 6px; }
-  .items-title { font-size: 16px; }
-  .items-filtros { padding: 4px 14px 8px; }
-}
 </style>

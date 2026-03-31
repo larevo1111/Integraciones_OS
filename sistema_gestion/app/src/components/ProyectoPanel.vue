@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="pp-overlay" @click.self="$emit('cerrar')">
-      <aside class="pp-panel" :class="{ 'pp-mobile': esMobile }">
+      <aside class="pp-panel" :class="{ 'pp-mobile': esMobile }" @click.stop>
 
         <!-- ═══ SUB-PANEL: Detalle tarea ═══ -->
         <template v-if="tareaAbierta">
