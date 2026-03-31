@@ -357,7 +357,7 @@ function fmtFecha(iso) {
   display: flex; justify-content: flex-end;
 }
 .pp-panel {
-  width: 420px; max-width: 100%;
+  width: 500px; max-width: 100%;
   height: 100vh;
   background: var(--bg-card);
   border-left: 1px solid var(--border-default);

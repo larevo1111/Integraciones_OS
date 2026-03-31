@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { api } from 'src/services/api'
 import GestionTable from 'src/components/GestionTable.vue'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
@@ -169,6 +169,14 @@ function onGuardado(p) {
 function onEliminado(p) {
   items.value = items.value.filter(x => x.id !== p.id)
 }
+
+// Recargar cuando cambia el tipo (Vue Router reutiliza el componente)
+watch(() => props.tipo, () => {
+  filtroEstado.value = ''
+  filtroPrioridad.value = ''
+  panelVisible.value = false
+  cargar()
+})
 
 onMounted(() => { cargar() })
 </script>
