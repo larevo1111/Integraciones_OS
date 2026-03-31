@@ -208,15 +208,45 @@
                 <span class="material-icons">close</span>
               </button>
             </div>
-            <nav class="sidebar-nav">
-              <RouterLink to="/tareas"       class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">check_circle_outline</span><span class="nav-item-label">Mis Tareas</span></RouterLink>
-              <RouterLink to="/equipo"       class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">group</span><span class="nav-item-label">Equipo</span></RouterLink>
-              <RouterLink to="/jornadas"     class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">schedule</span><span class="nav-item-label">Jornadas</span></RouterLink>
-              <div class="sidebar-section-label" style="padding:12px 16px 2px">Tablas</div>
-              <RouterLink to="/proyectos-tabla" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">folder_open</span><span class="nav-item-label">Proyectos</span></RouterLink>
-              <RouterLink to="/dificultades" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">warning_amber</span><span class="nav-item-label">Dificultades</span></RouterLink>
-              <RouterLink to="/compromisos"  class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">task_alt</span><span class="nav-item-label">Compromisos</span></RouterLink>
-              <RouterLink to="/ideas"        class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">lightbulb_outline</span><span class="nav-item-label">Ideas</span></RouterLink>
+            <nav class="sidebar-nav" style="overflow-y:auto">
+              <RouterLink to="/tareas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">check_circle_outline</span><span class="nav-item-label">Mis Tareas</span></RouterLink>
+              <RouterLink to="/equipo" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">group</span><span class="nav-item-label">Equipo</span></RouterLink>
+              <RouterLink to="/jornadas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">schedule</span><span class="nav-item-label">Jornadas</span></RouterLink>
+
+              <!-- Secciones dinámicas con items -->
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="sec.tipo" class="sidebar-section">
+                <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
+                  <span>{{ sec.label }}</span>
+                  <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click="drawerOpen=false; abrirPanel(sec.tipo)">
+                    <span class="material-icons" style="font-size:14px">add</span>
+                  </button>
+                </div>
+                <RouterLink
+                  v-for="p in itemsPorTipo(sec.tipo)"
+                  :key="p.id"
+                  :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                  class="nav-item nav-item-proyecto"
+                  @click="drawerOpen=false"
+                >
+                  <span class="nav-item-icon">
+                    <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
+                  </span>
+                  <span class="nav-item-label">{{ p.nombre }}</span>
+                  <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
+                </RouterLink>
+                <div v-if="!itemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
+                  Sin {{ sec.label.toLowerCase() }}
+                </div>
+              </div>
+
+              <!-- Links tablas -->
+              <div class="sidebar-section">
+                <div class="sidebar-section-label">Tablas</div>
+                <RouterLink to="/proyectos-tabla" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">folder_open</span><span class="nav-item-label">Proyectos</span></RouterLink>
+                <RouterLink to="/dificultades" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">warning_amber</span><span class="nav-item-label">Dificultades</span></RouterLink>
+                <RouterLink to="/compromisos" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">task_alt</span><span class="nav-item-label">Compromisos</span></RouterLink>
+                <RouterLink to="/ideas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">lightbulb_outline</span><span class="nav-item-label">Ideas</span></RouterLink>
+              </div>
             </nav>
           </aside>
         </div>
