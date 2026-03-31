@@ -228,11 +228,14 @@
             <td class="td td-center"><span class="status-dot" :class="claseDot(a)"></span></td>
             <td class="td cell-id">{{ a.id_effi }}</td>
             <td class="td cell-articulo">
-              <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ a.grupo || 'MP' }}</span>
-              <span class="articulo-nombre">{{ a.nombre }}</span>
-              <span v-if="a.unidad" class="unit-tag">{{ a.unidad }}</span>
+              <div class="articulo-line1">
+                <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ a.grupo || 'MP' }}</span>
+                <span class="articulo-nombre">{{ a.nombre }}</span>
+                <span v-if="a.unidad" class="unit-tag">{{ a.unidad }}</span>
+              </div>
+              <div class="articulo-line2">{{ a.categoria }}</div>
             </td>
-            <td class="td cell-categoria">{{ a.categoria }}</td>
+            <td class="td cell-categoria cell-categoria-desktop">{{ a.categoria }}</td>
             <td class="td">
               <div class="conteo-cell">
                 <div class="teorico-block">
@@ -1173,7 +1176,9 @@ onUnmounted(() => clearInterval(clockInterval))
 .dot-critical { background: var(--color-error); box-shadow: 0 0 6px rgba(248,113,113,0.3); }
 
 .cell-id { font-size: 12px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; }
-.cell-articulo { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.cell-articulo { font-size: 13px; color: var(--text-primary); }
+.articulo-line1 { display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.articulo-line2 { display: none; }
 .grupo-tag { font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
 .grupo-mp { background: rgba(59,130,246,0.15); color: #60a5fa; }
 .grupo-pp { background: rgba(168,85,247,0.15); color: #c084fc; }
@@ -1183,6 +1188,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .articulo-nombre { overflow: hidden; text-overflow: ellipsis; }
 .unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
 .cell-categoria { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.cell-categoria-desktop { }
 
 /* CONTEO CELL */
 .conteo-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; height: 44px; }
@@ -1306,29 +1312,33 @@ onUnmounted(() => clearInterval(clockInterval))
   .inv-bodega-add-btn { width: 20px; height: 20px; }
   .inv-bodega-dropdown { left: auto; right: 0; min-width: 180px; }
 
-  /* Tabla: ocultar ID y categoría */
+  /* Tabla: ocultar ID y columna categoría desktop */
   .inv-table { table-layout: auto; width: 100%; }
   .inv-table col:nth-child(2), .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
-  .inv-table col:nth-child(4), .inv-table .cell-categoria, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
+  .inv-table col:nth-child(4), .cell-categoria-desktop, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
   .inv-table col:nth-child(1) { width: 18px; }
   .inv-table col:nth-child(3) { width: auto; }
-  .inv-table col:nth-child(5) { width: 140px; }
-  .inv-table td { padding: 0 3px; height: 40px; }
-  .inv-table th { padding: 0 3px; font-size: 9px; height: 28px; }
+  .inv-table col:nth-child(5) { width: 130px; }
+  .inv-table td { padding: 0 4px; height: auto; min-height: 40px; vertical-align: middle; }
+  .inv-table th { padding: 0 4px; font-size: 9px; height: 28px; }
 
-  /* Conteo */
+  /* Artículo: 2 líneas — nombre + categoría debajo */
+  .cell-articulo { padding: 4px 0; }
+  .articulo-line1 { font-size: 12px; gap: 3px; flex-wrap: nowrap; }
+  .articulo-line2 { display: block; font-size: 9px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+  .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grupo-tag { font-size: 7px; padding: 1px 3px; }
+  .unit-tag { font-size: 7px; padding: 1px 3px; }
+
+  /* Conteo: compacto */
   .teorico-block { display: none; }
-  .stepper-btn { width: 24px; height: 32px; }
-  .count-input { width: 50px; height: 32px; font-size: 13px; }
+  .stepper-btn { width: 22px; height: 28px; }
+  .count-input { width: 42px; height: 28px; font-size: 12px; }
   .conteo-cell { gap: 2px; }
-  .diff-badge { font-size: 9px; min-width: 22px; padding: 1px 3px; }
+  .diff-badge { font-size: 8px; min-width: 20px; padding: 1px 2px; }
+  .contador-chip { font-size: 7px; padding: 0 2px; }
 
-  /* Artículo: letra más chica, wrap */
-  .cell-articulo { font-size: 11px; white-space: normal; line-height: 1.2; flex-wrap: wrap; }
-  .grupo-tag { font-size: 6px; padding: 0 2px; }
-  .unit-tag { font-size: 6px; padding: 0 2px; }
-
-  /* Status dot más chico */
+  /* Status dot */
   .status-dot { width: 6px; height: 6px; }
 
   /* Modales */
