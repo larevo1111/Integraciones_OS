@@ -387,6 +387,15 @@ def reiniciar_inventario(data: GestionInventario):
     return {"ok": True, "reiniciados": affected}
 
 
+@app.post("/api/inventario/eliminar")
+def eliminar_inventario(data: GestionInventario):
+    """Elimina un inventario completo (todas las filas de esa fecha)."""
+    affected = db_execute(DB_INV, "DELETE FROM inv_conteos WHERE fecha_inventario = %s", (data.fecha_inventario,))
+    registrar_auditoria(0, 'eliminar_inventario', data.usuario, None, data.fecha_inventario,
+                        f'{affected} filas eliminadas')
+    return {"ok": True, "eliminados": affected}
+
+
 @app.post("/api/inventario/cerrar")
 def cerrar_inventario(data: GestionInventario):
     """Cierra un inventario (marca estado = 'cerrado' en pendientes)."""

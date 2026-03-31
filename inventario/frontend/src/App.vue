@@ -39,6 +39,9 @@
             <button class="inv-panel-action" @click.stop="confirmarCerrar" title="Cerrar inventario">
               <span class="material-icons" style="font-size:13px">lock</span>
             </button>
+            <button v-if="puede('eliminar_inventario')" class="inv-panel-action inv-panel-action-danger" @click.stop="confirmarEliminar" title="Eliminar inventario">
+              <span class="material-icons" style="font-size:13px">delete_outline</span>
+            </button>
           </div>
         </div>
         <div v-if="!fechasInventario.length" class="inv-panel-empty">Sin inventarios</div>
@@ -94,6 +97,24 @@
           <div class="alerta-btns">
             <button class="alerta-btn-confirmar" @click="mostrarConfirmCerrar = false">Cancelar</button>
             <button class="inv-btn-primary" @click="ejecutarCerrar">Cerrar inventario</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CONFIRMAR ELIMINAR -->
+    <div v-if="mostrarConfirmEliminar" class="inv-overlay" @click.self="mostrarConfirmEliminar = false">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header inv-modal-header-warn">
+          <span class="material-icons" style="font-size:18px;color:var(--color-error)">delete_forever</span>
+          <span>Eliminar inventario</span>
+          <button class="action-btn" @click="mostrarConfirmEliminar = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <p class="alerta-mensaje">Se eliminarán TODOS los registros del inventario {{ fechaDisplay }}, incluyendo conteos, notas y fotos. Esta acción es irreversible.</p>
+          <div class="alerta-btns">
+            <button class="alerta-btn-confirmar" @click="mostrarConfirmEliminar = false">Cancelar</button>
+            <button class="inv-btn-danger" @click="ejecutarEliminar">Eliminar inventario</button>
           </div>
         </div>
       </div>
@@ -420,6 +441,7 @@ const nuevaFechaInv = ref('')
 const creandoInv = ref(false)
 const mostrarConfirmReiniciar = ref(false)
 const mostrarConfirmCerrar = ref(false)
+const mostrarConfirmEliminar = ref(false)
 const mostrarFoto = ref(false)
 const articuloFoto = ref(null)
 const fotoInput = ref(null)
@@ -743,6 +765,7 @@ async function crearInventario() {
 
 function confirmarReiniciar() { mostrarConfirmReiniciar.value = true }
 function confirmarCerrar() { mostrarConfirmCerrar.value = true }
+function confirmarEliminar() { mostrarConfirmEliminar.value = true }
 
 async function ejecutarReiniciar() {
   await fetch(API + '/api/inventario/reiniciar', {
@@ -753,6 +776,21 @@ async function ejecutarReiniciar() {
   await cargarArticulos()
   await cargarResumen()
   await cargarBodegas()
+}
+
+async function ejecutarEliminar() {
+  await fetch(API + '/api/inventario/eliminar', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+  })
+  mostrarConfirmEliminar.value = false
+  await cargarFechas()
+  if (fechasInventario.value.length) {
+    cambiarFecha(fechasInventario.value[0].fecha_inventario)
+  } else {
+    articulos.value = []
+    resumen.value = {}
+  }
 }
 
 async function ejecutarCerrar() {
@@ -908,6 +946,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-panel-item-actions { display: flex; gap: 2px; margin-top: 4px; }
 .inv-panel-action { width: 24px; height: 24px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
 .inv-panel-action:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+.inv-panel-action-danger:hover { background: rgba(248,113,113,0.1); color: var(--color-error); }
 .inv-form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; display: block; }
 .inv-form-input { width: 100%; height: 36px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 10px; color: var(--text-primary); font-size: 13px; font-family: inherit; margin-bottom: 8px; }
 .inv-form-input:focus { border-color: var(--accent); outline: none; }
