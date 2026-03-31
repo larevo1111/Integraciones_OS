@@ -21,12 +21,13 @@
 
 <script setup>
 import { ref, watch, onBeforeUnmount, computed } from 'vue'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { useEditor, EditorContent, VueNodeViewRenderer } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 import { api } from 'src/services/api'
+import ImageNodeView from './ImageNodeView.vue'
 
 const props = defineProps({
   modelValue:  { type: String, default: '' },
@@ -52,7 +53,9 @@ const editor = useEditor({
     }),
     Link.configure({ openOnClick: false, HTMLAttributes: { class: 'tiptap-link' } }),
     Placeholder.configure({ placeholder: props.placeholder }),
-    Image.configure({ inline: false, allowBase64: false }),
+    Image.extend({
+      addNodeView() { return VueNodeViewRenderer(ImageNodeView) },
+    }).configure({ inline: false, allowBase64: false }),
   ],
   onUpdate({ editor: ed }) {
     clearTimeout(debounceTimer)
