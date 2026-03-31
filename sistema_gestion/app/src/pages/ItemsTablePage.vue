@@ -159,11 +159,11 @@ function abrirDetalle(row) {
 function onGuardado(p) {
   if (p._accion === 'creado') {
     items.value.unshift({ ...p, responsables_str: (p.responsables || []).join(',') })
+    panelVisible.value = false
   } else {
     const idx = items.value.findIndex(x => x.id === p.id)
     if (idx !== -1) items.value[idx] = { ...items.value[idx], ...p, responsables_str: (p.responsables || []).join(',') }
   }
-  panelVisible.value = false
 }
 
 function onEliminado(p) {

@@ -1,7 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="pp-overlay">
-      <div class="pp-backdrop" @click="$emit('cerrar')"></div>
+    <div class="pp-overlay" @click.self="$emit('cerrar')">
       <aside class="pp-panel" :class="{ 'pp-mobile': esMobile }">
 
         <!-- ═══ SUB-PANEL: Detalle tarea ═══ -->
@@ -405,14 +404,10 @@ function fmtFecha(iso) {
 <style scoped>
 .pp-overlay {
   position: fixed; inset: 0; z-index: 5000;
+  background: rgba(0,0,0,0.4);
   display: flex; justify-content: flex-end;
 }
-.pp-backdrop {
-  position: absolute; inset: 0;
-  background: rgba(0,0,0,0.4);
-}
 .pp-panel {
-  position: relative; z-index: 1;
   width: 500px; max-width: 100%;
   height: 100vh;
   background: var(--bg-card);

@@ -320,11 +320,11 @@ function onItemGuardado(p) {
   if (p._accion === 'creado') {
     todosItems.value.push(p)
     router.push({ path: '/tareas', query: { proyecto_id: p.id } })
+    panelVisible.value = false
   } else {
     const idx = todosItems.value.findIndex(x => x.id === p.id)
     if (idx !== -1) todosItems.value[idx] = { ...todosItems.value[idx], ...p }
   }
-  panelVisible.value = false
 }
 
 function onItemEliminado(p) {
