@@ -1312,34 +1312,40 @@ onUnmounted(() => clearInterval(clockInterval))
   .inv-bodega-add-btn { width: 20px; height: 20px; }
   .inv-bodega-dropdown { left: auto; right: 0; min-width: 180px; }
 
-  /* Tabla: ocultar ID y columna categoría desktop */
-  .inv-table { table-layout: auto; width: 100%; }
+  /* Tabla: layout fijo, sin scroll horizontal */
+  .inv-table-container { overflow-x: hidden; }
+  .inv-table { table-layout: fixed; width: 100%; }
+  /* Ocultar ID y categoría desktop */
   .inv-table col:nth-child(2), .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
   .inv-table col:nth-child(4), .cell-categoria-desktop, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
-  .inv-table col:nth-child(1) { width: 18px; }
+  /* Anchos fijos: dot 20px, artículo resto, conteo 125px */
+  .inv-table col:nth-child(1) { width: 20px; }
   .inv-table col:nth-child(3) { width: auto; }
-  .inv-table col:nth-child(5) { width: 130px; }
-  .inv-table td { padding: 0 4px; height: auto; min-height: 40px; vertical-align: middle; }
-  .inv-table th { padding: 0 4px; font-size: 9px; height: 28px; }
+  .inv-table col:nth-child(5) { width: 125px; }
+  .inv-table td { padding: 0 3px; height: auto; vertical-align: middle; }
+  .inv-table th { padding: 0 3px; font-size: 9px; height: 26px; }
 
-  /* Artículo: 2 líneas — nombre + categoría debajo */
-  .cell-articulo { padding: 4px 0; }
-  .articulo-line1 { font-size: 12px; gap: 3px; flex-wrap: nowrap; }
+  /* Artículo: 2 líneas */
+  .cell-articulo { padding: 3px 0; overflow: hidden; }
+  .articulo-line1 { font-size: 11px; gap: 3px; flex-wrap: nowrap; overflow: hidden; }
   .articulo-line2 { display: block; font-size: 9px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-  .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .grupo-tag { font-size: 7px; padding: 1px 3px; }
-  .unit-tag { font-size: 7px; padding: 1px 3px; }
+  .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+  .grupo-tag { font-size: 7px; padding: 1px 3px; flex-shrink: 0; }
+  .unit-tag { font-size: 7px; padding: 1px 3px; flex-shrink: 0; }
 
-  /* Conteo: compacto */
+  /* Conteo: ultra compacto */
   .teorico-block { display: none; }
-  .stepper-btn { width: 22px; height: 28px; }
-  .count-input { width: 42px; height: 28px; font-size: 12px; }
-  .conteo-cell { gap: 2px; }
-  .diff-badge { font-size: 8px; min-width: 20px; padding: 1px 2px; }
-  .contador-chip { font-size: 7px; padding: 0 2px; }
+  .stepper-btn { width: 20px; height: 26px; }
+  .count-input { width: 36px; height: 26px; font-size: 12px; }
+  .conteo-cell { gap: 1px; }
+  .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
+  .contador-chip { display: none; }
 
   /* Status dot */
   .status-dot { width: 6px; height: 6px; }
+
+  /* Menú y FAB */
+  .action-btn { width: 18px; height: 18px; }
 
   /* Modales */
   .inv-modal, .inv-modal-sm { width: calc(100vw - 16px); margin: 8px; }
