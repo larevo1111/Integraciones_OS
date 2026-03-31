@@ -933,69 +933,74 @@ onUnmounted(() => clearInterval(clockInterval))
 
 /* ═══ MÓVIL (≤768px) ═══ */
 @media (max-width: 768px) {
+  .inv-app { width: 100vw; max-width: 100vw; overflow-x: hidden; }
+  .inv-content { width: 100%; min-width: 0; }
+
   /* Panel: overlay */
-  .inv-panel.open { position: fixed; z-index: 30; width: 280px; height: 100vh; box-shadow: 8px 0 40px rgba(0,0,0,0.6); }
+  .inv-panel.open { position: fixed; z-index: 30; width: 260px; height: 100vh; box-shadow: 8px 0 40px rgba(0,0,0,0.6); }
 
-  /* Header: compacto */
-  .inv-header { flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
-  .inv-header-right { width: 100%; justify-content: space-between; }
-  .inv-progress-wrap { flex: 1; width: auto; }
-  .inv-clock { font-size: 10px; }
-  .inv-user-name { font-size: 12px; }
-  .inv-title { font-size: 11px; }
+  /* Header: 1 línea compacta */
+  .inv-header { padding: 6px 10px; }
+  .inv-header-left { gap: 6px; }
+  .inv-header-left .inv-avatar { display: none; }
+  .inv-user-name { font-size: 11px; }
+  .inv-title { font-size: 9px; }
+  .inv-clock { display: none; }
+  .inv-header-right { gap: 8px; }
+  .inv-progress-wrap { width: 100px; }
+  .inv-progress-text { font-size: 10px; }
 
-  /* Toolbar */
-  .inv-toolbar { padding: 6px 12px; }
+  /* Toolbar: compacto */
+  .inv-toolbar { padding: 4px 8px; gap: 4px; }
+  .inv-search-box { height: 28px; padding: 0 6px; }
+  .inv-search-input { font-size: 12px; }
+  .inv-search-icon { font-size: 14px; }
+  .inv-btn-scan { height: 28px; padding: 0 7px; font-size: 11px; }
   .inv-btn-scan span:last-child { display: none; }
-  .inv-btn-scan { padding: 0 8px; min-width: 32px; }
 
-  /* Filtros: scroll horizontal */
-  .inv-filters-row { padding: 6px 12px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  /* Filtros: scroll horizontal, compacto */
+  .inv-filters-row { padding: 3px 8px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 3px; }
   .inv-filters-row::-webkit-scrollbar { display: none; }
+  .inv-pill { padding: 2px 7px; font-size: 10px; }
+  .inv-pill-count { font-size: 9px; }
   .inv-bodegas-label { display: none; }
+  .inv-separator { height: 16px; margin: 0 3px; }
+  .inv-bodega-add-btn { width: 20px; height: 20px; }
+  .inv-bodega-dropdown { left: auto; right: 0; min-width: 180px; }
 
-  /* Tabla: ocultar ID y categoría, layout auto */
-  .inv-table { table-layout: auto; }
-  .inv-table col:nth-child(2) { width: 0; }
-  .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
-  .inv-table col:nth-child(4) { width: 0; }
-  .inv-table .cell-categoria, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
-  .inv-table col:nth-child(1) { width: 24px; }
+  /* Tabla: ocultar ID y categoría */
+  .inv-table { table-layout: auto; width: 100%; }
+  .inv-table col:nth-child(2), .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
+  .inv-table col:nth-child(4), .inv-table .cell-categoria, .inv-table th:nth-child(4), .inv-table td:nth-child(4) { display: none; }
+  .inv-table col:nth-child(1) { width: 18px; }
   .inv-table col:nth-child(3) { width: auto; }
-  .inv-table col:nth-child(5) { width: 150px; }
-  .inv-table td { padding: 0 6px; height: 48px; }
-  .inv-table th { padding: 0 6px; }
+  .inv-table col:nth-child(5) { width: 140px; }
+  .inv-table td { padding: 0 3px; height: 40px; }
+  .inv-table th { padding: 0 3px; font-size: 9px; height: 28px; }
 
-  /* Conteo: compacto */
+  /* Conteo */
   .teorico-block { display: none; }
-  .stepper-btn { width: 32px; height: 40px; }
-  .count-input { width: 52px; height: 40px; font-size: 18px; }
-  .conteo-cell { gap: 6px; }
-  .diff-badge { font-size: 10px; min-width: 28px; padding: 2px 4px; }
+  .stepper-btn { width: 24px; height: 32px; }
+  .count-input { width: 40px; height: 32px; font-size: 14px; }
+  .conteo-cell { gap: 2px; }
+  .diff-badge { font-size: 9px; min-width: 22px; padding: 1px 3px; }
 
-  /* Articulo: más espacio */
-  .cell-articulo { font-size: 13px; white-space: normal; line-height: 1.3; }
+  /* Artículo: letra más chica, wrap */
+  .cell-articulo { font-size: 11px; white-space: normal; line-height: 1.2; }
+  .unit-tag { font-size: 7px; padding: 0 3px; }
 
-  /* Modales: casi full width */
-  .inv-modal { width: calc(100vw - 24px); margin: 12px; }
-  .inv-modal-sm { width: calc(100vw - 24px); }
+  /* Status dot más chico */
+  .status-dot { width: 6px; height: 6px; }
+
+  /* Modales */
+  .inv-modal, .inv-modal-sm { width: calc(100vw - 16px); margin: 8px; }
 
   /* FAB */
-  .inv-fab { width: 52px; height: 52px; bottom: 20px; right: 16px; }
+  .inv-fab { width: 44px; height: 44px; bottom: 12px; right: 10px; }
 
-  /* Mini menú: a la izquierda */
+  /* Mini menú */
   .action-menu { right: 0; left: auto; }
-
-  /* Search input: evitar zoom en iOS */
-  .inv-search-input { font-size: 16px; }
-}
-
-/* ═══ MÓVIL PEQUEÑO (≤400px) ═══ */
-@media (max-width: 400px) {
-  .inv-header-left .inv-avatar { display: none; }
-  .inv-table col:nth-child(5) { width: 120px; }
-  .count-input { width: 48px; }
-  .cell-articulo { font-size: 12px; }
+  .action-btn { width: 20px; height: 20px; }
 }
 </style>
 
