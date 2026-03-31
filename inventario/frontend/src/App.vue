@@ -147,7 +147,15 @@
                   <span class="teorico-label">Teórico</span>
                   <span class="teorico-value">{{ fmtNum(a.inventario_teorico) }}</span>
                 </div>
-                <input class="count-input" :class="claseInput(a)" type="number" inputmode="numeric" placeholder="—" :value="a.inventario_fisico" @change="onConteo(a, $event)">
+                <div class="stepper">
+                  <button class="stepper-btn stepper-down" @click="ajustarConteo(a, -1)" tabindex="-1">
+                    <span class="material-icons" style="font-size:12px">remove</span>
+                  </button>
+                  <input class="count-input" :class="claseInput(a)" type="number" inputmode="numeric" placeholder="—" :value="a.inventario_fisico" @change="onConteo(a, $event)">
+                  <button class="stepper-btn stepper-up" @click="ajustarConteo(a, 1)" tabindex="-1">
+                    <span class="material-icons" style="font-size:12px">add</span>
+                  </button>
+                </div>
                 <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
                 <div class="action-menu-wrap">
                   <button class="action-btn" :class="{ 'has-note': a.notas || a.foto }" @click.stop="toggleMenu(a.id)">
@@ -502,6 +510,24 @@ async function onConteo(articulo, event) {
   cargarBodegas()
 }
 
+function ajustarConteo(articulo, delta) {
+  const actual = articulo.inventario_fisico != null ? articulo.inventario_fisico : (articulo.inventario_teorico || 0)
+  const nuevo = Math.max(0, actual + delta)
+  onConteoDirecto(articulo, nuevo)
+}
+
+async function onConteoDirecto(articulo, valor) {
+  const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
+    method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inventario_fisico: valor, contado_por: usuario.value })
+  }).then(r => r.json())
+  articulo.inventario_fisico = valor
+  articulo.diferencia = res.diferencia
+  articulo.estado = 'contado'
+  cargarResumen()
+  cargarBodegas()
+}
+
 // ── Notas ──
 function abrirNotas(a) { articuloNota.value = a; textoNota.value = a.notas || ''; mostrarNotas.value = true }
 function cerrarNotas() { mostrarNotas.value = false; articuloNota.value = null }
@@ -769,7 +795,13 @@ onUnmounted(() => clearInterval(clockInterval))
 .teorico-block { display: flex; flex-direction: column; align-items: flex-end; min-width: 40px; }
 .teorico-label { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
 .teorico-value { font-size: 13px; color: var(--text-secondary); font-family: 'Fragment Mono', monospace; font-weight: 500; }
-.count-input { width: 52px; height: 32px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 4px; color: var(--text-primary); font-size: 14px; font-weight: 500; font-family: 'Fragment Mono', monospace; text-align: center; outline: none; -moz-appearance: textfield; }
+.stepper { display: flex; align-items: center; gap: 0; }
+.stepper-btn { width: 24px; height: 32px; border: 1px solid var(--border-default); background: transparent; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.08s; }
+.stepper-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+.stepper-btn:active { background: var(--accent-muted); color: var(--accent); }
+.stepper-down { border-radius: 4px 0 0 4px; border-right: none; }
+.stepper-up { border-radius: 0 4px 4px 0; border-left: none; }
+.count-input { width: 52px; height: 32px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 0; color: var(--text-primary); font-size: 14px; font-weight: 500; font-family: 'Fragment Mono', monospace; text-align: center; outline: none; -moz-appearance: textfield; }
 .count-input::-webkit-inner-spin-button, .count-input::-webkit-outer-spin-button { -webkit-appearance: none; }
 .count-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,200,83,0.15); }
 .input-ok { border-color: var(--color-ok); background: rgba(34,197,94,0.06); }
@@ -858,6 +890,7 @@ onUnmounted(() => clearInterval(clockInterval))
 
   /* Conteo: compacto */
   .teorico-block { display: none; }
+  .stepper-btn { width: 32px; height: 40px; }
   .count-input { width: 52px; height: 40px; font-size: 18px; }
   .conteo-cell { gap: 6px; }
   .diff-badge { font-size: 10px; min-width: 28px; padding: 2px 4px; }
