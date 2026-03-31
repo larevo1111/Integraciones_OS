@@ -327,21 +327,89 @@
     </Teleport>
 
     <!-- MODAL AGREGAR -->
-    <div v-if="mostrarAgregar" class="inv-overlay" @click.self="mostrarAgregar = false">
-      <div class="inv-modal">
+    <div v-if="mostrarAgregar" class="inv-overlay" @click.self="cerrarModalAgregar">
+      <div class="inv-modal" :class="{ 'inv-modal-expanded': tabAgregar === 'manual' }">
         <div class="inv-modal-header">
-          <span>Agregar artículo{{ bodegaActiva ? ' a ' + bodegaActiva : '' }}</span>
-          <button class="action-btn" @click="mostrarAgregar = false"><span class="material-icons">close</span></button>
+          <span>Agregar artículo</span>
+          <button class="action-btn" @click="cerrarModalAgregar"><span class="material-icons">close</span></button>
         </div>
+
+        <!-- Tabs -->
+        <div class="inv-modal-tabs">
+          <button class="inv-modal-tab" :class="{ active: tabAgregar === 'buscar' }" @click="tabAgregar = 'buscar'">Buscar</button>
+          <button class="inv-modal-tab" :class="{ active: tabAgregar === 'excluidos' }" @click="tabAgregar = 'excluidos'; cargarExcluidos()">Excluidos</button>
+          <button class="inv-modal-tab" :class="{ active: tabAgregar === 'manual' }" @click="tabAgregar = 'manual'">No matriculado</button>
+        </div>
+
         <div class="inv-modal-body">
-          <input v-model="busquedaAgregar" class="inv-modal-search" type="text" placeholder="Buscar artículo por nombre o código..." @input="buscarParaAgregar">
-          <div class="inv-modal-results">
-            <div v-for="r in resultadosAgregar" :key="r.id" class="inv-modal-result-item" @click="agregarArticulo(r)">
-              <span class="inv-modal-result-name">{{ r.nombre }}</span>
-              <span class="inv-modal-result-id">{{ r.id }}</span>
+          <!-- TAB BUSCAR -->
+          <template v-if="tabAgregar === 'buscar'">
+            <input v-model="busquedaAgregar" class="inv-modal-search" type="text" placeholder="Buscar artículo por nombre o código..." @input="buscarParaAgregar">
+            <div class="inv-modal-results">
+              <div v-for="r in resultadosAgregar" :key="r.id" class="inv-modal-result-item" @click="agregarArticulo(r)">
+                <span class="inv-modal-result-name">{{ r.nombre }}</span>
+                <span class="inv-modal-result-id">{{ r.id }}</span>
+              </div>
+              <div v-if="busquedaAgregar && !resultadosAgregar.length" class="inv-modal-empty">Sin resultados</div>
             </div>
-            <div v-if="busquedaAgregar && !resultadosAgregar.length" class="inv-modal-empty">Sin resultados</div>
-          </div>
+          </template>
+
+          <!-- TAB EXCLUIDOS -->
+          <template v-if="tabAgregar === 'excluidos'">
+            <input v-model="busquedaExcluidos" class="inv-modal-search" type="text" placeholder="Filtrar excluidos...">
+            <div class="inv-modal-results">
+              <div v-for="e in excluidosFiltrados" :key="e.id" class="inv-modal-result-item" @click="reactivarExcluido(e)">
+                <div class="inv-modal-result-name">{{ e.nombre }}</div>
+                <div class="inv-modal-result-sub">{{ e.razon_exclusion }}</div>
+              </div>
+              <div v-if="!excluidosFiltrados.length" class="inv-modal-empty">
+                {{ busquedaExcluidos ? 'Sin resultados' : 'No hay artículos excluidos' }}
+              </div>
+            </div>
+          </template>
+
+          <!-- TAB NO MATRICULADO -->
+          <template v-if="tabAgregar === 'manual'">
+            <div class="inv-form-group">
+              <label class="inv-form-label">Nombre del artículo *</label>
+              <input v-model="manualNombre" class="inv-form-input" type="text" placeholder="Ej: Producto nuevo sin código">
+            </div>
+            <div class="inv-form-row">
+              <div class="inv-form-group inv-form-half">
+                <label class="inv-form-label">Cantidad *</label>
+                <input v-model="manualCantidad" class="inv-form-input" type="text" inputmode="decimal" placeholder="0">
+              </div>
+              <div class="inv-form-group inv-form-half">
+                <label class="inv-form-label">Unidad *</label>
+                <select v-model="manualUnidad" class="inv-form-input">
+                  <option value="UND">UND</option>
+                  <option value="KG">KG</option>
+                  <option value="GRS">GRS</option>
+                  <option value="LT">LT</option>
+                  <option value="ML">ML</option>
+                </select>
+              </div>
+            </div>
+            <div class="inv-form-group">
+              <label class="inv-form-label">Costo unitario</label>
+              <input v-model="manualCosto" class="inv-form-input" type="text" inputmode="decimal" placeholder="Opcional">
+            </div>
+            <div class="inv-form-group">
+              <label class="inv-form-label">Observaciones</label>
+              <textarea v-model="manualNotas" class="inv-nota-textarea" rows="2" placeholder="Por qué no está matriculado, dónde se encontró..."></textarea>
+            </div>
+            <div class="inv-form-group">
+              <label class="inv-form-label">Foto</label>
+              <button class="inv-btn-outline" @click="$refs.manualFotoInput.click()">
+                <span class="material-icons" style="font-size:14px">photo_camera</span>
+                {{ manualFotoNombre || 'Tomar foto' }}
+              </button>
+              <input ref="manualFotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="onManualFoto">
+            </div>
+            <button class="inv-btn-primary" :disabled="!manualNombre || !manualCantidad || !manualUnidad" @click="agregarNoMatriculado">
+              Agregar artículo
+            </button>
+          </template>
         </div>
       </div>
     </div>
@@ -427,8 +495,19 @@ const busqueda = ref('')
 const filtroActivo = ref(null)
 const cargando = ref(false)
 const mostrarAgregar = ref(false)
+const tabAgregar = ref('buscar')
 const busquedaAgregar = ref('')
 const resultadosAgregar = ref([])
+const busquedaExcluidos = ref('')
+const excluidos = ref([])
+const manualNombre = ref('')
+const manualCantidad = ref('')
+const manualUnidad = ref('UND')
+const manualCosto = ref('')
+const manualNotas = ref('')
+const manualFoto = ref(null)
+const manualFotoNombre = ref('')
+const manualFotoInput = ref(null)
 const mostrarNotas = ref(false)
 const articuloNota = ref(null)
 const textoNota = ref('')
@@ -708,10 +787,68 @@ function buscarParaAgregar() {
 }
 async function agregarArticulo(art) {
   await fetch(API + `/api/inventario/articulos/agregar`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ fecha_inventario: FECHA.value, bodega: bodegaActiva.value || 'Principal', id_effi: art.id, contado_por: usuario.value })
   })
-  mostrarAgregar.value = false; busquedaAgregar.value = ''; resultadosAgregar.value = []
+  cerrarModalAgregar()
+  cargarArticulos(); cargarResumen(); cargarBodegas()
+}
+
+function cerrarModalAgregar() {
+  mostrarAgregar.value = false
+  tabAgregar.value = 'buscar'
+  busquedaAgregar.value = ''; resultadosAgregar.value = []
+  busquedaExcluidos.value = ''; excluidos.value = []
+  manualNombre.value = ''; manualCantidad.value = ''; manualUnidad.value = 'UND'
+  manualCosto.value = ''; manualNotas.value = ''; manualFoto.value = null; manualFotoNombre.value = ''
+}
+
+// ── Excluidos ──
+async function cargarExcluidos() {
+  excluidos.value = await fetchApi(`/api/inventario/excluidos?fecha=${FECHA.value}`)
+}
+
+const excluidosFiltrados = computed(() => {
+  if (!busquedaExcluidos.value) return excluidos.value
+  const q = busquedaExcluidos.value.toLowerCase()
+  return excluidos.value.filter(e => e.nombre.toLowerCase().includes(q))
+})
+
+async function reactivarExcluido(art) {
+  await fetch(API + `/api/inventario/articulos/${art.id}/reactivar`, {
+    method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario: usuario.value })
+  })
+  excluidos.value = excluidos.value.filter(e => e.id !== art.id)
+  cargarArticulos(); cargarResumen(); cargarBodegas()
+}
+
+// ── No matriculado ──
+function onManualFoto(event) {
+  const file = event.target.files[0]
+  if (file) { manualFoto.value = file; manualFotoNombre.value = file.name }
+}
+
+async function agregarNoMatriculado() {
+  if (!manualNombre.value || !manualCantidad.value || !manualUnidad.value) return
+  const cantidad = parseDecimal(manualCantidad.value)
+  if (isNaN(cantidad)) return
+
+  const formData = new FormData()
+  formData.append('fecha_inventario', FECHA.value)
+  formData.append('bodega', bodegaActiva.value || 'Principal')
+  formData.append('nombre', manualNombre.value)
+  formData.append('unidad', manualUnidad.value)
+  formData.append('cantidad', cantidad)
+  formData.append('costo', manualCosto.value || '0')
+  formData.append('notas', manualNotas.value || '')
+  formData.append('usuario', usuario.value)
+  if (manualFoto.value) formData.append('foto', manualFoto.value)
+
+  await fetch(API + '/api/inventario/articulos/no-matriculado', {
+    method: 'POST', headers: authHeaders(), body: formData
+  })
+  cerrarModalAgregar()
   cargarArticulos(); cargarResumen(); cargarBodegas()
 }
 
@@ -1080,10 +1217,21 @@ onUnmounted(() => clearInterval(clockInterval))
 
 /* MODALS */
 .inv-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 50; display: flex; align-items: center; justify-content: center; }
-.inv-modal { background: var(--bg-card, #1c1c1e); border: 1px solid var(--border-default); border-radius: 8px; width: 460px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 80px rgba(0,0,0,0.8); }
+.inv-modal { background: var(--bg-card, #1c1c1e); border: 1px solid var(--border-default); border-radius: 8px; width: 460px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 80px rgba(0,0,0,0.8); transition: width 0.2s ease; }
 .inv-modal-sm { width: 380px; }
 .inv-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); font-weight: 500; }
 .inv-modal-body { padding: 16px; }
+.inv-modal-expanded { width: 500px; }
+.inv-modal-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); padding: 0 16px; }
+.inv-modal-tab { padding: 8px 14px; font-size: 12px; font-weight: 500; color: var(--text-tertiary); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.1s; }
+.inv-modal-tab:hover { color: var(--text-secondary); }
+.inv-modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.inv-modal-result-sub { font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
+.inv-form-group { margin-bottom: 12px; }
+.inv-form-row { display: flex; gap: 12px; }
+.inv-form-half { flex: 1; }
+.inv-btn-outline { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; background: transparent; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--text-secondary); font-size: 12px; cursor: pointer; width: 100%; }
+.inv-btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 .inv-modal-search { width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; color: var(--text-primary); font-size: 13px; outline: none; }
 .inv-modal-search:focus { border-color: var(--accent); }
 .inv-modal-results { max-height: 300px; overflow-y: auto; }

@@ -309,6 +309,76 @@ def agregar_articulo(data: ArticuloAgregar):
     return {"ok": True, "nombre": art['nombre']}
 
 
+@app.get("/api/inventario/excluidos")
+def listar_excluidos(fecha: str):
+    """Lista artículos excluidos de un inventario."""
+    rows = db_query(DB_INV, """
+        SELECT id, id_effi, nombre, categoria, razon_exclusion
+        FROM inv_conteos
+        WHERE fecha_inventario = %s AND excluido = 1
+        ORDER BY nombre
+    """, (fecha,))
+    return rows
+
+
+class ReactivarArticulo(BaseModel):
+    usuario: str
+
+
+@app.put("/api/inventario/articulos/{id}/reactivar")
+def reactivar_articulo(id: int, data: ReactivarArticulo):
+    """Reactiva un artículo excluido (lo pone inventariable)."""
+    db_execute(DB_INV, """
+        UPDATE inv_conteos
+        SET excluido = 0, razon_exclusion = NULL, inventario_teorico = 0,
+            bodega = COALESCE(NULLIF(bodega, '—'), 'Principal')
+        WHERE id = %s
+    """, (id,))
+    registrar_auditoria(id, 'reactivar', data.usuario, 'excluido', 'inventariable')
+    return {"ok": True}
+
+
+@app.post("/api/inventario/articulos/no-matriculado")
+async def agregar_no_matriculado(
+    fecha_inventario: str = Form(...),
+    bodega: str = Form(...),
+    nombre: str = Form(...),
+    unidad: str = Form(...),
+    cantidad: float = Form(...),
+    costo: float = Form(0),
+    notas: str = Form(''),
+    usuario: str = Form(...),
+    foto: Optional[UploadFile] = File(None)
+):
+    """Agrega un artículo no matriculado en Effi."""
+    foto_nombre = None
+    if foto:
+        ext = os.path.splitext(foto.filename)[1] or '.jpg'
+        foto_nombre = f"nm_{uuid.uuid4().hex[:8]}{ext}"
+        ruta = os.path.join(FOTOS_DIR, foto_nombre)
+        with open(ruta, 'wb') as f:
+            shutil.copyfileobj(foto.file, f)
+
+    conn = pymysql.connect(**DB_INV)
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO inv_conteos
+                (fecha_inventario, bodega, id_effi, nombre, categoria,
+                 excluido, inventario_teorico, inventario_fisico, diferencia,
+                 costo_promedio, estado, contado_por, fecha_conteo, notas, foto)
+            VALUES (%s, %s, %s, %s, %s, 0, 0, %s, %s, %s, 'contado', %s, NOW(), %s, %s)
+        """, (fecha_inventario, bodega, f'NM-{uuid.uuid4().hex[:6]}', nombre,
+              f'NO MATRICULADO ({unidad})', cantidad, cantidad, costo,
+              usuario, notas or f'Artículo no matriculado. Unidad: {unidad}', foto_nombre))
+        new_id = cur.lastrowid
+        conn.commit()
+    conn.close()
+
+    registrar_auditoria(new_id, 'no_matriculado', usuario, None, f'{nombre} ({cantidad} {unidad})',
+                        f'Artículo no matriculado en Effi')
+    return {"ok": True, "id": new_id}
+
+
 @app.get("/api/inventario/articulos/buscar")
 def buscar_articulos_effi(q: str):
     """Busca artículos en el catálogo de Effi (para agregar a bodega)."""
