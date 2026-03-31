@@ -142,31 +142,33 @@ def listar_todas_bodegas(fecha: str):
 def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[str] = None, busqueda: Optional[str] = None):
     """Lista artículos para contar en una bodega/fecha. Sin bodega = todas."""
     sql = """
-        SELECT id, id_effi, cod_barras, nombre, categoria, bodega,
-               inventario_teorico, inventario_fisico, diferencia,
-               costo_promedio, estado, contado_por, fecha_conteo, notas, foto
-        FROM inv_conteos
-        WHERE fecha_inventario = %s AND excluido = 0
+        SELECT c.id, c.id_effi, c.cod_barras, c.nombre, c.categoria, c.bodega,
+               c.inventario_teorico, c.inventario_fisico, c.diferencia,
+               c.costo_promedio, c.estado, c.contado_por, c.fecha_conteo, c.notas, c.foto,
+               r.unidad, r.rango_min, r.rango_max, r.factor_error
+        FROM inv_conteos c
+        LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+        WHERE c.fecha_inventario = %s AND c.excluido = 0
     """
     params = [fecha]
 
     if bodega:
-        sql += " AND bodega = %s"
+        sql += " AND c.bodega = %s"
         params.append(bodega)
 
     if filtro == 'pendientes':
-        sql += " AND estado = 'pendiente'"
+        sql += " AND c.estado = 'pendiente'"
     elif filtro == 'contados':
-        sql += " AND estado = 'contado'"
+        sql += " AND c.estado = 'contado'"
     elif filtro == 'diferencias':
-        sql += " AND estado = 'contado' AND diferencia != 0"
+        sql += " AND c.estado = 'contado' AND c.diferencia != 0"
 
     if busqueda:
-        sql += " AND (nombre LIKE %s OR id_effi LIKE %s OR cod_barras LIKE %s)"
+        sql += " AND (c.nombre LIKE %s OR c.id_effi LIKE %s OR c.cod_barras LIKE %s)"
         like = f"%{busqueda}%"
         params.extend([like, like, like])
 
-    sql += " ORDER BY categoria, nombre"
+    sql += " ORDER BY c.categoria, c.nombre"
     rows = db_query(DB_INV, sql, params)
 
     for r in rows:
@@ -175,6 +177,9 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         r['diferencia'] = float(r['diferencia']) if r['diferencia'] is not None else None
         r['costo_promedio'] = float(r['costo_promedio']) if r['costo_promedio'] is not None else 0
         r['fecha_conteo'] = str(r['fecha_conteo']) if r['fecha_conteo'] else None
+        r['rango_min'] = float(r['rango_min']) if r['rango_min'] is not None else None
+        r['rango_max'] = float(r['rango_max']) if r['rango_max'] is not None else None
+        r['factor_error'] = int(r['factor_error']) if r['factor_error'] else None
     return rows
 
 

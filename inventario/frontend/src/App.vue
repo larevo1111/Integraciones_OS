@@ -139,7 +139,10 @@
           <tr v-for="a in sortedRows" :key="a.id" :class="clasesFila(a)">
             <td class="td td-center"><span class="status-dot" :class="claseDot(a)"></span></td>
             <td class="td cell-id">{{ a.id_effi }}</td>
-            <td class="td cell-articulo">{{ a.nombre }}</td>
+            <td class="td cell-articulo">
+              <span>{{ a.nombre }}</span>
+              <span v-if="a.unidad && a.unidad !== 'UND'" class="unit-tag">{{ a.unidad }}</span>
+            </td>
             <td class="td cell-categoria">{{ a.categoria }}</td>
             <td class="td">
               <div class="conteo-cell">
@@ -151,7 +154,7 @@
                   <button class="stepper-btn stepper-down" @click="ajustarConteo(a, -1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">remove</span>
                   </button>
-                  <input class="count-input" :class="claseInput(a)" type="number" inputmode="numeric" placeholder="—" :value="a.inventario_fisico" @change="onConteo(a, $event)">
+                  <input class="count-input" :class="claseInput(a)" type="number" inputmode="numeric" placeholder="—" :value="a.inventario_fisico" @change="onConteoConValidacion(a, $event)">
                   <button class="stepper-btn stepper-up" @click="ajustarConteo(a, 1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">add</span>
                   </button>
@@ -281,6 +284,29 @@
       </div>
     </div>
 
+    <!-- ALERTA DE RANGO -->
+    <div v-if="alertaRango" class="inv-overlay" @click.self="alertaRango = null">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header inv-modal-header-warn">
+          <span class="material-icons" style="font-size:18px;color:var(--color-warning)">warning</span>
+          <span>Valor inusual</span>
+          <button class="action-btn" @click="alertaRango = null"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <p class="alerta-articulo">{{ alertaRango.articulo.nombre }}</p>
+          <p class="alerta-mensaje">{{ alertaRango.mensaje }}</p>
+          <div class="alerta-btns">
+            <button v-if="alertaRango.sugerencia != null" class="inv-btn-primary" @click="corregirAlerta">
+              Corregir a {{ alertaRango.sugerencia }}
+            </button>
+            <button class="alerta-btn-confirmar" @click="confirmarAlerta">
+              Confirmar {{ alertaRango.valor }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- INPUT OCULTO PARA CÁMARA -->
     <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="onFotoCapturada">
 
@@ -324,6 +350,7 @@ const mostrarFoto = ref(false)
 const articuloFoto = ref(null)
 const fotoInput = ref(null)
 const articuloParaFoto = ref(null)
+const alertaRango = ref(null) // { articulo, valor, sugerencia, mensaje }
 const fechasInventario = ref([])
 const mostrarListaBodegas = ref(false)
 
@@ -508,6 +535,48 @@ async function onConteo(articulo, event) {
   articulo.estado = 'contado'
   cargarResumen()
   cargarBodegas()
+}
+
+function onConteoConValidacion(articulo, event) {
+  const valor = parseFloat(event.target.value)
+  if (isNaN(valor)) return
+  if (valor === 0) { onConteo(articulo, event); return }
+
+  const min = articulo.rango_min
+  const max = articulo.rango_max
+  const factor = articulo.factor_error
+
+  if (min != null && max != null && (valor < min || valor > max)) {
+    let sugerencia = null
+    let mensaje = ''
+
+    if (factor && valor > max * 10) {
+      sugerencia = +(valor / factor).toFixed(2)
+      const unidad = articulo.unidad || 'UND'
+      mensaje = `${valor} ${unidad} parece un error. ¿Quisiste decir ${sugerencia} ${unidad}?`
+    } else if (valor < min && valor > 0) {
+      mensaje = `${valor} es menor al mínimo esperado (${min}). ¿Estás seguro?`
+    } else {
+      mensaje = `${valor} está fuera del rango esperado (${min} — ${max}). ¿Confirmas?`
+    }
+
+    alertaRango.value = { articulo, valor, sugerencia, mensaje }
+    return
+  }
+
+  onConteo(articulo, event)
+}
+
+function confirmarAlerta() {
+  if (!alertaRango.value) return
+  onConteoDirecto(alertaRango.value.articulo, alertaRango.value.valor)
+  alertaRango.value = null
+}
+
+function corregirAlerta() {
+  if (!alertaRango.value?.sugerencia) return
+  onConteoDirecto(alertaRango.value.articulo, alertaRango.value.sugerencia)
+  alertaRango.value = null
 }
 
 function ajustarConteo(articulo, delta) {
@@ -787,7 +856,8 @@ onUnmounted(() => clearInterval(clockInterval))
 .dot-critical { background: var(--color-error); box-shadow: 0 0 6px rgba(248,113,113,0.3); }
 
 .cell-id { font-size: 12px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; }
-.cell-articulo { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; }
+.cell-articulo { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
 .cell-categoria { font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 
 /* CONTEO CELL */
@@ -844,6 +914,14 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-nota-textarea:focus { border-color: var(--accent); }
 .inv-btn-primary { background: var(--accent); color: #000; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; }
 .inv-btn-primary:hover { background: var(--accent-hover); }
+
+/* Alerta de rango */
+.inv-modal-header-warn { gap: 8px; }
+.alerta-articulo { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+.alerta-mensaje { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+.alerta-btns { display: flex; flex-direction: column; gap: 8px; }
+.alerta-btn-confirmar { background: transparent; border: 1px solid var(--border-strong); color: var(--text-secondary); padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; width: 100%; }
+.alerta-btn-confirmar:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
 
 /* ═══ TABLET (≤1024px) ═══ */
 @media (max-width: 1024px) {
