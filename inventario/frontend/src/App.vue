@@ -249,6 +249,7 @@
                   </button>
                 </div>
                 <span class="diff-badge" :class="claseBadge(a)">{{ textoBadge(a) }}</span>
+                <span v-if="a.contado_por" class="contador-chip">{{ a.contado_por.substring(0, 3).toUpperCase() }}</span>
                 <div class="action-menu-wrap">
                   <button class="action-btn" :class="{ 'has-note': a.notas || a.foto }" @click.stop="toggleMenu(a.id)">
                     <span class="material-icons" style="font-size:16px">more_vert</span>
@@ -1205,6 +1206,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .badge-warning { background: rgba(245,158,11,0.12); color: #fbbf24; }
 .badge-error { background: rgba(248,113,113,0.12); color: #f87171; }
 .badge-empty { color: var(--text-tertiary); }
+.contador-chip { font-size: 8px; font-weight: 600; font-family: 'Fragment Mono', monospace; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-tertiary); letter-spacing: 0.3px; }
 .diff-col { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 32px; }
 .contado-por { font-size: 8px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; letter-spacing: 0.3px; }
 
