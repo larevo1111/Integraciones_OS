@@ -410,7 +410,7 @@ const tituloRuta = computed(() => {
   for (const [path, titulo] of Object.entries(TITULOS)) {
     if (ruta.value.startsWith(path)) return titulo
   }
-  return 'OS Gestión'
+  return ''
 })
 
 function toggleTema() {

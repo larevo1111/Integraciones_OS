@@ -50,13 +50,11 @@
         <div class="pp-body">
 
           <!-- Título editable -->
-          <textarea
+          <input
             ref="tituloRef"
             class="pp-titulo"
             :value="form.nombre"
             :placeholder="LABELS[tipoLocal].placeholder"
-            rows="1"
-            @input="autoGrow"
             @blur="guardarCampo('nombre', $event.target.value.trim())"
             @keydown.enter.prevent="e => e.target.blur()"
           />
@@ -310,10 +308,7 @@ watch(() => props.item, initForm, { immediate: true })
 
 onMounted(async () => {
   await nextTick()
-  if (tituloRef.value) {
-    autoGrow({ target: tituloRef.value })
-    if (!props.item?.id) tituloRef.value.focus() // solo focus al crear nuevo
-  }
+  if (tituloRef.value && !props.item?.id) tituloRef.value.focus()
   if (props.item?.id) cargarTareas()
 })
 
@@ -322,12 +317,6 @@ async function cargarTareas() {
     const data = await api(`/api/gestion/tareas?proyecto_id=${props.item.id}&estado=`)
     tareasVinculadas.value = data.tareas || []
   } catch { tareasVinculadas.value = [] }
-}
-
-function autoGrow(e) {
-  const el = e.target
-  el.style.height = '0'
-  el.style.height = Math.max(el.scrollHeight, 28) + 'px'
 }
 
 // ── Guardar campo individual (edit mode) ──
@@ -454,8 +443,8 @@ function fmtFecha(iso) {
 .pp-titulo {
   width: 100%; border: none; background: transparent;
   font-size: 18px; font-weight: 600; color: var(--text-primary);
-  font-family: var(--font-sans); resize: none; outline: none;
-  line-height: 1.3; padding: 0;
+  font-family: var(--font-sans); outline: none;
+  height: 32px; padding: 0;
 }
 .pp-titulo::placeholder { color: var(--text-tertiary); }
 
