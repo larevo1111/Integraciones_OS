@@ -1323,18 +1323,18 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Tabla: layout fijo, sin scroll horizontal */
   .inv-table-container { overflow-x: hidden; }
   .inv-table { table-layout: fixed; width: 100%; }
-  /* Columnas: todas visibles, ID mínimo */
-  .col-status { width: 16px; }
-  .col-id { width: 28px; }
+  /* Columnas: todas visibles */
+  .col-status { width: 14px; }
+  .col-id { width: 22px; }
   .col-articulo { width: auto; }
-  .col-categoria { width: 70px; }
-  .col-conteo { width: 115px; }
+  .col-categoria { width: 60px; }
+  .col-conteo { width: 105px; }
   .inv-table-container { overflow-x: hidden; }
   .inv-table td { padding: 2px 2px; vertical-align: middle; }
   .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
 
   /* ID: chiquito */
-  .cell-id { font-size: 9px; }
+  .cell-id { font-size: 8px; }
 
   /* Artículo: wrap, alto variable */
   .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: wrap; }
@@ -1343,8 +1343,8 @@ onUnmounted(() => clearInterval(clockInterval))
   .grupo-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
 
-  /* Categoría: wrap */
-  .cell-categoria-desktop { font-size: 9px; white-space: normal; word-break: break-word; line-height: 1.2; }
+  /* Categoría: wrap, más chica */
+  .cell-categoria-desktop { font-size: 8px; white-space: normal; word-break: break-word; line-height: 1.15; }
 
   /* Conteo */
   .teorico-block { display: none; }
