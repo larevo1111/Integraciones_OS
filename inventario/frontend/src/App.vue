@@ -1318,39 +1318,35 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Ocultar solo ID */
   .inv-table col:nth-child(2) { width: 0; }
   .inv-table .cell-id, .inv-table th:nth-child(2), .inv-table td:nth-child(2) { display: none; }
-  /* Anchos: dot 16px, artículo auto, categoría 28%, conteo 115px */
+  /* Anchos fijos */
   .inv-table { table-layout: fixed; width: 100%; }
   .inv-table col:nth-child(1) { width: 16px; }
-  .inv-table col:nth-child(3) { width: auto; }
-  .inv-table col:nth-child(4) { width: 28%; }
-  .inv-table col:nth-child(5) { width: 115px; }
-  .inv-table td { padding: 0 3px; vertical-align: middle; }
-  .inv-table th { padding: 0 3px; font-size: 8px; height: 26px; }
+  .inv-table col:nth-child(3) { width: 38%; }
+  .inv-table col:nth-child(4) { width: 22%; }
+  .inv-table col:nth-child(5) { width: 40%; }
+  .inv-table td { padding: 0 2px; height: 38px; vertical-align: middle; overflow: hidden; }
+  .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
 
-  /* Artículo: wrap, sin línea 2 (categoría tiene su columna) */
-  .cell-articulo { padding: 3px 0; overflow: hidden; }
-  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: wrap; }
+  /* Artículo: 1 línea, truncar */
+  .cell-articulo { overflow: hidden; }
+  .articulo-line1 { font-size: 10px; gap: 2px; flex-wrap: nowrap; overflow: hidden; }
   .articulo-line2 { display: none; }
-  .articulo-nombre { overflow: hidden; text-overflow: ellipsis; }
-  .grupo-tag { font-size: 7px; padding: 1px 3px; }
-  .unit-tag { font-size: 7px; padding: 1px 3px; }
+  .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .grupo-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
+  .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
 
-  /* Categoría: wrap, pequeña */
-  .cell-categoria-desktop { font-size: 9px; white-space: normal; line-height: 1.2; word-break: break-word; }
+  /* Categoría: 1 línea truncada */
+  .cell-categoria-desktop { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Conteo: compacto */
   .teorico-block { display: none; }
   .stepper-btn { width: 20px; height: 26px; }
-  .count-input { width: 34px; height: 26px; font-size: 12px; }
+  .count-input { width: 34px; height: 26px; font-size: 11px; }
   .conteo-cell { gap: 1px; }
   .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
-  .contador-chip { display: none; }
-
-  /* Status dot */
+  .contador-chip { font-size: 6px; padding: 0 2px; }
   .status-dot { width: 6px; height: 6px; }
-
-  /* Menú */
-  .action-btn { width: 18px; height: 18px; }
+  .action-btn { width: 16px; height: 16px; }
 
   /* Modales */
   .inv-modal, .inv-modal-sm { width: calc(100vw - 16px); margin: 8px; }
