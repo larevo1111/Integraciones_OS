@@ -855,3 +855,42 @@ URL webhook configurada en `wa-bridge.service` → `WA_WEBHOOK_URL` (default: `h
 - Un solo número puede conectarse a un solo proceso. No correr dos instancias con el mismo número.
 - Uso interno/bajo volumen → riesgo de ban mínimo. Evitar patrones de spam.
 - Log: `logs/wa_bridge.log`
+
+---
+
+## 6. Scripts de Inventario Físico
+
+### depurar_inventario.py
+- **Propósito**: Clasifica artículos vigentes y genera filas de conteo por artículo+bodega
+- **Ejecución**: `python3 scripts/inventario/depurar_inventario.py [--fecha 2026-03-31]`
+- **BD lectura**: `effi_data.zeffi_inventario`
+- **BD escritura**: `os_inventario.inv_conteos` (DELETE+INSERT por fecha)
+- **Config**: `scripts/inventario/config_depuracion.json` (reglas de exclusión)
+- **Resultado**: 489 artículos → ~300 inventariables + ~189 excluidos. Filas por bodega con stock > 0
+
+### calcular_rangos.py
+- **Propósito**: Genera tabla de rangos, unidades y grupos cruzando con OPs
+- **Ejecución**: `python3 scripts/inventario/calcular_rangos.py`
+- **BD lectura**: `effi_data.zeffi_inventario`, `effi_data.zeffi_articulos_producidos`
+- **BD escritura**: `os_inventario.inv_rangos` (TRUNCATE+INSERT)
+- **Grupos**: MP (T01 sin OPs), PP (producido en OPs), PT (TPT.xx), INS (T03.xx), DS (DESARROLLO)
+- **Unidades**: KG, GRS, UND, LT, ML — detectadas del nombre del artículo
+- **Factor error**: 1000 para KG/LT (detección error kg↔g)
+
+### api.py (FastAPI)
+- **Propósito**: Backend API + sirve frontend estático de la app de inventario
+- **Ejecución**: `python3 scripts/inventario/api.py` (o systemd `os-inventario-api.service`)
+- **Puerto**: 9401
+- **BD**: `os_inventario` (inv_conteos, inv_rangos, inv_auditorias) + `effi_data` (búsqueda artículos)
+- **Auth**: JWT compartido con sistema_gestion (mismo secret)
+- **Frontend**: sirve `inventario/static/` (build Vue 3 + Vite)
+
+### config_depuracion.json
+- **Propósito**: Reglas de exclusión para el depurador
+- **Reglas**: excluir_sin_gestion_stock, excluir_sin_categoria, excluir_categorias (T999%, T05%, XMATERIAL%, GASTOS%)
+
+### politicas.json
+- **Propósito**: Políticas de acceso por acción y nivel de usuario
+- **Ubicación**: `inventario/politicas.json`
+- **Niveles**: 1 (contador), 3 (coordinador), 5 (supervisor), 7 (admin)
+- **11 acciones**: contar, notas, fotos, agregar_articulo, nuevo/reiniciar/cerrar/eliminar inventario, etc.

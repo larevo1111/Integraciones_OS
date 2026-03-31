@@ -513,6 +513,19 @@ Integraciones_OS/
 - `.agent/docs/` — Informes y documentación externa.
 - `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — **Manual completo de producción e inventarios en Effi.** Tablas, campos, estados de OPs, trazabilidad, lógica de signos, relaciones entre tablas, reconstrucción de stock a fecha, ajuste por OPs generadas.
 - `.agent/contextos/inventario_fisico.md` — Contexto del subproyecto de inventario físico vs teórico.
+- `inventario/POLITICAS_ACCESO.md` — Políticas de acceso y seguridad del módulo de inventario.
+- `inventario/politicas.json` — Config de permisos por acción y nivel de usuario.
+
+### Sistema de Inventario Físico (2026-03-31)
+App independiente para conteo de inventario. Separada de sistema_gestion.
+- **App**: `inv.oscomunidad.com` — Vue 3 + Vite frontend, FastAPI backend (puerto 9401)
+- **BD**: `os_inventario` — 3 tablas: `inv_conteos` (conteos), `inv_rangos` (unidades/grupos/rangos), `inv_auditorias` (historial)
+- **Scripts**: `depurar_inventario.py` (genera conteos), `calcular_rangos.py` (unidades/grupos), `api.py` (servidor)
+- **Auth**: Google OAuth, JWT compartido con sistema_gestion
+- **Grupos**: MP (materia prima), PP (producto en proceso), PT (producto terminado), INS (insumos), DS (desarrollo)
+- **Validación**: Unidades KG/GRS/UND/LT con rangos min/max y detección de error x1000 (kg↔g)
+- **Auditoría**: Todo cambio registrado (conteo, edición, nota, foto, reinicio, cierre)
+- **Systemd**: `os-inventario-api.service`, cloudflared `inv.oscomunidad.com`
 
 ### Protocolo de documentación de scripts
 Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:

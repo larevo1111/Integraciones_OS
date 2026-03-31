@@ -23,7 +23,9 @@
 | Éxito SQL | ~87% | **100%** | **100%** |
 | Latencia avg | 13.8s | 15.5s | 24.2s |
 | Costo | $0.075/M input | **$0 (gratis)** | **$0 (gratis)** |
-| Contexto máx | 1M tokens | 32K tokens | 32K tokens |
+| Contexto máx | 1M tokens | 32K tokens | 131K tokens |
+
+**Nota contexto**: cada llamada individual usa ~9-10K tokens (DDL 8K + reglas 765 + ejemplos ~200 + pregunta). Los 67K promedio en logs son la SUMA de 2-3 llamadas por consulta. Los 32K de Qwen son **más que suficientes** (~22K de margen).
 
 ### Comparación routers: Groq vs Ollama
 

@@ -10,6 +10,7 @@
 | ERP Frontend | [contextos/erp_frontend.md](contextos/erp_frontend.md) | Módulo Ventas completo | Normal |
 | Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ activos | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Integración bidireccional activa | Normal |
+| Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | App activa inv.oscomunidad.com, BD + scripts listos | Alta |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
 ## Trabajo activo esta semana (2026-03-30)
@@ -20,6 +21,7 @@
 - **Bot Telegram — Fix systemd ✅**: KillMode=process (pipeline sobrevive restart) + Wants ia-service (bot no muere si ia-service reinicia)
 - **IA Service — Warmup Ollama ✅**: Pre-flight check antes de llamar agentes locales. Detecta Ollama caído, modelo frío, y precarga automáticamente
 - **IA Service — Keywords período actual ✅**: Ampliados para forzar SQL fresco en más consultas de ventas
+- **Inventario Físico ✅**: App completa en inv.oscomunidad.com. Vue 3 + FastAPI. Login, conteo, validación unidades, auditoría, fotos, grupos MP/PP/PT/INS/DS
 - **Pendiente próximo**: Notificaciones jornada olvidada (activas vía cron 8pm L-V)
 
 ## Regla de actualización
@@ -43,6 +45,7 @@ MEMORY.md de Claude siempre refleja el módulo activo y su estado.
 | `nocodb_meta` | MariaDB local | Metadatos NocoDB |
 | `u768061575_os_integracion` | Hostinger | Fuente de verdad: 51 tablas (41 zeffi + 8 resumen + crm_contactos + catalogo_articulos) |
 | `u768061575_os_gestion` | Hostinger | Sistema Gestión OS |
+| `os_inventario` | MariaDB local | Inventario físico (inv_conteos, inv_rangos, inv_auditorias) |
 | `u768061575_os_comunidad` | Hostinger | **ERP REAL — PROHIBICIÓN ABSOLUTA, NO TOCAR** |
 
 MariaDB corre en el **host** (systemd), NO en Docker — puerto 3306.
@@ -58,6 +61,7 @@ Credenciales locales: `osadmin` / `Epist2487.`
 | IA Service Flask | 5100 | `ia-service.service` | interno |
 | WA Bridge | 3100 | `wa-bridge.service` | interno — ver `.agent/CATALOGO_APIS.md` |
 | Effi Webhook Flask | 5050 | `effi-webhook.service` | interno |
+| Inventario API | 9401 | `os-inventario-api.service` | inv.oscomunidad.com |
 | EspoCRM | 8083 | Docker | crm.oscomunidad.com |
 | NocoDB | — | Docker | nocodb.oscomunidad.com |
 

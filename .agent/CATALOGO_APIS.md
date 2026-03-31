@@ -281,3 +281,57 @@ def enviar_tabla_telegram(chat_id: str, titulo: str, texto: str,
 4. Tabla de endpoints
 5. Notas operativas relevantes
 6. Mencionar en `MANIFESTO.md` sección 11
+
+---
+
+## 6. Inventario API — FastAPI
+
+**Base URL**: `http://localhost:9401`
+**Proceso**: systemd `os-inventario-api.service`
+**BD**: `os_inventario` (MariaDB local)
+**Frontend**: `inv.oscomunidad.com` (Vue 3 + Vite, servido por FastAPI)
+**Auth**: JWT compartido con sistema_gestion (mismo Google OAuth Client ID)
+
+### Endpoints
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/api/inventario/politicas` | Políticas de acceso (JSON) |
+| GET | `/api/inventario/fechas` | Fechas de inventario disponibles |
+| GET | `/api/inventario/bodegas/todas?fecha=` | Todas las bodegas con conteo |
+| GET | `/api/inventario/resumen?fecha=&bodega=` | Resumen progreso (total/contados/pendientes/ok/diferencias) |
+| GET | `/api/inventario/articulos?fecha=&bodega=&filtro=&busqueda=` | Artículos con grupo/unidad/rango |
+| PUT | `/api/inventario/articulos/{id}/conteo` | Registrar conteo físico |
+| PUT | `/api/inventario/articulos/{id}/nota` | Agregar/editar nota |
+| POST | `/api/inventario/articulos/{id}/foto` | Subir foto (multipart) |
+| GET | `/api/inventario/fotos/{nombre}` | Servir foto |
+| POST | `/api/inventario/articulos/agregar` | Agregar artículo de Effi a bodega |
+| GET | `/api/inventario/articulos/buscar?q=` | Buscar en catálogo Effi |
+| GET | `/api/inventario/excluidos?fecha=` | Listar artículos excluidos |
+| PUT | `/api/inventario/articulos/{id}/reactivar` | Reactivar artículo excluido |
+| POST | `/api/inventario/articulos/no-matriculado` | Agregar artículo no matriculado (multipart) |
+| POST | `/api/inventario/nuevo` | Crear nuevo inventario (ejecuta depurador) |
+| POST | `/api/inventario/reiniciar` | Reiniciar conteos de un inventario |
+| POST | `/api/inventario/cerrar` | Cerrar inventario |
+| POST | `/api/inventario/eliminar` | Eliminar inventario completo |
+
+### BD `os_inventario`
+
+| Tabla | Descripción |
+|---|---|
+| `inv_conteos` | Conteos por artículo+bodega+fecha. Estado: pendiente/contado/verificado |
+| `inv_rangos` | Unidad, grupo (MP/PP/PT/INS/DS), rango min/max, factor_error por artículo |
+| `inv_auditorias` | Historial inmutable: conteo, edición, nota, foto, reinicio, cierre |
+
+### Ejemplo Python
+
+```python
+import requests
+# Artículos pendientes de bodega Principal
+arts = requests.get('http://localhost:9401/api/inventario/articulos',
+    params={'fecha': '2026-03-31', 'bodega': 'Principal', 'filtro': 'pendientes'}).json()
+
+# Registrar conteo
+requests.put(f'http://localhost:9401/api/inventario/articulos/{arts[0]["id"]}/conteo',
+    json={'inventario_fisico': 25, 'contado_por': 'Juan'})
+```
