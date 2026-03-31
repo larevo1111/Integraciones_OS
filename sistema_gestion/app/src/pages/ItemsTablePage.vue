@@ -23,12 +23,30 @@
 
     <!-- Tabla -->
     <GestionTable
-      :columnas="columnas"
-      :filas="filasFiltradas"
-      :cargando="cargando"
-      :cell-renderers="cellRenderers"
+      :columns="columnas"
+      :rows="filasFiltradas"
+      :loading="cargando"
       @row-click="abrirDetalle"
-    />
+    >
+      <template #cell-nombre="{ row, value }">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span :style="`width:8px;height:8px;border-radius:50%;background:${row.color||'#607D8B'};flex-shrink:0`" />
+          <span style="font-weight:500">{{ value }}</span>
+        </div>
+      </template>
+      <template #cell-estado="{ value }">
+        <span :style="`display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:${(ESTADO_COLORS[value]||'#78909C')}20;color:${ESTADO_COLORS[value]||'#78909C'}`">{{ value }}</span>
+      </template>
+      <template #cell-prioridad="{ value }">
+        <span :style="`color:${PRIORIDAD_COLORS[value]||'#78909C'};font-weight:500`">{{ value }}</span>
+      </template>
+      <template #cell-fecha_estimada_fin="{ value }">
+        {{ value ? new Date(value).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '—' }}
+      </template>
+      <template #cell-responsables_str="{ value }">
+        {{ value ? value.split(',').map(e => e.split('@')[0]).join(', ') : '—' }}
+      </template>
+    </GestionTable>
 
     <!-- Panel lateral -->
     <ProyectoPanel
@@ -46,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from 'src/services/api'
 import GestionTable from 'src/components/GestionTable.vue'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
@@ -74,41 +92,14 @@ const PRIORIDAD_COLORS = {
 }
 
 const columnas = [
-  { key: 'nombre',          label: 'Nombre',       sortable: true },
-  { key: 'estado',          label: 'Estado',        sortable: true, filterable: true },
-  { key: 'prioridad',       label: 'Prioridad',     sortable: true, filterable: true },
-  { key: 'categoria_nombre', label: 'Categoría',    sortable: true },
-  { key: 'responsables_str', label: 'Responsable',  sortable: true },
-  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true },
-  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, numeric: true },
+  { key: 'nombre',           label: 'Nombre',      sortable: true, visible: true },
+  { key: 'estado',           label: 'Estado',       sortable: true, visible: true },
+  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true },
+  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true },
+  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true },
+  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true },
+  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, numeric: true },
 ]
-
-const cellRenderers = {
-  nombre(val, row) {
-    return h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
-      h('span', { style: `width:8px;height:8px;border-radius:50%;background:${row.color||'#607D8B'};flex-shrink:0` }),
-      h('span', { style: 'font-weight:500' }, val),
-    ])
-  },
-  estado(val) {
-    const color = ESTADO_COLORS[val] || '#78909C'
-    return h('span', {
-      style: `display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:${color}20;color:${color}`
-    }, val)
-  },
-  prioridad(val) {
-    const color = PRIORIDAD_COLORS[val] || '#78909C'
-    return h('span', { style: `color:${color};font-weight:500` }, val)
-  },
-  fecha_estimada_fin(val) {
-    if (!val) return '—'
-    return new Date(val).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
-  },
-  responsables_str(val) {
-    if (!val) return '—'
-    return val.split(',').map(e => e.split('@')[0]).join(', ')
-  },
-}
 
 const items      = ref([])
 const cargando   = ref(false)
