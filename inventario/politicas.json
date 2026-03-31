@@ -1,0 +1,24 @@
+{
+  "_doc": "Políticas de acceso del módulo de inventario. Cambiar aquí para ajustar permisos.",
+
+  "acciones": {
+    "ver_inventario":        { "nivel_minimo": 1, "descripcion": "Ver artículos y conteos" },
+    "contar":                { "nivel_minimo": 1, "descripcion": "Registrar conteo físico" },
+    "agregar_nota":          { "nivel_minimo": 1, "descripcion": "Agregar notas a artículos" },
+    "tomar_foto":            { "nivel_minimo": 1, "descripcion": "Tomar foto de artículo" },
+    "agregar_articulo":      { "nivel_minimo": 3, "descripcion": "Agregar artículo no listado a una bodega" },
+    "nuevo_inventario":      { "nivel_minimo": 5, "descripcion": "Crear nuevo evento de inventario" },
+    "reiniciar_inventario":  { "nivel_minimo": 5, "descripcion": "Reiniciar conteos de un inventario (borra conteos, mantiene artículos)" },
+    "cerrar_inventario":     { "nivel_minimo": 5, "descripcion": "Cerrar inventario (no se pueden editar más conteos)" },
+    "ver_auditoria":         { "nivel_minimo": 5, "descripcion": "Ver historial de cambios" },
+    "administrar_rangos":    { "nivel_minimo": 7, "descripcion": "Editar rangos y unidades de artículos" },
+    "eliminar_inventario":   { "nivel_minimo": 7, "descripcion": "Eliminar un inventario completo" }
+  },
+
+  "perfiles": {
+    "1": { "nombre": "Contador",   "descripcion": "Personal operativo. Cuenta y documenta." },
+    "3": { "nombre": "Coordinador","descripcion": "Puede agregar artículos no listados." },
+    "5": { "nombre": "Supervisor", "descripcion": "Gestiona inventarios (crear, reiniciar, cerrar)." },
+    "7": { "nombre": "Admin",      "descripcion": "Control total. Puede eliminar y configurar." }
+  }
+}

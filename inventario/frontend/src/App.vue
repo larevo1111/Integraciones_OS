@@ -18,19 +18,86 @@
     <aside class="inv-panel" :class="{ open: panelAbierto }">
       <div class="inv-panel-header">
         <span class="inv-panel-title">Inventarios</span>
+        <button v-if="puede('nuevo_inventario')" class="inv-panel-add" @click="mostrarNuevoInv = true" title="Nuevo inventario">
+          <span class="material-icons" style="font-size:14px">add</span>
+        </button>
         <button class="action-btn" @click="panelAbierto = false"><span class="material-icons" style="font-size:18px">chevron_left</span></button>
       </div>
       <div class="inv-panel-list">
-        <div v-for="f in fechasInventario" :key="f.fecha_inventario" class="inv-panel-item" :class="{ active: FECHA === f.fecha_inventario }" @click="cambiarFecha(f.fecha_inventario)">
-          <div class="inv-panel-item-fecha">{{ formatFechaCorta(f.fecha_inventario) }}</div>
-          <div class="inv-panel-item-stats">
-            <span>{{ f.inventariables }} artículos</span>
-            <span class="inv-panel-item-pct">{{ f.contados }}/{{ f.inventariables }}</span>
+        <div v-for="f in fechasInventario" :key="f.fecha_inventario" class="inv-panel-item" :class="{ active: FECHA === f.fecha_inventario }">
+          <div class="inv-panel-item-main" @click="cambiarFecha(f.fecha_inventario)">
+            <div class="inv-panel-item-fecha">{{ formatFechaCorta(f.fecha_inventario) }}</div>
+            <div class="inv-panel-item-stats">
+              <span>{{ f.inventariables }} artículos</span>
+              <span class="inv-panel-item-pct">{{ f.contados }}/{{ f.inventariables }}</span>
+            </div>
+          </div>
+          <div v-if="puede('reiniciar_inventario') && FECHA === f.fecha_inventario" class="inv-panel-item-actions">
+            <button class="inv-panel-action" @click.stop="confirmarReiniciar" title="Reiniciar conteos">
+              <span class="material-icons" style="font-size:13px">restart_alt</span>
+            </button>
+            <button class="inv-panel-action" @click.stop="confirmarCerrar" title="Cerrar inventario">
+              <span class="material-icons" style="font-size:13px">lock</span>
+            </button>
           </div>
         </div>
         <div v-if="!fechasInventario.length" class="inv-panel-empty">Sin inventarios</div>
       </div>
     </aside>
+
+    <!-- MODAL NUEVO INVENTARIO -->
+    <div v-if="mostrarNuevoInv" class="inv-overlay" @click.self="mostrarNuevoInv = false">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header">
+          <span>Nuevo inventario</span>
+          <button class="action-btn" @click="mostrarNuevoInv = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <label class="inv-form-label">Fecha de corte del inventario</label>
+          <input v-model="nuevaFechaInv" type="date" class="inv-form-input">
+          <p class="inv-form-hint">Se generarán los artículos inventariables con el stock teórico a esta fecha.</p>
+          <button class="inv-btn-primary" :disabled="!nuevaFechaInv || creandoInv" @click="crearInventario">
+            {{ creandoInv ? 'Creando...' : 'Crear inventario' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CONFIRMAR REINICIAR -->
+    <div v-if="mostrarConfirmReiniciar" class="inv-overlay" @click.self="mostrarConfirmReiniciar = false">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header inv-modal-header-warn">
+          <span class="material-icons" style="font-size:18px;color:var(--color-warning)">warning</span>
+          <span>Reiniciar inventario</span>
+          <button class="action-btn" @click="mostrarConfirmReiniciar = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <p class="alerta-mensaje">Se borrarán todos los conteos del inventario {{ fechaDisplay }}. Los artículos se mantienen pero los valores vuelven a pendiente. Esta acción no se puede deshacer.</p>
+          <div class="alerta-btns">
+            <button class="alerta-btn-confirmar" @click="mostrarConfirmReiniciar = false">Cancelar</button>
+            <button class="inv-btn-danger" @click="ejecutarReiniciar">Reiniciar conteos</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CONFIRMAR CERRAR -->
+    <div v-if="mostrarConfirmCerrar" class="inv-overlay" @click.self="mostrarConfirmCerrar = false">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header">
+          <span class="material-icons" style="font-size:18px;color:var(--accent)">lock</span>
+          <span>Cerrar inventario</span>
+          <button class="action-btn" @click="mostrarConfirmCerrar = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <p class="alerta-mensaje">Se marcarán todos los conteos como verificados. El inventario quedará cerrado para edición.</p>
+          <div class="alerta-btns">
+            <button class="alerta-btn-confirmar" @click="mostrarConfirmCerrar = false">Cancelar</button>
+            <button class="inv-btn-primary" @click="ejecutarCerrar">Cerrar inventario</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- MAIN CONTENT -->
     <div class="inv-content">
@@ -196,7 +263,7 @@
     </div><!-- /inv-content -->
 
     <!-- FAB -->
-    <button class="inv-fab" @click="mostrarAgregar = true"><span class="material-icons">add</span></button>
+    <button v-if="puede('agregar_articulo')" class="inv-fab" @click="mostrarAgregar = true"><span class="material-icons">add</span></button>
 
     <!-- POPUP COLUMNA — idéntico a GestionTable -->
     <Teleport to="body">
@@ -346,6 +413,13 @@ const articuloNota = ref(null)
 const textoNota = ref('')
 const panelAbierto = ref(false)
 const menuAbierto = ref(null)
+const nivelUsuario = ref(1)
+const politicas = ref({ acciones: {} })
+const mostrarNuevoInv = ref(false)
+const nuevaFechaInv = ref('')
+const creandoInv = ref(false)
+const mostrarConfirmReiniciar = ref(false)
+const mostrarConfirmCerrar = ref(false)
 const mostrarFoto = ref(false)
 const articuloFoto = ref(null)
 const fotoInput = ref(null)
@@ -652,6 +726,46 @@ function verFoto(a) {
   mostrarFoto.value = true
 }
 
+// ── Gestión de inventarios ──
+async function crearInventario() {
+  if (!nuevaFechaInv.value) return
+  creandoInv.value = true
+  await fetch(API + '/api/inventario/nuevo', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: nuevaFechaInv.value, usuario: usuario.value })
+  })
+  mostrarNuevoInv.value = false
+  nuevaFechaInv.value = ''
+  creandoInv.value = false
+  await cargarFechas()
+  cambiarFecha(nuevaFechaInv.value || FECHA.value)
+}
+
+function confirmarReiniciar() { mostrarConfirmReiniciar.value = true }
+function confirmarCerrar() { mostrarConfirmCerrar.value = true }
+
+async function ejecutarReiniciar() {
+  await fetch(API + '/api/inventario/reiniciar', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+  })
+  mostrarConfirmReiniciar.value = false
+  await cargarArticulos()
+  await cargarResumen()
+  await cargarBodegas()
+}
+
+async function ejecutarCerrar() {
+  await fetch(API + '/api/inventario/cerrar', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+  })
+  mostrarConfirmCerrar.value = false
+  await cargarArticulos()
+  await cargarResumen()
+  await cargarFechas()
+}
+
 // ── Helpers visuales ──
 function parseDecimal(str) {
   if (str == null || str === '') return NaN
@@ -666,6 +780,12 @@ function claseDot(a) { if (a.estado === 'pendiente') return 'dot-pending'; if (a
 function claseInput(a) { if (a.inventario_fisico == null) return ''; if (a.diferencia === 0) return 'input-ok'; return Math.abs(a.diferencia) >= 10 ? 'input-critical' : 'input-warning' }
 function claseBadge(a) { if (a.estado === 'pendiente') return 'badge-empty'; if (a.diferencia === 0) return 'badge-ok'; return Math.abs(a.diferencia) >= 10 ? 'badge-error' : 'badge-warning' }
 function textoBadge(a) { if (a.estado === 'pendiente') return '—'; if (a.diferencia === 0) return 'OK'; return (a.diferencia > 0 ? '+' : '') + Math.round(a.diferencia) }
+
+// ── Permisos ──
+function puede(accion) {
+  const config = politicas.value.acciones?.[accion]
+  return config && nivelUsuario.value >= config.nivel_minimo
+}
 
 // ── Auth ──
 function initGoogleSignIn() {
@@ -715,6 +835,7 @@ function establecerUsuario(u) {
     usuario.value = u.nombre
     iniciales.value = u.nombre.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase()
   }
+  if (u?.nivel) nivelUsuario.value = u.nivel
 }
 
 function verificarSesion() {
@@ -731,7 +852,12 @@ function verificarSesion() {
   return false
 }
 
+async function cargarPoliticas() {
+  try { politicas.value = await fetchApi('/api/inventario/politicas') } catch {}
+}
+
 async function cargarDatos() {
+  await cargarPoliticas()
   await cargarFechas(); await cargarBodegas(); await cargarResumen(); await cargarArticulos()
 }
 
@@ -776,6 +902,18 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-panel-item-stats { font-size: 11px; color: var(--text-tertiary); display: flex; justify-content: space-between; margin-top: 2px; }
 .inv-panel-item-pct { font-family: 'Fragment Mono', monospace; }
 .inv-panel-empty { text-align: center; color: var(--text-tertiary); padding: 24px; font-size: 12px; }
+.inv-panel-add { width: 22px; height: 22px; border-radius: 4px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: auto; }
+.inv-panel-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-muted); }
+.inv-panel-item-main { cursor: pointer; flex: 1; }
+.inv-panel-item-actions { display: flex; gap: 2px; margin-top: 4px; }
+.inv-panel-action { width: 24px; height: 24px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.inv-panel-action:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+.inv-form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+.inv-form-input { width: 100%; height: 36px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 10px; color: var(--text-primary); font-size: 13px; font-family: inherit; margin-bottom: 8px; }
+.inv-form-input:focus { border-color: var(--accent); outline: none; }
+.inv-form-hint { font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px; line-height: 1.4; }
+.inv-btn-danger { background: var(--color-error); color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; }
+.inv-btn-danger:hover { opacity: 0.9; }
 .inv-panel-toggle { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; border-radius: 4px; margin-right: 4px; }
 .inv-panel-toggle:hover { background: rgba(255,255,255,0.06); }
 

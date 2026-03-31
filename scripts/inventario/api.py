@@ -14,8 +14,10 @@ import pymysql
 
 app = FastAPI(title="Inventario OS", version="1.0")
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'inventario', 'static')
-FOTOS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'inventario', 'fotos')
+BASE_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
+STATIC_DIR = os.path.join(BASE_DIR, 'inventario', 'static')
+FOTOS_DIR = os.path.join(BASE_DIR, 'inventario', 'fotos')
+POLITICAS_PATH = os.path.join(BASE_DIR, 'inventario', 'politicas.json')
 JWT_SECRET = '30e4cfa02643f4f05b846aab50974c7a5df85b1f05c990b3fe64e297538adbc2'
 
 
@@ -72,6 +74,14 @@ def registrar_auditoria(conteo_id, accion, usuario, valor_anterior=None, valor_n
 
 
 # === ENDPOINTS ===
+
+@app.get("/api/inventario/politicas")
+def obtener_politicas():
+    """Retorna las políticas de acceso."""
+    import json as _json
+    with open(POLITICAS_PATH, 'r') as f:
+        return _json.load(f)
+
 
 @app.get("/api/inventario/fechas")
 def listar_fechas():
@@ -332,6 +342,62 @@ def resumen_inventario(fecha: str, bodega: Optional[str] = None):
         params.append(bodega)
     rows = db_query(DB_INV, sql, params)
     return rows[0] if rows else {}
+
+
+# === GESTIÓN DE INVENTARIOS (nivel >= 5) ===
+
+class NuevoInventario(BaseModel):
+    fecha_inventario: str
+    usuario: str
+
+
+@app.post("/api/inventario/nuevo")
+def crear_inventario(data: NuevoInventario):
+    """Crea un nuevo evento de inventario ejecutando el depurador."""
+    import subprocess
+    result = subprocess.run(
+        ['python3', os.path.join(BASE_DIR, 'scripts/inventario/depurar_inventario.py'),
+         '--fecha', data.fecha_inventario],
+        capture_output=True, text=True, cwd=BASE_DIR
+    )
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr or 'Error al crear inventario')
+
+    registrar_auditoria(0, 'nuevo_inventario', data.usuario, None, data.fecha_inventario,
+                        f'Inventario creado para {data.fecha_inventario}')
+    return {"ok": True, "output": result.stdout}
+
+
+class GestionInventario(BaseModel):
+    fecha_inventario: str
+    usuario: str
+
+
+@app.post("/api/inventario/reiniciar")
+def reiniciar_inventario(data: GestionInventario):
+    """Reinicia conteos de un inventario (borra conteos, mantiene artículos)."""
+    affected = db_execute(DB_INV, """
+        UPDATE inv_conteos
+        SET inventario_fisico = NULL, diferencia = NULL, estado = 'pendiente',
+            contado_por = NULL, fecha_conteo = NULL, notas = NULL, foto = NULL
+        WHERE fecha_inventario = %s AND excluido = 0
+    """, (data.fecha_inventario,))
+    registrar_auditoria(0, 'reiniciar_inventario', data.usuario, None, data.fecha_inventario,
+                        f'{affected} conteos reiniciados')
+    return {"ok": True, "reiniciados": affected}
+
+
+@app.post("/api/inventario/cerrar")
+def cerrar_inventario(data: GestionInventario):
+    """Cierra un inventario (marca estado = 'cerrado' en pendientes)."""
+    affected = db_execute(DB_INV, """
+        UPDATE inv_conteos
+        SET estado = 'verificado'
+        WHERE fecha_inventario = %s AND excluido = 0 AND estado = 'contado'
+    """, (data.fecha_inventario,))
+    registrar_auditoria(0, 'cerrar_inventario', data.usuario, None, data.fecha_inventario,
+                        f'{affected} conteos verificados/cerrados')
+    return {"ok": True, "cerrados": affected}
 
 
 # Servir frontend estático (después de todas las rutas /api/)
