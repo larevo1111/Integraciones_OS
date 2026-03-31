@@ -1,0 +1,42 @@
+/* === DESIGN SYSTEM OS — Dark Mode (Linear-based, acento verde) === */
+:root {
+  --bg-app: #0d0d0f;
+  --bg-sidebar: #141418;
+  --bg-card: #1c1c1e;
+  --bg-input: #161618;
+  --bg-row-hover: #1a1a1e;
+  --accent: #00C853;
+  --accent-hover: #00E060;
+  --accent-muted: rgba(0,200,83,0.12);
+  --accent-border: rgba(0,200,83,0.35);
+  --text-primary: #ffffff;
+  --text-secondary: #8a8f98;
+  --text-tertiary: #5f6369;
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.18);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --color-ok: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #f87171;
+  --color-pending: #6b7280;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', sans-serif;
+  font-size: 13px;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }

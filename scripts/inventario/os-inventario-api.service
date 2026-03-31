@@ -1,0 +1,14 @@
+[Unit]
+Description=OS Inventario API (FastAPI)
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=osserver
+WorkingDirectory=/home/osserver/Proyectos_Antigravity/Integraciones_OS
+ExecStart=/usr/bin/python3 scripts/inventario/api.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
