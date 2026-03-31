@@ -115,7 +115,7 @@ def listar_conversaciones(usuario_id: str, empresa: str) -> list[dict]:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                'SELECT id, nombre, activa, created_at FROM sa_sesiones '
+                'SELECT id, claude_session_id, nombre, activa, created_at FROM sa_sesiones '
                 'WHERE usuario_id=%s AND empresa=%s '
                 'ORDER BY activa DESC, updated_at DESC',
                 (usuario_id, empresa)
@@ -175,6 +175,63 @@ def borrar_conversacion(sesion_id: int, usuario_id: str) -> str | None:
             return row['nombre']
     finally:
         conn.close()
+
+
+def obtener_historial(claude_session_id: str, max_intercambios: int = 5) -> str:
+    """
+    Lee el .jsonl de la sesión de Claude y retorna los últimos N intercambios
+    user/assistant como texto formateado para mostrar en Telegram.
+    """
+    jsonl = os.path.join(CLAUDE_SESSIONS_DIR, f'{claude_session_id}.jsonl')
+    if not os.path.exists(jsonl):
+        return ''
+
+    intercambios = []
+    try:
+        with open(jsonl, encoding='utf-8') as f:
+            lines = [json.loads(l) for l in f if l.strip()]
+
+        ultimo_user = None
+        for line in lines:
+            tipo = line.get('type')
+            msg = line.get('message', {})
+            role = msg.get('role', '')
+            content = msg.get('content', '')
+
+            # Extraer texto
+            if isinstance(content, list):
+                texto = ' '.join(
+                    c.get('text', '') for c in content
+                    if isinstance(c, dict) and c.get('type') == 'text'
+                ).strip()
+            else:
+                texto = str(content).strip()
+
+            if not texto:
+                continue
+
+            # Saltar el primer mensaje user (es el system prompt)
+            if tipo == 'user' and role == 'user':
+                # El primer mensaje contiene el prompt del sistema — saltar
+                if '\nSos el Super Agente' in texto or '\nEres el Super Agente' in texto:
+                    continue
+                ultimo_user = texto[:300]
+            elif tipo == 'assistant' and role == 'assistant' and ultimo_user:
+                intercambios.append((ultimo_user, texto[:300]))
+                ultimo_user = None
+
+    except Exception:
+        return ''
+
+    if not intercambios:
+        return ''
+
+    ultimos = intercambios[-max_intercambios:]
+    lineas = ['📜 *Últimos intercambios:*']
+    for i, (usr, ast) in enumerate(ultimos, 1):
+        lineas.append(f'\n*{i}. Tú:* {usr}')
+        lineas.append(f'*SA:* {ast}')
+    return '\n'.join(lineas)
 
 
 # ── Config ───────────────────────────────────────────────────────────────────

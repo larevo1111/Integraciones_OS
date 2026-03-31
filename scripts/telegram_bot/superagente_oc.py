@@ -125,7 +125,7 @@ def listar_conversaciones(usuario_id: str, empresa: str) -> list[dict]:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                'SELECT id, nombre, activa, created_at FROM saoc_sesiones '
+                'SELECT id, oc_session_id, nombre, activa, created_at FROM saoc_sesiones '
                 'WHERE usuario_id=%s AND empresa=%s '
                 'ORDER BY activa DESC, updated_at DESC',
                 (usuario_id, empresa)
@@ -181,6 +181,63 @@ def borrar_conversacion(sesion_id: int, usuario_id: str) -> str | None:
             return row['nombre']
     finally:
         conn.close()
+
+
+_OC_DB = os.path.expanduser('~/.local/share/opencode/opencode.db')
+
+
+def obtener_historial(oc_session_id: str, max_intercambios: int = 5) -> str:
+    """
+    Lee el SQLite de OpenCode y retorna los últimos N intercambios como texto.
+    """
+    if not os.path.exists(_OC_DB):
+        return ''
+    try:
+        import sqlite3
+        conn = sqlite3.connect(_OC_DB)
+        # Obtener parts tipo 'text' con su rol (via message) ordenados
+        rows = conn.execute(
+            '''
+            SELECT json_extract(m.data, '$.role') AS role, p.data
+            FROM part p
+            JOIN message m ON p.message_id = m.id
+            WHERE p.session_id = ?
+              AND json_extract(p.data, '$.type') = 'text'
+            ORDER BY p.time_created
+            ''',
+            (oc_session_id,)
+        ).fetchall()
+        conn.close()
+
+        intercambios = []
+        ultimo_user = None
+        for role, data_str in rows:
+            try:
+                data = json.loads(data_str)
+                texto = data.get('text', '').strip()
+            except Exception:
+                continue
+            if not texto:
+                continue
+
+            if role == 'user':
+                ultimo_user = texto[:300]
+            elif role == 'assistant' and ultimo_user:
+                intercambios.append((ultimo_user, texto[:300]))
+                ultimo_user = None
+
+        if not intercambios:
+            return ''
+
+        ultimos = intercambios[-max_intercambios:]
+        lineas = ['📜 *Últimos intercambios:*']
+        for i, (usr, ast) in enumerate(ultimos, 1):
+            lineas.append(f'\n*{i}. Tú:* {usr}')
+            lineas.append(f'*SA:* {ast}')
+        return '\n'.join(lineas)
+
+    except Exception:
+        return ''
 
 
 # ── Consulta principal ───────────────────────────────────────────────────────

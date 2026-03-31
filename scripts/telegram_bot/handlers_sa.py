@@ -244,6 +244,11 @@ async def handle_sa_callback(query, user, nivel: int, nombre: str, sa_mod):
         nombre_conv = conv['nombre'] if conv else '?'
         await query.edit_message_text(f'✅ Conversación activa: *{nombre_conv}*',
                                        parse_mode=ParseMode.MARKDOWN)
+        # Mostrar historial de la conversación cargada
+        if conv:
+            historial = sa_mod.obtener_historial(conv['claude_session_id'])
+            if historial:
+                await query.message.reply_text(historial, parse_mode=ParseMode.MARKDOWN)
         return
 
     # Renombrar
