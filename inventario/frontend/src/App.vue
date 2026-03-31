@@ -1320,39 +1320,34 @@ onUnmounted(() => clearInterval(clockInterval))
   .inv-bodega-add-btn { width: 20px; height: 20px; }
   .inv-bodega-dropdown { left: auto; right: 0; min-width: 180px; }
 
-  /* Tabla: layout fijo, sin scroll horizontal */
+  /* Tabla: 400px = status(14) + id(24) + art(auto≈200) + cat(80) + conteo(82) */
   .inv-table-container { overflow-x: hidden; }
-  .inv-table { table-layout: fixed; width: 100%; }
-  /* Columnas: todas visibles */
   .col-status { width: 14px; }
-  .col-id { width: 22px; }
+  .col-id { width: 24px; }
   .col-articulo { width: auto; }
-  .col-categoria { width: 60px; }
-  .col-conteo { width: 105px; }
-  .inv-table-container { overflow-x: hidden; }
-  .inv-table td { padding: 2px 2px; vertical-align: middle; }
+  .col-categoria { width: 80px; }
+  .col-conteo { width: 82px; }
+  .inv-table td { padding: 3px 2px; vertical-align: middle; }
   .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
-
-  /* ID: chiquito */
   .cell-id { font-size: 8px; }
 
-  /* Artículo: wrap, alto variable */
-  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: wrap; }
+  /* Artículo: wrap */
+  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: nowrap; }
   .articulo-line2 { display: none; }
-  .articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.3; }
+  .articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.25; }
   .grupo-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
 
-  /* Categoría: wrap, más chica */
+  /* Categoría: wrap */
   .cell-categoria-desktop { font-size: 8px; white-space: normal; word-break: break-word; line-height: 1.15; }
 
-  /* Conteo */
+  /* Conteo: SIN stepper, solo input + badge + dots */
   .teorico-block { display: none; }
-  .stepper-btn { width: 20px; height: 26px; }
-  .count-input { width: 34px; height: 26px; font-size: 11px; }
-  .conteo-cell { gap: 1px; }
-  .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
+  .stepper-btn { display: none; }
+  .count-input { width: 36px; height: 28px; font-size: 12px; border-radius: 4px; }
+  .conteo-cell { gap: 2px; }
   .diff-col { flex-direction: column; gap: 0; align-items: center; }
+  .diff-badge { font-size: 8px; min-width: 18px; padding: 1px 2px; }
   .contador-chip { font-size: 6px; }
   .status-dot { width: 6px; height: 6px; }
   .action-btn { width: 16px; height: 16px; }
