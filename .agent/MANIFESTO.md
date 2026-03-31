@@ -1,5 +1,24 @@
 # MANIFESTO — Integraciones_OS
 
+> **Este es el documento constitución del proyecto.** Contiene reglas que aplican globalmente y cambian poco.
+> Para el estado actual del sistema → `CONTEXTO_ACTIVO.md`
+> Para orientación general y mapa del repo → `MEMORY.md` (memoria Claude)
+> Para saber cómo mantener la documentación → `MANUAL_DOCUMENTACION.md`
+
+## Índice de secciones
+
+- [Reglas críticas de frontend](#frontend)
+- [1. Protocolo de identidad y gobernanza](#1-identidad)
+- [2. Arquitectura general](#2-arquitectura)
+- [3. Convenciones de código y BD](#3-convenciones)
+- [4. Reglas de timezone](#4-timezone)
+- [5. Reglas del pipeline](#5-pipeline)
+- [6. Gotchas técnicos — Effi](#6-gotchas-effi)
+- [7. Gotchas técnicos — EspoCRM](#7-gotchas-espocrm)
+- [8. Reglas del super agente](#8-super-agente)
+- [9. Reglas modo autónomo](#9-modo-autonomo)
+- [10. Reglas de documentación](#10-documentacion)
+
 ---
 
 ## ⚠️ REGLAS CRÍTICAS DE FRONTEND (leer antes de cualquier tarea de UI)
@@ -855,3 +874,28 @@ El prompt le indica al Super Agente 3 formatos:
 - `scripts/telegram_bot/superagente.py` — sesiones + `_ejecutar_claude()` con --resume + procesamiento de respuesta
 - `scripts/telegram_bot/handlers_sa.py` — handlers Telegram: menú, conversaciones, callbacks
 - `scripts/telegram_bot/bot.py` — routing: si agente='superagente' → handlers_sa (NO ia_service)
+
+---
+
+## 10. REGLAS DE DOCUMENTACIÓN
+
+> Detalle completo en `.agent/MANUAL_DOCUMENTACION.md` — este es el resumen ejecutivo.
+
+### La jerarquía
+
+```
+MEMORY.md (Claude)     → Mapa del repo. Primera lectura. < 200 líneas. Solo índices.
+MANIFESTO.md           → Constitución. Reglas globales. Este archivo.
+CONTEXTO_ACTIVO.md     → Estado actual. Se actualiza cada sesión.
+contextos/<módulo>.md  → Contexto profundo. Leer solo al trabajar en ese módulo.
+CATALOGO_*.md          → Catálogos de referencia. Actualizar al agregar recursos.
+Skills (.claude/)      → Guías especializadas por dominio.
+```
+
+### Reglas básicas
+
+1. **MEMORY.md es un mapa, no un dump.** Si supera 200 líneas, mover detalle a contextos/ o MANIFESTO.md y dejar solo el puntero.
+2. **Un dato, un lugar.** Si algo aparece en dos archivos, hay duplicación. Elegir fuente canónica.
+3. **Al terminar una tarea significativa**: actualizar `contextos/<módulo>.md`. Si cambió el estado global, actualizar `CONTEXTO_ACTIVO.md`.
+4. **Planes nunca se borran.** Completados → `.agent/planes/completados/` con `Estado: Completado` al inicio.
+5. **Ciclo de vida de módulos**: En desarrollo → Activo → Estable → Archivado. Módulos estables sin trabajo activo NO tienen prioridad Alta en CONTEXTO_ACTIVO.md.
