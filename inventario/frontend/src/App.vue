@@ -1320,26 +1320,28 @@ onUnmounted(() => clearInterval(clockInterval))
   /* Tabla: layout fijo, sin scroll horizontal */
   .inv-table-container { overflow-x: hidden; }
   .inv-table { table-layout: fixed; width: 100%; }
-  /* Columnas: ID invisible (width 0), todas visibles */
+  /* Columnas: todas visibles, ID mínimo */
   .col-status { width: 16px; }
-  .col-id { width: 0; }
+  .col-id { width: 28px; }
   .col-articulo { width: auto; }
   .col-categoria { width: 70px; }
   .col-conteo { width: 115px; }
   .inv-table-container { overflow-x: hidden; }
-  .inv-table td:nth-child(2), .inv-table th:nth-child(2) { padding: 0; font-size: 0; border: none; }
-  .inv-table td { padding: 0 2px; height: 36px; overflow: hidden; }
+  .inv-table td { padding: 2px 2px; vertical-align: middle; }
   .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
 
-  /* Artículo: inline, truncar nombre */
-  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: nowrap; overflow: hidden; }
+  /* ID: chiquito */
+  .cell-id { font-size: 9px; }
+
+  /* Artículo: wrap, alto variable */
+  .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: wrap; }
   .articulo-line2 { display: none; }
-  .articulo-nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.3; }
   .grupo-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
 
-  /* Categoría: truncar */
-  .cell-categoria-desktop { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Categoría: wrap */
+  .cell-categoria-desktop { font-size: 9px; white-space: normal; word-break: break-word; line-height: 1.2; }
 
   /* Conteo */
   .teorico-block { display: none; }
