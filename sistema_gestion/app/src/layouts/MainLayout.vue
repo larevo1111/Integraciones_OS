@@ -405,10 +405,6 @@ const TITULOS = {
   '/tareas':          'Mis Tareas',
   '/equipo':          'Equipo',
   '/jornadas':        'Jornadas',
-  '/proyectos-tabla': 'Proyectos',
-  '/dificultades':    'Dificultades',
-  '/compromisos':     'Compromisos',
-  '/ideas':           'Ideas',
 }
 const tituloRuta = computed(() => {
   for (const [path, titulo] of Object.entries(TITULOS)) {

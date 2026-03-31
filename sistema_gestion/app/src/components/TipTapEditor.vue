@@ -14,6 +14,8 @@
       </button>
     </div>
     <editor-content :editor="editor" class="tiptap-content" />
+    <!-- Input oculto para seleccionar archivos -->
+    <input ref="fileInput" type="file" accept="image/*" style="display:none" @change="onFileSelected" />
   </div>
 </template>
 
@@ -23,15 +25,22 @@ import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
+import { api } from 'src/services/api'
 
 const props = defineProps({
   modelValue:  { type: String, default: '' },
   placeholder: { type: String, default: 'Escribe aquí...' },
   editable:    { type: Boolean, default: true },
+  // Contexto para nombrar el archivo subido
+  uploadTipo:   { type: String, default: 'general' },
+  uploadItemId: { type: [Number, String], default: '' },
+  uploadItemNombre: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue'])
 
 const isFocused = ref(false)
+const fileInput = ref(null)
 let debounceTimer = null
 
 const editor = useEditor({
@@ -43,6 +52,7 @@ const editor = useEditor({
     }),
     Link.configure({ openOnClick: false, HTMLAttributes: { class: 'tiptap-link' } }),
     Placeholder.configure({ placeholder: props.placeholder }),
+    Image.configure({ inline: false, allowBase64: false }),
   ],
   onUpdate({ editor: ed }) {
     clearTimeout(debounceTimer)
@@ -52,6 +62,29 @@ const editor = useEditor({
   },
   onFocus() { isFocused.value = true },
   onBlur()  { isFocused.value = false },
+  editorProps: {
+    handleDrop(view, event) {
+      const files = event.dataTransfer?.files
+      if (files?.length && files[0].type.startsWith('image/')) {
+        event.preventDefault()
+        subirArchivo(files[0])
+        return true
+      }
+      return false
+    },
+    handlePaste(view, event) {
+      const items = event.clipboardData?.items
+      if (!items) return false
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          event.preventDefault()
+          subirArchivo(item.getAsFile())
+          return true
+        }
+      }
+      return false
+    },
+  },
 })
 
 watch(() => props.modelValue, (val) => {
@@ -69,6 +102,40 @@ onBeforeUnmount(() => {
   editor.value?.destroy()
 })
 
+// ── Upload ──
+async function subirArchivo(file) {
+  if (!file || !file.type.startsWith('image/')) return
+  if (file.size > 10 * 1024 * 1024) { alert('Imagen demasiado grande (máx 10 MB)'); return }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('tipo', props.uploadTipo)
+  formData.append('item_id', props.uploadItemId)
+  formData.append('item_nombre', props.uploadItemNombre)
+
+  try {
+    const resp = await fetch('/api/gestion/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('gestion_token')}` },
+      body: formData,
+    })
+    const data = await resp.json()
+    if (data.url && editor.value) {
+      editor.value.chain().focus().setImage({ src: data.url }).run()
+    }
+  } catch (e) { console.error('Error subiendo imagen:', e) }
+}
+
+function abrirSelectorArchivo() {
+  fileInput.value?.click()
+}
+
+function onFileSelected(e) {
+  const file = e.target.files?.[0]
+  if (file) subirArchivo(file)
+  e.target.value = '' // reset para poder subir el mismo archivo otra vez
+}
+
 const toolbarBtns = computed(() => {
   if (!editor.value) return []
   const e = editor.value
@@ -81,6 +148,7 @@ const toolbarBtns = computed(() => {
     { action: 'ordered', icon: 'format_list_numbered', label: 'Lista numerada', run: () => e.chain().focus().toggleOrderedList().run(), isActive: () => e.isActive('orderedList') },
     { action: 'blockquote', icon: 'format_quote', label: 'Cita', run: () => e.chain().focus().toggleBlockquote().run(), isActive: () => e.isActive('blockquote') },
     { action: 'code', icon: 'code', label: 'Código', run: () => e.chain().focus().toggleCodeBlock().run(), isActive: () => e.isActive('codeBlock') },
+    { action: 'image', icon: 'image', label: 'Imagen', run: () => abrirSelectorArchivo() },
   ]
 })
 </script>
@@ -148,6 +216,12 @@ const toolbarBtns = computed(() => {
   font-style: italic;
 }
 .tiptap-content :deep(.tiptap strong) { font-weight: 600; }
+
+/* Imágenes dentro del editor */
+.tiptap-content :deep(.tiptap img) {
+  max-width: 100%; height: auto; border-radius: var(--radius-md);
+  margin: 8px 0; display: block;
+}
 
 @media (max-width: 600px) {
   .tiptap-content { min-height: 80px; padding: 8px 10px; }

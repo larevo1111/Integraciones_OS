@@ -160,6 +160,9 @@
             <TipTapEditor
               v-model="form.descripcion"
               :placeholder="'Describe la situación, documenta el progreso...'"
+              :upload-tipo="tipoLocal"
+              :upload-item-id="item?.id || ''"
+              :upload-item-nombre="form.nombre"
               @update:model-value="guardarCampo('descripcion', $event)"
             />
           </div>
@@ -307,7 +310,10 @@ watch(() => props.item, initForm, { immediate: true })
 
 onMounted(async () => {
   await nextTick()
-  if (tituloRef.value) { autoGrow({ target: tituloRef.value }); tituloRef.value.focus() }
+  if (tituloRef.value) {
+    autoGrow({ target: tituloRef.value })
+    if (!props.item?.id) tituloRef.value.focus() // solo focus al crear nuevo
+  }
   if (props.item?.id) cargarTareas()
 })
 
@@ -320,8 +326,8 @@ async function cargarTareas() {
 
 function autoGrow(e) {
   const el = e.target
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
+  el.style.height = '0'
+  el.style.height = Math.max(el.scrollHeight, 28) + 'px'
 }
 
 // ── Guardar campo individual (edit mode) ──

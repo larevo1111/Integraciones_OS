@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@quasar/extras": "^1.16.12",
+    "@tiptap/extension-image": "^3.21.0",
     "@tiptap/extension-link": "^3.21.0",
     "@tiptap/extension-placeholder": "^3.21.0",
     "@tiptap/starter-kit": "^3.21.0",

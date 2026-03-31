@@ -11,9 +11,17 @@ const express  = require('express')
 const path     = require('path')
 const https    = require('https')
 const fs       = require('fs')
+const crypto   = require('crypto')
 const jwt      = require('jsonwebtoken')
+const multer   = require('multer')
 const { execFile } = require('child_process')
 const db      = require('./db')
+
+// ─── Upload config ─────────────────────────────────────────────────
+const SUBIDOS_ROOT  = '/home/osserver/subidos'
+const MIME_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']
+const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
+const upload = multer({ dest: '/tmp/gestion-uploads/', limits: { fileSize: MAX_SIZE } })
 
 // ─── Cargar .env ───────────────────────────────────────────────────
 const envPath = path.join(__dirname, '.env')
@@ -42,6 +50,7 @@ if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
 const app = express()
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../app/dist/spa')))
+app.use('/subidos', express.static(SUBIDOS_ROOT))
 
 // ─── CORS ──────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -2095,6 +2104,41 @@ app.put('/api/gestion/tipos-pausa/:id', requireAuth, async (req, res) => {
     const [[tipo]] = await db.gestion.query('SELECT * FROM g_tipos_pausa WHERE id = ?', [req.params.id])
     res.json({ ok: true, tipo })
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── Upload de archivos (imágenes en TipTap) ──────────────────────
+function slugify(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+}
+
+app.post('/api/gestion/upload', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Falta archivo' })
+  if (!MIME_PERMITIDOS.includes(req.file.mimetype)) {
+    fs.unlink(req.file.path, () => {})
+    return res.status(400).json({ error: 'Formato no permitido. Usa: jpg, png, webp, gif, pdf' })
+  }
+
+  const { tipo, item_id, item_nombre } = req.body
+  const tipoVal = tipo || 'general'
+  const idSlug  = item_id ? `${item_id}_${slugify(item_nombre || 'sin-nombre')}` : 'sin-item'
+
+  // Timestamp Colombia
+  const now = new Date()
+  const ts  = now.toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(/[- :]/g, '').slice(0, 15)
+  const stamp = ts.slice(0, 8) + '-' + ts.slice(8)
+  const hash  = crypto.randomBytes(3).toString('hex')
+  const ext   = path.extname(req.file.originalname).toLowerCase() || '.jpg'
+
+  const relDir  = `gestion/${tipoVal}/${idSlug}`
+  const relPath = `${relDir}/${stamp}_${hash}${ext}`
+  const absDir  = path.join(SUBIDOS_ROOT, relDir)
+  const absPath = path.join(SUBIDOS_ROOT, relPath)
+
+  fs.mkdirSync(absDir, { recursive: true })
+  fs.renameSync(req.file.path, absPath)
+
+  res.json({ ok: true, url: `/subidos/${relPath}`, ruta_relativa: relPath })
 })
 
 // ─── Fallback SPA ──────────────────────────────────────────────────
