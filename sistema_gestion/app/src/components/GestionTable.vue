@@ -12,6 +12,7 @@
           <span class="material-icons" style="font-size:10px">close</span>
         </span>
         <span v-if="activeAggCount > 0" class="agg-badge">Σ {{ activeAggCount }}</span>
+        <span style="font-size:9px;color:#666;margin-left:4px">v3</span>
       </div>
       <div class="toolbar-right">
         <!-- Slot para controles externos (filtros de fecha, etc.) -->
@@ -57,6 +58,7 @@
                 'th-filtered': hasFilter(col.key),
                 'th-popup-open': colPopup === col.key
               }"
+              :style="col.width ? { minWidth: col.width } : {}"
               @click.stop="openColPopup(col.key, $event)"
             >
               <div class="th-inner">
@@ -203,16 +205,10 @@ const AGG_OPTS = [
   { v: 'min', label: 'Mínimo',   icon: '↓' },
 ]
 
-// ── Mobile detection ────────────────────────────────
-const isMobile = ref(window.innerWidth < 768)
-function onResize() { isMobile.value = window.innerWidth < 768 }
-onMounted(() => window.addEventListener('resize', onResize))
-onUnmounted(() => window.removeEventListener('resize', onResize))
-
 // ── Columnas ─────────────────────────────────────────
 const localColumns = ref([])
 watch(() => props.columns, cols => { localColumns.value = cols.map(c => ({ ...c })) }, { immediate: true })
-const visibleColumns = computed(() => localColumns.value.filter(c => c.visible && !(isMobile.value && c.hideOnMobile)))
+const visibleColumns = computed(() => localColumns.value.filter(c => c.visible))
 function showAll() { localColumns.value.forEach(c => c.visible = true) }
 function hideAll() { localColumns.value.forEach(c => c.visible = false) }
 
