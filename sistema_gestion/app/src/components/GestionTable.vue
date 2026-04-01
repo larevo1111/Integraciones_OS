@@ -12,7 +12,6 @@
           <span class="material-icons" style="font-size:10px">close</span>
         </span>
         <span v-if="activeAggCount > 0" class="agg-badge">Σ {{ activeAggCount }}</span>
-        <span style="font-size:9px;color:#666;margin-left:4px">v3</span>
       </div>
       <div class="toolbar-right">
         <!-- Slot para controles externos (filtros de fecha, etc.) -->

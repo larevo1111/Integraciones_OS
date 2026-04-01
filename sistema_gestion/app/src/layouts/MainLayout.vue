@@ -16,14 +16,18 @@
 
       <!-- Nav -->
       <nav class="sidebar-nav">
-        <!-- ═══ MIS TAREAS ═══ -->
+        <!-- ═══ MIS TAREAS (acordeón) ═══ -->
         <div class="sidebar-section">
-          <RouterLink to="/tareas" class="nav-item" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
-            <span class="nav-item-icon material-icons">check_circle_outline</span>
-            <span class="nav-item-label">Mis Tareas</span>
-          </RouterLink>
+          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
+            <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-mis')">{{ acordeonAbierto['bloque-mis'] ? 'expand_more' : 'chevron_right' }}</span>
+            <RouterLink to="/tareas" class="nav-item-link-grow">
+              <span class="nav-item-icon material-icons">check_circle_outline</span>
+              <span class="nav-item-label">Mis Tareas</span>
+            </RouterLink>
+          </div>
         </div>
 
+        <template v-if="acordeonAbierto['bloque-mis']">
         <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-section">
           <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
             <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
@@ -66,18 +70,23 @@
             </div>
           </template>
         </div>
+        </template>
 
         <!-- ═══ SEPARADOR ═══ -->
         <div class="sidebar-separator" />
 
-        <!-- ═══ EQUIPO ═══ -->
+        <!-- ═══ EQUIPO (acordeón) ═══ -->
         <div class="sidebar-section">
-          <RouterLink to="/equipo" class="nav-item" :class="{ active: ruta === '/equipo' }">
-            <span class="nav-item-icon material-icons">group</span>
-            <span class="nav-item-label">Equipo</span>
-          </RouterLink>
+          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/equipo' }">
+            <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-eq')">{{ acordeonAbierto['bloque-eq'] ? 'expand_more' : 'chevron_right' }}</span>
+            <RouterLink to="/equipo" class="nav-item-link-grow">
+              <span class="nav-item-icon material-icons">group</span>
+              <span class="nav-item-label">Equipo</span>
+            </RouterLink>
+          </div>
         </div>
 
+        <template v-if="acordeonAbierto['bloque-eq']">
         <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-section">
           <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
             <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
@@ -140,6 +149,7 @@
             </div>
           </template>
         </div>
+        </template>
 
         <!-- ═══ SEPARADOR ═══ -->
         <div class="sidebar-separator" />
@@ -267,9 +277,16 @@
               </button>
             </div>
             <nav class="sidebar-nav" style="overflow-y:auto">
-              <!-- ═══ MIS TAREAS ═══ -->
-              <RouterLink to="/tareas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">check_circle_outline</span><span class="nav-item-label">Mis Tareas</span></RouterLink>
+              <!-- ═══ MIS TAREAS (acordeón) ═══ -->
+              <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
+                <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-mis')">{{ acordeonAbierto['bloque-mis'] ? 'expand_more' : 'chevron_right' }}</span>
+                <RouterLink to="/tareas" class="nav-item-link-grow" @click="drawerOpen=false">
+                  <span class="nav-item-icon material-icons">check_circle_outline</span>
+                  <span class="nav-item-label">Mis Tareas</span>
+                </RouterLink>
+              </div>
 
+              <template v-if="acordeonAbierto['bloque-mis']">
               <div v-for="sec in SECCIONES_SIDEBAR" :key="'dm-'+sec.tipo" class="sidebar-section">
                 <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
                   <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
@@ -289,12 +306,20 @@
                   <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
                 </template>
               </div>
+              </template>
 
               <div class="sidebar-separator" />
 
-              <!-- ═══ EQUIPO ═══ -->
-              <RouterLink to="/equipo" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">group</span><span class="nav-item-label">Equipo</span></RouterLink>
+              <!-- ═══ EQUIPO (acordeón) ═══ -->
+              <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/equipo' }">
+                <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-eq')">{{ acordeonAbierto['bloque-eq'] ? 'expand_more' : 'chevron_right' }}</span>
+                <RouterLink to="/equipo" class="nav-item-link-grow" @click="drawerOpen=false">
+                  <span class="nav-item-icon material-icons">group</span>
+                  <span class="nav-item-label">Equipo</span>
+                </RouterLink>
+              </div>
 
+              <template v-if="acordeonAbierto['bloque-eq']">
               <div v-for="sec in SECCIONES_SIDEBAR" :key="'de-'+sec.tipo" class="sidebar-section">
                 <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
                   <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
@@ -314,6 +339,7 @@
                   <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
                 </template>
               </div>
+              </template>
 
               <div class="sidebar-separator" />
 
@@ -632,6 +658,24 @@ onMounted(() => {
   user-select: none; margin: 2px 0;
 }
 .sidebar-acordeon-header:hover { color: var(--text-secondary); }
+
+/* Acordeón principal (Mis Tareas / Equipo) */
+.nav-item-acordeon {
+  display: flex; align-items: center; gap: 0;
+  padding: 0 4px 0 4px;
+}
+.nav-item-toggle {
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
+  color: var(--text-tertiary); padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color 80ms, background 80ms;
+}
+.nav-item-toggle:hover { color: var(--text-primary); background: var(--bg-row-hover); }
+.nav-item-link-grow {
+  display: flex; align-items: center; gap: 10px;
+  flex: 1; min-width: 0;
+  text-decoration: none; color: inherit;
+}
 .acordeon-count {
   font-size: 10px; color: var(--text-tertiary);
   min-width: 14px; text-align: right; margin-right: 4px;
