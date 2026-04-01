@@ -529,7 +529,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
   if (solo_mias === '1') { where.push('t.responsable = ?'); params.push(req.usuario.email) }
 
   try {
-    const [tareas] = await db.gestion.query(`
+    const [tareasBase] = await db.gestion.query(`
       SELECT t.id, t.titulo, t.estado, t.prioridad, t.responsable,
              t.categoria_id, c.nombre AS categoria_nombre, c.color AS categoria_color,
              t.fecha_limite, t.fecha_fin_real, t.tiempo_real_min,
@@ -540,6 +540,19 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
       ORDER BY t.fecha_ult_modificacion DESC
       LIMIT 50
     `, params)
+    // Enriquecer con nombre del responsable
+    const emails = [...new Set(tareasBase.map(t => t.responsable).filter(Boolean))]
+    let nombreMap = {}
+    if (emails.length) {
+      try {
+        const [users] = await db.comunidad.query(
+          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${emails.map(() => '?').join(',')})`,
+          emails
+        )
+        nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
+      } catch {}
+    }
+    const tareas = tareasBase.map(t => ({ ...t, responsable_nombre: nombreMap[t.responsable] || null }))
     res.json({ ok: true, tareas })
   } catch (e) {
     res.status(500).json({ error: e.message })
