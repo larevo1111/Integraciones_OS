@@ -33,6 +33,9 @@
             </div>
           </div>
           <div v-if="puede('reiniciar_inventario') && FECHA === f.fecha_inventario" class="inv-panel-item-actions">
+            <button class="inv-panel-action" :class="{ 'inv-panel-action-spin': calculandoTeorico }" :disabled="calculandoTeorico" @click.stop="calcularTeorico" :title="estadoTeorico && estadoTeorico.calculado ? 'Recalcular teórico (' + formatFechaHora(estadoTeorico.calculado_en) + ')' : 'Calcular inventario teórico'">
+              <span class="material-icons" :class="{ spin: calculandoTeorico }" style="font-size:13px">analytics</span>
+            </button>
             <button class="inv-panel-action" @click.stop="confirmarReiniciar" title="Reiniciar conteos">
               <span class="material-icons" style="font-size:13px">restart_alt</span>
             </button>
@@ -45,26 +48,6 @@
           </div>
         </div>
         <div v-if="!fechasInventario.length" class="inv-panel-empty">Sin inventarios</div>
-      </div>
-      <!-- SECCIÓN DATOS TEÓRICOS -->
-      <div v-if="FECHA && puede('reiniciar_inventario')" class="inv-panel-teorico">
-        <div class="inv-panel-teorico-title">
-          <span class="material-icons" style="font-size:14px">analytics</span>
-          Datos teóricos
-        </div>
-        <div v-if="estadoTeorico && estadoTeorico.calculado" class="inv-panel-teorico-info">
-          <span class="inv-panel-teorico-detail">{{ estadoTeorico.articulos }} artículos</span>
-          <span class="inv-panel-teorico-detail">{{ estadoTeorico.ops_generadas_count }} OPs ajustadas</span>
-          <span class="inv-panel-teorico-date">{{ formatFechaHora(estadoTeorico.calculado_en) }}</span>
-        </div>
-        <div v-else class="inv-panel-teorico-info">
-          <span class="inv-panel-teorico-date">Sin calcular</span>
-        </div>
-        <button class="inv-panel-teorico-btn" :disabled="calculandoTeorico" @click="calcularTeorico">
-          <span v-if="calculandoTeorico" class="material-icons spin" style="font-size:14px">sync</span>
-          <span v-else class="material-icons" style="font-size:14px">refresh</span>
-          {{ calculandoTeorico ? 'Calculando...' : (estadoTeorico && estadoTeorico.calculado ? 'Recalcular' : 'Calcular ahora') }}
-        </button>
       </div>
     </aside>
 
@@ -1148,14 +1131,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-panel-item-stats { font-size: 11px; color: var(--text-tertiary); display: flex; justify-content: space-between; margin-top: 2px; }
 .inv-panel-item-pct { font-family: 'Fragment Mono', monospace; }
 .inv-panel-empty { text-align: center; color: var(--text-tertiary); padding: 24px; font-size: 12px; }
-.inv-panel-teorico { padding: 12px 14px; border-top: 1px solid var(--border-default); margin-top: auto; }
-.inv-panel-teorico-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-.inv-panel-teorico-info { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
-.inv-panel-teorico-detail { font-size: 11px; color: var(--text-primary); }
-.inv-panel-teorico-date { font-size: 10px; color: var(--text-tertiary); }
-.inv-panel-teorico-btn { width: 100%; padding: 6px 10px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-overlay); color: var(--text-secondary); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s; }
-.inv-panel-teorico-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-muted); }
-.inv-panel-teorico-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.inv-panel-action-spin { pointer-events: none; opacity: 0.7; }
 @keyframes spin-anim { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
 .spin { animation: spin-anim 1s linear infinite; }
 .inv-panel-add { width: 22px; height: 22px; border-radius: 4px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: auto; }
