@@ -649,7 +649,7 @@ async function qaAgregar() {
   try {
     const body = {
       titulo:       qaTitulo.value,
-      categoria_id: qaCatId.value || categorias.value[0]?.id,
+      categoria_id: qaCatId.value || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id,
       proyecto_id:  qaProyectoId.value ?? proyectoFiltroId.value ?? null,
       id_op:        qaOp.value      || null,
       id_remision:  qaRemision.value || null,
@@ -1103,7 +1103,6 @@ async function abrirPadre(parentId) {
 
 function onTareaGuardada(tarea) {
   tareas.value.push(tarea)
-  tareaSeleccionada.value = tarea
 }
 
 async function editarTituloInline({ tarea, titulo }) {
