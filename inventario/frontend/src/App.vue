@@ -1130,11 +1130,11 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-login-error { color: var(--color-error); font-size: 12px; margin-top: 8px; }
 .inv-login-loading { color: var(--text-tertiary); font-size: 12px; margin-top: 8px; }
 
-.inv-app { display: flex; height: 100vh; overflow: hidden; }
+.inv-app { display: flex; height: 100dvh; overflow: hidden; }
 .inv-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
 /* SIDE PANEL */
-.inv-panel { width: 0; overflow: hidden; background: var(--bg-sidebar); border-right: 1px solid var(--border-default); display: flex; flex-direction: column; transition: width 0.2s ease; flex-shrink: 0; }
+.inv-panel { width: 0; overflow: hidden; background: var(--bg-sidebar); border-right: 1px solid var(--border-default); display: flex; flex-direction: column; transition: width 0.2s ease; flex-shrink: 0; min-height: 0; }
 .inv-panel.open { width: 240px; }
 .inv-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
 .inv-panel-title { font-size: 13px; font-weight: 600; }
@@ -1358,7 +1358,7 @@ onUnmounted(() => clearInterval(clockInterval))
   .inv-content { width: 100%; min-width: 0; }
 
   /* Panel: overlay */
-  .inv-panel.open { position: fixed; z-index: 30; width: 260px; height: 100vh; box-shadow: 8px 0 40px rgba(0,0,0,0.6); }
+  .inv-panel.open { position: fixed; z-index: 30; width: 260px; height: 100dvh; box-shadow: 8px 0 40px rgba(0,0,0,0.6); }
 
   /* Header: 1 línea compacta */
   .inv-header { padding: 6px 10px; }
