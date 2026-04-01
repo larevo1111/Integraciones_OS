@@ -46,6 +46,26 @@
         </div>
         <div v-if="!fechasInventario.length" class="inv-panel-empty">Sin inventarios</div>
       </div>
+      <!-- SECCIÓN DATOS TEÓRICOS -->
+      <div v-if="FECHA && puede('reiniciar_inventario')" class="inv-panel-teorico">
+        <div class="inv-panel-teorico-title">
+          <span class="material-icons" style="font-size:14px">analytics</span>
+          Datos teóricos
+        </div>
+        <div v-if="estadoTeorico && estadoTeorico.calculado" class="inv-panel-teorico-info">
+          <span class="inv-panel-teorico-detail">{{ estadoTeorico.articulos }} artículos</span>
+          <span class="inv-panel-teorico-detail">{{ estadoTeorico.ops_generadas_count }} OPs ajustadas</span>
+          <span class="inv-panel-teorico-date">{{ formatFechaHora(estadoTeorico.calculado_en) }}</span>
+        </div>
+        <div v-else class="inv-panel-teorico-info">
+          <span class="inv-panel-teorico-date">Sin calcular</span>
+        </div>
+        <button class="inv-panel-teorico-btn" :disabled="calculandoTeorico" @click="calcularTeorico">
+          <span v-if="calculandoTeorico" class="material-icons spin" style="font-size:14px">sync</span>
+          <span v-else class="material-icons" style="font-size:14px">refresh</span>
+          {{ calculandoTeorico ? 'Calculando...' : (estadoTeorico && estadoTeorico.calculado ? 'Recalcular' : 'Calcular ahora') }}
+        </button>
+      </div>
     </aside>
 
     <!-- MODAL NUEVO INVENTARIO -->
@@ -527,6 +547,8 @@ const creandoInv = ref(false)
 const mostrarConfirmReiniciar = ref(false)
 const mostrarConfirmCerrar = ref(false)
 const mostrarConfirmEliminar = ref(false)
+const estadoTeorico = ref(null)
+const calculandoTeorico = ref(false)
 const mostrarFoto = ref(false)
 const articuloFoto = ref(null)
 const fotoInput = ref(null)
@@ -567,6 +589,13 @@ function formatFechaCorta(f) {
   const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
   return `${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`
 }
+function formatFechaHora(ts) {
+  if (!ts) return ''
+  const d = new Date(ts.replace(' ', 'T'))
+  const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0')
+  const ampm = h >= 12 ? 'pm' : 'am'
+  return `${d.getDate()}/${d.getMonth()+1} ${h % 12 || 12}:${m}${ampm}`
+}
 
 function cambiarFecha(f) {
   FECHA.value = f
@@ -575,7 +604,7 @@ function cambiarFecha(f) {
   busqueda.value = ''
   columnFilters.value = {}
   sortKey.value = ''
-  cargarBodegas(); cargarResumen(); cargarArticulos()
+  cargarBodegas(); cargarResumen(); cargarArticulos(); cargarEstadoTeorico()
   panelAbierto.value = false
 }
 
@@ -950,6 +979,31 @@ async function ejecutarCerrar() {
   await cargarFechas()
 }
 
+// ── Inventario teórico ──
+async function cargarEstadoTeorico() {
+  if (!FECHA.value) return
+  const res = await fetch(API + `/api/inventario/teorico/estado?fecha=${FECHA.value}`, { headers: authHeaders() })
+  estadoTeorico.value = await res.json()
+}
+
+async function calcularTeorico() {
+  calculandoTeorico.value = true
+  try {
+    const res = await fetch(API + '/api/inventario/calcular-teorico', {
+      method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+    })
+    if (!res.ok) throw new Error('Error al calcular')
+    await cargarEstadoTeorico()
+    await cargarArticulos()
+    await cargarResumen()
+  } catch (e) {
+    alert('Error calculando inventario teórico: ' + e.message)
+  } finally {
+    calculandoTeorico.value = false
+  }
+}
+
 // ── Helpers visuales ──
 function parseDecimal(str) {
   if (str == null || str === '') return NaN
@@ -1050,7 +1104,7 @@ async function cargarPoliticas() {
 
 async function cargarDatos() {
   await cargarPoliticas()
-  await cargarFechas(); await cargarBodegas(); await cargarResumen(); await cargarArticulos()
+  await cargarFechas(); await cargarBodegas(); await cargarResumen(); await cargarArticulos(); await cargarEstadoTeorico()
 }
 
 onMounted(async () => {
@@ -1094,6 +1148,16 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-panel-item-stats { font-size: 11px; color: var(--text-tertiary); display: flex; justify-content: space-between; margin-top: 2px; }
 .inv-panel-item-pct { font-family: 'Fragment Mono', monospace; }
 .inv-panel-empty { text-align: center; color: var(--text-tertiary); padding: 24px; font-size: 12px; }
+.inv-panel-teorico { padding: 12px 14px; border-top: 1px solid var(--border-default); margin-top: auto; }
+.inv-panel-teorico-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.inv-panel-teorico-info { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.inv-panel-teorico-detail { font-size: 11px; color: var(--text-primary); }
+.inv-panel-teorico-date { font-size: 10px; color: var(--text-tertiary); }
+.inv-panel-teorico-btn { width: 100%; padding: 6px 10px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-overlay); color: var(--text-secondary); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: all 0.15s; }
+.inv-panel-teorico-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-muted); }
+.inv-panel-teorico-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+@keyframes spin-anim { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+.spin { animation: spin-anim 1s linear infinite; }
 .inv-panel-add { width: 22px; height: 22px; border-radius: 4px; border: 1px dashed var(--border-strong); background: transparent; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: auto; }
 .inv-panel-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-muted); }
 .inv-panel-item-main { cursor: pointer; flex: 1; }

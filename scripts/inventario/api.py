@@ -414,6 +414,48 @@ def resumen_inventario(fecha: str, bodega: Optional[str] = None):
     return rows[0] if rows else {}
 
 
+class GestionInventario(BaseModel):
+    fecha_inventario: str
+    usuario: str
+
+
+# === INVENTARIO TEÓRICO ===
+
+@app.post("/api/inventario/calcular-teorico")
+def calcular_teorico(data: GestionInventario):
+    """Calcula inventario teórico a fecha de corte (nivel >= 5)."""
+    import subprocess
+    result = subprocess.run(
+        ['python3', os.path.join(BASE_DIR, 'scripts/inventario/calcular_inventario_teorico.py'),
+         '--fecha', data.fecha_inventario],
+        capture_output=True, text=True, cwd=BASE_DIR, timeout=120
+    )
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail=result.stderr or 'Error al calcular teórico')
+
+    registrar_auditoria(0, 'calcular_teorico', data.usuario, None, data.fecha_inventario,
+                        f'Inventario teórico calculado para {data.fecha_inventario}')
+    return {"ok": True, "output": result.stdout}
+
+
+@app.get("/api/inventario/teorico/estado")
+def estado_teorico(fecha: str):
+    """Retorna info del último cálculo teórico para una fecha."""
+    rows = db_query(DB_INV, """
+        SELECT calculado_en, ops_generadas_count,
+               COUNT(*) as articulos
+        FROM inv_teorico
+        WHERE fecha_corte = %s
+        GROUP BY calculado_en, ops_generadas_count
+    """, (fecha,))
+    if not rows:
+        return {"calculado": False}
+    r = rows[0]
+    r['calculado'] = True
+    r['calculado_en'] = str(r['calculado_en']) if r['calculado_en'] else None
+    return r
+
+
 # === GESTIÓN DE INVENTARIOS (nivel >= 5) ===
 
 class NuevoInventario(BaseModel):
@@ -436,11 +478,6 @@ def crear_inventario(data: NuevoInventario):
     registrar_auditoria(0, 'nuevo_inventario', data.usuario, None, data.fecha_inventario,
                         f'Inventario creado para {data.fecha_inventario}')
     return {"ok": True, "output": result.stdout}
-
-
-class GestionInventario(BaseModel):
-    fecha_inventario: str
-    usuario: str
 
 
 @app.post("/api/inventario/reiniciar")
