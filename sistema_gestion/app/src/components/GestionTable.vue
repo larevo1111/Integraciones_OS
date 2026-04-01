@@ -429,7 +429,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 
 /* TABLA */
 .table-scroll { overflow-x: auto; }
-.os-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.os-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 
 .th {
   text-align: left; padding: 0 12px; height: 36px;
