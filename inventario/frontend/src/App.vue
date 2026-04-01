@@ -235,6 +235,7 @@
                 <span class="articulo-nombre">{{ a.nombre }}</span>
                 <span v-if="a.unidad" class="unit-tag">{{ a.unidad }}</span>
               </div>
+              <div class="articulo-teorico-movil">TEO {{ fmtNum(a.inventario_teorico) }}</div>
             </td>
             <td class="td cell-categoria" :title="grupoNombre(a.grupo)">
               <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ grupoCorto(a.grupo) }}</span>
@@ -1232,6 +1233,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .cell-id { font-size: 12px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; }
 .cell-articulo { font-size: 13px; color: var(--text-primary); }
 .articulo-line1 { display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.articulo-teorico-movil { display: none; }
 .articulo-line2 { display: none; }
 .grupo-tag { font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
 .grupo-mp { background: rgba(59,130,246,0.15); color: #60a5fa; }
@@ -1379,14 +1381,16 @@ onUnmounted(() => clearInterval(clockInterval))
   .inv-table th { padding: 0 2px; font-size: 8px; height: 24px; }
   .cell-id { font-size: 8px; }
 
-  /* Artículo: wrap, nombre + unidad */
+  /* Artículo: wrap, nombre + unidad + teórico debajo */
   .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: nowrap; }
   .articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.25; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
+  .articulo-teorico-movil { display: block; font-size: 9px; color: var(--text-tertiary); margin-top: 1px; letter-spacing: 0.3px; }
 
   /* Categoría: texto wrap, multilinea */
+  .col-categoria { width: 36px; }
   .cell-categoria { text-align: center; }
-  .grupo-tag { font-size: 6px; white-space: normal; word-break: break-all; line-height: 1.2; display: inline-block; }
+  .grupo-tag { font-size: 7px; white-space: normal; word-break: break-word; line-height: 1.3; display: inline-block; padding: 2px 3px; }
 
   /* Conteo: stepper + input + badge + dots */
   .teorico-block { display: none; }
