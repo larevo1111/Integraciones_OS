@@ -137,6 +137,9 @@
             <span class="inv-user-name">{{ usuario }}</span>
             <span class="inv-title">Inventario {{ fechaDisplay }}</span>
           </div>
+          <button class="inv-logout-btn" @click="cerrarSesion" title="Cerrar sesión">
+            <span class="material-icons" style="font-size:16px">logout</span>
+          </button>
         </div>
         <div class="inv-header-right">
           <div class="inv-clock" id="inv-clock"></div>
@@ -1069,6 +1072,16 @@ function establecerUsuario(u) {
   if (u?.nivel) nivelUsuario.value = u.nivel
 }
 
+function cerrarSesion() {
+  localStorage.removeItem(KEY_JWT)
+  localStorage.removeItem(KEY_USUARIO)
+  autenticado.value = false
+  usuario.value = ''
+  iniciales.value = ''
+  nivelUsuario.value = 1
+  nextTick(() => initGoogleSignIn())
+}
+
 function verificarSesion() {
   const token = localStorage.getItem(KEY_JWT)
   const usr = localStorage.getItem(KEY_USUARIO)
@@ -1158,6 +1171,8 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-muted); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
 .inv-user-info { display: flex; flex-direction: column; }
 .inv-user-name { font-size: 13px; font-weight: 500; }
+.inv-logout-btn { background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; }
+.inv-logout-btn:hover { color: var(--text-primary); background: var(--bg-overlay); }
 .inv-title { font-size: 12px; color: var(--accent); font-weight: 500; }
 .inv-header-right { display: flex; align-items: center; gap: 16px; }
 .inv-clock { font-size: 11px; color: var(--text-tertiary); font-family: 'Fragment Mono', 'JetBrains Mono', monospace; }

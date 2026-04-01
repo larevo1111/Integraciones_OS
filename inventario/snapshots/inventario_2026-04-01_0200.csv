@@ -1,0 +1,492 @@
+id	nombre	categoria	vigencia	stock_total	costo_promedio	stock_principal	stock_jenifer	stock_santiago	stock_ricardo	stock_mercado_libre	stock_villa_aburra	stock_apica	stock_el_salvador	stock_desarrollo	stock_no_conformes
+10	MIEL OS PLASTICO 715grs	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	13856	0	0	0	0	0	0	0	0	0	0
+100	BOLSA FLEX UP VENTANA MED 160 X 240 350-450 GRS ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	159	436.1894	159	0	0	0	0	0	0	0	0	0
+101	BOLSA TRANSP VALVULA DOY PACK 10 X 18 + FFA 6cms 200 - 300 GRS (ABIERTA) Bolsa transparente con tapa pequeña ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	2	319.472	2	0	0	0	0	0	0	0	0	0
+102	BOLSA TRANSP VALVULA DOY PACK 10 X 18 + FFA 6cms 200 - 300 GRS (CERRADA) Bolsa transparente con tapa pequeña ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	45	297.3398	45	0	0	0	0	0	0	0	0	0
+103	BOLSA TRANSP VALVULA DOY PACK 13.3 X 21 + FFA 7cms 300 - 400 GRS (ABIERTA) Bolsa transparente con tapa mediana ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	6	447.0556	6	0	0	0	0	0	0	0	0	0
+104	BOLSA TRANSP VALVULA DOY PACK 13.3 X 21 + FFA 7cms 300 - 400 GRS (CERRADA) Bolsa transparente con tapa mediana ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	32	445.9608	32	0	0	0	0	0	0	0	0	0
+106	CUCHARA MIELERA ECOSANOS GRANDE	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+11	CHOCOMIEL OS 250cc	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	16	14737.0941	16	0	0	0	0	0	0	0	0	0
+112	ACEITE DE MANI THAI 1 LT BEST CHOICE	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	73500	0	0	0	0	0	0	0	0	0	0
+113	VAINILLA EN VAINA UNIDAD	T01.03. AGROECOLOGICOS GRAL	Vigente	20	9300.5	20	0	0	0	0	0	0	0	0	0
+114	MANI SIN CASCARA TOSTADO X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	21.63	11280.107	21.63	0	0	0	0	0	0	0	0	0
+115	AVELLANA GR	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	72	0	0	0	0	0	0	0	0	0	0
+116	ALMENDRAS KG	T01.03. AGROECOLOGICOS GRAL	Vigente	1.43	40859.1034	1.43	0	0	0	0	0	0	0	0	0
+117	PROCESO EMPACADO CHOCOLATE	T09.02. SERVICIOS M.O.	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+12	Miel os plastico 265 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	12	6222	12	0	0	0	0	0	0	0	0	0
+13	Miel Os Vidrio 150 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	18	27100.2417	17	0	0	0	0	0	0	0	0	1
+134	Extracto de Vainilla en Miel OS x Kilo	T01.03. AGROECOLOGICOS GRAL	Vigente	1.9	101995.3891	1.9	0	0	0	0	0	0	0	0	0
+135	ENVASE VIDRIO R 4186-2465, 130 CC B.48 C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	27	947	27	0	0	0	0	0	0	0	0	0
+137	MANI SIN CASCARA X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	18500	0	0	0	0	0	0	0	0	0	0
+138	BOLSA PLANA FLEXIBLE TRANSPARENTE SIN IMPRESION 6 X 20 CM 70 MICRAS - CON VALVULA - PERFORACION	T03.03. ENVASES ECOLOGICOS	Vigente	71	267.2612	71	0	0	0	0	0	0	0	0	0
+139	BOLSA DOY PACK PET/FLEXIBLE SIN IMPRESION TRANSPARENTE 7.0 X 8.0 80 MICRAS CON VALVULA	T03.03. ENVASES ECOLOGICOS	Vigente	2	60.75	2	0	0	0	0	0	0	0	0	0
+14	Miel Os vidrio 275 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	11	26817.7544	9	0	0	0	0	0	0	0	0	2
+140	RECIPACK 2.0 - AB 100X180FFA60MM FLEX UP TTE	T03.03. ENVASES ECOLOGICOS	Vigente	0	235.9455	0	0	0	0	0	0	0	0	0	0
+141	RECIPACK 2.0-AB 133X210FFA70MM FLEX UP TTE	T03.03. ENVASES ECOLOGICOS	Vigente	19	215.5	19	0	0	0	0	0	0	0	0	0
+142	RECIPACK 2.0 160X240FFA80MM FLEX UP TTE	T03.03. ENVASES ECOLOGICOS	Vigente	11	279.2083	11	0	0	0	0	0	0	0	0	0
+143	BOLSA FLEX UP PET/COEXT HBA COLOR METALIZADO CON VENTANA 14 X 22 CM + FFA 8 CM 130 MICRAS CON ZIPPER ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	369	487.1706	369	0	0	0	0	0	0	0	0	0
+144	CUCHARA MIELERA PEQUEÑA	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	48	1512.2797	48	0	0	0	0	0	0	0	0	0
+145	CUCHARA MIELERA MEDIANA	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	12	2550	12	0	0	0	0	0	0	0	0	0
+146	POLEN APICA X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	25.53	55382.7893	25.53	0	0	0	0	0	0	0	0	0
+147	PROPOLEO APICA X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	22.18	13434.4287	22.18	0	0	0	0	0	0	0	0	0
+148	DULCE DE LECHE MIEL OS X KILO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	27802	0	0	0	0	0	0	0	0	0	0
+149	AREQUIPE MIEL OS X KILO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	32646	0	0	0	0	0	0	0	0	0	0
+15	Miel Os Vidrio 640 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	22	17687.5846	21	0	0	0	0	0	0	0	0	1
+150	MANO DE OBRA OS GENERAL	T09.02. SERVICIOS M.O.	Vigente	-No aplica-	57	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+151	CREMA DE MANI OS X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	2.23	221288.1128	2.23	0	0	0	0	0	0	0	0	0
+152	CREMA DE CHOCOLATE ARTESANAL OS X KILO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	27791.0535	0	0	0	0	0	0	0	0	0	0
+153	INFUSION DE CACAO OS CON MENTA, POLEN Y YERBABUENA X KILO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	13585	0	0	0	0	0	0	0	0	0	0
+157	Yerbabuena x gramo	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	2500	0	0	0	0	0	0	0	0	0	0
+158	CAJA POLEN, MIEL, PROPOLO Y MIELERO PEQ.	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	92932.88	0	0	0	0	0	0	0	0	0	0
+159	TAZA CHOCOLATE LECHE 7OZ	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+16	Chocolate Puro Cacao 500 grs Bombones LT	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	9	43850.647	9	0	0	0	0	0	0	0	0	0
+160	Taza infusion cacao, menta y polen	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+161	Domicilio	T09.06. SERVICIOS LOGISTICA	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+163	Miel OS Panal 150 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	6	8273.4733	6	0	0	0	0	0	0	0	0	0
+164	Miel OS Panal 275 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	29	7701.84	29	0	0	0	0	0	0	0	0	0
+166	Comision bold	T09.10. SERVICIOS GENERALES	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+167	MENTA SECA X KG	T01.03. AGROECOLOGICOS GRAL	Vigente	0	50	0	0	0	0	0	0	0	0	0	0
+168	POLEN DE ABEJA OS 200 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	26431.567	0	0	0	0	0	0	0	0	0	0
+169	PROPOLEO OS 265 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	16	18307.6561	16	0	0	0	0	0	0	0	0	0
+17	CHOCOLATE MESA OS BOLSA 400 GRS PORCIONADA (44p)	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+170	PROPOLEO OS 325 grs	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	7657.9	0	0	0	0	0	0	0	0	0	0
+171	POLEN DE ABEJA OS 150 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	5	24616.25	5	0	0	0	0	0	0	0	0	0
+172	CUCHARA MIELERA GRANDE	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	2	2302.6654	2	0	0	0	0	0	0	0	0	0
+173	Muestra Chocolate de mesa 2 porciones	TPT.02. VENTA OTROS	Vigente	9	1867.1873	9	0	0	0	0	0	0	0	0	0
+174	TAZA POLEN Y JUGO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+175	TAZA CHOCOLATE LECHE 7OZ + COMPLEMENTO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+176	MAQUILA OBTENCION DE NIBS DE CACAO X KG	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	4845	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+177	ENMOLDADO DE CHOCOLATE X KG	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	5000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+178	NIBS DE CACAO X KG LT	T01.03. AGROECOLOGICOS GRAL	Vigente	28.55	33181.1238	28.55	0	0	0	0	0	0	0	0	0
+179	Empaque mini para muestra de chocolate de mesa	T03.41. CAJAS	Vigente	74	1000	74	0	0	0	0	0	0	0	0	0
+18	CHOCOLATE MESA OS BOLSA 200 GRS PORCIONADA (22P)	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	653760.8818	0	0	0	0	0	0	0	0	0	0
+180	TAPA METALICA DORADA B.48	T03.01. ENVASES Y TAPAS	Vigente	0	462	0	0	0	0	0	0	0	0	0	0
+181	Envase Vidrio R 4267 Flint, 450cc, B.89, C Tapa UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	8	2242	8	0	0	0	0	0	0	0	0	0
+183	Azucar de Coco Organica x kg	T01.03. AGROECOLOGICOS GRAL	Vigente	6.27	68088.216	6.27	0	0	0	0	0	0	0	0	0
+184	DS STEVIA Sg45 X GR MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	370.4	0	0	0	0	0	0	0	0	0	0
+185	Stevia Sg90 xgr	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	480	0	0	0	0	0	0	0	0	0	0
+186	DS ALMENDRA DE CACAO RECUBIERTA DE CHOCOLATE X GRAMO MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	0.69	159880.116	0.69	0	0	0	0	0	0	0	0	0
+187	CREMA DE MANI OS 230 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	23	24227.9967	23	0	0	0	0	0	0	0	0	0
+189	DS AREQUIPE DE MIEL MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	7412.25	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+19	CHOCOLATE MESA OS BOLSA 135 GRS PORCIONADA (15p)	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+190	DS CREMA DE CHOCOLATE MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+192	DS COBERTURA DE CHOCOLATE MARZO 2024 X KILO	DESARROLLO DE PRODUCTO	Vigente	0	14.893	0	0	0	0	0	0	0	0	0	0
+193	MANTECA DE CACAO X KG	T01.03. AGROECOLOGICOS GRAL	Vigente	4.14	73770.1464	4.14	0	0	0	0	0	0	0	0	0
+194	DS NUEZ DEL BRASIL X GRAMO MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+195	MARAÑON x KILO MARZO 2024	T01.03. AGROECOLOGICOS GRAL	Vigente	0.51	50078.161	0.51	0	0	0	0	0	0	0	0	0
+196	MACADAMIA TOSTADA X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	1.67	98190.8405	1.67	0	0	0	0	0	0	0	0	0
+197	DS SEMILLA DE CALABAZA MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+198	DS SOYA TOSTADA MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+199	DS LECITINA 60 CC. MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	60	1237.2379	0	0	0	0	0	0	0	0	60	0
+20	POLEN DE ABEJA OS 80grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	12	26212.6279	12	0	0	0	0	0	0	0	0	0
+200	MOLDE POLICARBONATO FORMA CACAITO	T05.02. A.F. MOLDES	Vigente	2	55000	2	0	0	0	0	0	0	0	0	0
+201	ESPATULA BLANCA	T05.03. HERRAMIENTAS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+202	REJILLA COCINA	T05.02. A.F. MOLDES	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+203	TAPETE SILICONA	T05.02. A.F. MOLDES	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+204	DS MOSTAZA AMARILLA MARZO 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	500	0	0	0	0	0	0	0	0	0	500	0
+205	JENGIBRE EN POLVO X Kg	T01.03. AGROECOLOGICOS GRAL	Vigente	0	18.8106	0	0	0	0	0	0	0	0	0	0
+206	DS FRUTAS DESHIDRATADAS 250 GR MARZO 2024	DESARROLLO DE PRODUCTO	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+207	CHOCOLATE EN POLVO X Kg	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	76.3281	0	0	0	0	0	0	0	0	0	0
+208	Envase Vidrio R mb110h Flint, 110cc, B. 46 UNICOR	T03.01. ENVASES Y TAPAS	Vigente	0	816.249	0	0	0	0	0	0	0	0	0	0
+209	DS ROMERO EN RAMA X KG	DESARROLLO DE PRODUCTO	Vigente	0	7429.0912	0	0	0	0	0	0	0	0	0	0
+21	PROPOLEO OS 150 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	7	8542.0573	7	0	0	0	0	0	0	0	0	0
+210	TERMOMIX	T05.03. HERRAMIENTAS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+211	REFINADORA CHOCOLATE PREMIER1	T05.03. HERRAMIENTAS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+212	Bicarbonato x gramo	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+213	Sal Común x Gramo	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+214	Caramelo de miel pulverizado x gramo	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	32	0	0	0	0	0	0	0	0	0	0
+215	Caramelo de panela x gramo	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+216	ABAS TOSTADAS X KG	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	33	0	0	0	0	0	0	0	0	0	0
+217	PITAHAYA DESHIDRATADA X GRAMO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	190	0	0	0	0	0	0	0	0	0	0
+218	PIÑA DESHIDRATADA X GRAMO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	100	0	0	0	0	0	0	0	0	0	0
+219	AJONJOLÍ TOSTADO X GRAMO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	26	0	0	0	0	0	0	0	0	0	0
+22	DULCE DE LECHE MIEL OS 130 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+220	BANANO DESHIDRATADO X GRAMO	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	137	0	0	0	0	0	0	0	0	0	0
+221	PISTOLA DE CALOR RANGER	T05.03. HERRAMIENTAS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+222	TELA YUTE  ANCHOO 1.5 X METRO	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+223	TELA CABUYA FIQUE ANCHO 1,2 X METRO	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+224	CABUYA TAMBOR X 25METROS	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+227	DS Aceite de Coco X kg	DESARROLLO DE PRODUCTO	Vigente	0	52300	0	0	0	0	0	0	0	0	0	0
+229	DS JENGIBRE RAIZ X KG	DESARROLLO DE PRODUCTO	Vigente	0	20835.0733	0	0	0	0	0	0	0	0	0	0
+23	AREQUIPE MIEL OS 130 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	6615.98	0	0	0	0	0	0	0	0	0	0
+230	DS MIEL VAINILLA CARAMELIZADA 2024	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+231	POLEN DE ABEJA OS 320 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	8	42972.8154	8	0	0	0	0	0	0	0	0	0
+232	Envase Vidrio MB50H Flint, 50cc, B. 46 C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	4	827	4	0	0	0	0	0	0	0	0	0
+233	Envase Vidrio MB30R Flint, 30cc, B. 41 C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	0	784	0	0	0	0	0	0	0	0	0	0
+234	Espátula Alta Temperatura 16pulg.	T05.03. HERRAMIENTAS	Vigente	1	31933	1	0	0	0	0	0	0	0	0	0
+235	EXHIBIDOR MEDIANO MADERA 2 NIVELES	XMATERIAL DE APOYO VENTAS POP	Vigente	-No aplica-	35000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+236	Flete Mercadolibre	T09.06. SERVICIOS LOGISTICA	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+237	PROPOLEO OS 600 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	34407.3337	0	0	0	0	0	0	0	0	0	0
+238	Infusión de Cacao con Menta y Polen 200 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	13	11455.6305	12	0	0	0	0	0	0	0	0	1
+239	Miel Os Vidrio 1000 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	4	23950.3095	4	0	0	0	0	0	0	0	0	0
+24	CREMA DE CHOCOLATE ARTESANAL OS 250 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+240	Miel OS Panal 640 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	2	32064.0834	0	0	0	0	0	0	0	0	0	2
+241	CREMA DE MANI OS 500 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	13	45017.1226	13	0	0	0	0	0	0	0	0	0
+242	AREQUIPE MIEL OS 230 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	10208	0	0	0	0	0	0	0	0	0	0
+244	PANELA PULVERIZADA X KG	DESARROLLO DE PRODUCTO	Vigente	9.32	1214.6179	9.32	0	0	0	0	0	0	0	0	0
+245	EXHIBIDOR GRANDE MADERA 3 NIVELES	XMATERIAL DE APOYO VENTAS POP	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+246	HABLADOR EN ACRILICO BASE MADERA	XMATERIAL DE APOYO VENTAS POP	Vigente	4	0	4	0	0	0	0	0	0	0	0	0
+248	Miel Os Bolsa 700 grs	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+25	CREMA DE MANI OS 130 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	27	24616.9458	27	0	0	0	0	0	0	0	0	0
+250	SAL ROSADA DEL HIMALAYA X KG	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	205.5821	0	0	0	0	0	0	0	0	0	0
+251	EXHIBIDOR PEQUEÑO MADERA 1 NIVEL	XMATERIAL DE APOYO VENTAS POP	Vigente	-No aplica-	2666.6667	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+252	BOLSA PLANA FLEXIBLE 25X35cms con valvula	T03.31. BOLSAS PLASTICAS	Vigente	36	774.8002	36	0	0	0	0	0	0	0	0	0
+253	BOLSA FLEX UP 16 X 26 CON VALVULA	T03.31. BOLSAS PLASTICAS	Vigente	11	589.229	11	0	0	0	0	0	0	0	0	0
+254	BOLSA PLANA FLEXIBLE15 X 20 CM CON VALVULA	T03.31. BOLSAS PLASTICAS	Vigente	15	272.53	15	0	0	0	0	0	0	0	0	0
+255	BOLSA DE PAPEL ANTIGRASA 2LB X 100UDS	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	12353	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+256	BOLSA PAPEL CON CARGADERA 50uds 23.5 x12 x 33 SIGMAPLAST	T03.31. BOLSAS DE PAPEL	Vigente	0	1	0	0	0	0	0	0	0	0	0	0
+257	PLATO CANOA BAMBÚ 10CMS 25uds SIGMAPLAST	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	-No aplica-	22400	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+258	ROLLO EXTENSIBLE PLASTICO ALIMENTOS RAP 300M	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	-No aplica-	16500	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+259	TOALLA DE PAPEL PARA COCINA x 3 Rollos	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	-No aplica-	11000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+26	CHOCOLATE MESA OS BOLSA 300 GRS PORCIONADA (33p)	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	17409.9071	0	0	0	0	0	0	0	0	0	0
+260	PAPEL PARAFINADO ROLLO X 100M EMPAQUES Y DESECHABLES LA MAYORISTA	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	0	20000	0	0	0	0	0	0	0	0	0	0
+261	ALMENDRA DE CACAO TOSTADA X KILO	T01.04. CACAO/CAFE ALMENDRAS ECOLOGICO	Vigente	6	15000	6	0	0	0	0	0	0	0	0	0
+262	ETIQUETA MIEL 640 X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	94	300	94	0	0	0	0	0	0	0	0	0
+263	ETIQUETA MIEL 1000 X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	244	318.9747	244	0	0	0	0	0	0	0	0	0
+264	ETIQUETA CREMA DE MANÍ 500 X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	95	291.6083	95	0	0	0	0	0	0	0	0	0
+267	CAJA KIT VENTANA PEQUEÑA X UNIDAD	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	3000	0	0	0	0	0	0	0	0	0	0
+268	VITRINA RODAJA MADERA	XMATERIAL DE APOYO VENTAS POP	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+269	PINCHO PINZA BAMBÚ BE-GREEN PARA DEGUSTACIÓN X 20UDS	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	-No aplica-	4202	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+27	INFUSION DE CACAO OS CON MENTA, POLEN X 100 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	3213.08	0	0	0	0	0	0	0	0	0	0
+270	MOLDE POLICARBONATO AMAZON FIGURAS 9 - 12g X UNIDAD	T05.02. A.F. MOLDES	Vigente	19	52105.2621	19	0	0	0	0	0	0	0	0	0
+271	MOLDE POLICARBONATO AMAZON TABLETA  CUADRICULA X UNIDAD	T05.02. A.F. MOLDES	Vigente	16	11562.5	16	0	0	0	0	0	0	0	0	0
+272	Chocolate Puro Cacao 250 grs Bombones LT	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	1	19691.7143	1	0	0	0	0	0	0	0	0	0
+274	DS CREMA DE AVELLANAS X KG	DESARROLLO DE PRODUCTO	Vigente	0.46	72	0	0	0	0	0	0	0	0	0.46	0
+275	CHOCOBEETAL X KG	T01.03. AGROECOLOGICOS GRAL	Vigente	2.85	45003.405	0.49	0	0	0	0	0	0	0	0	2.36
+276	DS Miel OS bolsa con válvula x Gramo	DESARROLLO DE PRODUCTO	Vigente	0	86.686	0	0	0	0	0	0	0	0	0	0
+277	DS Miel y Polen x gramo	DESARROLLO DE PRODUCTO	Vigente	0	72.238	0	0	0	0	0	0	0	0	0	0
+278	MIX FRUTOS SECOS SELECCIONADOS 200 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	17325	0	0	0	0	0	0	0	0	0	0
+279	CHOCOLATE 100% 24 HORAS TABLETAS 100g	DESARROLLO DE PRODUCTO	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+28	CREMA DE CHOCOLATE ARTESANAL OS 130 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	6399.67	0	0	0	0	0	0	0	0	0	0
+280	BATA DESECHABLE POLIPROPILENO X UNIDAD	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	10	4899.75	10	0	0	0	0	0	0	0	0	0
+281	GORRO DESECHABLE BLANCO X 100 UNIDADS	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	1	18997.5	1	0	0	0	0	0	0	0	0	0
+282	GUANTES DE NITRILO TALLA M CAJA X 50 PARES	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	1	32997.5	1	0	0	0	0	0	0	0	0	0
+283	Etiquetas chocolate Bombon 250g Delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	136	1297.56	136	0	0	0	0	0	0	0	0	0
+284	Etiquetas Infusión 200g Delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	18	2326.6485	18	0	0	0	0	0	0	0	0	0
+285	DS COBERTURA MIEL X KILO	DESARROLLO DE PRODUCTO	Vigente	0	38045.5645	0	0	0	0	0	0	0	0	0	0
+286	Amonio Cuaternario x litro (Limpieza y desinfección)	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	1	12700	1	0	0	0	0	0	0	0	0	0
+287	Papel kraf 150g cortado Tamaño carta Pliego (100x70 CMS)	DESARROLLO DE PRODUCTO	Vigente	-No aplica-	750	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+288	Papel Kraf 120g cortado Tamaño carta pliego x 9uds	DESARROLLO DE PRODUCTO	Vigente	-No aplica-	650	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+289	Etiqueta Nibs de cacao 200g delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	57	1307.739	57	0	0	0	0	0	0	0	0	0
+290	Etiqueta Miel 150	T03.21. ETIQUETAS ADESIVAS	Vigente	100	300	100	0	0	0	0	0	0	0	0	0
+291	Etiqueta Miel 275	T03.21. ETIQUETAS ADESIVAS	Vigente	100	300	100	0	0	0	0	0	0	0	0	0
+295	Etiqueta Polen 80	T03.21. ETIQUETAS ADESIVAS	Vigente	48	300.0644	48	0	0	0	0	0	0	0	0	0
+296	Etiqueta Polen 150	T03.21. ETIQUETAS ADESIVAS	Vigente	53	301.6658	53	0	0	0	0	0	0	0	0	0
+297	Etiqueta Polen 320	T03.21. ETIQUETAS ADESIVAS	Vigente	114	300.1736	114	0	0	0	0	0	0	0	0	0
+298	Etiqueta Propóleo 150	T03.21. ETIQUETAS ADESIVAS	Vigente	13	300	13	0	0	0	0	0	0	0	0	0
+299	Etiqueta Propóleo 265	T03.21. ETIQUETAS ADESIVAS	Vigente	78	300	78	0	0	0	0	0	0	0	0	0
+300	Etiqueta Propóleo 600	T03.21. ETIQUETAS ADESIVAS	Vigente	67	287.8857	67	0	0	0	0	0	0	0	0	0
+301	Etiqueta Crema de Maní 130	T03.21. ETIQUETAS ADESIVAS	Vigente	93	300	93	0	0	0	0	0	0	0	0	0
+302	Etiqueta Crema de Maní 230	T03.21. ETIQUETAS ADESIVAS	Vigente	129	296.9193	129	0	0	0	0	0	0	0	0	0
+304	Bowld Metálico de 32cms	T05.03. HERRAMIENTAS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+305	Crema de mani OS degustacion 65 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	16	120577.4601	16	0	0	0	0	0	0	0	0	0
+306	Miel OS degustacion 65 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	1	3994.2879	1	0	0	0	0	0	0	0	0	0
+307	Propóleo OS degustacion 65 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	16	23938.3916	16	0	0	0	0	0	0	0	0	0
+308	NIBS DE CACAO ORGANICO OS 200 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	1	13204.9893	1	0	0	0	0	0	0	0	0	0
+309	Bolsa plana flexible transparente 25x40cms	T03.31. BOLSAS PLASTICAS	Vigente	198	374.9762	198	0	0	0	0	0	0	0	0	0
+310	Etiqueta Almendra de Cacao 200g delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	13	1358.2156	13	0	0	0	0	0	0	0	0	0
+311	ETIQUETA MIX FRUTOS SECOS 200G DELANTERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	51	1341.9672	51	0	0	0	0	0	0	0	0	0
+312	Etiquetas Chocolate 500g Bombon Delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	48	1681.6526	48	0	0	0	0	0	0	0	0	0
+315	ALMENDRA DE CACAO ORGANICO TOSTADA 200 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	19081.2756	0	0	0	0	0	0	0	0	0	0
+316	MIX FRUTOS SECOS SELECCIONADOS 100 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	1	1974.9132	0	0	0	0	0	0	0	0	0	1
+317	NIBS DE CACAO ORGANICO OS 100 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	13166.765	0	0	0	0	0	0	0	0	0	0
+318	ALMENDRA DE CACAO ORGANICO TOSTADA 100 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	13	6877.283	13	0	0	0	0	0	0	0	0	0
+319	COBERTURA CHOCOLATE CPM 73% OS X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	2.94	46977.4696	2.94	0	0	0	0	0	0	0	0	0
+320	Tableta Chocolate 73p 50 grs CPM	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	62	22254.2659	62	0	0	0	0	0	0	0	0	0
+321	CHOCOLATE MESA GRANULADO OS BOLSA 1 KILO	TPT.02. VENTA OTROS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+322	TAPA METÁLICA B46 X UNIDAD	T03.01. ENVASES Y TAPAS	Vigente	36	202.2222	36	0	0	0	0	0	0	0	0	0
+323	PANAL DE ABEJAS X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	16500	0	0	0	0	0	0	0	0	0	0
+324	ENVASE 500G CON PANAL X UNIDAD	T01.03. AGROECOLOGICOS GRAL	Vigente	0	20975	0	0	0	0	0	0	0	0	0	0
+325	ENVASE 230G CON PANAL X UNIDAD	T01.03. AGROECOLOGICOS GRAL	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+326	ENVASE DE 110CC CON PANAL	T01.03. AGROECOLOGICOS GRAL	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+328	Lecitina de Girasol X kg	DESARROLLO DE PRODUCTO	Vigente	0	150	0	0	0	0	0	0	0	0	0	0
+329	ETIQUETA MIX FRUTOS SECOS 100G DELANTERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	134	679.0869	134	0	0	0	0	0	0	0	0	0
+330	ETIQUETA ALMENDRA DE CACAO 100G DELANTERA  X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	40	981.3908	40	0	0	0	0	0	0	0	0	0
+331	ETIQUETA NIBS DE CACAO 100G delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	410	0	0	0	0	0	0	0	0	0	0
+332	BOLSA DOY PACK PET/FLEXIBLE TRANSP. SIN IMP. 10x18 zipper (alt.recipack)	T03.31. BOLSAS PLASTICAS	Vigente	95	248.2724	95	0	0	0	0	0	0	0	0	0
+333	BOLSA PLANA FLEXIBLE SIN IMPRESION TRANSPARENTE 32X42 EMPAQUE MAT. PRIMA	T03.31. BOLSAS PLASTICAS	Vigente	198	465.7683	198	0	0	0	0	0	0	0	0	0
+334	DEGUSTACION DOY PACK 45gm Crema de mani	TPT.02. VENTA OTROS	Vigente	0	3573.375	0	0	0	0	0	0	0	0	0	0
+335	DEGUSTACION DOY PACK 45gm Miel	TPT.02. VENTA OTROS	Vigente	0	4764.5	0	0	0	0	0	0	0	0	0	0
+336	DEGUSTACION DOY PACK 45gm Propoleo	TPT.02. VENTA OTROS	Vigente	0	4764.5	0	0	0	0	0	0	0	0	0	0
+337	ENVASE MB50R FLINT 50CCTO B.45 DEGUSTACION REDONDO	T03.01. ENVASES Y TAPAS	Vigente	0	915	0	0	0	0	0	0	0	0	0	0
+338	BOLSA PLANA PET METALIZADA / FLEXIBLE SIN IMPRESION 16X22 EMPAQUE COBERTURA	T03.31. BOLSAS PLASTICAS	Vigente	4	254.4	4	0	0	0	0	0	0	0	0	0
+339	INFUSION DE CACAO CON MENTA Y POLEN X KILO PRODUCTO EN PROCESO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	9855	0	0	0	0	0	0	0	0	0	0
+340	VINAGRE / ACIDO ACETICO X 3 LITROS / MINORISTA (LIMPIEZA Y DESINFECCION)	T05.06. CONSUMIBLES PRODUCCION Y VENTAS	Vigente	-No aplica-	4800	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+341	BOLSA PLANA PET METALIZADA  FELXIBLE 16X28CM	T03.31. BOLSAS PLASTICAS	Vigente	50	396.79	50	0	0	0	0	0	0	0	0	0
+342	MIEL OS CARMEN X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	15001.1046	0	0	0	0	0	0	0	0	0	0
+343	ETIQUETA CHOCOMIEL 250	T03.21. ETIQUETAS ADESIVAS	Vigente	33	150	33	0	0	0	0	0	0	0	0	0
+344	ETIQUETA CHOCOMIEL 135	T03.21. ETIQUETAS ADESIVAS	Vigente	93	150	93	0	0	0	0	0	0	0	0	0
+346	CHOCOMIEL 80/20 x Kg	T01.03. AGROECOLOGICOS GRAL	Vigente	0.82	271058.1818	0.82	0	0	0	0	0	0	0	0	0
+347	Miel OS Carmen Cristalizada 150 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	2	6794.2492	0	0	0	0	0	0	0	0	0	2
+348	Miel OS Carmen Cristalizada 275 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	4	13478.2354	0	0	0	0	0	0	0	0	0	4
+349	Miel OS Carmen Cristalizada 640 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	21547.2455	0	0	0	0	0	0	0	0	0	0
+350	Miel OS Carmen Cristalizada 1000 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	1	35821.6321	0	0	0	0	0	0	0	0	0	1
+351	ETIQUETA MIEL OS CARMEN CRISTALIZADA  150G	T03.21. ETIQUETAS ADESIVAS	Vigente	20	283.9745	20	0	0	0	0	0	0	0	0	0
+352	ETIQUETA MIEL OS CARMEN CRISTALIZADA  275G	T03.21. ETIQUETAS ADESIVAS	Vigente	4	272.7918	4	0	0	0	0	0	0	0	0	0
+353	ETIQUETA MIEL OS CARMEN CRISTALIZADA  640G	T03.21. ETIQUETAS ADESIVAS	Vigente	0	260.2994	0	0	0	0	0	0	0	0	0	0
+354	ETIQUETA MIEL OS CARMEN CRISTALIZADA  1000G	T03.21. ETIQUETAS ADESIVAS	Vigente	1	317.037	1	0	0	0	0	0	0	0	0	0
+355	CHOCOMIEL OS 135cc	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	15	16540.4671	15	0	0	0	0	0	0	0	0	0
+358	NIBS DE CACAO SF X KG	T01.03. AGROECOLOGICOS GRAL	Vigente	0	24828.8007	0	0	0	0	0	0	0	0	0	0
+359	CASCARILLA DE CACAO SF x KL	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+360	Chocomiel degustacion 65g	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	16	24369.2731	16	0	0	0	0	0	0	0	0	0
+361	Miel Os Carmen degustacion 65 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	2064.667	0	0	0	0	0	0	0	0	0	0
+363	MACADAMIA CRUDA (SIN TOSTAR) X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0.87	62087.1039	0.87	0	0	0	0	0	0	0	0	0
+367	CREMA DE MACADAMIA X KILO	DESARROLLO DE PRODUCTO	Vigente	0	124484.4028	0	0	0	0	0	0	0	0	0	0
+369	DESCUENTOS	NULL	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+370	DS Crema de chocolate receta 1 x gramo	DESARROLLO DE PRODUCTO	Vigente	0	25.0472	0	0	0	0	0	0	0	0	0	0
+371	DS Crema de chocolate receta 2 x gramo	DESARROLLO DE PRODUCTO	Vigente	0	36.8676	0	0	0	0	0	0	0	0	0	0
+372	DS Crema de miel x Kg	T999. PRODUCTOS QUE NO SE USAN	Vigente	0.88	15000	0	0	0	0	0	0	0	0	0.88	0
+373	MIEL FILTRADA  y PASTEURIZADA x KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	16500	0	0	0	0	0	0	0	0	0	0
+374	BOLSA GRAN FORMATO 13KG EMPAQUE MAT. PRIMA	T03.31. BOLSAS PLASTICAS	Vigente	0	2566.36	0	0	0	0	0	0	0	0	0	0
+375	BOLSA VERDE 35KG IMPRESA EMPAQUE MAT. PRIMA	T03.31. BOLSAS PLASTICAS	Vigente	0	6647	0	0	0	0	0	0	0	0	0	0
+376	Etiquetas Chocolate 500g granulado Delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	70	1602.4676	70	0	0	0	0	0	0	0	0	0
+377	Etiquetas chocolate 250g granulado Delantera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	63	1425.9486	63	0	0	0	0	0	0	0	0	0
+378	DS AJO CRIOLLO X KG	DESARROLLO DE PRODUCTO	Vigente	0	30	0	0	0	0	0	0	0	0	0	0
+379	DS AJI VARIEDADES x KG	DESARROLLO DE PRODUCTO	Vigente	0.27	50000	0.27	0	0	0	0	0	0	0	0	0
+380	EUCALIPTO EN RAMA X KG	T01.03. AGROECOLOGICOS GRAL	Vigente	0	13661.7278	0	0	0	0	0	0	0	0	0	0
+381	DS MIEL INFUSIONADA ROMERO Y JENGIBRE 265g	DESARROLLO DE PRODUCTO	Vigente	0	39440	0	0	0	0	0	0	0	0	0	0
+382	DS MIEL INFUSIONADA  AJO CRIOLLO 265g	DESARROLLO DE PRODUCTO	Vigente	0	32846.75	0	0	0	0	0	0	0	0	0	0
+383	DS MIEL INFUSIONADA EUCALIPTO 265g	DESARROLLO DE PRODUCTO	Vigente	0	39440	0	0	0	0	0	0	0	0	0	0
+384	Miel Aromatica OS 275 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	9	6774.0125	9	0	0	0	0	0	0	0	0	0
+385	DS MIEL INFUSIONADA ALOE VERA 265g	DESARROLLO DE PRODUCTO	Vigente	0	39440	0	0	0	0	0	0	0	0	0	0
+386	DS ROMERO ALOE VERA 2024 X GRAMO	DESARROLLO DE PRODUCTO	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+387	Miel de Fuego OS 275 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	2	7427.778	2	0	0	0	0	0	0	0	0	0
+388	CREMA DE MACADAMIA CON NIBS X KILO	DESARROLLO DE PRODUCTO	Vigente	0	1.006	0	0	0	0	0	0	0	0	0	0
+391	HABLADOR MADERA	XMATERIAL DE APOYO VENTAS POP	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+392	Cacao Almendra x Kg. Proveedores Varios San Carlos	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	29852.5641	0	0	0	0	0	0	0	0	0	0
+393	CREMA DE MACADAMIA CON NIBS OS 60 GRS	DESARROLLO DE PRODUCTO	Vigente	0	2897.1505	0	0	0	0	0	0	0	0	0	0
+394	CREMA DE MACADAMIA CON NIBS OS 110 GRS	DESARROLLO DE PRODUCTO	Vigente	0	5727.7617	0	0	0	0	0	0	0	0	0	0
+395	CREMA DE MACADAMIA CON NIBS OS 200 GRS	DESARROLLO DE PRODUCTO	Vigente	0	5657.5903	0	0	0	0	0	0	0	0	0	0
+397	DS CREMA DE MANI DOY PACK 10X18 (ID102)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	13681.79	0	0	0	0	0	0	0	0	0	0
+398	CREMA DE MANI BOLSA PLANA VALVULA PERFORACION  (ID 138)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	13681.79	0	0	0	0	0	0	0	0	0	0
+399	ETIQUETA CHOCOBEETAL 90g	T03.21. ETIQUETAS ADESIVAS	Vigente	0	167.3427	0	0	0	0	0	0	0	0	0	0
+4	Articulo 1Y	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+400	ETIQUETA CHOCOBEETAL 130g	T03.21. ETIQUETAS ADESIVAS	Vigente	8	150	8	0	0	0	0	0	0	0	0	0
+401	ETIQUETA CHOCOBEETAL 200g	T03.21. ETIQUETAS ADESIVAS	Vigente	0	164.6972	0	0	0	0	0	0	0	0	0	0
+402	ETIQUETA CREMA DE MACADAMIA CON NIBS DE CACAO 60g	T03.21. ETIQUETAS ADESIVAS	Vigente	51	217.157	51	0	0	0	0	0	0	0	0	0
+403	ETIQUETA CREMA DE MACADAMIA CON NIBS DE CACAO 110g	T03.21. ETIQUETAS ADESIVAS	Vigente	55	196.6328	55	0	0	0	0	0	0	0	0	0
+404	ETIQUETA CREMA DE MACADAMIA CON NIBS DE CACAO 200g	T03.21. ETIQUETAS ADESIVAS	Vigente	55	187.8418	55	0	0	0	0	0	0	0	0	0
+405	CHOCOBEETAL OS 130 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	82	7470.5511	72	0	0	0	0	0	0	0	0	10
+406	CHOCOBEETAL OS 230 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	18	25625.0318	18	0	0	0	0	0	0	0	0	0
+407	CHOCOBEETAL OS 90 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	-1	4311.96	-1	0	0	0	0	0	0	0	0	0
+408	MOLDE POLICARBONATO AMAZON TABLETA RAYA X UNIDAD	T05.02. A.F. MOLDES	Vigente	1	0	1	0	0	0	0	0	0	0	0	0
+409	MOLDE POLICARBONATO AMAZON FIGURAS  VARIAS X UNIDAD	T05.02. A.F. MOLDES	Vigente	4	55000	4	0	0	0	0	0	0	0	0	0
+410	Chocolate Puro Cacao 250 grs Granulado LT	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	2	21580.354	2	0	0	0	0	0	0	0	0	0
+411	Chocolate Puro Cacao 500 grs Granulado LT	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	8	54263.3556	8	0	0	0	0	0	0	0	0	0
+412	CAJA CHOCOLATE OSCURO 73Pgm X UND	T03.41. CAJAS	Vigente	1062	1000	1062	0	0	0	0	0	0	0	0	0
+414	BOLSA PLASTICA COBERTURA 3x6" X UND	T03.31. BOLSAS PLASTICAS	Vigente	0	5	0	0	0	0	0	0	0	0	0	0
+415	O01.01. Papeleria	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+416	O01.02. Impuestos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+417	O01.03. Gastos de publicidad e imagen	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+418	O01.04. Gastos desarrollo de producto	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+419	O01.05. Fletes Ventas OS	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+420	O01.06. Gastos de Venta OS	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+421	O01.07. Software	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+422	O01.08. Gestiones administrativas y legales	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+423	O01.09. Viaticos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+424	O01.10. Gastos Bancarios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+425	O01.11. Arriendo	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+426	O01.12. Servicios Publicos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+427	O01.13. Ferreteria	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+428	O01.14. Feria viaticos y general	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+429	O01.15. Feria gastos de venta	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+430	O01.16. Feria insumos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+431	O01.17. Gastos en mejoras y varios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+432	O01.18. Uniformes y dotacion	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+433	O01.19. Consumibles produccion	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+434	O01.20. Gastos Generales	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+435	O01.21. Tecnologia	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+436	O01.22. Fletes compras	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+437	O01.23. Estudios de mercado y competencia	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+438	O01.30. Por Identificar	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+439	O06.01. Herramientas	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+440	O06.02. Maquinas	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+441	O06.03. Activos Muebles	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+442	O06.04. Activos Fijos y reformas	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+443	O06.05. Vehiculos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+444	O06.06. Tecnologia	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+445	O06.07. Molderia general	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+446	O06.08. Material POP	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+447	O06.20. Otros Activos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+448	O07.01. Honorarios a socios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+449	O07.02. Comisiones miembros	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+450	O07.03. Honorarios a terceros	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+451	O07.04. Salarios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+452	O07.05. Eps	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+453	O07.06. Arl	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+454	O07.07. Pension	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+455	O07.08. Parafiscales	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+456	O07.09. Primas	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+457	O07.10. Cesantias	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+458	O07.11. Bonificaciones e incentivos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+459	O07.12. Pago Dividendos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+460	O07.13. Subsidio de transporte	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+461	O07.14. Comision x desempéño	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+462	O07.15. Pagos x Dia	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+463	O07.16. Comisiones red de amigos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+464	O07.17. Comisiones a terceros	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+465	O07.18. x	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+466	O07.19. x	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+467	O07.20. Pagos de Honorarios y dividendos General	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+468	O08.04. Pago Intereses Socios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+469	O08.05. Pago Intereses Familiares y amigos	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+47	MIEL APICA X 320 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	15521495.8	0	0	0	0	0	0	0	0	0	0
+470	O08.06. Pago Intereses Entidades Financieras	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+471	O08.10. Pago Deudas e Intereses:	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+472	O09.04. Inversiones Financieras	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+473	O10.01. Cursos y mentorias	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+474	O10.02. Talleres y seminarios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+475	O10.02. Estudios periodos medios	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+476	O10.10. Capacitaciones y Asesorias General	GASTOS	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+478	Chocolate Puro Granulado x Kilo LT	T01.03. AGROECOLOGICOS GRAL	Vigente	0	67440	0	0	0	0	0	0	0	0	0	0
+479	CREMA DE ALMENDRA X KILO	DESARROLLO DE PRODUCTO	Vigente	0	100000	0	0	0	0	0	0	0	0	0	0
+48	MIEL APICA X 180 GR	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+480	Tableta Chocolate 73% x 50grs CPM (sin empacar)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	24	4160.8693	0	0	0	0	0	0	0	0	0	24
+481	Tableta Chocolate 73% con Mani x 50grs CPM (sin empacar)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	3285.0718	0	0	0	0	0	0	0	0	0	0
+482	Tableta Chocolate 73% con Macadamia x 50grs CPM (sin empacar)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	16	4417.2732	0	0	0	0	0	0	0	0	0	16
+483	Tableta Chocolate 73% con Almendra x 50grs CPM (sin empacar)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	8	3877.2391	0	0	0	0	0	0	0	0	0	8
+484	Tableta Chocolate 73% con Nibs x 50grs CPM (sin empacar)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	7	3221.0396	0	0	0	0	0	0	0	0	0	7
+485	MANTECA DE CACAO TEMPLADA X KG	T01.03. AGROECOLOGICOS GRAL	Vigente	1.57	17575.6994	1.57	0	0	0	0	0	0	0	0	0
+486	DS Bombon Chocolate Relleno Mani	DESARROLLO DE PRODUCTO	Vigente	0	3225.986	0	0	0	0	0	0	0	0	0	0
+487	DS Bombon Chocolate Relleno Macadamia	DESARROLLO DE PRODUCTO	Vigente	0	3225.986	0	0	0	0	0	0	0	0	0	0
+488	DS Bombon Chocolate Relleno Miel	DESARROLLO DE PRODUCTO	Vigente	0	3225.986	0	0	0	0	0	0	0	0	0	0
+489	Tableta Chocolate 73p 50 grs pack x 5 CPM	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+49	MIEL APICA X MEDIA 500GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+490	Etiquetas Infusion 400g Delantera  x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	41	1888.4831	41	0	0	0	0	0	0	0	0	0
+491	ETIQUETA MIEL OS 500G PLAST.	T03.21. ETIQUETAS ADESIVAS	Vigente	0	150	0	0	0	0	0	0	0	0	0	0
+492	ETIQUETA MIEL OS 265G PLAST.	T03.21. ETIQUETAS ADESIVAS	Vigente	0	150	0	0	0	0	0	0	0	0	0	0
+493	Tableta Chocolate 73p con Macadamia 50 grs CPM	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	21	25024.8912	21	0	0	0	0	0	0	0	0	0
+494	Tableta Chocolate 73p con Mani 50 grs CPM	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	32	25013.1506	32	0	0	0	0	0	0	0	0	0
+495	Tableta Chocolate 73p con Almendra 50 grs CPM	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	15	26742.308	15	0	0	0	0	0	0	0	0	0
+496	Tableta Chocolate 73p con Nibs 50 grs CPM	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	5	19785.7319	5	0	0	0	0	0	0	0	0	0
+497	Infusión de Cacao con Menta y Polen 400 grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	6	48297.4305	6	0	0	0	0	0	0	0	0	0
+498	Chocolate 1000g Granulado	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	449116.658	0	0	0	0	0	0	0	0	0	0
+499	Tableta Chocolate 100Pgm (sin empacar)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	1660	0	0	0	0	0	0	0	0	0	0
+50	MIEL APICA X 688 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+500	SAL MARINA GRANO FINO SIN REFINAR X KG	T01.30. OTROS PRODUCTOS AGROECOLOGICOS	Vigente	2.67	8900	2.67	0	0	0	0	0	0	0	0	0
+501	ETIQUETA MARAÑON 100G DELANTERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	45	1000	45	0	0	0	0	0	0	0	0	0
+502	ETIQUETA MARAÑON 200G DELANTERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	8	1500	8	0	0	0	0	0	0	0	0	0
+503	ETIQUETA MACADAMIA 100G DELANTERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	55	818	55	0	0	0	0	0	0	0	0	0
+504	ETIQUETA MACADAMIA 200G DELANTERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	0	1500	0	0	0	0	0	0	0	0	0	0
+505	ETIQUETA ALMENDRA 100G X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	0	818	0	0	0	0	0	0	0	0	0	0
+506	ETIQUETA ALMENDRA 200G X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	5	1500	5	0	0	0	0	0	0	0	0	0
+507	ETIQUETA PRECIOS X HOJA	T03.21. ETIQUETAS ADESIVAS	Vigente	0	6500	0	0	0	0	0	0	0	0	0	0
+508	ALMENDRAS TOSTADAS  KG	T01.03. AGROECOLOGICOS GRAL	Vigente	2.24	54611.09	2.24	0	0	0	0	0	0	0	0	0
+509	ALMENDRA  x 100 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	6	38104.091	6	0	0	0	0	0	0	0	0	0
+51	MIEL APICA X 1.370 GRS	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+510	ALMENDRA  x 200 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	72412.6634	0	0	0	0	0	0	0	0	0	0
+511	Macadamia Tostada x 200 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	34677.447	0	0	0	0	0	0	0	0	0	0
+512	Macadamia Tostada x 100 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	6	12401.0746	6	0	0	0	0	0	0	0	0	0
+513	Marañon  x 100 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	55615.5013	0	0	0	0	0	0	0	0	0	0
+514	Marañon  x 200 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	1	69354.893	1	0	0	0	0	0	0	0	0	0
+515	Guayusa hojas x Kg	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	175000	0	0	0	0	0	0	0	0	0	0
+516	MARAÑON TOSTADO x KG	T01.03. AGROECOLOGICOS GRAL	Vigente	2	30707.9631	2	0	0	0	0	0	0	0	0	0
+517	CHOCOBEETAL OS 50 GRS	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	6651.43	0	0	0	0	0	0	0	0	0	0
+519	DESPERDICIO - CREMA DE MANI OS X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	1095108.4003	0	0	0	0	0	0	0	0	0	0
+52	MIEL APICA X 5 KG	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+520	DESPERDICIO - CHOCOMIEL 80/20 x Kg	T01.03. AGROECOLOGICOS GRAL	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+521	DESPERDICO - COBERTURA CHOCOLATE CPM 73% OS X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	1542801.885	0	0	0	0	0	0	0	0	0	0
+522	Exhibidor tableta pequeño	NULL	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+523	Etiquetas Infusion 400g Trasera  x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	84	1125	84	0	0	0	0	0	0	0	0	0
+524	Etiquetas Infusión 200g Trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	15	1250	15	0	0	0	0	0	0	0	0	0
+525	Etiquetas Chocolate 500g Bombon Trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	69	1125	69	0	0	0	0	0	0	0	0	0
+526	Etiquetas Chocolate granulado 500g  Trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	73	1125	73	0	0	0	0	0	0	0	0	0
+527	Etiquetas chocolate 250g granulado Trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	117	1228.1579	117	0	0	0	0	0	0	0	0	0
+528	Etiquetas chocolate Bombon 250g Trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	83	1343.9144	83	0	0	0	0	0	0	0	0	0
+529	Etiqueta Nibs de cacao 200g trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	90	662.7633	90	0	0	0	0	0	0	0	0	0
+53	MIEL SAN MIGUEL CRUDA x KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	32.31	19032.6178	32.31	0	0	0	0	0	0	0	0	0
+530	ETIQUETA NIBS DE CACAO 100G trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	59	409.9335	59	0	0	0	0	0	0	0	0	0
+531	Etiqueta tableta tornasol cacao organico x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	21	0	0	0	0	0	0	0	0	0	0
+532	Etiqueta tableta tornasol 100p natural x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	21	0	0	0	0	0	0	0	0	0	0
+533	Etiqueta tableta tornasol solo chocolate x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	19.54	0	0	0	0	0	0	0	0	0	0
+534	Etiqueta tableta tornasol con macadamia x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+535	Etiqueta tableta tornasol con mani x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	19.54	0	0	0	0	0	0	0	0	0	0
+536	Etiqueta tableta tornasol con almendra x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	19.54	0	0	0	0	0	0	0	0	0	0
+537	Etiqueta tableta tornasol con nibs de cacao x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	19.54	0	0	0	0	0	0	0	0	0	0
+538	Etiqueta tableta tornasol con sal marina x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	0	19.54	0	0	0	0	0	0	0	0	0	0
+539	ETIQUETA ALMENDRA DE CACAO 100G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	30	410	30	0	0	0	0	0	0	0	0	0
+54	MIEL APICA PROCESADA X KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+540	ETIQUETA MIX FRUTOS SECOS 200G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	89	439.6842	89	0	0	0	0	0	0	0	0	0
+541	ETIQUETA MIX FRUTOS SECOS 100G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	133	410	133	0	0	0	0	0	0	0	0	0
+542	ETIQUETA MACADAMIA 100G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	55	818	55	0	0	0	0	0	0	0	0	0
+543	ETIQUETA MACADAMIA 200G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	0	1500	0	0	0	0	0	0	0	0	0	0
+544	ETIQUETA MARAÑON 100G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	45	1000	45	0	0	0	0	0	0	0	0	0
+545	ETIQUETA MARAÑON 200G TRASERA X UNIDAD	T03.21. ETIQUETAS ADESIVAS	Vigente	4	1144.0817	4	0	0	0	0	0	0	0	0	0
+546	Miel Os vidrio 275 grs ( SIN ETIQUETAR)	T01.03. AGROECOLOGICOS GRAL	Vigente	0	6800	0	0	0	0	0	0	0	0	0	0
+547	Miel Os vidrio 640grs ( SIN ETIQUETAR)	T01.03. AGROECOLOGICOS GRAL	Vigente	0	13000	0	0	0	0	0	0	0	0	0	0
+548	Miel Os vidrio 150grs ( SIN ETIQUETAR)	T01.03. AGROECOLOGICOS GRAL	Vigente	1	4000	1	0	0	0	0	0	0	0	0	0
+549	Etiqueta Almendra de Cacao 200g trasera x unidad	T03.21. ETIQUETAS ADESIVAS	Vigente	39	1032.9675	39	0	0	0	0	0	0	0	0	0
+55	ALMENDRA DE CACAO  KL	T01.03. AGROECOLOGICOS GRAL	Vigente	0	15000	0	0	0	0	0	0	0	0	0	0
+550	Miel Os Vidrio 1000 grs ( SIN ETIQUETAR)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	19700	0	0	0	0	0	0	0	0	0	0
+551	Chocolate 1000g bombones	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	0	7007	0	0	0	0	0	0	0	0	0	0
+552	Envase 750cc C/Tapa B. 63 - ESTERILIZADO	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+553	Envase 110cc C/Tapa  B. 46 - ESTERILIZADO	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+554	Envase 230cc C/Tapa B. 63 - ESTERILIZADO	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+555	Envase 500cc C/Tapa B. 63 - ESTERILIZADO	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+556	Envase 50cc, B. 46 C Tapa - ESTERILIZADO	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+557	CHOCOBEETAL OS 65 GRS (degustacion)	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	15	19764.2556	15	0	0	0	0	0	0	0	0	0
+558	BOLSA FLEX UP VENTANA MED CON ETIQUETAS CHOCOLATE BOMBONES 500 GR	T03.03. ENVASES ECOLOGICOS	Vigente	40	4647.5542	40	0	0	0	0	0	0	0	0	0
+559	BOLSA FLEX UP VENTANA MED CON ETIQUETAS CHOCOLATE GRANULADO 500 GR	T03.03. ENVASES ECOLOGICOS	Vigente	10	12396.9924	10	0	0	0	0	0	0	0	0	0
+56	REFINADO CF CACAO 12H	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	5000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+560	BOLSA FLEX UP VENTANA MED CON ETIQUETAS INFUSION 400 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+561	BOLSA METALIZADA VENTANA CON ETIQUETAS INFUSION 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+562	BOLSA METALIZADA VENTANA CON ETIQUETAS CHOCOLATE BOMBONES 250 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+563	BOLSA METALIZADA VENTANA CON ETIQUETAS CHOCOLATE GRANULADO 250 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+564	Exhibidor Tableta Grande	NULL	Vigente	-No aplica-	15000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+565	BOLSA METALIZADA VENTANA CON ETIQUETAS NIBS 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+566	BOLSA METALIZADA VENTANA CON ETIQUETAS ALMENDRA 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+567	BOLSA METALIZADA VENTANA CON ETIQUETAS ALMENDRA DE CACAO 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+568	BOLSA METALIZADA VENTANA CON ETIQUETAS MACADAMIA 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+569	BOLSA METALIZADA VENTANA CON ETIQUETAS MARAÑON 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+57	REFINADO CACAO 24H	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	10000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+570	BOLSA METALIZADA VENTANA CON ETIQUETAS MIX FRUTOS SECOS 200 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+571	BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS MIX FRUTOS SECOS 100 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+572	BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS MACADAMIA 100 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+573	BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS ALMENDRA 100 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+574	BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS MARAÑON 100 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+575	BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS NIBS 100 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+576	BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS ALMENDRA DE CACAO 100 GR	T03.03. ENVASES ECOLOGICOS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+577	Etiqueta Transparente Miel Panal 275 gr	T03.21. ETIQUETAS ADESIVAS	Vigente	6	300	6	0	0	0	0	0	0	0	0	0
+578	Etiqueta Transparente Miel Panal 150 gr	T03.21. ETIQUETAS ADESIVAS	Vigente	2	300	2	0	0	0	0	0	0	0	0	0
+579	Almendra recubierta de chocolate OS x kilo	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	5	26059.2	5	0	0	0	0	0	0	0	0	0
+58	TOSTADO CF CACAO	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	2000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+580	CAJA CHOCOLATE OSCURO 100% X UND	T03.41. CAJAS	Vigente	460	1000	460	0	0	0	0	0	0	0	0	0
+581	COBERTURA CHOCOLATE CPM 73% OS X KILO  -  TEMPLADA	T01.03. AGROECOLOGICOS GRAL	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+59	DESCASCARILLADO CF CACAO	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	2000	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+60	MIEL SAN MIGUEL FILTRADA x KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	0	16500	0	0	0	0	0	0	0	0	0	0
+61	FILTRADO APICA	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+62	ENVASADO APICA	T999. PRODUCTOS QUE NO SE USAN	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+63	ENVASE VIDRIO R 3590, 255 CC B.53 UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	10	945.08	10	0	0	0	0	0	0	0	0	0
+64	TAPA METALICA B.53 UNICOR	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+65	ENVASE PET SALSERO R E588-1, 350 CC, B.28/410 SOLO ENVASES	T03.01. ENVASES Y TAPAS	Vigente	0	487.7318	0	0	0	0	0	0	0	0	0	0
+66	Tapa Fliptop R-28 Salsa Negra SOLO ENVASES	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	294.12	0	0	0	0	0	0	0	0	0	0
+67	ENVASE VIDRIO R 4423, 280 CC B.38 UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	790	0	0	0	0	0	0	0	0	0	0
+68	TAPA METALICA DORADA B.38 UNICOR	T03.01. ENVASES Y TAPAS	Vigente	0	0	0	0	0	0	0	0	0	0	0	0
+69	ENVASE VIDRIO R. 4353, 400 CC, B.38 UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	905.1	0	0	0	0	0	0	0	0	0	0
+7	MIEL OS VIDRIO 400grs	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	8822.87	0	0	0	0	0	0	0	0	0	0
+70	ENVASE PET DISCORDOBA 500 CC B.28	T999. PRODUCTOS QUE NO SE USAN	Vigente	6	475	6	0	0	0	0	0	0	0	0	0
+73	CHOCOLATE MESA OS/CF 24H X BLOQUE KL	T01.03. AGROECOLOGICOS GRAL	Vigente	4	54125	4	0	0	0	0	0	0	0	0	0
+74	CHOCOLATE MESA OS/CF 12H BLOQUE x KILO	T01.03. AGROECOLOGICOS GRAL	Vigente	7.4	14907.741	7.4	0	0	0	0	0	0	0	0	0
+76	CHOCOMIEL MAQUILA CF ENVASADO 250 CC	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	500	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+77	ENVASE VIDRIO R 2670, 230 CC B.63 UNICOR	T03.01. ENVASES Y TAPAS	Vigente	72	750	72	0	0	0	0	0	0	0	0	0
+78	TAPA METALICA B.63 X UNIDAD	T03.01. ENVASES Y TAPAS	Vigente	62	348.6939	62	0	0	0	0	0	0	0	0	0
+79	CHOCOMIEL LT/CF x Kg	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	21276	0	0	0	0	0	0	0	0	0	0
+8	MIEL OS VIDRIO 565grs	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	11717.22	0	0	0	0	0	0	0	0	0	0
+80	CASCARILLA DE CACAO LT x KL	T01.03. AGROECOLOGICOS GRAL	Vigente	89.28	71922.8453	89.28	0	0	0	0	0	0	0	0	0
+81	Envase Pet Salsa Mixta R 0081SAL200, 200cc SOLO ENVASES	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	515.361	0	0	0	0	0	0	0	0	0	0
+82	ENVASE VIDRIO R 3590, 255 CC B.53 C Tapa  UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	10	1234.5464	10	0	0	0	0	0	0	0	0	0
+83	ENVASE VIDRIO R 4423, 280 CC B.38 C Tapa UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	973.2	0	0	0	0	0	0	0	0	0	0
+84	ENVASE VIDRIO R. 4353, 400 CC, B.38 C Tapa UNICOR	T999. PRODUCTOS QUE NO SE USAN	Vigente	0	1295	0	0	0	0	0	0	0	0	0	0
+85	Envase Vidrio R 1264 Flint, 750cc, B. 63 C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	43	2205.0526	43	0	0	0	0	0	0	0	0	0
+86	Envase Vidrio R mb110h Flint, 110cc, B. 46 C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	91	1033.1624	91	0	0	0	0	0	0	0	0	0
+87	Envase Vidrio R 2670 Flint, 230cc, B.63, C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	51	1069.3182	51	0	0	0	0	0	0	0	0	0
+88	Envase Vidrio 1263 Flint, 500cc, b.63, C Tapa UNICOR	T03.01. ENVASES Y TAPAS	Vigente	82	1555	82	0	0	0	0	0	0	0	0	0
+9	MIEL OS PLASTICO 500grs	TPT.01. VENTA AGROECOLOGICOS VARIOS	Vigente	7	10250	7	0	0	0	0	0	0	0	0	0
+90	Etiqueta Origen Silvestre tapa	T03.21. ETIQUETAS ADESIVAS	Vigente	1307	389.8866	1307	0	0	0	0	0	0	0	0	0
+93	CHOCOLATE MESA OS MOLDEADO X KG MOLDE  9 a 12 g	T01.03. AGROECOLOGICOS GRAL	Vigente	8	46524.8654	8	0	0	0	0	0	0	0	0	0
+94	PROCESO MOLDEADO CHOCOLATE DE MESA	T09.01. SERVICIOS MAQUILA	Vigente	-No aplica-	0	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-	-No aplica-
+95	BOLSA FLEX UP MINI 133 X 170 80-160 GRS ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	3	311.0179	3	0	0	0	0	0	0	0	0	0
+96	BOLSA FLEX UP PEQUE 133 X 210 150-250 GRS ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	8	330.9334	8	0	0	0	0	0	0	0	0	0
+97	BOLSA FLEX UP MED 160 X 240 350-450 GRS ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	0	444.0625	0	0	0	0	0	0	0	0	0	0
+98	BOLSA FLEX UP GRANDE 190 X 250 480-650 GRS ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	0	591.6	0	0	0	0	0	0	0	0	0	0
+99	BOLSA FLEX UP VENTANA PEQUE 133 X 210 150-250 GRS ALICO	T03.03. ENVASES ECOLOGICOS	Vigente	0	265.7763	0	0	0	0	0	0	0	0	0	0
