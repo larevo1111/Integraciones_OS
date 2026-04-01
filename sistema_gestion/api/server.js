@@ -49,6 +49,13 @@ if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
 
 const app = express()
 app.use(express.json())
+// sw.js e index.html sin caché para que el PWA se actualice
+app.use((req, res, next) => {
+  if (req.path === '/sw.js' || req.path === '/index.html' || req.path === '/') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  }
+  next()
+})
 app.use(express.static(path.join(__dirname, 'public')))
 app.use('/subidos', express.static(SUBIDOS_ROOT))
 
