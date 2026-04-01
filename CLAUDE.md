@@ -74,6 +74,38 @@ Cuando Claude Code corre sin supervisión directa (cron, scripts `claude_trainer
 
 **Los cambios de código Python → SOLO en sesión interactiva con Santi.**
 
+## Stack
+
+- Frontend: Quasar Framework + Vue 3 (Composition API + script setup)
+- Backend: Node.js (Express) + Python 3
+- BD: MariaDB local + MySQL Hostinger
+- NO TypeScript (JavaScript puro)
+- NO Tailwind, NO Bootstrap, NO CSS custom frameworks
+
+## ⚠️ REGLA ABSOLUTA — UI/Layout (Quasar)
+
+**OBLIGATORIO usar componentes y clases utilitarias de Quasar para TODO el layout y UI.**
+
+- SIEMPRE usar `<q-page>`, `<q-table>`, `<q-input>`, `<q-btn>`, `<q-card>`, etc.
+- SIEMPRE usar clases flex Quasar: `row`, `col-12 col-md-6`, `q-gutter-md`, `items-center`, `justify-between`
+- SIEMPRE usar spacing Quasar: `q-pa-md`, `q-mt-sm`, `q-mx-auto`
+- NUNCA escribir CSS crudo para: flexbox, grid, spacing, alignment, breakpoints responsive
+- NUNCA escribir media queries. Usar clases responsive de columnas (`col-xs-12 col-md-6`) o helpers de visibilidad (`gt-sm`, `lt-md`)
+- NUNCA usar HTML crudo (`<button>`, `<input>`, `<table>`, `<select>`) cuando Quasar tiene componente
+- NUNCA crear wrapper divs solo para flex layout
+- Si el layout necesita más de 5 líneas de CSS custom → ESTÁS HACIENDO MAL. Usá clases Quasar.
+- **Mantenerlo SIMPLE. Estructura primero con componentes Quasar, detalles después.**
+- Skill completo con patrones y tablas: `.claude/skills/quasar-layout/SKILL.md`
+
+## Vue — Convenciones de componentes
+
+- Usar `<script setup>` (Composition API)
+- Props con `defineProps()`, emits con `defineEmits()`
+- Estado reactivo: `ref()` y `reactive()`
+- Composables en `/src/composables/` con prefijo `use`
+- Pages en `/src/pages/`, components en `/src/components/`, layouts en `/src/layouts/`
+- Imports agrupados: vue → quasar → módulos del proyecto → componentes
+
 ## Estilo de respuesta
 
 - Conciso y directo — sin preámbulos ni relleno
