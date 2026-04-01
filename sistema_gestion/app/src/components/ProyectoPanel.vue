@@ -655,7 +655,7 @@ function fmtFecha(iso) {
   .pp-chips { gap: 6px; }
   .pp-chip { padding: 4px 12px; font-size: 12px; }
   .pp-subtarea-wrap { max-height: 70vh; overflow-y: auto; }
-  .pp-subtarea-wrap :deep(.tarea-panel) { min-width: 100%; }
+  .pp-subtarea-wrap :deep(.tarea-panel) { display: flex !important; min-width: 100%; width: 100%; border-left: none; }
   .pp-tarea-link { padding: 6px 4px; }
 }
 </style>
