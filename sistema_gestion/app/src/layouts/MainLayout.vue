@@ -16,7 +16,7 @@
 
       <!-- Nav -->
       <nav class="sidebar-nav">
-        <!-- ═══ BLOQUE MIS TAREAS ═══ -->
+        <!-- ═══ MIS TAREAS ═══ -->
         <div class="sidebar-section">
           <RouterLink to="/tareas" class="nav-item" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
             <span class="nav-item-icon material-icons">check_circle_outline</span>
@@ -24,132 +24,132 @@
           </RouterLink>
         </div>
 
-        <!-- Mis items (proyectos/dificultades/etc donde soy responsable) -->
-        <div v-if="tieneMisItems() || !cargandoProyectos" class="sidebar-bloque">
-          <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo">
-            <template v-if="misItemsPorTipo(sec.tipo).length">
-              <div class="sidebar-section">
-                <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
-                  <span>{{ sec.label }}</span>
-                  <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click="abrirPanel(sec.tipo)">
-                    <span class="material-icons" style="font-size:14px">add</span>
-                  </button>
-                </div>
-                <div
-                  v-for="p in misItemsPorTipo(sec.tipo)"
-                  :key="p.id"
-                  class="nav-item-proyecto-wrap"
-                  @mouseenter="proyectoHover = p.id"
-                  @mouseleave="proyectoHover = null"
-                >
-                  <RouterLink
-                    :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                    class="nav-item nav-item-proyecto"
-                    :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
-                  >
-                    <span class="nav-item-icon">
-                      <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
-                    </span>
-                    <span class="nav-item-label">{{ p.nombre }}</span>
-                    <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                    <template v-if="proyectoHover === p.id">
-                      <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
-                        <span class="material-icons" style="font-size:15px">check_circle_outline</span>
-                      </button>
-                      <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
-                        <span class="material-icons" style="font-size:16px">more_vert</span>
-                      </button>
-                    </template>
-                  </RouterLink>
-                </div>
-              </div>
-            </template>
+        <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-section">
+          <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
+            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
+            <span style="flex:1">{{ sec.label }}</span>
+            <span v-if="misItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ misItemsPorTipo(sec.tipo).length }}</span>
+            <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click.stop="abrirPanel(sec.tipo)">
+              <span class="material-icons" style="font-size:14px">add</span>
+            </button>
           </div>
+          <template v-if="acordeonAbierto['mis-'+sec.tipo]">
+            <div
+              v-for="p in misItemsPorTipo(sec.tipo)"
+              :key="p.id"
+              class="nav-item-proyecto-wrap"
+              @mouseenter="proyectoHover = p.id"
+              @mouseleave="proyectoHover = null"
+            >
+              <RouterLink
+                :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                class="nav-item nav-item-proyecto"
+                :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
+              >
+                <span class="nav-item-icon">
+                  <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
+                </span>
+                <span class="nav-item-label">{{ p.nombre }}</span>
+                <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
+                <template v-if="proyectoHover === p.id">
+                  <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
+                    <span class="material-icons" style="font-size:15px">check_circle_outline</span>
+                  </button>
+                  <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
+                    <span class="material-icons" style="font-size:16px">more_vert</span>
+                  </button>
+                </template>
+              </RouterLink>
+            </div>
+            <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
+              Sin {{ sec.label.toLowerCase() }}
+            </div>
+          </template>
         </div>
 
         <!-- ═══ SEPARADOR ═══ -->
         <div class="sidebar-separator" />
 
-        <!-- ═══ BLOQUE EQUIPO ═══ -->
+        <!-- ═══ EQUIPO ═══ -->
         <div class="sidebar-section">
           <RouterLink to="/equipo" class="nav-item" :class="{ active: ruta === '/equipo' }">
             <span class="nav-item-icon material-icons">group</span>
             <span class="nav-item-label">Equipo</span>
           </RouterLink>
+        </div>
+
+        <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-section">
+          <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
+            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
+            <span style="flex:1">{{ sec.label }}</span>
+            <span v-if="equipoItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ equipoItemsPorTipo(sec.tipo).length }}</span>
+            <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click.stop="abrirPanel(sec.tipo)">
+              <span class="material-icons" style="font-size:14px">add</span>
+            </button>
+          </div>
+          <template v-if="acordeonAbierto['eq-'+sec.tipo]">
+            <div
+              v-for="p in equipoItemsPorTipo(sec.tipo)"
+              :key="p.id"
+              class="nav-item-proyecto-wrap"
+              @mouseenter="proyectoHover = p.id"
+              @mouseleave="proyectoHover = null"
+            >
+              <RouterLink
+                :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                class="nav-item nav-item-proyecto"
+                :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
+              >
+                <span class="nav-item-icon">
+                  <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
+                </span>
+                <span class="nav-item-label">{{ p.nombre }}</span>
+                <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
+                <template v-if="proyectoHover === p.id">
+                  <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
+                    <span class="material-icons" style="font-size:15px">check_circle_outline</span>
+                  </button>
+                  <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
+                    <span class="material-icons" style="font-size:16px">more_vert</span>
+                  </button>
+                </template>
+              </RouterLink>
+            </div>
+            <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
+              Sin {{ sec.label.toLowerCase() }}
+            </div>
+          </template>
+        </div>
+
+        <!-- Completados -->
+        <div v-if="proyectosCompletados.length" class="completados-wrap" style="padding:0 8px">
+          <div class="completados-header" @click="mostrarCompletados = !mostrarCompletados">
+            <span class="material-icons" style="font-size:14px">{{ mostrarCompletados ? 'expand_more' : 'chevron_right' }}</span>
+            Completados ({{ proyectosCompletados.length }})
+          </div>
+          <template v-if="mostrarCompletados">
+            <div
+              v-for="p in proyectosCompletados"
+              :key="p.id"
+              class="nav-item nav-item-proyecto nav-item-completado"
+            >
+              <span class="nav-item-icon">
+                <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B', opacity: 0.5 }"></span>
+              </span>
+              <span class="nav-item-label nav-item-label-completado">{{ p.nombre }}</span>
+            </div>
+          </template>
+        </div>
+
+        <!-- ═══ SEPARADOR ═══ -->
+        <div class="sidebar-separator" />
+
+        <!-- ═══ JORNADAS ═══ -->
+        <div class="sidebar-section">
           <RouterLink to="/jornadas" class="nav-item" :class="{ active: ruta === '/jornadas' }">
             <span class="nav-item-icon material-icons">schedule</span>
             <span class="nav-item-label">Jornadas</span>
           </RouterLink>
-        </div>
-
-        <!-- Items del equipo (todos) — colapsable -->
-        <div class="sidebar-bloque">
-          <div class="sidebar-acordeon-header" @click="seccionEquipoAbierta = !seccionEquipoAbierta">
-            <span class="material-icons" style="font-size:14px">{{ seccionEquipoAbierta ? 'expand_more' : 'chevron_right' }}</span>
-            Todos los items
-          </div>
-          <template v-if="seccionEquipoAbierta">
-            <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-section">
-              <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
-                <span>{{ sec.label }}</span>
-                <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click="abrirPanel(sec.tipo)">
-                  <span class="material-icons" style="font-size:14px">add</span>
-                </button>
-              </div>
-
-              <div
-                v-for="p in equipoItemsPorTipo(sec.tipo)"
-                :key="p.id"
-                class="nav-item-proyecto-wrap"
-                @mouseenter="proyectoHover = p.id"
-                @mouseleave="proyectoHover = null"
-              >
-                <RouterLink
-                  :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                  class="nav-item nav-item-proyecto"
-                  :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
-                >
-                  <span class="nav-item-icon">
-                    <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
-                  </span>
-                  <span class="nav-item-label">{{ p.nombre }}</span>
-                  <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                  <template v-if="proyectoHover === p.id">
-                    <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
-                      <span class="material-icons" style="font-size:15px">check_circle_outline</span>
-                    </button>
-                    <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
-                      <span class="material-icons" style="font-size:16px">more_vert</span>
-                    </button>
-                  </template>
-                </RouterLink>
-              </div>
-
-              <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
-                Sin {{ sec.label.toLowerCase() }}
-              </div>
-            </div>
-
-            <!-- Completados -->
-            <div v-if="proyectosCompletados.length" class="completados-wrap" style="padding:0 8px">
-              <div class="completados-header" @click="mostrarCompletados = !mostrarCompletados">
-                <span class="material-icons" style="font-size:14px">{{ mostrarCompletados ? 'expand_more' : 'chevron_right' }}</span>
-                Completados ({{ proyectosCompletados.length }})
-              </div>
-              <template v-if="mostrarCompletados">
-                <div
-                  v-for="p in proyectosCompletados"
-                  :key="p.id"
-                  class="nav-item nav-item-proyecto nav-item-completado"
-                >
-                  <span class="nav-item-icon">
-                    <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B', opacity: 0.5 }"></span>
-                  </span>
-                  <span class="nav-item-label nav-item-label-completado">{{ p.nombre }}</span>
-                </div>
-              </template>
-            </div>
-          </template>
         </div>
 
         <!-- Tablas -->
@@ -270,25 +270,23 @@
               <!-- ═══ MIS TAREAS ═══ -->
               <RouterLink to="/tareas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">check_circle_outline</span><span class="nav-item-label">Mis Tareas</span></RouterLink>
 
-              <!-- Mis items -->
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'m-'+sec.tipo">
-                <template v-if="misItemsPorTipo(sec.tipo).length">
-                  <div class="sidebar-section">
-                    <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
-                      <span>{{ sec.label }}</span>
-                      <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click="drawerOpen=false; abrirPanel(sec.tipo)">
-                        <span class="material-icons" style="font-size:14px">add</span>
-                      </button>
-                    </div>
-                    <div v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id" class="nav-item-proyecto-wrap">
-                      <RouterLink :to="{ path: '/tareas', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
-                        <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span></span>
-                        <span class="nav-item-label">{{ p.nombre }}</span>
-                        <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                        <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuProyecto($event, p)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
-                      </RouterLink>
-                    </div>
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="'dm-'+sec.tipo" class="sidebar-section">
+                <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
+                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
+                  <span style="flex:1">{{ sec.label }}</span>
+                  <span v-if="misItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ misItemsPorTipo(sec.tipo).length }}</span>
+                  <button class="btn-icon-tiny" @click.stop="drawerOpen=false; abrirPanel(sec.tipo)"><span class="material-icons" style="font-size:14px">add</span></button>
+                </div>
+                <template v-if="acordeonAbierto['mis-'+sec.tipo]">
+                  <div v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id" class="nav-item-proyecto-wrap">
+                    <RouterLink :to="{ path: '/tareas', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
+                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span></span>
+                      <span class="nav-item-label">{{ p.nombre }}</span>
+                      <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
+                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuProyecto($event, p)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                    </RouterLink>
                   </div>
+                  <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
                 </template>
               </div>
 
@@ -296,21 +294,15 @@
 
               <!-- ═══ EQUIPO ═══ -->
               <RouterLink to="/equipo" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">group</span><span class="nav-item-label">Equipo</span></RouterLink>
-              <RouterLink to="/jornadas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">schedule</span><span class="nav-item-label">Jornadas</span></RouterLink>
 
-              <!-- Items equipo — colapsable -->
-              <div class="sidebar-acordeon-header" @click="seccionEquipoAbierta = !seccionEquipoAbierta">
-                <span class="material-icons" style="font-size:14px">{{ seccionEquipoAbierta ? 'expand_more' : 'chevron_right' }}</span>
-                Todos los items
-              </div>
-              <template v-if="seccionEquipoAbierta">
-                <div v-for="sec in SECCIONES_SIDEBAR" :key="'e-'+sec.tipo" class="sidebar-section">
-                  <div class="sidebar-section-label" style="display:flex;align-items:center;justify-content:space-between">
-                    <span>{{ sec.label }}</span>
-                    <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click="drawerOpen=false; abrirPanel(sec.tipo)">
-                      <span class="material-icons" style="font-size:14px">add</span>
-                    </button>
-                  </div>
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="'de-'+sec.tipo" class="sidebar-section">
+                <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
+                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
+                  <span style="flex:1">{{ sec.label }}</span>
+                  <span v-if="equipoItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ equipoItemsPorTipo(sec.tipo).length }}</span>
+                  <button class="btn-icon-tiny" @click.stop="drawerOpen=false; abrirPanel(sec.tipo)"><span class="material-icons" style="font-size:14px">add</span></button>
+                </div>
+                <template v-if="acordeonAbierto['eq-'+sec.tipo]">
                   <div v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id" class="nav-item-proyecto-wrap">
                     <RouterLink :to="{ path: '/tareas', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span></span>
@@ -319,11 +311,14 @@
                       <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuProyecto($event, p)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
                     </RouterLink>
                   </div>
-                  <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
-                    Sin {{ sec.label.toLowerCase() }}
-                  </div>
-                </div>
-              </template>
+                  <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
+                </template>
+              </div>
+
+              <div class="sidebar-separator" />
+
+              <!-- ═══ JORNADAS ═══ -->
+              <RouterLink to="/jornadas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">schedule</span><span class="nav-item-label">Jornadas</span></RouterLink>
 
               <!-- Links tablas -->
               <div class="sidebar-section">
@@ -355,7 +350,7 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, onMounted } from 'vue'
+import { ref, reactive, computed, provide, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
@@ -412,15 +407,9 @@ function misItemsPorTipo(tipo) {
 function equipoItemsPorTipo(tipo) {
   return todosItems.value.filter(p => p.tipo === tipo)
 }
-function tieneMisItems() {
-  return SECCIONES_SIDEBAR.some(s => misItemsPorTipo(s.tipo).length > 0)
-}
-function tieneEquipoItems() {
-  return SECCIONES_SIDEBAR.some(s => equipoItemsPorTipo(s.tipo).length > 0)
-}
-
-const seccionMisAbierta    = ref(true)
-const seccionEquipoAbierta = ref(false)
+// Acordeones individuales: 'mis-proyecto', 'mis-dificultad', 'eq-proyecto', etc.
+const acordeonAbierto = reactive({})
+function toggleAcordeon(key) { acordeonAbierto[key] = !acordeonAbierto[key] }
 
 // Alias para compatibilidad template (completados no filtran por tipo)
 const proyectos = todosItems // renombrado internamente
@@ -643,6 +632,10 @@ onMounted(() => {
   user-select: none; margin: 2px 0;
 }
 .sidebar-acordeon-header:hover { color: var(--text-secondary); }
+.acordeon-count {
+  font-size: 10px; color: var(--text-tertiary);
+  min-width: 14px; text-align: right; margin-right: 4px;
+}
 
 /* Acordeón completados */
 .completados-wrap { margin-top: 4px; }
