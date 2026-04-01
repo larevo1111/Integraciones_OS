@@ -209,7 +209,7 @@ body {
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  height: 30px;
+  min-height: 30px;
   border-radius: var(--radius-md);
   margin: 1px 8px;
   cursor: pointer;
@@ -218,8 +218,11 @@ body {
   font-weight: 500;
   text-decoration: none;
   transition: background 80ms, color 80ms;
-  white-space: nowrap;
-  overflow: hidden;
+}
+.nav-item.nav-item-proyecto {
+  white-space: normal;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 .nav-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 .nav-item.active { background: var(--bg-row-selected); color: var(--text-primary); }
