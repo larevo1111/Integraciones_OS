@@ -255,7 +255,7 @@
                   <button class="stepper-btn stepper-down" @click="ajustarConteo(a, -1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">remove</span>
                   </button>
-                  <input class="count-input" :class="claseInput(a)" type="text" inputmode="decimal" placeholder="—" :value="displayConteo(a)" @blur="onConteoConValidacion(a, $event)" @keyup.enter="$event.target.blur()">
+                  <input class="count-input" :class="claseInput(a)" type="text" inputmode="decimal" placeholder="—" :value="displayConteo(a)" @blur="onConteoConValidacion(a, $event)" @input="onInputDebounce(a, $event)" @keyup.enter="$event.target.blur()">
                   <button class="stepper-btn stepper-up" @click="ajustarConteo(a, 1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">add</span>
                   </button>
@@ -759,17 +759,36 @@ function onConteoConValidacion(articulo, event) {
   guardarConteo(articulo, valor)
 }
 
+// Debounce para guardar al escribir (backup de @blur)
+const _debounceTimers = {}
+function onInputDebounce(articulo, event) {
+  clearTimeout(_debounceTimers[articulo.id])
+  _debounceTimers[articulo.id] = setTimeout(() => {
+    const raw = event.target.value
+    const valor = parseDecimal(raw)
+    if (!isNaN(valor)) guardarConteo(articulo, valor)
+  }, 1500)
+}
+
 async function guardarConteo(articulo, valor) {
   // Actualizar inmediatamente en memoria para que Vue no borre el input
   articulo.inventario_fisico = valor
   articulo.estado = 'contado'
-  const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
-    method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inventario_fisico: valor, contado_por: usuario.value })
-  }).then(r => r.json())
-  articulo.diferencia = res.diferencia
-  cargarResumen()
-  cargarBodegas()
+  try {
+    const res = await fetch(API + `/api/inventario/articulos/${articulo.id}/conteo`, {
+      method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventario_fisico: valor, contado_por: usuario.value })
+    })
+    if (!res.ok) throw new Error(`Error ${res.status}`)
+    const data = await res.json()
+    articulo.diferencia = data.diferencia
+    cargarResumen()
+    cargarBodegas()
+  } catch (e) {
+    articulo.estado = 'pendiente'
+    console.error('Error guardando conteo:', e)
+    alert('Error guardando conteo de ' + articulo.nombre + '. Verificar conexión.')
+  }
 }
 
 function confirmarAlerta() {
