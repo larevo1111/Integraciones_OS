@@ -40,8 +40,4 @@ mysql -u osadmin -pEpist2487. effi_data -e "
 
 LINEAS=$(wc -l < "$ARCHIVO")
 echo "[$(date)] Snapshot guardado: $ARCHIVO ($LINEAS líneas)" >> "$LOG"
-
-# 3. Recalcular inventario teórico para hoy
-python3 scripts/inventario/calcular_inventario_teorico.py --fecha "$FECHA" >> "$LOG" 2>&1
-
 echo "[$(date)] === SNAPSHOT INVENTARIO — Completo ===" >> "$LOG"
