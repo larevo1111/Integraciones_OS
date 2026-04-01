@@ -170,8 +170,7 @@
                   v-model="qaSubTitulo"
                   class="subtarea-input"
                   placeholder="Nueva subtarea..."
-                  @keydown.enter.prevent="onSubEnter(t, $event)"
-                  @compositionend="onSubCompositionEnd(t)"
+                  @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
                   @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
                 />
@@ -549,7 +548,6 @@ const qaSubtareaParentId  = ref(null)
 const qaSubTitulo         = ref('')
 const qaSubInputRef       = ref(null)
 let   _qaSubGuardando     = false
-let   _enterPendiente     = null      // padre pendiente cuando IME está componiendo
 
 async function toggleSubtareas(tarea) {
   const id = tarea.id
@@ -591,14 +589,6 @@ function cancelarSubtarea() {
   qaSubTitulo.value = ''
 }
 
-function onSubEnter(padre, e) {
-  if (e.isComposing) { _enterPendiente = padre; return }
-  guardarSubtarea(padre)
-}
-function onSubCompositionEnd(padre) {
-  if (_enterPendiente) { guardarSubtarea(_enterPendiente); _enterPendiente = null }
-}
-
 async function guardarSubtarea(padre) {
   const titulo = qaSubTitulo.value.trim()
   if (!titulo || _qaSubGuardando) return
@@ -614,10 +604,8 @@ async function guardarSubtarea(padre) {
         parent_id:    padre.id
       })
     })
-    // Agregar al array local de subtareas
     const subs = subtareasData.value[padre.id] || []
     subtareasData.value = { ...subtareasData.value, [padre.id]: [...subs, data.tarea] }
-    // Actualizar conteo en la tarea padre
     const idx = tareas.value.findIndex(t => t.id === padre.id)
     if (idx !== -1) {
       tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
@@ -625,6 +613,8 @@ async function guardarSubtarea(padre) {
     await nextTick()
     const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
     el?.focus()
+    // Limpiar de nuevo tras refocus — atrapa repoblación del IME móvil
+    setTimeout(() => { qaSubTitulo.value = '' }, 80)
   } catch (e) { console.error(e) }
   _qaSubGuardando = false
 }
