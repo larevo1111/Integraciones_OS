@@ -170,7 +170,8 @@
                   v-model="qaSubTitulo"
                   class="subtarea-input"
                   placeholder="Nueva subtarea..."
-                  @keydown.enter.prevent="guardarSubtarea(t, $event)"
+                  @keydown.enter.prevent="onSubEnter(t, $event)"
+                  @compositionend="onSubCompositionEnd(t)"
                   @keydown.escape="cancelarSubtarea"
                   @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
                 />
@@ -548,6 +549,7 @@ const qaSubtareaParentId  = ref(null)
 const qaSubTitulo         = ref('')
 const qaSubInputRef       = ref(null)
 let   _qaSubGuardando     = false
+let   _enterPendiente     = null      // padre pendiente cuando IME está componiendo
 
 async function toggleSubtareas(tarea) {
   const id = tarea.id
@@ -589,8 +591,15 @@ function cancelarSubtarea() {
   qaSubTitulo.value = ''
 }
 
-async function guardarSubtarea(padre, e) {
-  if (e?.isComposing) return           // IME móvil aún componiendo — ignorar
+function onSubEnter(padre, e) {
+  if (e.isComposing) { _enterPendiente = padre; return }
+  guardarSubtarea(padre)
+}
+function onSubCompositionEnd(padre) {
+  if (_enterPendiente) { guardarSubtarea(_enterPendiente); _enterPendiente = null }
+}
+
+async function guardarSubtarea(padre) {
   const titulo = qaSubTitulo.value.trim()
   if (!titulo || _qaSubGuardando) return
   _qaSubGuardando = true
