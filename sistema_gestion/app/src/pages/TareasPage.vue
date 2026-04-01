@@ -393,6 +393,22 @@
               </div>
             </div>
 
+            <!-- Etiquetas -->
+            <div style="position:relative">
+              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuEtiqueta }" @click="cerrarMenusMulti('etiqueta')">
+                <span class="material-icons" style="font-size:14px">sell</span>
+                <span class="d-desktop-only">Etiq.</span>
+              </button>
+              <div v-if="multiMenuEtiqueta" class="multi-bar-menu multi-bar-menu-scroll">
+                <div v-for="e in etiquetas" :key="e.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarEtiquetaMulti(e.id)">
+                  <span class="multi-dot" :style="{ background: e.color || '#607D8B' }" />
+                  {{ e.nombre }}
+                </div>
+                <div class="multi-menu-sep" />
+                <div class="multi-menu-item" @click="quitarEtiquetasMulti">Quitar todas</div>
+              </div>
+            </div>
+
             <div class="multi-bar-divider" />
 
             <!-- Eliminar -->
@@ -530,12 +546,14 @@ const multiMenuFecha     = ref(false)
 const multiMenuEstado    = ref(false)
 const multiMenuCategoria = ref(false)
 const multiMenuProyecto  = ref(false)
+const multiMenuEtiqueta  = ref(false)
 
 function cerrarMenusMulti(abrir) {
   multiMenuFecha.value     = abrir === 'fecha'
   multiMenuEstado.value    = abrir === 'estado'
   multiMenuCategoria.value = abrir === 'categoria'
   multiMenuProyecto.value  = abrir === 'proyecto'
+  multiMenuEtiqueta.value  = abrir === 'etiqueta'
 }
 
 function isoRelativo(dias) {
@@ -1041,6 +1059,28 @@ async function aplicarProyectoMulti(proyectoId) {
   await _postBulk(ids)
 }
 
+async function aplicarEtiquetaMulti(etiquetaId) {
+  cerrarMenusMulti(null)
+  const ids = [...seleccionMultiIds.value]
+  const allTareas = [...tareas.value, ...completadas.value]
+  await Promise.all(ids.map(id => {
+    const t = allTareas.find(x => x.id === id)
+    const actuales = (t?.etiquetas || []).map(e => e.id)
+    if (actuales.includes(etiquetaId)) return Promise.resolve()
+    return api(`/api/gestion/tareas/${id}`, {
+      method: 'PUT', body: JSON.stringify({ etiquetas: [...actuales, etiquetaId] })
+    }).catch(console.error)
+  }))
+  await _postBulk(ids)
+}
+
+async function quitarEtiquetasMulti() {
+  cerrarMenusMulti(null)
+  const ids = [...seleccionMultiIds.value]
+  await _bulkPut(ids, { etiquetas: [] })
+  await _postBulk(ids)
+}
+
 async function eliminarMulti() {
   const n = seleccionMultiIds.value.length
   if (!confirm(`¿Eliminar ${n} tarea${n !== 1 ? 's' : ''}?`)) return
@@ -1211,6 +1251,7 @@ onUnmounted(() => {
 .d-desktop-only { }
 .d-mobile-only  { display: none; }
 @media (max-width: 768px) {
+  .d-desktop-only { display: none !important; }
   .d-mobile-only  { display: flex; }
   /* QuickAdd en mobile: padding ajustado */
   .quickadd-wrap { padding: 0 12px 8px; }
