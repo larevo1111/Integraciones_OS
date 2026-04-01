@@ -1172,7 +1172,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-muted); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
 .inv-user-info { display: flex; flex-direction: column; }
 .inv-user-name { font-size: 13px; font-weight: 500; }
-.inv-panel-logout { margin-top: auto; padding: 12px 14px; border-top: 1px solid var(--border-default); font-size: 12px; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.inv-panel-logout { margin-top: auto; padding: 12px 14px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 16px)); border-top: 1px solid var(--border-default); font-size: 12px; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .inv-panel-logout:hover { color: var(--text-primary); background: var(--bg-overlay); }
 .inv-title { font-size: 12px; color: var(--accent); font-weight: 500; }
 .inv-header-right { display: flex; align-items: center; gap: 16px; }
