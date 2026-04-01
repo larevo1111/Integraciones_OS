@@ -898,11 +898,35 @@ def _cargar_tipo(slug: str) -> dict | None:
 _OLLAMA_BASE = 'http://localhost:11434'
 _log = logging.getLogger('ia_service')
 
+# Servicios GPU que compiten con Ollama por VRAM (RTX 3060 12GB).
+# Ningún LLM 14B (~9GB) cabe si otro framework ocupa VRAM.
+_GPU_SERVICES_CONFLICTIVOS = ['os-comfyui.service']
+
+
+def _liberar_vram_si_necesario() -> None:
+    """
+    Revisa si hay servicios GPU conflictivos corriendo y los detiene.
+    RTX 3060 12GB: solo cabe 1 framework a la vez (Ollama O ComfyUI, no ambos).
+    """
+    for svc in _GPU_SERVICES_CONFLICTIVOS:
+        resultado = subprocess.run(
+            ['systemctl', 'is-active', svc],
+            capture_output=True, text=True, timeout=5,
+        )
+        if resultado.stdout.strip() == 'active':
+            _log.info(f'Deteniendo {svc} para liberar VRAM...')
+            subprocess.run(
+                ['sudo', 'systemctl', 'stop', svc],
+                capture_output=True, timeout=15,
+            )
+            time.sleep(2)  # esperar a que se libere la VRAM
+            _log.info(f'{svc} detenido — VRAM liberada')
+
 
 def _warmup_ollama(modelo_id: str) -> bool:
     """
-    Pre-flight check para Ollama: verifica que el servicio esté activo y el
-    modelo cargado en VRAM. Si no está cargado, envía un request de precarga.
+    Pre-flight check para Ollama: verifica servicio activo, VRAM libre y modelo
+    cargado. Si hay servicios GPU conflictivos (ComfyUI), los detiene primero.
     Retorna True si Ollama está listo, False si no se pudo activar.
     """
     # 1. Verificar que Ollama responde
@@ -911,7 +935,6 @@ def _warmup_ollama(modelo_id: str) -> bool:
         r.raise_for_status()
         modelos_cargados = [m['name'] for m in r.json().get('models', [])]
     except Exception:
-        # Ollama no responde — intentar levantar el servicio
         _log.warning('Ollama no responde, intentando iniciar servicio...')
         try:
             subprocess.run(
@@ -926,18 +949,26 @@ def _warmup_ollama(modelo_id: str) -> bool:
             _log.error(f'No se pudo iniciar Ollama: {e}')
             return False
 
-    # 2. Verificar si el modelo ya está en VRAM
+    # 2. Si el modelo ya está en VRAM, listo
     if modelo_id in modelos_cargados:
         return True
 
-    # 3. Precargar modelo (request mínimo que lo sube a VRAM)
+    # 3. Liberar VRAM si hay servicios GPU conflictivos
+    _liberar_vram_si_necesario()
+
+    # 4. Precargar modelo
     _log.info(f'Precargando modelo Ollama: {modelo_id}')
     try:
-        requests.post(
+        resp = requests.post(
             f'{_OLLAMA_BASE}/api/generate',
             json={'model': modelo_id, 'prompt': '', 'keep_alive': '10m'},
-            timeout=30,
+            timeout=60,
         )
+        # Detectar error de VRAM insuficiente
+        if resp.status_code >= 400:
+            error_msg = resp.text[:200]
+            _log.error(f'Error precargando {modelo_id}: {error_msg}')
+            return False
         _log.info(f'Modelo {modelo_id} precargado en VRAM')
         return True
     except Exception as e:

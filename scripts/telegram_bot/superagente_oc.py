@@ -48,7 +48,12 @@ def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = F
     stderr = (proc.stderr or '').strip()
 
     if not stdout:
-        return {'ok': False, 'error': stderr[:200] if stderr else 'El Super Agente OpenCode no respondió.'}
+        log.error(f'SAOC stdout vacío: rc={proc.returncode}, session={session_id}, stderr={stderr[:200]}')
+        return {
+            'ok': False,
+            'error': stderr[:200] if stderr else 'El Super Agente OpenCode no respondió.',
+            'sesion_rota': bool(session_id and not stderr),
+        }
 
     # Parsear líneas JSON — extraer textos y session_id
     text_parts = []
@@ -255,6 +260,10 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
     if sesion and sesion.get('oc_session_id'):
         resp = _ejecutar_opencode(pregunta, session_id=sesion['oc_session_id'], con_imagen=con_imagen)
         if not resp.get('ok'):
+            # Si la sesión está rota (stdout vacío sin stderr), crear una nueva
+            if resp.get('sesion_rota'):
+                log.warning(f'SAOC sesión rota {sesion["oc_session_id"]}, creando nueva')
+                return nueva_conversacion(pregunta, usuario_id, nombre_usuario, nivel, empresa, con_imagen=con_imagen)
             return resp
         return _procesar_respuesta(resp['result'])
     else:
