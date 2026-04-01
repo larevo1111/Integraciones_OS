@@ -1,7 +1,25 @@
 <template>
   <Teleport to="body">
     <div class="pp-overlay" @click.self="$emit('cerrar')">
-      <aside class="pp-panel">
+      <aside
+        class="pp-panel"
+        :class="{ 'pp-panel-full': ppSheetEstado === 'full' }"
+        :style="ppDragStyle"
+      >
+
+        <!-- Handle arrastrable (solo mobile) -->
+        <div
+          class="pp-handle-area"
+          @touchstart="ppTouchStart"
+          @touchmove.prevent="ppTouchMove"
+          @touchend="ppTouchEnd"
+          @touchcancel="ppTouchEnd"
+        >
+          <div class="pp-handle"></div>
+          <button v-if="ppSheetEstado === 'full'" class="pp-handle-close" @click.stop="$emit('cerrar')">
+            <span class="material-icons" style="font-size:20px">close</span>
+          </button>
+        </div>
 
         <!-- ═══ SUB-PANEL: Detalle tarea ═══ -->
         <template v-if="tareaAbierta">
@@ -243,6 +261,45 @@ const tipoLocal = computed(() => props.item?.tipo || props.tipo)
 const estadosDisponibles = computed(() => ESTADOS[tipoLocal.value] || ESTADOS.proyecto)
 const guardando = ref(false)
 const tituloRef = ref(null)
+
+// ─── DRAG (mobile bottom sheet) ───
+const ppSheetEstado   = ref('half')
+const ppDragY         = ref(0)
+const ppDragging      = ref(false)
+let   _ppTouchStartY  = 0
+let   _ppEstadoInicio = 'half'
+
+const ppDragStyle = computed(() =>
+  ppDragging.value && ppDragY.value !== 0
+    ? { transform: `translateY(${ppDragY.value}px)`, transition: 'none' }
+    : {}
+)
+function ppTouchStart(e) {
+  _ppTouchStartY  = e.touches[0].clientY
+  _ppEstadoInicio = ppSheetEstado.value
+  ppDragging.value = true
+  ppDragY.value = 0
+}
+function ppTouchMove(e) {
+  if (!ppDragging.value) return
+  const delta = e.touches[0].clientY - _ppTouchStartY
+  if (_ppEstadoInicio === 'half') {
+    ppDragY.value = Math.max(-window.innerHeight * 0.46, Math.min(delta, window.innerHeight))
+  } else {
+    ppDragY.value = Math.max(0, delta)
+  }
+}
+function ppTouchEnd() {
+  const delta = ppDragY.value
+  ppDragging.value = false
+  ppDragY.value = 0
+  if (_ppEstadoInicio === 'half') {
+    if (delta < -80)  ppSheetEstado.value = 'full'
+    else if (delta > 120) emit('cerrar')
+  } else {
+    if (delta > 100) ppSheetEstado.value = 'half'
+  }
+}
 const tareasVinculadas = ref([])
 const tareaAbierta = ref(null)
 
@@ -304,7 +361,7 @@ function initForm() {
   }
 }
 
-watch(() => props.item, initForm, { immediate: true })
+watch(() => props.item, (v, old) => { if (v && (!old || v.id !== old?.id)) ppSheetEstado.value = 'half'; initForm() }, { immediate: true })
 
 onMounted(async () => {
   await nextTick()
@@ -546,6 +603,11 @@ function fmtFecha(iso) {
 .pp-btn-crear:disabled { opacity: 0.4; cursor: default; }
 .pp-btn-crear:hover:not(:disabled) { background: #e8e8e8; }
 
+/* Handle arrastrable — solo visible en mobile */
+.pp-handle-area {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .pp-overlay { align-items: flex-end; }
   .pp-panel {
@@ -553,11 +615,41 @@ function fmtFecha(iso) {
     border-left: none; border-top: 1px solid var(--border-default);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     animation: pp-slide-up 180ms ease-out;
+    transition: height 320ms cubic-bezier(0.32,0.72,0,1), border-radius 320ms ease,
+                max-height 320ms cubic-bezier(0.32,0.72,0,1);
+  }
+  .pp-panel.pp-panel-full {
+    height: 100dvh; max-height: 100dvh; border-radius: 0;
   }
   @keyframes pp-slide-up {
     from { transform: translateY(100%); }
     to   { transform: none; }
   }
+  .pp-handle-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px 6px;
+    position: relative;
+    flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .pp-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--border-default);
+  }
+  .pp-handle-close {
+    position: absolute; right: 12px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--text-tertiary); cursor: pointer;
+    display: flex; align-items: center;
+    padding: 4px; border-radius: var(--radius-sm);
+    transition: color 80ms;
+  }
+  .pp-handle-close:hover { color: var(--text-primary); }
   .pp-field-label { width: 90px; }
   .pp-titulo { font-size: 16px; }
   .pp-chips { gap: 6px; }
