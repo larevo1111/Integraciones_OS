@@ -522,7 +522,10 @@ if os.path.isdir(STATIC_DIR):
 
     @app.get("/{full_path:path}")
     def serve_frontend(full_path: str):
-        """SPA fallback — sirve index.html para cualquier ruta no-API."""
+        """SPA fallback — sirve archivo estático si existe, si no index.html."""
+        file_path = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
