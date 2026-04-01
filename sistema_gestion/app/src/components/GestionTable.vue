@@ -57,7 +57,7 @@
                 'th-filtered': hasFilter(col.key),
                 'th-popup-open': colPopup === col.key
               }"
-              :style="col.width ? { width: col.width, minWidth: col.width } : {}"
+              :style="col.width ? { width: col.width } : {}"
               @click.stop="openColPopup(col.key, $event)"
             >
               <div class="th-inner">
@@ -429,7 +429,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 
 /* TABLA */
 .table-scroll { overflow-x: auto; }
-.os-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.os-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .th {
   text-align: left; padding: 0 12px; height: 36px;
