@@ -27,8 +27,8 @@
         </button>
       </template>
       <template #cell-nombre="{ row, value }">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span :style="`width:8px;height:8px;border-radius:50%;background:${row.color||'#607D8B'};flex-shrink:0`" />
+        <div style="display:flex;align-items:flex-start;gap:6px">
+          <span :style="`width:8px;height:8px;border-radius:50%;background:${row.color||'#607D8B'};flex-shrink:0;margin-top:4px`" />
           <span style="font-weight:500">{{ value }}</span>
         </div>
       </template>
@@ -91,12 +91,12 @@ const PRIORIDAD_COLORS = {
 
 const columnas = [
   { key: 'nombre',           label: 'Nombre',      sortable: true, visible: true },
-  { key: 'estado',           label: 'Estado',       sortable: true, visible: true },
-  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true },
-  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true },
-  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true },
-  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true },
-  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, numeric: true },
+  { key: 'estado',           label: 'Estado',       sortable: true, visible: true, width: '110px' },
+  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true, width: '90px' },
+  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true, width: '130px' },
+  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true, width: '140px' },
+  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true, width: '100px' },
+  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, width: '70px', numeric: true },
 ]
 
 const items      = ref([])

@@ -557,11 +557,16 @@ const multiMenuEtiqueta  = ref(false)
 const nuevaEtiquetaMulti = ref('')
 
 function cerrarMenusMulti(abrir) {
-  multiMenuFecha.value     = abrir === 'fecha'
-  multiMenuEstado.value    = abrir === 'estado'
-  multiMenuCategoria.value = abrir === 'categoria'
-  multiMenuProyecto.value  = abrir === 'proyecto'
-  multiMenuEtiqueta.value  = abrir === 'etiqueta'
+  const yaAbierto = abrir === 'fecha' && multiMenuFecha.value
+    || abrir === 'estado' && multiMenuEstado.value
+    || abrir === 'categoria' && multiMenuCategoria.value
+    || abrir === 'proyecto' && multiMenuProyecto.value
+    || abrir === 'etiqueta' && multiMenuEtiqueta.value
+  multiMenuFecha.value     = !yaAbierto && abrir === 'fecha'
+  multiMenuEstado.value    = !yaAbierto && abrir === 'estado'
+  multiMenuCategoria.value = !yaAbierto && abrir === 'categoria'
+  multiMenuProyecto.value  = !yaAbierto && abrir === 'proyecto'
+  multiMenuEtiqueta.value  = !yaAbierto && abrir === 'etiqueta'
 }
 
 function isoRelativo(dias) {

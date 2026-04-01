@@ -57,6 +57,7 @@
                 'th-filtered': hasFilter(col.key),
                 'th-popup-open': colPopup === col.key
               }"
+              :style="col.width ? { width: col.width, minWidth: col.width } : {}"
               @click.stop="openColPopup(col.key, $event)"
             >
               <div class="th-inner">
@@ -428,7 +429,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 
 /* TABLA */
 .table-scroll { overflow-x: auto; }
-.os-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.os-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 
 .th {
   text-align: left; padding: 0 12px; height: 36px;
@@ -449,9 +450,10 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .th-popup-open { background: var(--bg-card-hover); }
 
 .td {
-  padding: 0 12px; height: 36px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-secondary); vertical-align: middle; white-space: nowrap;
+  color: var(--text-secondary); vertical-align: middle;
+  word-break: break-word;
 }
 .data-row { cursor: pointer; transition: background 60ms; }
 .data-row:hover .td { background: var(--bg-row-hover); }
