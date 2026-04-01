@@ -57,7 +57,6 @@
                 'th-filtered': hasFilter(col.key),
                 'th-popup-open': colPopup === col.key
               }"
-              :style="col.width ? { width: col.width } : {}"
               @click.stop="openColPopup(col.key, $event)"
             >
               <div class="th-inner">
@@ -204,10 +203,16 @@ const AGG_OPTS = [
   { v: 'min', label: 'Mínimo',   icon: '↓' },
 ]
 
+// ── Mobile detection ────────────────────────────────
+const isMobile = ref(window.innerWidth < 768)
+function onResize() { isMobile.value = window.innerWidth < 768 }
+onMounted(() => window.addEventListener('resize', onResize))
+onUnmounted(() => window.removeEventListener('resize', onResize))
+
 // ── Columnas ─────────────────────────────────────────
 const localColumns = ref([])
 watch(() => props.columns, cols => { localColumns.value = cols.map(c => ({ ...c })) }, { immediate: true })
-const visibleColumns = computed(() => localColumns.value.filter(c => c.visible))
+const visibleColumns = computed(() => localColumns.value.filter(c => c.visible && !(isMobile.value && c.hideOnMobile)))
 function showAll() { localColumns.value.forEach(c => c.visible = true) }
 function hideAll() { localColumns.value.forEach(c => c.visible = false) }
 
