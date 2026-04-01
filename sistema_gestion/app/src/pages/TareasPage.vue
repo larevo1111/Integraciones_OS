@@ -57,6 +57,32 @@
         </div>
       </div>
 
+      <!-- Calendario inline -->
+      <div v-if="filtroActivo === 'calendario'" class="cal-inline">
+        <div class="cal-nav-row">
+          <button class="cal-nav-btn" @click="calMesAnt"><span class="material-icons">chevron_left</span></button>
+          <span class="cal-mes-label">{{ calMesLabel }}</span>
+          <button class="cal-nav-btn" @click="calMesSig"><span class="material-icons">chevron_right</span></button>
+          <button v-if="calMesOffset !== 0" class="cal-hoy-btn" @click="calIrHoy">Hoy</button>
+        </div>
+        <div class="cal-grid">
+          <div v-for="d in calDiasSemana" :key="d" class="cal-dow">{{ d }}</div>
+          <div
+            v-for="(c, i) in calCeldas" :key="i"
+            class="cal-cell"
+            :class="{ 'cal-otro': c.otro, 'cal-hoy': c.iso === hoyISO(), 'cal-sel': c.iso === calFechaSel, 'cal-tiene': calConteos[c.iso] }"
+            @click="calSelDia(c.iso)"
+          >
+            <span class="cal-num">{{ c.dia }}</span>
+            <span v-if="calConteos[c.iso]" class="cal-dot" />
+          </div>
+        </div>
+        <div class="cal-dia-info">
+          <span class="cal-dia-label">{{ calDiaLabel }}</span>
+          <span class="cal-dia-count">{{ tareasVisibles.length }} tarea{{ tareasVisibles.length !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+
       <!-- QuickAdd (desktop y mobile) -->
       <div class="quickadd-wrap">
         <form class="quickadd-row" :class="{ activo: qaActivo }" @submit.prevent="qaAgregar">
@@ -676,7 +702,8 @@ const FILTROS = [
   { key: 'ayer',         label: 'Ayer' },
   { key: 'semana',       label: 'Esta semana' },
   { key: 'todas',        label: 'Todas' },
-  { key: 'personalizado', label: 'Personalizado' }
+  { key: 'personalizado', label: 'Personalizado' },
+  { key: 'calendario',   label: 'Calendario' }
 ]
 
 // Filtro personalizado
@@ -734,9 +761,51 @@ function _localISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padS
 function hoyISO()    { return _localISO(new Date()) }
 function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return _localISO(d) }
 
+// ─── CALENDARIO ───
+const calMesOffset = ref(0)
+const calFechaSel  = ref(hoyISO())
+const calDiasSemana = ['L','M','M','J','V','S','D']
+
+const calMesLabel = computed(() => {
+  const d = _calMesBase()
+  const s = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+})
+function _calMesBase() {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + calMesOffset.value); return d
+}
+const calCeldas = computed(() => {
+  const b = _calMesBase(), año = b.getFullYear(), mes = b.getMonth()
+  let sd = new Date(año, mes, 1).getDay(); sd = sd === 0 ? 6 : sd - 1
+  const ultDia = new Date(año, mes + 1, 0).getDate()
+  const prevUlt = new Date(año, mes, 0).getDate()
+  const r = []
+  for (let i = sd - 1; i >= 0; i--) { const d = new Date(año, mes - 1, prevUlt - i); r.push({ dia: prevUlt - i, iso: _localISO(d), otro: true }) }
+  for (let d = 1; d <= ultDia; d++) { r.push({ dia: d, iso: _localISO(new Date(año, mes, d)), otro: false }) }
+  const rest = 42 - r.length
+  for (let d = 1; d <= rest; d++) { r.push({ dia: d, iso: _localISO(new Date(año, mes + 1, d)), otro: true }) }
+  return r
+})
+const calConteos = computed(() => {
+  const m = {}
+  for (const t of tareas.value) { if (t.fecha_limite) m[t.fecha_limite] = (m[t.fecha_limite] || 0) + 1 }
+  return m
+})
+const calDiaLabel = computed(() => {
+  const [y, m, d] = calFechaSel.value.split('-').map(Number)
+  const f = new Date(y, m - 1, d)
+  const s = f.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+})
+function calMesAnt() { calMesOffset.value-- }
+function calMesSig() { calMesOffset.value++ }
+function calIrHoy() { calMesOffset.value = 0; calFechaSel.value = hoyISO() }
+function calSelDia(iso) { calFechaSel.value = iso }
+
 watch(tareaSeleccionada, (v, old) => { if (v && (!old || v.id !== old.id)) bsheetEstado.value = 'half' })
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
+watch(calMesOffset, () => { if (filtroActivo.value === 'calendario') cargarTareas() })
 watch(() => route.query.proyecto_id, () => cargarTareas())
 watch(() => props.soloMias, (val) => {
   if (val && agruparPor.value === 'responsable') agruparPor.value = 'categoria'
@@ -787,11 +856,17 @@ function ordenSecundario(lista) {
   return lista
 }
 
+const tareasVisibles = computed(() =>
+  filtroActivo.value === 'calendario'
+    ? tareas.value.filter(t => t.fecha_limite === calFechaSel.value)
+    : tareas.value
+)
+
 const grupos = computed(() => {
-  if (!tareas.value.length) return []
+  if (!tareasVisibles.value.length) return []
   if (agruparPor.value === 'categoria') {
     const map = {}
-    tareas.value.forEach(t => {
+    tareasVisibles.value.forEach(t => {
       const k = t.categoria_id
       if (!map[k]) map[k] = { key: k, nombre: t.categoria_nombre, color: t.categoria_color, tareas: [] }
       map[k].tareas.push(t)
@@ -800,7 +875,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'prioridad') {
     const map = {}
-    tareas.value.forEach(t => {
+    tareasVisibles.value.forEach(t => {
       const p = t.prioridad || 'Media'
       if (!map[p]) map[p] = { key: p, nombre: p, color: COLORES_PRIORIDAD[p], tareas: [] }
       map[p].tareas.push(t)
@@ -809,7 +884,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'fecha') {
     const map = {}
-    tareas.value.forEach(t => {
+    tareasVisibles.value.forEach(t => {
       const f = t.fecha_limite || 'Sin fecha'
       if (!map[f]) map[f] = { key: f, nombre: formatGrupoFecha(f), color: '#6b7280', tareas: [] }
       map[f].tareas.push(t)
@@ -824,7 +899,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'proyecto') {
     const map = {}
-    tareas.value.forEach(t => {
+    tareasVisibles.value.forEach(t => {
       const k = t.proyecto_id || 'sin-proyecto'
       if (!map[k]) map[k] = { key: k, nombre: t.proyecto_nombre || 'Sin proyecto', color: t.proyecto_color || '#607D8B', tareas: [] }
       map[k].tareas.push(t)
@@ -836,7 +911,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'responsable') {
     const map = {}
-    tareas.value.forEach(t => {
+    tareasVisibles.value.forEach(t => {
       const k = t.responsable || 'sin-asignar'
       const nombre = t.responsable_nombre || t.responsable || 'Sin asignar'
       if (!map[k]) map[k] = { key: k, nombre, color: '#607D8B', tareas: [] }
@@ -878,6 +953,10 @@ async function cargarTareas() {
       if (f.proyecto_id)              params.set('proyecto_id',  f.proyecto_id)
       if (f.responsables?.length)     params.set('responsables', f.responsables.join(','))
       if (f.id_op)                    params.set('id_op',        f.id_op)
+    } else if (filtroActivo.value === 'calendario') {
+      const c = calCeldas.value
+      params.set('fecha_desde', c[0].iso)
+      params.set('fecha_hasta', c[c.length - 1].iso)
     } else if (filtroActivo.value !== 'todas' && filtroActivo.value !== 'personalizado') {
       params.set('filtro', filtroActivo.value)
     }
@@ -1427,4 +1506,43 @@ onUnmounted(() => {
 /* Animación entrada/salida */
 .multi-bar-enter-active, .multi-bar-leave-active { transition: all 180ms ease; }
 .multi-bar-enter-from, .multi-bar-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
+
+/* ─── CALENDARIO INLINE ─── */
+.cal-inline { flex-shrink: 0; padding: 0 12px 4px; border-bottom: 1px solid var(--border-subtle); }
+.cal-nav-row { display: flex; align-items: center; gap: 6px; padding: 6px 4px 4px; }
+.cal-mes-label { font-size: 14px; font-weight: 600; color: var(--text-primary); min-width: 130px; text-align: center; }
+.cal-nav-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  background: transparent; border: none; color: var(--text-secondary); cursor: pointer;
+}
+.cal-nav-btn:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.cal-hoy-btn {
+  margin-left: auto; padding: 2px 8px; height: 22px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border-default);
+  background: transparent; color: var(--text-secondary); font-size: 11px; cursor: pointer;
+}
+.cal-hoy-btn:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+.cal-dow { text-align: center; font-size: 10px; font-weight: 600; color: var(--text-tertiary); padding: 3px 0; }
+.cal-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 32px; border-radius: var(--radius-sm); cursor: pointer; position: relative;
+  transition: background 80ms;
+}
+.cal-cell:hover { background: var(--bg-row-hover); }
+.cal-num { font-size: 12px; color: var(--text-primary); line-height: 1; }
+.cal-otro .cal-num { color: var(--text-tertiary); opacity: 0.4; }
+.cal-hoy .cal-num {
+  background: var(--accent); color: #000; font-weight: 600;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.cal-sel { background: var(--bg-row-selected); }
+.cal-sel .cal-num { color: var(--accent); font-weight: 600; }
+.cal-hoy.cal-sel .cal-num { color: #000; }
+.cal-dot { position: absolute; bottom: 2px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.cal-dia-info { display: flex; align-items: center; gap: 8px; padding: 6px 4px 2px; }
+.cal-dia-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.cal-dia-count { font-size: 11px; color: var(--text-tertiary); }
 </style>

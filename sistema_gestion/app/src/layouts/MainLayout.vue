@@ -30,10 +30,6 @@
             <span class="nav-item-icon material-icons">schedule</span>
             <span class="nav-item-label">Jornadas</span>
           </RouterLink>
-          <RouterLink to="/calendario" class="nav-item" :class="{ active: ruta === '/calendario' }">
-            <span class="nav-item-icon material-icons">calendar_month</span>
-            <span class="nav-item-label">Calendario</span>
-          </RouterLink>
         </div>
 
         <!-- PROYECTOS -->
