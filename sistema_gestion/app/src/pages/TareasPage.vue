@@ -172,7 +172,7 @@
                   placeholder="Nueva subtarea..."
                   @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
-                  @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
+                  @blur="!_qaSubGuardando &amp;&amp; (qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea())"
                 />
                 <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
                   <span class="material-icons" style="font-size:13px">close</span>
@@ -590,13 +590,15 @@ function cancelarSubtarea() {
 }
 
 async function guardarSubtarea(padre) {
-  if (!qaSubTitulo.value.trim() || _qaSubGuardando) return
+  const titulo = qaSubTitulo.value.trim()
+  if (!titulo || _qaSubGuardando) return
   _qaSubGuardando = true
+  qaSubTitulo.value = ''          // limpiar ANTES del await
   try {
     const data = await api('/api/gestion/tareas', {
       method: 'POST',
       body: JSON.stringify({
-        titulo:      qaSubTitulo.value.trim(),
+        titulo,
         categoria_id: padre.categoria_id,
         proyecto_id:  padre.proyecto_id || null,
         parent_id:    padre.id
@@ -610,7 +612,6 @@ async function guardarSubtarea(padre) {
     if (idx !== -1) {
       tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
     }
-    qaSubTitulo.value = ''
     await nextTick()
     const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
     el?.focus()
