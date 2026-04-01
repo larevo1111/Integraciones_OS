@@ -592,10 +592,12 @@ function cancelarSubtarea() {
 }
 
 async function guardarSubtarea(padre) {
-  if (_qaComposing) return            // IME todavía componiendo, esperar
+  if (_qaComposing) return
   const titulo = qaSubTitulo.value.trim()
   if (!titulo || _qaSubGuardando) return
   _qaSubGuardando = true
+  // Cerrar input inmediatamente
+  qaSubtareaParentId.value = null
   qaSubTitulo.value = ''
   try {
     const data = await api('/api/gestion/tareas', {
