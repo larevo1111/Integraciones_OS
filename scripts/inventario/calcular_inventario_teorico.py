@@ -59,13 +59,25 @@ def obtener_stock_actual():
     return {r['id']: {'nombre': r['nombre'], 'stock': float(r['stock'])} for r in rows}
 
 
+def corte_utc(fecha_corte):
+    """Convierte fin de día Colombia (UTC-5) a UTC para comparar con timestamps Effi.
+
+    Las timestamps de Effi (zeffi_trazabilidad.fecha, zeffi_cambios_estado.f_cambio_de_estado,
+    zeffi_produccion_encabezados.fecha_de_creacion) están almacenadas en UTC.
+    El corte del inventario es en hora Colombia (UTC-5).
+    Fin del 31/03 Colombia = 31/03 23:59:59 COT = 01/04 04:59:59 UTC.
+    """
+    return f"{fecha_corte} 23:59:59' + INTERVAL 5 HOUR"
+
+
 def obtener_trazabilidad_post_corte(fecha_corte):
-    """Suma neta de movimientos post-corte por artículo."""
+    """Suma neta de movimientos post-corte por artículo.
+    Timestamps en UTC, corte en hora Colombia → sumar 5h."""
     rows = query(DB_EFFI, """
         SELECT id_articulo,
                SUM(CAST(REPLACE(cantidad, ',', '.') AS DECIMAL(12,2))) AS neto
         FROM zeffi_trazabilidad
-        WHERE fecha > %s
+        WHERE fecha > DATE_ADD(%s, INTERVAL 5 HOUR)
         GROUP BY id_articulo
     """, (f"{fecha_corte} 23:59:59",))
     return {r['id_articulo']: float(r['neto']) for r in rows}
@@ -74,33 +86,36 @@ def obtener_trazabilidad_post_corte(fecha_corte):
 def obtener_ops_generadas_al_corte(fecha_corte):
     """Lista IDs de OPs con estado 'Generada' al corte.
 
+    IMPORTANTE: Todas las timestamps de Effi están en UTC.
+    El corte es en hora Colombia (UTC-5). Se suma INTERVAL 5 HOUR
+    a las comparaciones para convertir el corte COT → UTC.
+
     Lógica:
     1. Actualmente 'Generada' → seguro estaba generada al corte (si fue creada antes)
     2. Actualmente 'Procesada' pero tiene registro en cambios_estado de 'Procesada'
-       DESPUÉS del corte → estaba generada al corte
+       DESPUÉS del corte (en hora Colombia) → estaba generada al corte
     3. Actualmente 'Procesada' sin registro en cambios_estado → NO incluir
-       (zeffi_cambios_estado no captura todos los cambios, hay OPs procesadas
-       sin registro, y no podemos asumir que estaban generadas)
+       (zeffi_cambios_estado no captura todos los cambios)
     """
     corte_ts = f"{fecha_corte} 23:59:59"
     rows = query(DB_EFFI, """
         SELECT e.id_orden
         FROM zeffi_produccion_encabezados e
         WHERE e.vigencia = 'Vigente'
-          AND e.fecha_de_creacion <= %s
+          AND e.fecha_de_creacion <= DATE_ADD(%s, INTERVAL 5 HOUR)
           AND (
             -- Caso 1: Actualmente generada → seguro estaba generada al corte
             e.estado = 'Generada'
             OR
             -- Caso 2: Actualmente procesada, pero el cambio a 'Procesada' fue
-            -- DESPUÉS del corte → al corte estaba generada
+            -- DESPUÉS del corte (hora Colombia) → al corte estaba generada
             (
               e.estado = 'Procesada'
               AND EXISTS (
                 SELECT 1 FROM zeffi_cambios_estado ce
                 WHERE ce.id_orden = e.id_orden
                   AND ce.nuevo_estado = 'Procesada'
-                  AND ce.f_cambio_de_estado > %s
+                  AND ce.f_cambio_de_estado > DATE_ADD(%s, INTERVAL 5 HOUR)
               )
             )
           )

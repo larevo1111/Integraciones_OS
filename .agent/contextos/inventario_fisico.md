@@ -121,6 +121,22 @@ Script: `scripts/inventario/depurar_inventario.py` → guarda en `os_inventario.
 - Para operar: `CAST(REPLACE(cantidad, ',', '.') AS DECIMAL(12,2))`
 - Lo mismo aplica para campos `cantidad` en `zeffi_materiales` y `zeffi_articulos_producidos`
 
+### TIMESTAMPS EFFI ESTÁN EN UTC — REGLA CRÍTICA
+**Todas las timestamps de tablas Effi (zeffi_*) están en UTC, NO en hora Colombia.**
+- `zeffi_trazabilidad.fecha` → UTC
+- `zeffi_cambios_estado.f_cambio_de_estado` → UTC
+- `zeffi_produccion_encabezados.fecha_de_creacion` → UTC
+
+Al comparar contra una fecha de corte en hora Colombia (UTC-5):
+```sql
+-- MAL: compara COT contra UTC, desfase de 5 horas
+WHERE fecha > '2026-03-31 23:59:59'
+
+-- BIEN: convierte corte COT a UTC sumando 5 horas
+WHERE fecha > DATE_ADD('2026-03-31 23:59:59', INTERVAL 5 HOUR)
+```
+**Bug real**: el 31/03/2026, OPs procesadas a las 7pm COT aparecían como "1 de abril 00:02 UTC". El script las trataba como post-corte e incluía 38 OPs falsas.
+
 ---
 
 ## Inventario Teórico a Fecha de Corte — Logica completa (verificada 2026-03-31)
