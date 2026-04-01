@@ -187,20 +187,23 @@
 
           <!-- Tareas vinculadas -->
           <div v-if="item?.id" class="pp-section">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <span class="pp-section-label">Tareas vinculadas ({{ tareasVinculadas.length }})</span>
-              <button class="btn-icon-tiny" title="Agregar tarea" @click="mostrarFormTarea = !mostrarFormTarea; if (!nuevaTareaCatId) nuevaTareaCatId = form.categoria_id">
-                <span class="material-icons" style="font-size:14px">add</span>
-              </button>
-            </div>
-            <!-- Mini-form crear tarea -->
-            <template v-if="mostrarFormTarea">
-              <form class="quickadd-row activo" @submit.prevent="crearTareaEnProyecto">
-                <span class="material-icons quickadd-plus">add</span>
-                <input v-model="nuevaTareaTitulo" class="quickadd-input" placeholder="Agregar una tarea..." />
+            <span class="pp-section-label">Tareas vinculadas ({{ tareasVinculadas.length }})</span>
+            <!-- Quickadd tarea -->
+            <form class="quickadd-row" :class="{ activo: mostrarFormTarea }" @submit.prevent="crearTareaEnProyecto">
+              <span class="material-icons quickadd-plus">add</span>
+              <input
+                v-model="nuevaTareaTitulo"
+                class="quickadd-input"
+                placeholder="Agregar una tarea..."
+                @focus="mostrarFormTarea = true; if (!nuevaTareaCatId) nuevaTareaCatId = form.categoria_id"
+                @keydown.escape="mostrarFormTarea = false; nuevaTareaTitulo = ''"
+              />
+              <template v-if="mostrarFormTarea">
                 <button type="button" class="btn btn-ghost btn-sm" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''">Cancelar</button>
                 <button type="submit" class="btn btn-primary btn-sm" :disabled="!nuevaTareaTitulo.trim()">Agregar</button>
-              </form>
+              </template>
+            </form>
+            <template v-if="mostrarFormTarea">
               <div class="quickadd-cats">
                 <button
                   v-for="c in categorias"
