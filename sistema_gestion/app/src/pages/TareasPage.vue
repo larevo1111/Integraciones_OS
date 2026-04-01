@@ -172,7 +172,7 @@
                   placeholder="Nueva subtarea..."
                   @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
-                  @blur="!_qaSubGuardando &amp;&amp; (qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea())"
+                  @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
                 />
                 <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
                   <span class="material-icons" style="font-size:13px">close</span>
