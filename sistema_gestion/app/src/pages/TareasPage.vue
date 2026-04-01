@@ -172,7 +172,7 @@
                   placeholder="Nueva subtarea..."
                   @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
-                  @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
+                  @blur="onSubBlur(t)"
                 />
                 <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
                   <span class="material-icons" style="font-size:13px">close</span>
@@ -587,6 +587,12 @@ async function iniciarSubtarea(tarea) {
 function cancelarSubtarea() {
   qaSubtareaParentId.value = null
   qaSubTitulo.value = ''
+}
+
+function onSubBlur(padre) {
+  if (_qaSubGuardando) return          // guardado en curso, no cancelar
+  if (qaSubTitulo.value.trim()) guardarSubtarea(padre)
+  else cancelarSubtarea()
 }
 
 async function guardarSubtarea(padre) {
@@ -1073,6 +1079,19 @@ function cancelarTiempoModal() {
 }
 
 function onTareaActualizada(t) {
+  // Si es subtarea → actualizar en subtareasData, no en tareas principales
+  if (t.parent_id) {
+    const subs = subtareasData.value[t.parent_id]
+    if (subs) {
+      subtareasData.value = {
+        ...subtareasData.value,
+        [t.parent_id]: subs.map(s => s.id === t.id ? t : s)
+      }
+    }
+    if (tareaSeleccionada.value?.id === t.id) tareaSeleccionada.value = t
+    return
+  }
+  // Tarea principal
   const esCompletada = ['Completada','Cancelada'].includes(t.estado)
   tareas.value      = tareas.value.filter(x => x.id !== t.id)
   completadas.value = completadas.value.filter(x => x.id !== t.id)
