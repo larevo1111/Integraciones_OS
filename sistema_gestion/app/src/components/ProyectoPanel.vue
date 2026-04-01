@@ -68,11 +68,13 @@
         <div class="pp-body">
 
           <!-- Título editable -->
-          <input
+          <textarea
             ref="tituloRef"
             class="pp-titulo"
             :value="form.nombre"
             :placeholder="LABELS[tipoLocal].placeholder"
+            rows="1"
+            @input="autoResizeTitulo"
             @blur="guardarCampo('nombre', $event.target.value.trim())"
             @keydown.enter.prevent="e => e.target.blur()"
           />
@@ -262,6 +264,13 @@ const estadosDisponibles = computed(() => ESTADOS[tipoLocal.value] || ESTADOS.pr
 const guardando = ref(false)
 const tituloRef = ref(null)
 
+function autoResizeTitulo(e) {
+  const el = e?.target || tituloRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
 // ─── DRAG (mobile bottom sheet) ───
 const ppSheetEstado   = ref('half')
 const ppDragY         = ref(0)
@@ -367,7 +376,10 @@ onMounted(async () => {
   await nextTick()
   if (tituloRef.value && !props.item?.id) tituloRef.value.focus()
   if (props.item?.id) cargarTareas()
+  autoResizeTitulo()
 })
+
+watch(() => form.value.nombre, () => nextTick(() => autoResizeTitulo()))
 
 async function cargarTareas() {
   try {
@@ -501,7 +513,8 @@ function fmtFecha(iso) {
   width: 100%; border: none; background: transparent;
   font-size: 18px; font-weight: 600; color: var(--text-primary);
   font-family: var(--font-sans); outline: none;
-  height: 32px; padding: 0;
+  min-height: 32px; padding: 0; resize: none;
+  overflow: hidden; line-height: 1.4;
 }
 .pp-titulo::placeholder { color: var(--text-tertiary); }
 

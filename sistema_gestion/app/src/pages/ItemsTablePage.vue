@@ -90,13 +90,13 @@ const PRIORIDAD_COLORS = {
 }
 
 const columnas = [
-  { key: 'nombre',           label: 'Nombre',      sortable: true, visible: true },
-  { key: 'estado',           label: 'Estado',       sortable: true, visible: true, width: '110px' },
-  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true, width: '90px' },
-  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true, width: '130px' },
-  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true, width: '140px' },
-  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true, width: '100px' },
-  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, width: '70px', numeric: true },
+  { key: 'nombre',           label: 'Nombre',      sortable: true, visible: true, width: '40%' },
+  { key: 'estado',           label: 'Estado',       sortable: true, visible: true },
+  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true },
+  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true },
+  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true },
+  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true },
+  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, numeric: true },
 ]
 
 const items      = ref([])
