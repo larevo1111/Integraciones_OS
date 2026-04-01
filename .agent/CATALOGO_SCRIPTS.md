@@ -908,11 +908,19 @@ URL webhook configurada en `wa-bridge.service` → `WA_WEBHOOK_URL` (default: `h
 - **Unidades**: KG, GRS, UND, LT, ML — detectadas del nombre del artículo
 - **Factor error**: 1000 para KG/LT (detección error kg↔g)
 
+### calcular_inventario_teorico.py
+- **Propósito**: Calcula inventario teórico a fecha de corte. Combina stock actual, trazabilidad post-corte y ajuste por OPs generadas
+- **Ejecución**: `python3 scripts/inventario/calcular_inventario_teorico.py --fecha 2026-03-31`
+- **BD lectura**: `effi_data` (zeffi_inventario, zeffi_trazabilidad, zeffi_produccion_encabezados, zeffi_cambios_estado, zeffi_materiales, zeffi_articulos_producidos)
+- **BD escritura**: `os_inventario.inv_teorico` (DELETE+INSERT) + actualiza `inv_conteos.inventario_teorico`
+- **Fórmula**: stock_teorico = stock_effi - trazabilidad_post_corte + materiales_OPs_generadas - productos_OPs_generadas
+- **También invocable desde**: endpoint POST `/api/inventario/calcular-teorico`
+
 ### api.py (FastAPI)
 - **Propósito**: Backend API + sirve frontend estático de la app de inventario
 - **Ejecución**: `python3 scripts/inventario/api.py` (o systemd `os-inventario-api.service`)
 - **Puerto**: 9401
-- **BD**: `os_inventario` (inv_conteos, inv_rangos, inv_auditorias) + `effi_data` (búsqueda artículos)
+- **BD**: `os_inventario` (inv_conteos, inv_rangos, inv_auditorias, inv_teorico) + `effi_data` (búsqueda artículos)
 - **Auth**: JWT compartido con sistema_gestion (mismo secret)
 - **Frontend**: sirve `inventario/static/` (build Vue 3 + Vite)
 

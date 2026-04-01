@@ -1,7 +1,7 @@
 # Plan: Inventario Teórico a Fecha de Corte
 
 **Creado**: 2026-03-31
-**Estado**: Pendiente de ejecución
+**Estado**: Implementado (2026-03-31)
 **Módulos**: 1 (Foto a fecha) + 2 (Ajuste OPs generadas) del inventario físico
 
 ---

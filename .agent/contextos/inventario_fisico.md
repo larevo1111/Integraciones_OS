@@ -225,10 +225,10 @@ CREATE TABLE inv_teorico (
 
 | # | Modulo | Descripcion | Estado |
 |---|---|---|---|
-| 1 | Foto de inventario a fecha | Reconstruir stock a cualquier fecha desde trazabilidad | Pendiente |
-| 2 | Ajuste por OPs generadas | Revertir efecto de 81 OPs no ejecutadas | Pendiente |
-| 3 | App de conteo fisico | PWA para captura en celular/tablet por bodega | Pendiente |
-| 4 | Deteccion errores de unidades | Alertar si conteo > 100x promedio historico | Pendiente |
+| 1 | Foto de inventario a fecha | Reconstruir stock a cualquier fecha desde trazabilidad | **Implementado** |
+| 2 | Ajuste por OPs generadas | Revertir efecto de OPs no ejecutadas | **Implementado** |
+| 3 | App de conteo fisico | PWA para captura en celular/tablet por bodega | **Implementado** |
+| 4 | Deteccion errores de unidades | Alertar si conteo > 100x promedio historico | **Implementado** |
 | 5 | Verificacion inconsistencias | Comparar fisico vs teorico, threshold 2% | Pendiente |
 | 6 | Informe final | Resumen ejecutivo + inconsistencias + obsoleto | Pendiente |
 
@@ -330,7 +330,7 @@ App independiente de conteo de inventario físico. Separada de sistema_gestion.
 ## Pendiente
 
 - [ ] Offline-first (Service Worker, IndexedDB)
-- [ ] Módulo 1: Foto de inventario a fecha (reconstrucción desde trazabilidad)
-- [ ] Módulo 2: Ajuste por OPs generadas (81 OPs vigentes no ejecutadas)
+- [x] Módulo 1: Foto de inventario a fecha (reconstrucción desde trazabilidad)
+- [x] Módulo 2: Ajuste por OPs generadas (50 OPs vigentes al 31/03)
 - [ ] Módulo 5: Verificación inconsistencias (comparar físico vs teórico)
 - [ ] Módulo 6: Informe final
