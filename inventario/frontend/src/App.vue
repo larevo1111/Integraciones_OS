@@ -238,7 +238,8 @@
               <div class="articulo-teorico-movil">TEO {{ fmtNum(a.inventario_teorico) }}</div>
             </td>
             <td class="td cell-categoria" :title="grupoNombre(a.grupo)">
-              <span class="grupo-tag" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ grupoCorto(a.grupo) }}</span>
+              <span class="grupo-tag grupo-tag-full" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ grupoNombre(a.grupo) }}</span>
+              <span class="grupo-tag grupo-tag-short" :class="'grupo-' + (a.grupo || 'MP').toLowerCase()">{{ grupoCorto(a.grupo) }}</span>
             </td>
             <td class="td">
               <div class="conteo-cell">
@@ -1200,7 +1201,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .col-status { width: 32px; }
 .col-id { width: 60px; }
 .col-articulo { width: auto; }
-.col-categoria { width: 60px; }
+.col-categoria { width: 80px; }
 .col-conteo { width: 280px; }
 .inv-table thead { position: sticky; top: 0; z-index: 5; }
 
@@ -1245,7 +1246,9 @@ onUnmounted(() => clearInterval(clockInterval))
 .grupo-nm { background: rgba(14,165,233,0.15); color: #38bdf8; }
 .articulo-nombre { overflow: hidden; text-overflow: ellipsis; }
 .unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
-.cell-categoria { font-size: 12px; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.cell-categoria { font-size: 12px; cursor: default; }
+.grupo-tag-full { white-space: normal; line-height: 1.3; }
+.grupo-tag-short { display: none; }
 
 /* CONTEO CELL */
 .conteo-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; height: 44px; }
@@ -1387,10 +1390,11 @@ onUnmounted(() => clearInterval(clockInterval))
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
   .articulo-teorico-movil { display: block; font-size: 9px; color: var(--text-tertiary); margin-top: 1px; letter-spacing: 0.3px; }
 
-  /* Categoría: texto wrap, multilinea */
+  /* Categoría: short en móvil */
   .col-categoria { width: 36px; }
   .cell-categoria { text-align: center; }
-  .grupo-tag { font-size: 7px; white-space: normal; word-break: break-word; line-height: 1.3; display: inline-block; padding: 2px 3px; }
+  .grupo-tag-full { display: none; }
+  .grupo-tag-short { display: inline-block; font-size: 7px; white-space: normal; word-break: break-word; line-height: 1.3; padding: 2px 3px; }
 
   /* Conteo: stepper + input + badge + dots */
   .teorico-block { display: none; }
