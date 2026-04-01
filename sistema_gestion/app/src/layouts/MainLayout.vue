@@ -254,6 +254,18 @@
                 <RouterLink to="/compromisos" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">task_alt</span><span class="nav-item-label">Compromisos</span></RouterLink>
                 <RouterLink to="/ideas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">lightbulb_outline</span><span class="nav-item-label">Ideas</span></RouterLink>
               </div>
+
+              <!-- Footer usuario (móvil) -->
+              <div style="margin-top:auto; padding:12px 8px; border-top:1px solid var(--border-subtle)">
+                <div class="nav-item" style="margin-bottom:4px" @click="toggleTema; drawerOpen=false">
+                  <span class="nav-item-icon material-icons">{{ auth.tema === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
+                  <span class="nav-item-label">{{ auth.tema === 'dark' ? 'Modo claro' : 'Modo oscuro' }}</span>
+                </div>
+                <div class="nav-item" @click="cerrarSesion">
+                  <span class="nav-item-icon material-icons">logout</span>
+                  <span class="nav-item-label">Cerrar sesión</span>
+                </div>
+              </div>
             </nav>
           </aside>
         </div>
