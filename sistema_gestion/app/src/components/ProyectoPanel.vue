@@ -39,7 +39,7 @@
               :tarea="tareaAbierta"
               :usuarios="usuarios"
               :categorias="categorias"
-              :proyectos="[]"
+              :proyectos="proyectosParaTareas"
               :etiquetas="etiquetas"
               @cerrar="cerrarSubTarea"
               @actualizada="onSubTareaActualizada"
@@ -187,8 +187,20 @@
 
           <!-- Tareas vinculadas -->
           <div v-if="item?.id" class="pp-section">
-            <span class="pp-section-label">Tareas vinculadas ({{ tareasVinculadas.length }})</span>
-            <div v-if="!tareasVinculadas.length" class="pp-empty">Sin tareas vinculadas</div>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span class="pp-section-label">Tareas vinculadas ({{ tareasVinculadas.length }})</span>
+              <button class="btn-icon-tiny" title="Agregar tarea" @click="mostrarFormTarea = !mostrarFormTarea">
+                <span class="material-icons" style="font-size:14px">add</span>
+              </button>
+            </div>
+            <!-- Mini-form crear tarea -->
+            <form v-if="mostrarFormTarea" class="pp-nueva-tarea" @submit.prevent="crearTareaEnProyecto">
+              <input v-model="nuevaTareaTitulo" placeholder="Nueva tarea..." class="pp-nueva-tarea-input" />
+              <button type="submit" class="btn-icon-tiny" :disabled="!nuevaTareaTitulo.trim()">
+                <span class="material-icons" style="font-size:14px">check</span>
+              </button>
+            </form>
+            <div v-if="!tareasVinculadas.length && !mostrarFormTarea" class="pp-empty">Sin tareas vinculadas</div>
             <div v-for="t in tareasVinculadas" :key="t.id" class="pp-tarea-link" @click="abrirSubTarea(t)">
               <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">
                 {{ t.estado === 'Completada' ? 'check_circle' : 'radio_button_unchecked' }}
@@ -311,9 +323,50 @@ function ppTouchEnd() {
 }
 const tareasVinculadas = ref([])
 const tareaAbierta = ref(null)
+const proyectosLista = ref([])
+
+const proyectosParaTareas = computed(() => {
+  // Si ya cargamos la lista completa, usarla
+  if (proyectosLista.value.length) return proyectosLista.value
+  // Fallback: al menos el proyecto actual
+  if (props.item?.id && props.tipo === 'proyecto') {
+    return [{ id: props.item.id, nombre: props.item.nombre || form.value.nombre, color: props.item.color || form.value.color }]
+  }
+  return []
+})
+
+async function cargarProyectos() {
+  if (proyectosLista.value.length) return
+  try {
+    const data = await api('/api/gestion/proyectos?estado=Activo')
+    proyectosLista.value = data.proyectos || []
+  } catch {}
+}
+
+// Crear tarea desde proyecto
+const mostrarFormTarea = ref(false)
+const nuevaTareaTitulo = ref('')
+
+async function crearTareaEnProyecto() {
+  const titulo = nuevaTareaTitulo.value.trim()
+  if (!titulo) return
+  try {
+    await api('/api/gestion/tareas', {
+      method: 'POST',
+      body: JSON.stringify({
+        titulo,
+        proyecto_id: props.item.id,
+        categoria_id: form.value.categoria_id || 1
+      })
+    })
+    nuevaTareaTitulo.value = ''
+    mostrarFormTarea.value = false
+    await cargarTareas()
+  } catch (e) { console.error(e) }
+}
 
 async function abrirSubTarea(t) {
-  // Cargar detalle completo de la tarea
+  cargarProyectos()
   try {
     const data = await api(`/api/gestion/tareas/${t.id}`)
     tareaAbierta.value = data.tarea || t
@@ -577,6 +630,18 @@ function fmtFecha(iso) {
 }
 .pp-tarea-link:hover { background: var(--bg-row-hover); }
 .pp-tarea-done { text-decoration: line-through; color: var(--text-tertiary); }
+.pp-nueva-tarea {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0; margin-bottom: 4px;
+}
+.pp-nueva-tarea-input {
+  flex: 1; min-width: 0; padding: 4px 8px; font-size: 13px;
+  background: var(--bg-card-hover, #222); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); color: var(--text-primary); outline: none;
+  font-family: var(--font-sans);
+}
+.pp-nueva-tarea-input:focus { border-color: var(--accent); }
+.pp-nueva-tarea-input::placeholder { color: var(--text-tertiary); }
 
 /* Sub-panel tarea embebido */
 .pp-subtarea-wrap {
