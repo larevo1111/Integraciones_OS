@@ -26,7 +26,12 @@ export default defineConfig(() => {
     },
     animations: [],
     pwa: {
-      workboxMode: 'GenerateSW'
+      workboxMode: 'GenerateSW',
+      workboxOptions: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true
+      }
     },
     capacitor: { hideSplashscreen: true }
   }
