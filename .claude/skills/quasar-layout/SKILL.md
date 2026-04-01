@@ -238,3 +238,39 @@ Custom CSS is ONLY acceptable for:
 - Third-party component overrides
 
 Even then, keep it minimal and scoped (`<style scoped>`).
+
+---
+
+## 11. Mobile Input — REGLA CRÍTICA (IME / Teclado Virtual)
+
+**NUNCA usar `@keydown.enter` ni `@keyup.enter` en inputs que se usen en móvil.**
+
+El teclado virtual (IME) de Android/iOS mantiene la composición activa durante autocompletar/predicción. `@keydown.enter` se dispara ANTES de que el IME confirme el texto, causando:
+- Última palabra cortada
+- Texto duplicado en el input
+- Comportamiento inconsistente entre desktop y móvil
+
+### Patrón CORRECTO: `<form>` con `@submit.prevent`
+
+```html
+<form @submit.prevent="guardar()">
+  <input v-model="texto" placeholder="..." />
+  <button type="submit">✓</button>
+  <button type="button" @click="cancelar">×</button>
+</form>
+```
+
+**Por qué funciona:** Al presionar Enter dentro de un `<form>`, el navegador primero le dice al IME "confirmá el texto", el IME confirma la composición completa, y DESPUÉS dispara el evento `submit`. Es el estándar HTML.
+
+### Beneficios:
+- Funciona en desktop Y móvil sin cambios
+- Compatible con Capacitor (WebView)
+- El botón ✓ da alternativa visual al Enter
+- Cero hacks: sin `@blur` auto-save, sin flags, sin setTimeout, sin compositionstart/end
+
+### NUNCA hacer:
+- `@keydown.enter.prevent="guardar()"` — corta texto en móvil
+- `@keyup.enter="guardar()"` — timing inconsistente
+- `@blur="guardar()"` — causa race conditions con Enter
+- `el.blur(); el.value = ''` — rompe v-model y composición IME
+- `event.isComposing` checks — no funciona en todos los teclados móviles

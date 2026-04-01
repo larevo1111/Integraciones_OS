@@ -97,6 +97,12 @@ Cuando Claude Code corre sin supervisión directa (cron, scripts `claude_trainer
 - **Mantenerlo SIMPLE. Estructura primero con componentes Quasar, detalles después.**
 - Skill completo con patrones y tablas: `.claude/skills/quasar-layout/SKILL.md`
 
+## ⚠️ REGLA ABSOLUTA — Inputs + Enter (Móvil / IME)
+
+**NUNCA usar `@keydown.enter` ni `@keyup.enter` en inputs.** El IME del teclado móvil corta la última palabra.
+
+**SIEMPRE usar `<form @submit.prevent="fn()">`** — el navegador confirma el IME antes de disparar submit. Funciona en desktop, móvil y Capacitor.
+
 ## Vue — Convenciones de componentes
 
 - Usar `<script setup>` (Composition API)
