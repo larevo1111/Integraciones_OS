@@ -252,6 +252,7 @@ CREATE TABLE inv_teorico (
 
 ## Documentacion relacionada
 
+- `.agent/manuales/inventario_fisico_manual.md` — **Manual completo de la app de inventario fisico** (17 secciones: stack, BD, API, scripts, frontend, formula teorica, flujos, deploy, troubleshooting)
 - `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — Manual completo de tablas y logicas de produccion e inventario en Effi
 
 ## Infraestructura implementada

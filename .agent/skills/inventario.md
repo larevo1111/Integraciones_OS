@@ -59,5 +59,8 @@ curl -s "http://127.0.0.1:9401/api/inventario/resumen?fecha=2026-03-31&bodega=Pr
 - Fotos se guardan en `inventario/fotos/` con UUID, referencia en inv_conteos.foto
 - Frontend build va a `inventario/static/` (FastAPI lo sirve)
 
+## Manual completo
+`.agent/manuales/inventario_fisico_manual.md` — 17 secciones: stack, BD completa (4 tablas con campos), API (15 endpoints), scripts, frontend, grupos, unidades, politicas, formula teorica, flujos, deploy, troubleshooting.
+
 ## Contexto detallado
 `.agent/contextos/inventario_fisico.md`

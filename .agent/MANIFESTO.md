@@ -580,11 +580,12 @@ Todo archivo subido por usuarios (imágenes, documentos, audio, etc.) va aquí. 
 
 ### Sistema de Inventario Físico (2026-03-31)
 App independiente para conteo de inventario. Separada de sistema_gestion.
+- **Manual completo**: `.agent/manuales/inventario_fisico_manual.md` — 17 secciones, v1.0
 - **App**: `inv.oscomunidad.com` — Vue 3 + Vite frontend, FastAPI backend (puerto 9401)
-- **BD**: `os_inventario` — 3 tablas: `inv_conteos` (conteos), `inv_rangos` (unidades/grupos/rangos), `inv_auditorias` (historial)
-- **Scripts**: `depurar_inventario.py` (genera conteos), `calcular_rangos.py` (unidades/grupos), `api.py` (servidor)
+- **BD**: `os_inventario` — 4 tablas: `inv_conteos` (conteos), `inv_rangos` (unidades/grupos/rangos), `inv_auditorias` (historial), `inv_teorico` (calculo teorico)
+- **Scripts**: `depurar_inventario.py` (genera conteos), `calcular_rangos.py` (unidades/grupos), `calcular_inventario_teorico.py` (stock teorico), `api.py` (servidor)
 - **Auth**: Google OAuth, JWT compartido con sistema_gestion
-- **Grupos**: MP (materia prima), PP (producto en proceso), PT (producto terminado), INS (insumos), DS (desarrollo)
+- **Grupos**: MP (materia prima), PP (producto en proceso), PT (producto terminado), INS (insumos), DS (desarrollo), DES (desperdicio), NM (no matriculado)
 - **Validación**: Unidades KG/GRS/UND/LT con rangos min/max y detección de error x1000 (kg↔g)
 - **Auditoría**: Todo cambio registrado (conteo, edición, nota, foto, reinicio, cierre)
 - **Systemd**: `os-inventario-api.service`, cloudflared `inv.oscomunidad.com`
