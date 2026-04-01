@@ -28,7 +28,7 @@
         </div>
 
         <template v-if="acordeonAbierto['bloque-mis']">
-        <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-section">
+        <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-section sidebar-section-indented">
           <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
             <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
             <span style="flex:1">{{ sec.label }}</span>
@@ -87,7 +87,7 @@
         </div>
 
         <template v-if="acordeonAbierto['bloque-eq']">
-        <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-section">
+        <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-section sidebar-section-indented">
           <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
             <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
             <span style="flex:1">{{ sec.label }}</span>
@@ -287,7 +287,7 @@
               </div>
 
               <template v-if="acordeonAbierto['bloque-mis']">
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'dm-'+sec.tipo" class="sidebar-section">
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="'dm-'+sec.tipo" class="sidebar-section sidebar-section-indented">
                 <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
                   <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
                   <span style="flex:1">{{ sec.label }}</span>
@@ -320,7 +320,7 @@
               </div>
 
               <template v-if="acordeonAbierto['bloque-eq']">
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'de-'+sec.tipo" class="sidebar-section">
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="'de-'+sec.tipo" class="sidebar-section sidebar-section-indented">
                 <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
                   <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
                   <span style="flex:1">{{ sec.label }}</span>

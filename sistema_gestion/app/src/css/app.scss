@@ -224,6 +224,11 @@ body {
   padding-top: 4px;
   padding-bottom: 4px;
 }
+
+/* Sangría para sub-secciones dentro de acordeones */
+.sidebar-section-indented {
+  padding-left: 16px;
+}
 .nav-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 .nav-item.active { background: var(--bg-row-selected); color: var(--text-primary); }
 .nav-item.active .nav-dot { opacity: 1; }
