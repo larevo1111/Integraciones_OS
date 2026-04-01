@@ -364,8 +364,9 @@ const proyectosParaTareas = computed(() => {
 async function cargarProyectos() {
   if (proyectosLista.value.length) return
   try {
-    const data = await api('/api/gestion/proyectos?estado=Activo')
-    proyectosLista.value = data.proyectos || []
+    const data = await api('/api/gestion/proyectos')
+    const estadosFinales = ['Completado','Archivado','Resuelta','Cerrada','Cumplido','Cancelado','Aprobada','Descartada']
+    proyectosLista.value = (data.proyectos || []).filter(p => !estadosFinales.includes(p.estado))
   } catch {}
 }
 

@@ -1058,12 +1058,15 @@ async function cargarCatalogos() {
   const [resCat, resUsr, resProy, resEtq] = await Promise.allSettled([
     api('/api/gestion/categorias'),
     api('/api/gestion/usuarios'),
-    api('/api/gestion/proyectos?estado=Activo'),
+    api('/api/gestion/proyectos'),
     api('/api/gestion/etiquetas')
   ])
   if (resCat.status  === 'fulfilled') categorias.value = resCat.value.categorias   || []
   if (resUsr.status  === 'fulfilled') usuarios.value   = resUsr.value.usuarios     || []
-  if (resProy.status === 'fulfilled') proyectos.value  = resProy.value.proyectos   || []
+  if (resProy.status === 'fulfilled') {
+    const estadosFinales = ['Completado','Archivado','Resuelta','Cerrada','Cumplido','Cancelado','Aprobada','Descartada']
+    proyectos.value = (resProy.value.proyectos || []).filter(p => !estadosFinales.includes(p.estado))
+  }
   if (resEtq.status  === 'fulfilled') etiquetas.value  = resEtq.value.etiquetas    || []
 }
 
