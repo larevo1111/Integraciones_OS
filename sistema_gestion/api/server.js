@@ -49,7 +49,7 @@ if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
 
 const app = express()
 app.use(express.json())
-app.use(express.static(path.join(__dirname, '../app/dist/spa')))
+app.use(express.static(path.join(__dirname, '../app/dist/pwa')))
 app.use('/subidos', express.static(SUBIDOS_ROOT))
 
 // ─── CORS ──────────────────────────────────────────────────────────
@@ -2156,8 +2156,8 @@ app.post('/api/gestion/upload', upload.single('file'), (req, res) => {
 
 // ─── Fallback SPA ──────────────────────────────────────────────────
 app.use((req, res) => {
-  const spa = path.join(__dirname, '../app/dist/spa/index.html')
-  if (fs.existsSync(spa)) return res.sendFile(spa)
+  const pwa = path.join(__dirname, '../app/dist/pwa/index.html')
+  if (fs.existsSync(pwa)) return res.sendFile(pwa)
   res.status(404).json({ error: 'Frontend no desplegado aún' })
 })
 

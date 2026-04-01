@@ -25,6 +25,9 @@ export default defineConfig(() => {
       plugins: ['Notify', 'Dialog', 'Loading']
     },
     animations: [],
+    pwa: {
+      workboxMode: 'GenerateSW'
+    },
     capacitor: { hideSplashscreen: true }
   }
 })

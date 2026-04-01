@@ -2,6 +2,8 @@
 /* Default: DARK (tema principal de la app) */
 /* Acento: #00C853 verde OS (reemplaza el violeta del ERP) */
 
+html { overscroll-behavior-y: contain; }
+
 :root {
   /* Fondos — DARK */
   --bg-app:          #0d0d0d;
