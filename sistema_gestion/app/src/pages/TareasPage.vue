@@ -789,6 +789,18 @@ function hoyISO()    { return _localISO(new Date()) }
 function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return _localISO(d) }
 
 // ─── COMPLETADAS FILTRADAS (mismo filtro que pendientes) ───
+function _finRealISO(t) {
+  // fecha_fin_real viene como "2026-03-31 18:00:23" → extraer solo la fecha
+  return t.fecha_fin_real ? String(t.fecha_fin_real).slice(0, 10) : null
+}
+function _coincideFecha(t, iso) {
+  return t.fecha_limite === iso || _finRealISO(t) === iso
+}
+function _coincideRango(t, desde, hasta) {
+  const fl = t.fecha_limite
+  const fr = _finRealISO(t)
+  return (fl && fl >= desde && fl <= hasta) || (fr && fr >= desde && fr <= hasta)
+}
 const completadasFiltradas = computed(() => {
   const all = completadas.value
   if (!all.length) return []
@@ -796,36 +808,28 @@ const completadasFiltradas = computed(() => {
 
   if (f === 'todas' || proyectoFiltroId.value) return all
 
-  if (f === 'hoy') {
-    const hoy = hoyISO()
-    return all.filter(t => t.fecha_limite === hoy)
-  }
-  if (f === 'manana') {
-    const man = mananaISO()
-    return all.filter(t => t.fecha_limite === man)
-  }
-  if (f === 'ayer') {
-    const ayer = isoRelativo(-1)
-    return all.filter(t => t.fecha_limite === ayer)
-  }
+  if (f === 'hoy')    return all.filter(t => _coincideFecha(t, hoyISO()))
+  if (f === 'manana') return all.filter(t => _coincideFecha(t, mananaISO()))
+  if (f === 'ayer')   return all.filter(t => _coincideFecha(t, isoRelativo(-1)))
+
   if (f === 'semana') {
     const hoy = new Date()
     const dow = hoy.getDay() || 7
     const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - dow + 1)
     const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6)
-    const desde = _localISO(lunes)
-    const hasta = _localISO(domingo)
-    return all.filter(t => t.fecha_limite && t.fecha_limite >= desde && t.fecha_limite <= hasta)
+    return all.filter(t => _coincideRango(t, _localISO(lunes), _localISO(domingo)))
   }
-  if (f === 'calendario') {
-    const sel = calFechaSel.value
-    return all.filter(t => t.fecha_limite === sel)
-  }
+  if (f === 'calendario') return all.filter(t => _coincideFecha(t, calFechaSel.value))
+
   if (f === 'personalizado' && filtroPersonalizado.value) {
     const fp = filtroPersonalizado.value
     return all.filter(t => {
-      if (fp.fecha_desde && (!t.fecha_limite || t.fecha_limite < fp.fecha_desde)) return false
-      if (fp.fecha_hasta && (!t.fecha_limite || t.fecha_limite > fp.fecha_hasta)) return false
+      if (fp.fecha_desde || fp.fecha_hasta) {
+        const fl = t.fecha_limite, fr = _finRealISO(t)
+        const enRangoFl = fl && (!fp.fecha_desde || fl >= fp.fecha_desde) && (!fp.fecha_hasta || fl <= fp.fecha_hasta)
+        const enRangoFr = fr && (!fp.fecha_desde || fr >= fp.fecha_desde) && (!fp.fecha_hasta || fr <= fp.fecha_hasta)
+        if (!enRangoFl && !enRangoFr) return false
+      }
       if (fp.categorias?.length && !fp.categorias.includes(t.categoria_id)) return false
       return true
     })
