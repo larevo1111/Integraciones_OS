@@ -59,7 +59,7 @@
 
       <!-- QuickAdd (desktop y mobile) -->
       <div class="quickadd-wrap">
-        <div class="quickadd-row" :class="{ activo: qaActivo }">
+        <form class="quickadd-row" :class="{ activo: qaActivo }" @submit.prevent="qaAgregar">
           <span class="material-icons quickadd-plus">add</span>
           <input
             ref="qaInputRef"
@@ -67,16 +67,15 @@
             v-model="qaTitulo"
             placeholder="Agregar una tarea..."
             @focus="qaActivo = true"
-            @keydown.enter.prevent="qaAgregar"
             @keydown.escape="qaCancelar"
           />
           <template v-if="qaActivo">
-            <button class="btn btn-ghost btn-sm" @click="qaCancelar">Cancelar</button>
-            <button class="btn btn-primary btn-sm" :disabled="!qaTitulo || qaGuardando" @click="qaAgregar">
+            <button type="button" class="btn btn-ghost btn-sm" @click="qaCancelar">Cancelar</button>
+            <button type="submit" class="btn btn-primary btn-sm" :disabled="!qaTitulo || qaGuardando">
               {{ qaGuardando ? '...' : 'Agregar' }}
             </button>
           </template>
-        </div>
+        </form>
 
         <!-- Categorías chips + OP -->
         <div v-if="qaActivo" class="quickadd-cats">
@@ -162,22 +161,23 @@
                 @editar-titulo="editarTituloInline"
                 @seleccionar-multi="onSeleccionarMulti"
               />
-              <!-- Inline quickadd para nueva subtarea — Enter guarda, blur guarda, × cancela -->
-              <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
+              <!-- Inline quickadd para nueva subtarea -->
+              <form v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop @submit.prevent="guardarSubtarea(t)">
                 <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
                 <input
                   ref="qaSubInputRef"
                   v-model="qaSubTitulo"
                   class="subtarea-input"
                   placeholder="Nueva subtarea..."
-                  @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
-                  @blur="onSubBlur(t)"
                 />
-                <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
+                <button type="submit" class="btn-sub-ok" :disabled="!qaSubTitulo.trim()" title="Agregar">
+                  <span class="material-icons" style="font-size:13px">check</span>
+                </button>
+                <button type="button" class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
                   <span class="material-icons" style="font-size:13px">close</span>
                 </button>
-              </div>
+              </form>
             </template>
           </template>
         </template>
@@ -547,7 +547,6 @@ const subtareasData       = ref({})   // { [tareaId]: [subtarea, ...] }
 const qaSubtareaParentId  = ref(null)
 const qaSubTitulo         = ref('')
 const qaSubInputRef       = ref(null)
-let   _qaSubGuardando     = false
 
 async function toggleSubtareas(tarea) {
   const id = tarea.id
@@ -589,16 +588,9 @@ function cancelarSubtarea() {
   qaSubTitulo.value = ''
 }
 
-function onSubBlur(padre) {
-  if (_qaSubGuardando) return          // guardado en curso, no cancelar
-  if (qaSubTitulo.value.trim()) guardarSubtarea(padre)
-  else cancelarSubtarea()
-}
-
 async function guardarSubtarea(padre) {
   const titulo = qaSubTitulo.value.trim()
-  if (!titulo || _qaSubGuardando) return
-  _qaSubGuardando = true
+  if (!titulo) return
   qaSubTitulo.value = ''
   try {
     const data = await api('/api/gestion/tareas', {
@@ -619,10 +611,7 @@ async function guardarSubtarea(padre) {
     await nextTick()
     const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
     el?.focus()
-    // Limpiar de nuevo tras refocus — atrapa repoblación del IME móvil
-    setTimeout(() => { qaSubTitulo.value = '' }, 80)
   } catch (e) { console.error(e) }
-  _qaSubGuardando = false
 }
 
 // QuickAdd desktop
@@ -1291,13 +1280,15 @@ onUnmounted(() => {
   font-family: var(--font-sans);
 }
 .subtarea-input::placeholder { color: var(--text-tertiary); }
-.btn-sub-cancel {
+.btn-sub-ok, .btn-sub-cancel {
   display: flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; flex-shrink: 0;
   background: transparent; border: none; border-radius: var(--radius-sm);
   color: var(--text-tertiary); cursor: pointer;
   transition: color 80ms, background 80ms;
 }
+.btn-sub-ok:hover { color: var(--accent); }
+.btn-sub-ok:disabled { opacity: 0.3; cursor: default; }
 .btn-sub-cancel:hover { color: var(--color-error); background: var(--color-error-bg); }
 .subtarea-add-row {
   display: flex; align-items: center; gap: 6px;
