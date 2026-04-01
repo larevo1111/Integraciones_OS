@@ -401,15 +401,9 @@ onUnmounted(() => {
     height: 24px;
     z-index: 1;
   }
-  /* En mobile: fluye en la columna (no absoluto) para no quedar tapado por la siguiente fila */
+  /* En mobile: mantener absoluto para no crear espacio extra entre filas */
   .btn-add-sub-solo {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
-    opacity: 0.6;
-    width: 24px;
-    height: 24px;
+    opacity: 0.5;
   }
   .btn-add-sub:active,
   .btn-add-sub-solo:active {

@@ -162,7 +162,7 @@
                 @editar-titulo="editarTituloInline"
                 @seleccionar-multi="onSeleccionarMulti"
               />
-              <!-- Inline quickadd para nueva subtarea -->
+              <!-- Inline quickadd para nueva subtarea — Enter guarda, blur guarda, × cancela -->
               <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
                 <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
                 <input
@@ -170,10 +170,9 @@
                   v-model="qaSubTitulo"
                   class="subtarea-input"
                   placeholder="Nueva subtarea..."
-                  @compositionstart="_qaComposing = true"
-                  @compositionend="_qaComposing = false"
-                  @keyup.enter="guardarSubtarea(t)"
+                  @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
+                  @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
                 />
                 <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
                   <span class="material-icons" style="font-size:13px">close</span>
@@ -549,7 +548,6 @@ const qaSubtareaParentId  = ref(null)
 const qaSubTitulo         = ref('')
 const qaSubInputRef       = ref(null)
 let   _qaSubGuardando     = false
-let   _qaComposing        = false   // true mientras el IME del teclado móvil está componiendo
 
 async function toggleSubtareas(tarea) {
   const id = tarea.id
@@ -592,12 +590,9 @@ function cancelarSubtarea() {
 }
 
 async function guardarSubtarea(padre) {
-  if (_qaComposing) return
   const titulo = qaSubTitulo.value.trim()
   if (!titulo || _qaSubGuardando) return
   _qaSubGuardando = true
-  // Cerrar input inmediatamente
-  qaSubtareaParentId.value = null
   qaSubTitulo.value = ''
   try {
     const data = await api('/api/gestion/tareas', {
@@ -609,12 +604,17 @@ async function guardarSubtarea(padre) {
         parent_id:    padre.id
       })
     })
+    // Agregar al array local de subtareas
     const subs = subtareasData.value[padre.id] || []
     subtareasData.value = { ...subtareasData.value, [padre.id]: [...subs, data.tarea] }
+    // Actualizar conteo en la tarea padre
     const idx = tareas.value.findIndex(t => t.id === padre.id)
     if (idx !== -1) {
       tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
     }
+    await nextTick()
+    const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
+    el?.focus()
   } catch (e) { console.error(e) }
   _qaSubGuardando = false
 }
