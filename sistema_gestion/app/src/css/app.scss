@@ -1215,3 +1215,41 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 .dropdown-item-teleport:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 .dropdown-item-teleport.active { color: var(--accent); }
+
+/* ─── QUICKADD (reutilizable) ─── */
+.quickadd-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 0 6px;
+}
+.quickadd-plus {
+  font-size: 18px; color: var(--text-tertiary); flex-shrink: 0;
+}
+.quickadd-row.activo .quickadd-plus { color: var(--accent); }
+.quickadd-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-size: 14px; color: var(--text-primary); font-family: var(--font-sans);
+}
+.quickadd-input::placeholder { color: var(--text-tertiary); }
+.quickadd-cats {
+  display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 4px; padding-left: 26px;
+}
+.cat-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 20px;
+  border: 1px solid var(--border-subtle); background: transparent;
+  color: var(--text-secondary); font-size: 11px; cursor: pointer;
+  transition: all 80ms; font-family: var(--font-sans); white-space: nowrap;
+}
+.cat-chip:hover { border-color: var(--border-default); color: var(--text-primary); }
+.cat-chip.selected {
+  background: var(--bg-row-hover); border-color: var(--border-strong); color: var(--text-primary);
+}
+.cat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.quickadd-extra {
+  display: flex; align-items: center; gap: 8px; padding: 4px 0 6px 26px; flex-wrap: wrap;
+}
+.quickadd-date {
+  height: 26px; padding: 0 6px; font-size: 12px;
+  background: transparent; border: 1px solid var(--border-subtle);
+  border-radius: 20px; color: var(--text-secondary); font-family: var(--font-sans);
+}
+.quickadd-date:focus { outline: none; border-color: var(--accent); }

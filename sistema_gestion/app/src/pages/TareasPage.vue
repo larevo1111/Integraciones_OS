@@ -1360,65 +1360,6 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border-subtle);
   padding: 0 16px 10px;
 }
-.quickadd-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0 6px;
-}
-.quickadd-plus {
-  font-size: 18px;
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-}
-.quickadd-row.activo .quickadd-plus { color: var(--accent); }
-.quickadd-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-size: 14px;
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-}
-.quickadd-input::placeholder { color: var(--text-tertiary); }
-
-/* Category chips */
-.quickadd-cats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding-bottom: 4px;
-  padding-left: 26px;
-}
-.cat-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 20px;
-  border: 1px solid var(--border-subtle);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 80ms;
-  font-family: var(--font-sans);
-  white-space: nowrap;
-}
-.cat-chip:hover { border-color: var(--border-default); color: var(--text-primary); }
-.cat-chip.selected {
-  background: var(--bg-row-hover);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-.cat-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 /* OP row */
 .quickadd-op {
   display: flex;
@@ -1427,21 +1368,12 @@ onUnmounted(() => {
   padding: 4px 0 0 26px;
 }
 
-/* Dropdown agrupar — estilos movidos a app.scss como globales (teleport) */
-
 /* Panel */
 .panel-enter-active, .panel-leave-active { transition: transform 200ms ease-out, opacity 200ms; }
 .panel-enter-from, .panel-leave-to { transform: translateX(20px); opacity: 0; }
 
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* QuickAdd extra (proyecto + etiquetas) */
-.quickadd-extra {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 0 6px 26px;
-  flex-wrap: wrap;
-}
 
 /* Chip filtro proyecto activo */
 /* Header de proyecto activo */

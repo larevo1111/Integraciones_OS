@@ -195,20 +195,17 @@
             </div>
             <!-- Mini-form crear tarea -->
             <template v-if="mostrarFormTarea">
-              <form class="pp-nueva-tarea" @submit.prevent="crearTareaEnProyecto">
-                <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">add</span>
-                <input v-model="nuevaTareaTitulo" placeholder="Agregar una tarea..." class="pp-nueva-tarea-input" />
-                <button type="button" class="btn-icon-tiny" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''">
-                  <span class="material-icons" style="font-size:14px">close</span>
-                </button>
-                <button type="submit" class="btn-icon-tiny" :disabled="!nuevaTareaTitulo.trim()" style="color:var(--accent)">
-                  <span class="material-icons" style="font-size:14px">check</span>
-                </button>
+              <form class="quickadd-row activo" @submit.prevent="crearTareaEnProyecto">
+                <span class="material-icons quickadd-plus">add</span>
+                <input v-model="nuevaTareaTitulo" class="quickadd-input" placeholder="Agregar una tarea..." />
+                <button type="button" class="btn btn-ghost btn-sm" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm" :disabled="!nuevaTareaTitulo.trim()">Agregar</button>
               </form>
-              <div class="pp-nueva-tarea-cats">
+              <div class="quickadd-cats">
                 <button
                   v-for="c in categorias"
                   :key="c.id"
+                  type="button"
                   class="cat-chip"
                   :class="{ selected: nuevaTareaCatId === c.id }"
                   @click="nuevaTareaCatId = c.id"
@@ -217,13 +214,13 @@
                   {{ c.nombre.replace(/_/g, ' ') }}
                 </button>
               </div>
-              <div class="pp-nueva-tarea-extra">
+              <div class="quickadd-extra">
                 <EtiquetasSelector
                   v-model="nuevaTareaEtiquetas"
                   :etiquetas="etiquetas"
                   @etiqueta-creada="e => $emit('etiqueta-creada', e)"
                 />
-                <input type="date" v-model="nuevaTareaFecha" class="pp-nueva-tarea-date" />
+                <input type="date" v-model="nuevaTareaFecha" class="quickadd-date" />
               </div>
             </template>
             <div v-if="!tareasVinculadas.length && !mostrarFormTarea" class="pp-empty">Sin tareas vinculadas</div>
@@ -663,31 +660,6 @@ function fmtFecha(iso) {
 }
 .pp-tarea-link:hover { background: var(--bg-row-hover); }
 .pp-tarea-done { text-decoration: line-through; color: var(--text-tertiary); }
-.pp-nueva-tarea {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 0; margin-bottom: 4px;
-}
-.pp-nueva-tarea-input {
-  flex: 1; min-width: 0; padding: 4px 8px; font-size: 13px;
-  background: var(--bg-card-hover, #222); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm); color: var(--text-primary); outline: none;
-  font-family: var(--font-sans);
-}
-.pp-nueva-tarea-input:focus { border-color: var(--accent); }
-.pp-nueva-tarea-input::placeholder { color: var(--text-tertiary); }
-.pp-nueva-tarea-cats {
-  display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0;
-}
-.pp-nueva-tarea-extra {
-  display: flex; align-items: center; gap: 8px; padding: 4px 0;
-}
-.pp-nueva-tarea-date {
-  height: 26px; padding: 0 6px; font-size: 12px;
-  background: var(--bg-card-hover, #222); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm); color: var(--text-primary);
-  font-family: var(--font-sans);
-}
-.pp-nueva-tarea-date:focus { outline: none; border-color: var(--accent); }
 
 /* Sub-panel tarea embebido */
 .pp-subtarea-wrap {
