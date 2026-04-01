@@ -189,17 +189,43 @@
           <div v-if="item?.id" class="pp-section">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <span class="pp-section-label">Tareas vinculadas ({{ tareasVinculadas.length }})</span>
-              <button class="btn-icon-tiny" title="Agregar tarea" @click="mostrarFormTarea = !mostrarFormTarea">
+              <button class="btn-icon-tiny" title="Agregar tarea" @click="mostrarFormTarea = !mostrarFormTarea; if (!nuevaTareaCatId) nuevaTareaCatId = form.categoria_id">
                 <span class="material-icons" style="font-size:14px">add</span>
               </button>
             </div>
             <!-- Mini-form crear tarea -->
-            <form v-if="mostrarFormTarea" class="pp-nueva-tarea" @submit.prevent="crearTareaEnProyecto">
-              <input v-model="nuevaTareaTitulo" placeholder="Nueva tarea..." class="pp-nueva-tarea-input" />
-              <button type="submit" class="btn-icon-tiny" :disabled="!nuevaTareaTitulo.trim()">
-                <span class="material-icons" style="font-size:14px">check</span>
-              </button>
-            </form>
+            <template v-if="mostrarFormTarea">
+              <form class="pp-nueva-tarea" @submit.prevent="crearTareaEnProyecto">
+                <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">add</span>
+                <input v-model="nuevaTareaTitulo" placeholder="Agregar una tarea..." class="pp-nueva-tarea-input" />
+                <button type="button" class="btn-icon-tiny" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''">
+                  <span class="material-icons" style="font-size:14px">close</span>
+                </button>
+                <button type="submit" class="btn-icon-tiny" :disabled="!nuevaTareaTitulo.trim()" style="color:var(--accent)">
+                  <span class="material-icons" style="font-size:14px">check</span>
+                </button>
+              </form>
+              <div class="pp-nueva-tarea-cats">
+                <button
+                  v-for="c in categorias"
+                  :key="c.id"
+                  class="cat-chip"
+                  :class="{ selected: nuevaTareaCatId === c.id }"
+                  @click="nuevaTareaCatId = c.id"
+                >
+                  <span class="cat-dot" :style="{ background: c.color }"></span>
+                  {{ c.nombre.replace(/_/g, ' ') }}
+                </button>
+              </div>
+              <div class="pp-nueva-tarea-extra">
+                <EtiquetasSelector
+                  v-model="nuevaTareaEtiquetas"
+                  :etiquetas="etiquetas"
+                  @etiqueta-creada="e => $emit('etiqueta-creada', e)"
+                />
+                <input type="date" v-model="nuevaTareaFecha" class="pp-nueva-tarea-date" />
+              </div>
+            </template>
             <div v-if="!tareasVinculadas.length && !mostrarFormTarea" class="pp-empty">Sin tareas vinculadas</div>
             <div v-for="t in tareasVinculadas" :key="t.id" class="pp-tarea-link" @click="abrirSubTarea(t)">
               <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">
@@ -344,22 +370,29 @@ async function cargarProyectos() {
 }
 
 // Crear tarea desde proyecto
-const mostrarFormTarea = ref(false)
-const nuevaTareaTitulo = ref('')
+const mostrarFormTarea    = ref(false)
+const nuevaTareaTitulo    = ref('')
+const nuevaTareaCatId     = ref(null)
+const nuevaTareaEtiquetas = ref([])
+const nuevaTareaFecha     = ref('')
 
 async function crearTareaEnProyecto() {
   const titulo = nuevaTareaTitulo.value.trim()
   if (!titulo) return
+  const body = {
+    titulo,
+    proyecto_id: props.item.id,
+    categoria_id: nuevaTareaCatId.value || form.value.categoria_id || 1,
+    etiquetas: nuevaTareaEtiquetas.value,
+    fecha_limite: nuevaTareaFecha.value || null
+  }
   try {
     await api('/api/gestion/tareas', {
-      method: 'POST',
-      body: JSON.stringify({
-        titulo,
-        proyecto_id: props.item.id,
-        categoria_id: form.value.categoria_id || 1
-      })
+      method: 'POST', body: JSON.stringify(body)
     })
     nuevaTareaTitulo.value = ''
+    nuevaTareaEtiquetas.value = []
+    nuevaTareaFecha.value = ''
     mostrarFormTarea.value = false
     await cargarTareas()
   } catch (e) { console.error(e) }
@@ -642,6 +675,19 @@ function fmtFecha(iso) {
 }
 .pp-nueva-tarea-input:focus { border-color: var(--accent); }
 .pp-nueva-tarea-input::placeholder { color: var(--text-tertiary); }
+.pp-nueva-tarea-cats {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0;
+}
+.pp-nueva-tarea-extra {
+  display: flex; align-items: center; gap: 8px; padding: 4px 0;
+}
+.pp-nueva-tarea-date {
+  height: 26px; padding: 0 6px; font-size: 12px;
+  background: var(--bg-card-hover, #222); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+.pp-nueva-tarea-date:focus { outline: none; border-color: var(--accent); }
 
 /* Sub-panel tarea embebido */
 .pp-subtarea-wrap {
