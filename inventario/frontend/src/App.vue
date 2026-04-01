@@ -1260,7 +1260,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .grupo-ds { background: rgba(107,114,128,0.15); color: #9ca3af; }
 .grupo-des { background: rgba(239,68,68,0.15); color: #f87171; }
 .grupo-nm { background: rgba(14,165,233,0.15); color: #38bdf8; }
-.articulo-nombre { overflow: hidden; text-overflow: ellipsis; }
+.articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.3; }
 .unit-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 3px; background: rgba(0,200,83,0.12); color: var(--accent); flex-shrink: 0; }
 .cell-categoria { font-size: 12px; cursor: default; }
 .grupo-tag-full { white-space: normal; line-height: 1.3; }
@@ -1402,7 +1402,7 @@ onUnmounted(() => clearInterval(clockInterval))
 
   /* Artículo: wrap, nombre + unidad + teórico debajo */
   .articulo-line1 { font-size: 11px; gap: 2px; flex-wrap: nowrap; }
-  .articulo-nombre { white-space: normal; word-break: break-word; line-height: 1.25; }
+  .articulo-nombre { line-height: 1.25; }
   .unit-tag { font-size: 6px; padding: 0 2px; flex-shrink: 0; }
   .articulo-teorico-movil { display: block; font-size: 9px; color: var(--text-tertiary); margin-top: 1px; letter-spacing: 0.3px; }
 
