@@ -405,6 +405,13 @@
                   {{ e.nombre }}
                 </div>
                 <div class="multi-menu-sep" />
+                <form class="multi-menu-nueva-etiq" @submit.prevent="crearEtiquetaDesdeMulti">
+                  <input v-model="nuevaEtiquetaMulti" placeholder="Nueva etiqueta..." class="multi-menu-nueva-input" />
+                  <button type="submit" class="multi-menu-nueva-btn" :disabled="!nuevaEtiquetaMulti.trim()">
+                    <span class="material-icons" style="font-size:14px">add</span>
+                  </button>
+                </form>
+                <div class="multi-menu-sep" />
                 <div class="multi-menu-item" @click="quitarEtiquetasMulti">Quitar todas</div>
               </div>
             </div>
@@ -547,6 +554,7 @@ const multiMenuEstado    = ref(false)
 const multiMenuCategoria = ref(false)
 const multiMenuProyecto  = ref(false)
 const multiMenuEtiqueta  = ref(false)
+const nuevaEtiquetaMulti = ref('')
 
 function cerrarMenusMulti(abrir) {
   multiMenuFecha.value     = abrir === 'fecha'
@@ -1059,6 +1067,21 @@ async function aplicarProyectoMulti(proyectoId) {
   await _postBulk(ids)
 }
 
+async function crearEtiquetaDesdeMulti() {
+  const nombre = nuevaEtiquetaMulti.value.trim()
+  if (!nombre) return
+  try {
+    const data = await api('/api/gestion/etiquetas', {
+      method: 'POST', body: JSON.stringify({ nombre })
+    })
+    etiquetas.value.push(data.etiqueta)
+    nuevaEtiquetaMulti.value = ''
+    await aplicarEtiquetaMulti(data.etiqueta.id)
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 async function aplicarEtiquetaMulti(etiquetaId) {
   cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
@@ -1536,6 +1559,23 @@ onUnmounted(() => {
 .multi-menu-item-dot { display: flex; align-items: center; gap: 6px; }
 .multi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .multi-menu-sep { height: 1px; background: var(--border-subtle); margin: 3px 0; }
+.multi-menu-nueva-etiq {
+  display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+}
+.multi-menu-nueva-input {
+  flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;
+  background: var(--bg-card, #222); border: 1px solid var(--border-subtle);
+  border-radius: 5px; color: var(--text-primary); outline: none;
+}
+.multi-menu-nueva-input::placeholder { color: var(--text-tertiary); }
+.multi-menu-nueva-input:focus { border-color: var(--accent); }
+.multi-menu-nueva-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border: none; border-radius: 5px;
+  background: transparent; color: var(--text-tertiary); cursor: pointer;
+}
+.multi-menu-nueva-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--accent); }
+.multi-menu-nueva-btn:disabled { opacity: 0.3; cursor: default; }
 .multi-bar-menu-scroll { max-height: 200px; overflow-y: auto; }
 
 /* Animación entrada/salida */
