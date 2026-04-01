@@ -790,8 +790,15 @@ function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return _l
 
 // ─── COMPLETADAS FILTRADAS (mismo filtro que pendientes) ───
 function _finRealISO(t) {
-  // fecha_fin_real viene como "2026-03-31 18:00:23" → extraer solo la fecha
-  return t.fecha_fin_real ? String(t.fecha_fin_real).slice(0, 10) : null
+  if (!t.fecha_fin_real) return null
+  const s = String(t.fecha_fin_real)
+  // Si viene con T (ISO): parsear como Date y extraer fecha local Colombia
+  if (s.includes('T')) {
+    const d = new Date(s)
+    return _localISO(d)
+  }
+  // Si viene como "2026-04-01 18:00:23": tomar los primeros 10 chars
+  return s.slice(0, 10)
 }
 function _coincideFecha(t, iso) {
   return t.fecha_limite === iso || _finRealISO(t) === iso
