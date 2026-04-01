@@ -162,7 +162,7 @@
                 @editar-titulo="editarTituloInline"
                 @seleccionar-multi="onSeleccionarMulti"
               />
-              <!-- Inline quickadd para nueva subtarea — Enter guarda, blur guarda, × cancela -->
+              <!-- Inline quickadd para nueva subtarea — Enter guarda, blur cancela -->
               <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
                 <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
                 <input
@@ -172,7 +172,6 @@
                   placeholder="Nueva subtarea..."
                   @keydown.enter.prevent="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
-                  @blur="qaSubTitulo.trim() ? guardarSubtarea(t) : cancelarSubtarea()"
                 />
                 <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
                   <span class="material-icons" style="font-size:13px">close</span>
@@ -593,7 +592,12 @@ async function guardarSubtarea(padre) {
   const titulo = qaSubTitulo.value.trim()
   if (!titulo || _qaSubGuardando) return
   _qaSubGuardando = true
-  qaSubTitulo.value = ''          // limpiar ANTES del await
+
+  // 1. Blur para matar el IME/autocompletar del teclado móvil
+  const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
+  if (el) { el.blur(); el.value = '' }
+  qaSubTitulo.value = ''
+
   try {
     const data = await api('/api/gestion/tareas', {
       method: 'POST',
@@ -612,9 +616,10 @@ async function guardarSubtarea(padre) {
     if (idx !== -1) {
       tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
     }
+    // 2. Refocus limpio (IME ya fue reseteado)
     await nextTick()
-    const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
-    el?.focus()
+    const el2 = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
+    el2?.focus()
   } catch (e) { console.error(e) }
   _qaSubGuardando = false
 }
