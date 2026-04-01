@@ -6,10 +6,10 @@
 
       <!-- Header de proyecto activo (breadcrumb) -->
       <div v-if="proyectoFiltro" class="proyecto-header-bar">
-        <RouterLink :to="props.soloMias ? '/tareas' : '/equipo'" class="proyecto-back-link">
+        <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
           <span class="material-icons" style="font-size:15px">arrow_back</span>
           {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
-        </RouterLink>
+        </a>
         <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
         <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
         <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
@@ -442,7 +442,7 @@
 
 <script setup>
 import { ref, computed, inject, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
 
@@ -460,7 +460,8 @@ import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
 
 const auth  = useAuthStore()
-const route = useRoute()
+const route  = useRoute()
+const router = useRouter()
 const abrirPanelItem = inject('abrirPanelItem', () => {})
 
 // Detección mobile (≤768px) — controla bottom sheet vs panel lateral

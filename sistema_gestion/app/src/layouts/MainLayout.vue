@@ -368,7 +368,7 @@ provide('abrirPanelItem', abrirPanel)
 function onItemGuardado(p) {
   if (p._accion === 'creado') {
     todosItems.value.push(p)
-    router.push({ path: '/tareas', query: { proyecto_id: p.id } })
+    router.replace({ path: '/tareas', query: { proyecto_id: p.id } })
     panelVisible.value = false
   } else {
     const idx = todosItems.value.findIndex(x => x.id === p.id)
@@ -422,7 +422,7 @@ async function completarItem(p) {
     })
     todosItems.value = todosItems.value.filter(x => x.id !== p.id)
     proyectosCompletados.value.unshift({ ...p, estado: estadoFinal, fecha_finalizacion_real: hoy })
-    if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
+    if (String(route.query.proyecto_id) === String(p.id)) router.replace('/tareas')
   } catch (e) { console.error(e) }
 }
 
@@ -434,7 +434,7 @@ async function archivarProyecto(p) {
       body: JSON.stringify({ estado: 'Archivado' })
     })
     todosItems.value = todosItems.value.filter(x => x.id !== p.id)
-    if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
+    if (String(route.query.proyecto_id) === String(p.id)) router.replace('/tareas')
   } catch (e) { console.error(e) }
 }
 
@@ -444,7 +444,7 @@ async function eliminarProyecto(p) {
   try {
     await api(`/api/gestion/proyectos/${p.id}`, { method: 'DELETE' })
     todosItems.value = todosItems.value.filter(x => x.id !== p.id)
-    if (String(route.query.proyecto_id) === String(p.id)) router.push('/tareas')
+    if (String(route.query.proyecto_id) === String(p.id)) router.replace('/tareas')
   } catch (e) { console.error(e) }
 }
 
