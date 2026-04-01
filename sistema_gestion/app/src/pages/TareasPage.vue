@@ -162,7 +162,7 @@
                 @editar-titulo="editarTituloInline"
                 @seleccionar-multi="onSeleccionarMulti"
               />
-              <!-- Inline quickadd para nueva subtarea — Enter guarda, blur cancela -->
+              <!-- Inline quickadd para nueva subtarea -->
               <div v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop>
                 <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
                 <input
@@ -170,7 +170,9 @@
                   v-model="qaSubTitulo"
                   class="subtarea-input"
                   placeholder="Nueva subtarea..."
-                  @keydown.enter.prevent="guardarSubtarea(t)"
+                  @compositionstart="_qaComposing = true"
+                  @compositionend="_qaComposing = false"
+                  @keyup.enter="guardarSubtarea(t)"
                   @keydown.escape="cancelarSubtarea"
                 />
                 <button class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
@@ -546,7 +548,8 @@ const subtareasData       = ref({})   // { [tareaId]: [subtarea, ...] }
 const qaSubtareaParentId  = ref(null)
 const qaSubTitulo         = ref('')
 const qaSubInputRef       = ref(null)
-let   _qaSubGuardando     = false   // flag anti-doble (Enter + blur)
+let   _qaSubGuardando     = false
+let   _qaComposing        = false   // true mientras el IME del teclado móvil está componiendo
 
 async function toggleSubtareas(tarea) {
   const id = tarea.id
@@ -589,15 +592,11 @@ function cancelarSubtarea() {
 }
 
 async function guardarSubtarea(padre) {
+  if (_qaComposing) return            // IME todavía componiendo, esperar
   const titulo = qaSubTitulo.value.trim()
   if (!titulo || _qaSubGuardando) return
   _qaSubGuardando = true
-
-  // 1. Blur para matar el IME/autocompletar del teclado móvil
-  const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
-  if (el) { el.blur(); el.value = '' }
   qaSubTitulo.value = ''
-
   try {
     const data = await api('/api/gestion/tareas', {
       method: 'POST',
@@ -608,18 +607,12 @@ async function guardarSubtarea(padre) {
         parent_id:    padre.id
       })
     })
-    // Agregar al array local de subtareas
     const subs = subtareasData.value[padre.id] || []
     subtareasData.value = { ...subtareasData.value, [padre.id]: [...subs, data.tarea] }
-    // Actualizar conteo en la tarea padre
     const idx = tareas.value.findIndex(t => t.id === padre.id)
     if (idx !== -1) {
       tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
     }
-    // 2. Refocus limpio (IME ya fue reseteado)
-    await nextTick()
-    const el2 = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
-    el2?.focus()
   } catch (e) { console.error(e) }
   _qaSubGuardando = false
 }
