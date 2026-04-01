@@ -1,4 +1,5 @@
 /* eslint-env serviceworker */
+// SW v2 — forzar actualización 2026-04-01
 
 /*
  * This file (which will be your service worker)
