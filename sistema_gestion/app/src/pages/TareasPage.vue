@@ -79,7 +79,7 @@
         </div>
         <div class="cal-dia-info">
           <span class="cal-dia-label">{{ calDiaLabel }}</span>
-          <span class="cal-dia-count">{{ tareasVisibles.length }} tarea{{ tareasVisibles.length !== 1 ? 's' : '' }}</span>
+          <span class="cal-dia-count">{{ tareas.length }} tarea{{ tareas.length !== 1 ? 's' : '' }}</span>
         </div>
       </div>
 
@@ -800,7 +800,7 @@ const calDiaLabel = computed(() => {
 function calMesAnt() { calMesOffset.value-- }
 function calMesSig() { calMesOffset.value++ }
 function calIrHoy() { calMesOffset.value = 0; calFechaSel.value = hoyISO() }
-function calSelDia(iso) { calFechaSel.value = iso }
+function calSelDia(iso) { calFechaSel.value = iso; cargarTareas() }
 
 watch(tareaSeleccionada, (v, old) => { if (v && (!old || v.id !== old.id)) bsheetEstado.value = 'half' })
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
@@ -856,17 +856,11 @@ function ordenSecundario(lista) {
   return lista
 }
 
-const tareasVisibles = computed(() =>
-  filtroActivo.value === 'calendario'
-    ? tareas.value.filter(t => t.fecha_limite === calFechaSel.value)
-    : tareas.value
-)
-
 const grupos = computed(() => {
-  if (!tareasVisibles.value.length) return []
+  if (!tareas.value.length) return []
   if (agruparPor.value === 'categoria') {
     const map = {}
-    tareasVisibles.value.forEach(t => {
+    tareas.value.forEach(t => {
       const k = t.categoria_id
       if (!map[k]) map[k] = { key: k, nombre: t.categoria_nombre, color: t.categoria_color, tareas: [] }
       map[k].tareas.push(t)
@@ -875,7 +869,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'prioridad') {
     const map = {}
-    tareasVisibles.value.forEach(t => {
+    tareas.value.forEach(t => {
       const p = t.prioridad || 'Media'
       if (!map[p]) map[p] = { key: p, nombre: p, color: COLORES_PRIORIDAD[p], tareas: [] }
       map[p].tareas.push(t)
@@ -884,7 +878,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'fecha') {
     const map = {}
-    tareasVisibles.value.forEach(t => {
+    tareas.value.forEach(t => {
       const f = t.fecha_limite || 'Sin fecha'
       if (!map[f]) map[f] = { key: f, nombre: formatGrupoFecha(f), color: '#6b7280', tareas: [] }
       map[f].tareas.push(t)
@@ -899,7 +893,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'proyecto') {
     const map = {}
-    tareasVisibles.value.forEach(t => {
+    tareas.value.forEach(t => {
       const k = t.proyecto_id || 'sin-proyecto'
       if (!map[k]) map[k] = { key: k, nombre: t.proyecto_nombre || 'Sin proyecto', color: t.proyecto_color || '#607D8B', tareas: [] }
       map[k].tareas.push(t)
@@ -911,7 +905,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'responsable') {
     const map = {}
-    tareasVisibles.value.forEach(t => {
+    tareas.value.forEach(t => {
       const k = t.responsable || 'sin-asignar'
       const nombre = t.responsable_nombre || t.responsable || 'Sin asignar'
       if (!map[k]) map[k] = { key: k, nombre, color: '#607D8B', tareas: [] }
@@ -954,9 +948,8 @@ async function cargarTareas() {
       if (f.responsables?.length)     params.set('responsables', f.responsables.join(','))
       if (f.id_op)                    params.set('id_op',        f.id_op)
     } else if (filtroActivo.value === 'calendario') {
-      const c = calCeldas.value
-      params.set('fecha_desde', c[0].iso)
-      params.set('fecha_hasta', c[c.length - 1].iso)
+      params.set('fecha_desde', calFechaSel.value)
+      params.set('fecha_hasta', calFechaSel.value)
     } else if (filtroActivo.value !== 'todas' && filtroActivo.value !== 'personalizado') {
       params.set('filtro', filtroActivo.value)
     }
