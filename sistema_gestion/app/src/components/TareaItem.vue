@@ -373,10 +373,10 @@ onUnmounted(() => {
   width: 13px; height: 12px; flex-shrink: 0;
   background: transparent; border: none;
   color: var(--text-tertiary); cursor: pointer;
-  opacity: 0.3; transition: opacity 100ms, color 100ms;
+  opacity: 0.4; transition: opacity 100ms, color 100ms;
   padding: 0;
 }
-.tarea-item:hover .btn-add-sub { opacity: 0.7; }
+.tarea-item:hover .btn-add-sub { opacity: 0.8; }
 .btn-add-sub:hover { color: var(--accent) !important; opacity: 1 !important; }
 
 /* Botón ↳ solo (para tareas padre sin subtareas aún) — absoluto para no afectar altura del círculo */
@@ -390,13 +390,32 @@ onUnmounted(() => {
   opacity: 0; transition: opacity 100ms, color 100ms;
   padding: 0;
 }
-.tarea-item:hover .btn-add-sub-solo { opacity: 0.45; }
+.tarea-item:hover .btn-add-sub-solo { opacity: 0.6; }
 .btn-add-sub-solo:hover { color: var(--accent) !important; opacity: 1 !important; }
 
-/* Mobile: hacer los botones de subtarea siempre mínimamente visibles (sin hover) */
+/* Mobile: siempre visibles (no hay hover en touch) */
 @media (max-width: 768px) {
-  .btn-add-sub       { opacity: 0.45; }
-  .btn-add-sub-solo  { opacity: 0.25; }
+  .btn-add-sub {
+    opacity: 0.65;
+    width: 24px;
+    height: 24px;
+    z-index: 1;
+  }
+  /* En mobile: fluye en la columna (no absoluto) para no quedar tapado por la siguiente fila */
+  .btn-add-sub-solo {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    opacity: 0.6;
+    width: 24px;
+    height: 24px;
+  }
+  .btn-add-sub:active,
+  .btn-add-sub-solo:active {
+    color: var(--accent) !important;
+    opacity: 1 !important;
+  }
 }
 
 /* Título editable en desktop */
@@ -419,7 +438,7 @@ onUnmounted(() => {
 
 /* Subtarea: indentación */
 .is-subtarea { padding-left: 28px !important; }
-.is-subtarea .tarea-titulo { font-size: 11px; color: var(--text-secondary); }
+.is-subtarea .tarea-titulo { font-size: 12px; color: var(--text-secondary); }
 
 /* Multi-selección */
 .tarea-item.multi-sel {

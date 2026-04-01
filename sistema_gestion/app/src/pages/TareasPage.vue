@@ -547,6 +547,7 @@ const subtareasData       = ref({})   // { [tareaId]: [subtarea, ...] }
 const qaSubtareaParentId  = ref(null)
 const qaSubTitulo         = ref('')
 const qaSubInputRef       = ref(null)
+let   _qaSubGuardando     = false   // flag anti-doble (Enter + blur)
 
 async function toggleSubtareas(tarea) {
   const id = tarea.id
@@ -589,7 +590,8 @@ function cancelarSubtarea() {
 }
 
 async function guardarSubtarea(padre) {
-  if (!qaSubTitulo.value.trim()) return
+  if (!qaSubTitulo.value.trim() || _qaSubGuardando) return
+  _qaSubGuardando = true
   try {
     const data = await api('/api/gestion/tareas', {
       method: 'POST',
@@ -613,6 +615,7 @@ async function guardarSubtarea(padre) {
     const el = Array.isArray(qaSubInputRef.value) ? qaSubInputRef.value[0] : qaSubInputRef.value
     el?.focus()
   } catch (e) { console.error(e) }
+  _qaSubGuardando = false
 }
 
 // QuickAdd desktop
