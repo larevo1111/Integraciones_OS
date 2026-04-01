@@ -144,7 +144,7 @@
 
       <!-- Lista de tareas -->
       <div class="page-body lista-tareas" v-if="!cargando">
-        <div v-if="!grupos.length && !completadas.length" class="empty-state">
+        <div v-if="!grupos.length && !completadasFiltradas.length" class="empty-state">
           <span class="material-icons" style="font-size:32px">check_circle_outline</span>
           <p>No hay tareas con estos filtros</p>
         </div>
@@ -209,14 +209,14 @@
         </template>
 
         <!-- Completadas al fondo (colapsables) -->
-        <template v-if="completadas.length">
+        <template v-if="completadasFiltradas.length">
           <div class="completadas-header" @click="mostrarCompletadas = !mostrarCompletadas">
             <span class="material-icons" style="font-size:16px">{{ mostrarCompletadas ? 'expand_more' : 'chevron_right' }}</span>
-            Completadas ({{ completadas.length }})
+            Completadas ({{ completadasFiltradas.length }})
           </div>
           <template v-if="mostrarCompletadas">
             <TareaItem
-              v-for="t in completadas"
+              v-for="t in completadasFiltradas"
               :key="t.id"
               :tarea="t"
               :seleccionada="tareaSeleccionada?.id === t.id"
@@ -787,6 +787,51 @@ const conteoHoy = computed(() => tareas.value.filter(t => t.fecha_limite === hoy
 function _localISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 function hoyISO()    { return _localISO(new Date()) }
 function mananaISO() { const d = new Date(); d.setDate(d.getDate()+1); return _localISO(d) }
+
+// ─── COMPLETADAS FILTRADAS (mismo filtro que pendientes) ───
+const completadasFiltradas = computed(() => {
+  const all = completadas.value
+  if (!all.length) return []
+  const f = filtroActivo.value
+
+  if (f === 'todas' || proyectoFiltroId.value) return all
+
+  if (f === 'hoy') {
+    const hoy = hoyISO()
+    return all.filter(t => t.fecha_limite === hoy)
+  }
+  if (f === 'manana') {
+    const man = mananaISO()
+    return all.filter(t => t.fecha_limite === man)
+  }
+  if (f === 'ayer') {
+    const ayer = isoRelativo(-1)
+    return all.filter(t => t.fecha_limite === ayer)
+  }
+  if (f === 'semana') {
+    const hoy = new Date()
+    const dow = hoy.getDay() || 7
+    const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - dow + 1)
+    const domingo = new Date(lunes); domingo.setDate(lunes.getDate() + 6)
+    const desde = _localISO(lunes)
+    const hasta = _localISO(domingo)
+    return all.filter(t => t.fecha_limite && t.fecha_limite >= desde && t.fecha_limite <= hasta)
+  }
+  if (f === 'calendario') {
+    const sel = calFechaSel.value
+    return all.filter(t => t.fecha_limite === sel)
+  }
+  if (f === 'personalizado' && filtroPersonalizado.value) {
+    const fp = filtroPersonalizado.value
+    return all.filter(t => {
+      if (fp.fecha_desde && (!t.fecha_limite || t.fecha_limite < fp.fecha_desde)) return false
+      if (fp.fecha_hasta && (!t.fecha_limite || t.fecha_limite > fp.fecha_hasta)) return false
+      if (fp.categorias?.length && !fp.categorias.includes(t.categoria_id)) return false
+      return true
+    })
+  }
+  return all
+})
 
 // ─── CALENDARIO ───
 const calMesOffset = ref(0)

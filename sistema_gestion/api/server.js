@@ -49,7 +49,7 @@ if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
 
 const app = express()
 app.use(express.json())
-app.use(express.static(path.join(__dirname, '../app/dist/pwa')))
+app.use(express.static(path.join(__dirname, 'public')))
 app.use('/subidos', express.static(SUBIDOS_ROOT))
 
 // ─── CORS ──────────────────────────────────────────────────────────
