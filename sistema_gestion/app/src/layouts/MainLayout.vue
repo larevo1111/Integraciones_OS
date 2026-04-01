@@ -480,8 +480,11 @@ provide('abrirPanelItem', abrirPanel)
 function onItemGuardado(p) {
   if (p._accion === 'creado') {
     todosItems.value.push(p)
-    router.replace({ path: '/tareas', query: { proyecto_id: p.id } })
     panelVisible.value = false
+    // Abrir el acordeón correspondiente para que se vea el item nuevo
+    const bloque = (p.responsables || []).includes(miEmail.value) ? 'bloque-mis' : 'bloque-eq'
+    acordeonAbierto[bloque] = true
+    acordeonAbierto[(bloque === 'bloque-mis' ? 'mis-' : 'eq-') + (p.tipo || 'proyecto')] = true
   } else {
     const idx = todosItems.value.findIndex(x => x.id === p.id)
     if (idx !== -1) todosItems.value[idx] = { ...todosItems.value[idx], ...p }
