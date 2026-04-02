@@ -231,17 +231,21 @@
         </div>
         <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
           <span class="field-label">Inicio real</span>
-          <input type="date" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_inicio_real ? String(tarea.fecha_inicio_real).slice(0,10) : ''"
+          <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_inicio_real ? String(tarea.fecha_inicio_real).replace(' ', 'T').slice(0,16) : ''"
             :disabled="!esCompletada"
             @change="actualizar('fecha_inicio_real', $event.target.value || null)" />
         </div>
         <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
           <span class="field-label">Fin real</span>
-          <input type="date" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_fin_real ? String(tarea.fecha_fin_real).slice(0,10) : ''"
+          <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_fin_real ? String(tarea.fecha_fin_real).replace(' ', 'T').slice(0,16) : ''"
             :disabled="!esCompletada"
             @change="actualizar('fecha_fin_real', $event.target.value || null)" />
+        </div>
+        <div v-if="duracionReal" class="field-row">
+          <span class="field-label">Duración real</span>
+          <span style="font-size:12px;color:var(--text-secondary)">{{ duracionReal }}</span>
         </div>
       </template>
     </div>
@@ -343,6 +347,22 @@ const mostrarFechas = ref(false)
 const esCompletada = computed(() =>
   ['Completada', 'Cancelada'].includes(props.tarea?.estado)
 )
+
+const duracionReal = computed(() => {
+  if (!props.tarea?.fecha_inicio_real || !props.tarea?.fecha_fin_real) return null
+  const ini = new Date(props.tarea.fecha_inicio_real)
+  const fin = new Date(props.tarea.fecha_fin_real)
+  const diffMs = fin - ini
+  if (diffMs <= 0) return null
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`
+  const d = Math.floor(h / 24)
+  const hResto = h % 24
+  return hResto ? `${d}d ${hResto}h` : `${d}d`
+})
 
 // Mostrar OP Effi solo si la categoría seleccionada es Producción
 const esProduccion = computed(() => {
