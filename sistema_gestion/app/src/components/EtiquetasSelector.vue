@@ -313,7 +313,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 /* Input edición inline */
 .etiqueta-edit-input {
-  flex: 1; background: var(--bg-surface);
+  flex: 1; min-width: 0; background: var(--bg-surface);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 2px 6px; font-size: 12px;
