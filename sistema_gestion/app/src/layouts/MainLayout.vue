@@ -224,8 +224,17 @@
       </div>
 
       <!-- Contenido de la página -->
-      <div class="page-body">
-        <router-view />
+      <div class="page-body" ref="pageBodyRef"
+        @touchstart.passive="onPullStart"
+        @touchmove.passive="onPullMove"
+        @touchend="onPullEnd"
+      >
+        <!-- Indicador pull-to-refresh -->
+        <div class="ptr-indicator" :class="{ visible: pullY > 0, refreshing: pullRefreshing }" :style="{ height: Math.min(pullY, 60) + 'px' }">
+          <span v-if="pullRefreshing" class="material-icons ptr-spin">refresh</span>
+          <span v-else class="material-icons" :style="{ transform: `rotate(${Math.min(pullY / 60, 1) * 180}deg)` }">arrow_downward</span>
+        </div>
+        <router-view :key="refreshKey" />
       </div>
     </div>
 
@@ -385,7 +394,43 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v1.9.1'
+const APP_VERSION = 'v1.9.2'
+
+// ─── Pull-to-refresh ───
+const pageBodyRef    = ref(null)
+const refreshKey     = ref(0)
+const pullY          = ref(0)
+const pullRefreshing = ref(false)
+let pullStartY       = 0
+let pulling          = false
+
+function onPullStart(e) {
+  if (pageBodyRef.value?.scrollTop > 0) return
+  pullStartY = e.touches[0].clientY
+  pulling = true
+}
+function onPullMove(e) {
+  if (!pulling || pageBodyRef.value?.scrollTop > 0) { pulling = false; pullY.value = 0; return }
+  const diff = e.touches[0].clientY - pullStartY
+  if (diff > 0) pullY.value = diff * 0.4
+  else { pulling = false; pullY.value = 0 }
+}
+function onPullEnd() {
+  if (!pulling) return
+  pulling = false
+  if (pullY.value >= 50) {
+    pullRefreshing.value = true
+    pullY.value = 50
+    setTimeout(() => {
+      refreshKey.value++
+      cargarProyectos()
+      pullRefreshing.value = false
+      pullY.value = 0
+    }, 400)
+  } else {
+    pullY.value = 0
+  }
+}
 const auth             = useAuthStore()
 const router           = useRouter()
 const route            = useRoute()

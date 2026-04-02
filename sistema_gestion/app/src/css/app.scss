@@ -338,6 +338,18 @@ body {
   overflow-x: hidden;
 }
 
+/* ─── PULL TO REFRESH ─── */
+.ptr-indicator {
+  display: flex; align-items: center; justify-content: center;
+  height: 0; overflow: hidden;
+  color: var(--text-tertiary);
+  transition: height 150ms ease;
+}
+.ptr-indicator.visible { transition: none; }
+.ptr-indicator .material-icons { font-size: 20px; transition: transform 150ms; }
+.ptr-spin { animation: ptr-spin 600ms linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+
 /* ─── FILTROS CHIPS ─── */
 .filtros-bar-wrap {
   position: relative;
