@@ -537,16 +537,21 @@ def consultar(
                 if not sql_generado:
                     raise Exception("No hay SQL para ejecutar.")
 
+                # Pre-validación: corregir = exacto en nombres de persona antes de ejecutar
+                sql_generado = _corregir_igualdad_nombres(sql_generado)
+
                 res_sql = ejecutor_sql.ejecutar(sql_generado)
                 if not res_sql['ok']:
                     # Reintento: obtener columnas REALES de las tablas usadas y enviar al LLM
                     error_sql = res_sql['error']
                     columnas_reales = obtener_columnas_reales(sql_generado)
+                    consejo_like = _detectar_igualdad_nombres(sql_generado)
                     prompt_retry = (
                         f"El SQL que generaste falló con este error:\n{error_sql}\n\n"
                         f"SQL fallido:\n{sql_generado}\n\n"
                         f"{columnas_reales}"
-                        "Genera un SQL corregido usando SOLO las columnas listadas arriba. "
+                        f"{consejo_like}"
+                        "Genera un SQL corregido usando SOLO las tablas y columnas listadas arriba. "
                         "Solo responde con el SQL corregido en un bloque ```sql```, sin explicaciones."
                     )
                     msgs_retry = mensajes_base + [{'role': 'user', 'content': prompt_retry}]
@@ -594,10 +599,12 @@ def consultar(
                 if len(datos_crudos) == 0:
                     for _ in range(2):
                         fecha_max_ctx = obtener_fecha_maxima(sql_generado)
+                        consejo_like = _detectar_igualdad_nombres(sql_generado)
                         prompt_vacio = (
                             f"El SQL ejecutó sin errores pero devolvió 0 filas.\n"
                             f"SQL ejecutado:\n```sql\n{sql_generado}\n```\n\n"
                             f"{fecha_max_ctx}"
+                            f"{consejo_like}"
                             f"Revisa si el filtro de fecha es demasiado estricto, si el estado "
                             f"está mal escrito, o si hay una fecha futura por error. "
                             f"Genera un SQL corregido. Responde SOLO con el SQL en un bloque ```sql```."
@@ -893,6 +900,45 @@ def _cargar_tipo(slug: str) -> dict | None:
         return row
     finally:
         conn.close()
+
+
+import re as _re
+
+# ── Columnas que contienen nombres de persona — nunca usar = exacto ──────────
+_COLS_PERSONA = (
+    'vendedor', 'nombre', 'tercero', 'nombre_encargado',
+    'nombre_contacto', 'id_cliente', 'nombre_cliente',
+)
+_PATRON_IGUALDAD = _re.compile(
+    r"(?:" + "|".join(_COLS_PERSONA) + r")\s*=\s*'[^']+'"
+    , _re.IGNORECASE)
+
+
+def _detectar_igualdad_nombres(sql: str) -> str:
+    """Si el SQL usa = exacto para columnas de persona, sugiere LIKE."""
+    coincidencias = _PATRON_IGUALDAD.findall(sql)
+    if not coincidencias:
+        return ''
+    return (
+        'IMPORTANTE: Estás usando comparación exacta (=) para nombres de persona:\n'
+        + '\n'.join(f'  {c}' for c in coincidencias) + '\n'
+        'Los usuarios escriben nombres parciales. Cambia a LIKE con %:\n'
+        '  Ejemplo: vendedor LIKE \'%Santiago%\' en vez de vendedor = \'Santiago\'\n\n'
+    )
+
+
+_PATRON_CORRECCION = _re.compile(
+    r"(" + "|".join(_COLS_PERSONA) + r")\s*=\s*'([^']+)'"
+    , _re.IGNORECASE)
+
+
+def _corregir_igualdad_nombres(sql: str) -> str:
+    """Reemplaza columna_persona = 'Valor' por columna_persona LIKE '%Valor%'."""
+    def _reemplazo(m):
+        col, val = m.group(1), m.group(2)
+        _log.info(f'Auto-corrección: {col} = \'{val}\' → LIKE \'%{val}%\'')
+        return f"{col} LIKE '%{val}%'"
+    return _PATRON_CORRECCION.sub(_reemplazo, sql)
 
 
 _OLLAMA_BASE = 'http://localhost:11434'

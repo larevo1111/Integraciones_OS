@@ -1,5 +1,5 @@
 # Contexto: Servicio IA — ia_service_os
-**Actualizado**: 2026-03-30
+**Actualizado**: 2026-04-02
 
 ## Scope y propósito
 
@@ -291,7 +291,7 @@ Claude Code CLI corre en paralelo al ia_service. El usuario selecciona `🦾 Sup
 - Aprobación de código: Claude envía JSON tipo "aprobacion" → bot notifica nivel 7 con ✅/❌
 - **Timeout: 1200s (20 minutos)**
 
-## Super Agente OpenCode (activo — 2026-03-30)
+## Super Agente OpenCode (activo — 2026-04-01)
 
 OpenCode CLI (MiMo V2) como segundo super agente. Seleccionar `🧩 Super Agente (OpenCode)`.
 
@@ -302,6 +302,8 @@ OpenCode CLI (MiMo V2) como segundo super agente. Seleccionar `🧩 Super Agente
 - Imágenes se guardan en `/home/osserver/Proyectos_Antigravity/sa_opencode/uploads/`
 - Teclado propio con [🔄 Actualizar datos] para nivel ≥5
 - **Timeout: 1200s (20 minutos)**
+- **Auto-recovery de sesión rota**: si OpenCode devuelve stdout vacío sin stderr (sesión corrupta/expirada), se crea sesión nueva automáticamente
+- DB sesiones OpenCode: SQLite en `~/.local/share/opencode/opencode.db` (role en `json_extract(m.data, '$.role')`)
 
 ## Menú agentes bot (simplificado — 2026-03-30)
 
@@ -312,20 +314,39 @@ Solo 3 opciones en `teclado.py`:
 
 Los demás agentes cloud siguen activos en ia_service pero no aparecen en el bot.
 
-## Ollama — pre-flight warmup (2026-03-30)
+## Ollama — pre-flight warmup + VRAM automática (2026-04-01)
 
 Antes de cada llamada a un agente Ollama (`localhost:11434`), `_warmup_ollama()` en servicio.py:
 1. Verifica que Ollama responde (`/api/ps`)
 2. Si no responde → `sudo systemctl start ollama.service`
-3. Si el modelo no está en VRAM → lo precarga con `POST /api/generate` (prompt vacío, keep_alive 10m)
-4. Si todo falla → retorna error limpio sin activar fallback innecesario
+3. Si el modelo no está en VRAM → llama `_liberar_vram_si_necesario()` primero
+4. `_liberar_vram_si_necesario()` detiene servicios GPU conflictivos (`_GPU_SERVICES_CONFLICTIVOS = ['os-comfyui.service']`)
+5. Precarga el modelo con `POST /api/generate` (prompt vacío, keep_alive 10m)
+6. Si todo falla → retorna error limpio sin activar fallback innecesario
 
-Esto evita que el cold-start de Ollama (~10s para cargar 14B en VRAM) cause timeout y active fallback a agentes cloud.
+**RTX 3060 12GB**: solo puede correr 1 framework GPU a la vez. ComfyUI usa ~9GB, Qwen 14B usa ~9GB. La automatización garantiza que Ollama siempre tenga VRAM disponible.
+
+**ComfyUI deshabilitado de auto-start** (`systemctl disable os-comfyui.service`) — solo se activa manualmente cuando se necesita.
+
+Tiempos típicos:
+- Modelo ya en VRAM (hot): ~16s
+- Modelo frío (warmup + precarga): ~37-40s
 
 ## Detección de período actual (_periodo_actual — 2026-03-30)
 
 Keywords ampliados para forzar SQL fresco (evitar caché con datos viejos):
 `este mes, mes actual, esta semana, semana actual, hoy, de hoy, ventas del mes, ventas de este, ventas del, dame las ventas, las ventas, cuánto llevamos, cuanto llevamos, cómo vamos, como vamos, lo que va, cuánto hemos vendido, cuanto hemos vendido, facturado`
+
+## Historial de conversación en Super Agentes (2026-04-01)
+
+Al cargar una conversación existente (switch), el bot muestra las últimas 5 preguntas y respuestas:
+- SA Claude: lee archivos `.jsonl` en `~/.claude/projects/.../`
+- SA OpenCode: lee SQLite `opencode.db` con `json_extract`
+- Funciones: `obtener_historial()` en `superagente.py` y `superagente_oc.py`
+
+## ia_logica_negocio — regla LIKE para personas (2026-04-01)
+
+Regla #38 ahora incluye gotcha #7: SIEMPRE usar `LIKE '%nombre%'` para buscar personas (vendedor, cliente, contacto). Nunca `=` exacto. Los usuarios dicen nombres parciales ("Santiago" = "Santiago Sierra").
 
 ## Fixes systemd bot (2026-03-30)
 
