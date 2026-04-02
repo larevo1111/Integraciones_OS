@@ -205,7 +205,6 @@
         :value="tarea.descripcion"
         placeholder="Agrega detalles, pasos a seguir..."
         @input="camposPendientes.descripcion = $event.target.value"
-        @blur="guardarCampoPendiente('descripcion', $event.target.value)"
       />
 
       <!-- Notas -->
@@ -216,7 +215,6 @@
         :value="tarea.notas"
         placeholder="Notas rápidas..."
         @input="camposPendientes.notas = $event.target.value"
-        @blur="guardarCampoPendiente('notas', $event.target.value)"
       />
 
       <!-- Acordeón: más campos (al final) -->
@@ -308,25 +306,9 @@ const props = defineProps({
 })
 const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre'])
 
-// ─── Guardar pendientes al cambiar de tarea ───
-let tareaIdAnterior = props.tarea?.id || null
-
-watch(() => props.tarea?.id, (nuevoId) => {
-  if (tareaIdAnterior && tareaIdAnterior !== nuevoId && hayCambiosPendientes.value) {
-    const idViejo = tareaIdAnterior
-    if (confirm('¿Guardar los cambios antes de cambiar de tarea?')) {
-      for (const [campo, val] of Object.entries(camposPendientes)) {
-        if (val !== undefined) {
-          api(`/api/gestion/tareas/${idViejo}`, {
-            method: 'PUT',
-            body: JSON.stringify({ [campo]: val })
-          }).catch(() => {})
-        }
-      }
-    }
-    Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
-  }
-  tareaIdAnterior = nuevoId
+// Limpiar pendientes al cambiar de tarea
+watch(() => props.tarea?.id, () => {
+  Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
 })
 
 // Breadcrumb subtarea
