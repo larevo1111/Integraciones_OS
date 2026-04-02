@@ -195,7 +195,7 @@
         <div class="sidebar-user" @click="menuUsuario = !menuUsuario">
           <img :src="auth.usuario?.foto || ''" :alt="auth.usuario?.nombre" class="sidebar-user-foto" @error="e => e.target.style.display='none'" />
           <div class="sidebar-user-info">
-            <div class="sidebar-user-name">{{ auth.usuario?.nombre }}</div>
+            <div class="sidebar-user-name">{{ auth.usuario?.nombre }} <span v-if="auth.esAdmin" style="font-size:9px;color:var(--text-tertiary);font-weight:400">{{ APP_VERSION }}</span></div>
             <div class="sidebar-user-empresa">{{ auth.empresa_activa?.siglas || auth.empresa_activa?.uid }}</div>
           </div>
         </div>
@@ -384,6 +384,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
+const APP_VERSION = 'v1.4-sidebar'
 const auth             = useAuthStore()
 const router           = useRouter()
 const route            = useRoute()

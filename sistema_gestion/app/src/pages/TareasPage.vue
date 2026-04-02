@@ -343,7 +343,7 @@
             <!-- Fecha -->
             <div style="position:relative">
               <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuFecha }" @click="cerrarMenusMulti('fecha')">
-                <span class="material-icons" style="font-size:14px">event</span> Fecha
+                <span class="material-icons" style="font-size:14px">event</span>
               </button>
               <div v-if="multiMenuFecha" class="multi-bar-menu">
                 <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(0))">Hoy</div>
@@ -413,6 +413,18 @@
                 </form>
                 <div class="multi-menu-sep" />
                 <div class="multi-menu-item" @click="quitarEtiquetasMulti">Quitar todas</div>
+              </div>
+            </div>
+
+            <!-- Responsable -->
+            <div style="position:relative">
+              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuResponsable }" @click="cerrarMenusMulti('responsable')">
+                <span class="material-icons" style="font-size:14px">person</span>
+              </button>
+              <div v-if="multiMenuResponsable" class="multi-bar-menu multi-bar-menu-scroll">
+                <div v-for="u in usuarios" :key="u.email" class="multi-menu-item" @click="aplicarResponsableMulti(u.email)">
+                  {{ u.nombre || u.email.split('@')[0] }}
+                </div>
               </div>
             </div>
 
@@ -553,8 +565,9 @@ const multiMenuFecha     = ref(false)
 const multiMenuEstado    = ref(false)
 const multiMenuCategoria = ref(false)
 const multiMenuProyecto  = ref(false)
-const multiMenuEtiqueta  = ref(false)
-const nuevaEtiquetaMulti = ref('')
+const multiMenuEtiqueta    = ref(false)
+const multiMenuResponsable = ref(false)
+const nuevaEtiquetaMulti   = ref('')
 
 function cerrarMenusMulti(abrir) {
   const yaAbierto = abrir === 'fecha' && multiMenuFecha.value
@@ -562,11 +575,13 @@ function cerrarMenusMulti(abrir) {
     || abrir === 'categoria' && multiMenuCategoria.value
     || abrir === 'proyecto' && multiMenuProyecto.value
     || abrir === 'etiqueta' && multiMenuEtiqueta.value
-  multiMenuFecha.value     = !yaAbierto && abrir === 'fecha'
-  multiMenuEstado.value    = !yaAbierto && abrir === 'estado'
-  multiMenuCategoria.value = !yaAbierto && abrir === 'categoria'
-  multiMenuProyecto.value  = !yaAbierto && abrir === 'proyecto'
-  multiMenuEtiqueta.value  = !yaAbierto && abrir === 'etiqueta'
+    || abrir === 'responsable' && multiMenuResponsable.value
+  multiMenuFecha.value       = !yaAbierto && abrir === 'fecha'
+  multiMenuEstado.value      = !yaAbierto && abrir === 'estado'
+  multiMenuCategoria.value   = !yaAbierto && abrir === 'categoria'
+  multiMenuProyecto.value    = !yaAbierto && abrir === 'proyecto'
+  multiMenuEtiqueta.value    = !yaAbierto && abrir === 'etiqueta'
+  multiMenuResponsable.value = !yaAbierto && abrir === 'responsable'
 }
 
 function isoRelativo(dias) {
@@ -1165,6 +1180,13 @@ async function quitarEtiquetasMulti() {
   cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   await _bulkPut(ids, { etiquetas: [] })
+  await _postBulk(ids)
+}
+
+async function aplicarResponsableMulti(email) {
+  cerrarMenusMulti(null)
+  const ids = [...seleccionMultiIds.value]
+  await _bulkPut(ids, { responsable: email })
   await _postBulk(ids)
 }
 
