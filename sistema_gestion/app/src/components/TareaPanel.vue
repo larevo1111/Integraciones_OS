@@ -202,7 +202,7 @@
       <textarea
         class="input-field"
         rows="5"
-        :value="tarea.descripcion"
+        :value="camposPendientes.descripcion !== undefined ? camposPendientes.descripcion : tarea.descripcion"
         placeholder="Agrega detalles, pasos a seguir..."
         @input="camposPendientes.descripcion = $event.target.value"
       />
@@ -212,7 +212,7 @@
       <textarea
         class="input-field"
         rows="3"
-        :value="tarea.notas"
+        :value="camposPendientes.notas !== undefined ? camposPendientes.notas : tarea.notas"
         placeholder="Notas rápidas..."
         @input="camposPendientes.notas = $event.target.value"
       />
