@@ -384,7 +384,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v1.5-multiResp'
+const APP_VERSION = 'v1.6-recargar'
 const auth             = useAuthStore()
 const router           = useRouter()
 const route            = useRoute()
@@ -477,6 +477,7 @@ function abrirPanel(tipo, item = null) {
 }
 
 provide('abrirPanelItem', abrirPanel)
+provide('recargarSidebar', cargarProyectos)
 
 function onItemGuardado(p) {
   if (p._accion === 'creado') {

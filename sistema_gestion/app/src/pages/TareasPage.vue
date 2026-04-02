@@ -498,6 +498,7 @@ const auth  = useAuthStore()
 const route  = useRoute()
 const router = useRouter()
 const abrirPanelItem = inject('abrirPanelItem', () => {})
+const recargarSidebar = inject('recargarSidebar', () => {})
 
 // Detección mobile (≤768px) — controla bottom sheet vs panel lateral
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
@@ -1116,6 +1117,7 @@ async function _postBulk(ids) {
   if (tareaSeleccionada.value && ids.includes(tareaSeleccionada.value.id)) tareaSeleccionada.value = null
   seleccionMultiIds.value = []
   await cargarTareas()   // recarga con el filtro actual → vistas siempre correctas
+  recargarSidebar()      // actualizar conteos en sidebar
 }
 
 async function aplicarFechaMulti(fecha) {

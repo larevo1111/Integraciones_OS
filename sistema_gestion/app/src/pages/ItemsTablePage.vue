@@ -62,7 +62,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, inject } from 'vue'
 import { api } from 'src/services/api'
 import GestionTable from 'src/components/GestionTable.vue'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
@@ -119,6 +119,7 @@ const filasFiltradas = computed(() => {
 
 const panelVisible = ref(false)
 const panelItem    = ref(null)
+const recargarSidebar = inject('recargarSidebar', () => {})
 
 async function cargar() {
   cargando.value = true
@@ -164,10 +165,12 @@ function onGuardado(p) {
     const idx = items.value.findIndex(x => x.id === p.id)
     if (idx !== -1) items.value[idx] = { ...items.value[idx], ...p, responsables_str: (p.responsables || []).join(',') }
   }
+  recargarSidebar()
 }
 
 function onEliminado(p) {
   items.value = items.value.filter(x => x.id !== p.id)
+  recargarSidebar()
 }
 
 // Recargar cuando cambia el tipo (Vue Router reutiliza el componente)

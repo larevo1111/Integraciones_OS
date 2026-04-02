@@ -256,7 +256,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch, inject } from 'vue'
 import { api } from 'src/services/api'
 import CategoriaSelector from './CategoriaSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
@@ -272,6 +272,7 @@ const props = defineProps({
   etiquetas:   { type: Array, default: () => [] },
 })
 const emit = defineEmits(['cerrar', 'guardado', 'eliminado'])
+const recargarSidebar = inject('recargarSidebar', () => {})
 
 const LABELS = {
   proyecto:    { singular: 'Proyecto',    placeholder: 'Nombre del proyecto...' },
@@ -396,6 +397,7 @@ async function crearTareaEnProyecto() {
     nuevaTareaFecha.value = ''
     mostrarFormTarea.value = false
     await cargarTareas()
+    recargarSidebar()
   } catch (e) { console.error(e) }
 }
 
