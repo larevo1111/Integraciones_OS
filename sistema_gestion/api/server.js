@@ -2197,7 +2197,9 @@ app.get('/api/gestion/jornadas/tareas-dia', requireAuth, async (req, res) => {
     const [tareas] = await db.gestion.query(`
       SELECT t.id, t.titulo, t.estado,
              c.nombre AS categoria_nombre, c.color AS categoria_color,
-             t.fecha_inicio_real, t.fecha_fin_real, t.tiempo_real_min,
+             t.fecha_inicio_real, t.fecha_fin_real,
+             t.fecha_inicio_estimada, t.fecha_limite AS fecha_fin_estimada,
+             t.tiempo_real_min, t.tiempo_estimado_min,
              CASE
                WHEN t.fecha_inicio_real IS NOT NULL AND t.fecha_fin_real IS NOT NULL
                THEN TIMESTAMPDIFF(MINUTE, t.fecha_inicio_real, t.fecha_fin_real)

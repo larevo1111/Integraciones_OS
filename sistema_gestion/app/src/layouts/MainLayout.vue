@@ -394,7 +394,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v1.9.3'
+const APP_VERSION = 'v1.9.4'
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)

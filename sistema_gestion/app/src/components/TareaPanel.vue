@@ -46,7 +46,7 @@
             class="prioridad-chip"
             :class="{ active: tarea.estado === e.key }"
             :style="tarea.estado === e.key ? { background: e.color + '22', borderColor: e.color, color: e.color } : {}"
-            @click="actualizar('estado', e.key)"
+            @click="e.key === 'Completada' && tarea.estado !== 'Completada' ? completar() : actualizar('estado', e.key)"
           >
             <span class="p-dot" :style="{ background: e.color }"></span>
             {{ e.label }}
@@ -519,7 +519,9 @@ async function actualizar(campo, valor) {
 
 function ciclarEstado() {
   const ciclo = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente', 'Cancelada': 'Pendiente' }
-  actualizar('estado', ciclo[props.tarea.estado] || 'Pendiente')
+  const next = ciclo[props.tarea.estado] || 'Pendiente'
+  if (next === 'Completada') { completar(); return }
+  actualizar('estado', next)
 }
 
 

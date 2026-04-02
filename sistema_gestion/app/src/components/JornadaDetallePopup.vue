@@ -193,33 +193,18 @@
           </div>
 
           <!-- Sección: Tareas completadas -->
-          <div class="sec">
-            <div class="sec-label">Tareas completadas ({{ tareasCompletadas.length }})</div>
-            <div v-if="cargandoTareas" class="empty-pausas">Cargando...</div>
-            <div v-else-if="!tareasCompletadas.length" class="empty-pausas">Sin tareas completadas este día</div>
-            <div v-else class="pausas-scroll">
-              <table class="pausas-table">
-                <thead>
-                  <tr>
-                    <th class="pth">Tarea</th>
-                    <th class="pth">Categoría</th>
-                    <th class="pth">Fin</th>
-                    <th class="pth">Duración</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="t in tareasCompletadas" :key="t.id" class="ptr">
-                    <td class="ptd ptd-titulo">{{ t.titulo }}</td>
-                    <td class="ptd">
-                      <span class="cat-dot" :style="{ background: t.categoria_color || 'var(--text-tertiary)' }"></span>
-                      {{ t.categoria_nombre }}
-                    </td>
-                    <td class="ptd ptd-mono">{{ fmtHora(t.fecha_fin_real) }}</td>
-                    <td class="ptd ptd-mono">{{ formatMins(t.duracion_real_min) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <div class="sec sec-tareas">
+            <GestionTable
+              title="Tareas completadas"
+              :columns="tareasColumnas"
+              :rows="tareasRows"
+              :loading="cargandoTareas"
+            >
+              <template #cell-categoria_nombre="{ row }">
+                <span class="cat-dot" :style="{ background: row.categoria_color || 'var(--text-tertiary)' }"></span>
+                {{ row.categoria_nombre }}
+              </template>
+            </GestionTable>
           </div>
 
           <!-- Sección: Acciones admin -->
@@ -260,8 +245,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { api } from 'src/services/api'
+import GestionTable from 'src/components/GestionTable.vue'
 
 const props = defineProps({
   jornada: { type: Object, required: true },
@@ -274,6 +260,32 @@ const pausas = computed(() => props.jornada.pausas || [])
 // Tareas completadas ese día
 const tareasCompletadas = ref([])
 const cargandoTareas = ref(false)
+
+const tareasColumnas = reactive([
+  { key: 'titulo',               label: 'Tarea',           visible: true,  width: '160px' },
+  { key: 'categoria_nombre',     label: 'Categoría',       visible: true },
+  { key: 'estado',               label: 'Estado',          visible: false },
+  { key: 'fecha_inicio_real',    label: 'Inicio real',     visible: true },
+  { key: 'fecha_fin_real',       label: 'Fin real',        visible: true },
+  { key: 'duracion_real_min',    label: 'Dur. real',       visible: true },
+  { key: 'tiempo_real_min',      label: 'T. cronómetro',   visible: false },
+  { key: 'fecha_inicio_estimada',label: 'Inicio est.',     visible: false },
+  { key: 'fecha_fin_estimada',   label: 'Fin est.',        visible: false },
+  { key: 'tiempo_estimado_min',  label: 'Dur. estimada',   visible: false },
+])
+
+const tareasRows = computed(() => tareasCompletadas.value.map(t => ({
+  ...t,
+  fecha_inicio_real:     fmtDT(t.fecha_inicio_real),
+  fecha_fin_real:        fmtDT(t.fecha_fin_real),
+  fecha_inicio_estimada: fmtDT(t.fecha_inicio_estimada),
+  fecha_fin_estimada:    fmtDT(t.fecha_fin_estimada),
+  duracion_real_min:     formatMins(t.duracion_real_min),
+  tiempo_real_min:       formatMins(t.tiempo_real_min),
+  tiempo_estimado_min:   formatMins(t.tiempo_estimado_min),
+  // conservar color para el slot
+  categoria_color:       t.categoria_color,
+})))
 
 // Estado
 const estadoLabel = computed(() => {
@@ -543,6 +555,12 @@ function formatMins(mins) {
   const h = Math.floor(m / 60), r = m % 60
   return h > 0 ? `${h}h${r > 0 ? ' ' + r + 'm' : ''}` : `${m}m`
 }
+function fmtDT(val) {
+  if (!val) return '—'
+  const d = new Date(val)
+  if (isNaN(d)) return '—'
+  return d.toLocaleString('es-CO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
 function durPausa(p) {
   if (!p.hora_inicio) return '—'
   const fin = p.hora_fin ? new Date(p.hora_fin) : new Date()
@@ -636,8 +654,11 @@ function durPausa(p) {
 .ptd-mono { font-variant-numeric: tabular-nums; }
 .ptd-actions { text-align: center; }
 .ptr:last-child .ptd { border-bottom: none; }
-.ptd-titulo { white-space: normal; min-width: 120px; max-width: 200px; }
 .cat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.sec-tareas { margin: 0 -18px; }
+.sec-tareas :deep(.os-table-wrapper) { border: none; border-radius: 0; }
+.sec-tareas :deep(.table-toolbar) { padding: 8px 18px; }
+.sec-tareas :deep(.table-scroll) { max-height: 260px; }
 
 /* Botón edit dentro de fila */
 .btn-edit-pausa {
@@ -721,5 +742,7 @@ function durPausa(p) {
   .btn-add-pausa { height: 32px; padding: 0 14px; font-size: 12px; }
   .btn-edit-pausa { width: 32px; height: 32px; }
   .btn-edit-pausa .material-icons { font-size: 16px !important; }
+  .sec-tareas { margin: 0 -14px; }
+  .sec-tareas :deep(.table-toolbar) { padding: 8px 14px; }
 }
 </style>
