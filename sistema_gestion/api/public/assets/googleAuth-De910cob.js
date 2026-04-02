@@ -1,1 +1,0 @@
-import{b as t}from"./index-7LU7T6xe.js";import{L as e}from"./index.esm-DnE-z2Mm.js";const a=t(({app:o})=>{o.use(e,{clientId:"290093919454-j2l1el0p624v65cada556pdc3r2gm6k7.apps.googleusercontent.com"})});export{a as default};

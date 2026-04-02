@@ -192,6 +192,36 @@
             </button>
           </div>
 
+          <!-- Sección: Tareas completadas -->
+          <div class="sec">
+            <div class="sec-label">Tareas completadas ({{ tareasCompletadas.length }})</div>
+            <div v-if="cargandoTareas" class="empty-pausas">Cargando...</div>
+            <div v-else-if="!tareasCompletadas.length" class="empty-pausas">Sin tareas completadas este día</div>
+            <div v-else class="pausas-scroll">
+              <table class="pausas-table">
+                <thead>
+                  <tr>
+                    <th class="pth">Tarea</th>
+                    <th class="pth">Categoría</th>
+                    <th class="pth">Fin</th>
+                    <th class="pth">Duración</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="t in tareasCompletadas" :key="t.id" class="ptr">
+                    <td class="ptd ptd-titulo">{{ t.titulo }}</td>
+                    <td class="ptd">
+                      <span class="cat-dot" :style="{ background: t.categoria_color || 'var(--text-tertiary)' }"></span>
+                      {{ t.categoria_nombre }}
+                    </td>
+                    <td class="ptd ptd-mono">{{ fmtHora(t.fecha_fin_real) }}</td>
+                    <td class="ptd ptd-mono">{{ formatMins(t.duracion_real_min) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Sección: Acciones admin -->
           <div v-if="esAdmin" class="sec sec-admin">
             <div class="sec-label">Administración</div>
@@ -240,6 +270,10 @@ const props = defineProps({
 const emit = defineEmits(['cerrar', 'actualizada'])
 
 const pausas = computed(() => props.jornada.pausas || [])
+
+// Tareas completadas ese día
+const tareasCompletadas = ref([])
+const cargandoTareas = ref(false)
 
 // Estado
 const estadoLabel = computed(() => {
@@ -299,6 +333,14 @@ onMounted(async () => {
       tiposPausa.value = data.tipos || data || []
     } catch { /* silencio */ }
   }
+  // Cargar tareas completadas ese día por ese usuario
+  cargandoTareas.value = true
+  try {
+    const fecha = String(props.jornada.fecha).slice(0, 10)
+    const data = await api(`/api/gestion/jornadas/tareas-dia?usuario=${encodeURIComponent(props.jornada.usuario)}&fecha=${fecha}`)
+    tareasCompletadas.value = data.tareas || []
+  } catch { /* silencio */ }
+  cargandoTareas.value = false
 })
 
 // ── Nueva pausa ──
@@ -594,6 +636,8 @@ function durPausa(p) {
 .ptd-mono { font-variant-numeric: tabular-nums; }
 .ptd-actions { text-align: center; }
 .ptr:last-child .ptd { border-bottom: none; }
+.ptd-titulo { white-space: normal; min-width: 120px; max-width: 200px; }
+.cat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
 
 /* Botón edit dentro de fila */
 .btn-edit-pausa {

@@ -2165,6 +2165,32 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/gestion/jornadas/tareas-dia — tareas completadas por un usuario en una fecha
+app.get('/api/gestion/jornadas/tareas-dia', requireAuth, async (req, res) => {
+  const { usuario, fecha } = req.query
+  if (!usuario || !fecha) return res.status(400).json({ error: 'Falta usuario o fecha' })
+  try {
+    const [tareas] = await db.gestion.query(`
+      SELECT t.id, t.titulo, t.estado,
+             c.nombre AS categoria_nombre, c.color AS categoria_color,
+             t.fecha_inicio_real, t.fecha_fin_real, t.tiempo_real_min,
+             CASE
+               WHEN t.fecha_inicio_real IS NOT NULL AND t.fecha_fin_real IS NOT NULL
+               THEN TIMESTAMPDIFF(MINUTE, t.fecha_inicio_real, t.fecha_fin_real)
+               ELSE NULL
+             END AS duracion_real_min
+      FROM g_tareas t
+      JOIN g_categorias c ON c.id = t.categoria_id
+      WHERE t.empresa = ?
+        AND t.estado IN ('Completada', 'Cancelada')
+        AND DATE(t.fecha_fin_real) = ?
+        AND EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)
+      ORDER BY t.fecha_fin_real
+    `, [req.empresa, fecha, usuario])
+    res.json({ ok: true, tareas })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ─── TIPOS DE PAUSA ──────────────────────────────────────────────────
 
 // GET /api/gestion/tipos-pausa
