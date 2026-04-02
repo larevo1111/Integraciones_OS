@@ -24,12 +24,12 @@
         <!-- ═══ SUB-PANEL: Detalle tarea ═══ -->
         <template v-if="tareaAbierta">
           <div class="pp-header">
-            <button class="pp-btn-icon" @click="cerrarSubTarea" title="Volver">
+            <button class="btn-icon" @click="cerrarSubTarea" title="Volver">
               <span class="material-icons" style="font-size:18px">arrow_back</span>
             </button>
-            <span class="pp-header-tipo">Tarea</span>
-            <div style="display:flex;gap:4px;margin-left:auto">
-              <button class="pp-btn-icon" @click="$emit('cerrar')">
+            <span class="panel-header-tipo">Tarea</span>
+            <div class="panel-header-actions">
+              <button class="btn-icon" title="Cerrar" @click="$emit('cerrar')">
                 <span class="material-icons" style="font-size:18px">close</span>
               </button>
             </div>
@@ -53,12 +53,12 @@
         <template v-else>
         <!-- Header -->
         <div class="pp-header">
-          <span class="pp-header-tipo">{{ LABELS[tipoLocal].singular }}</span>
-          <div style="display:flex;gap:4px;margin-left:auto">
-            <button v-if="item?.id" class="pp-btn-icon" title="Eliminar" @click="eliminar">
+          <span class="panel-header-tipo">{{ LABELS[tipoLocal].singular }}</span>
+          <div class="panel-header-actions">
+            <button v-if="item?.id" class="btn-icon" title="Eliminar" @click="eliminar">
               <span class="material-icons" style="font-size:16px">delete_outline</span>
             </button>
-            <button class="pp-btn-icon" @click="$emit('cerrar')">
+            <button class="btn-icon" title="Cerrar" @click="$emit('cerrar')">
               <span class="material-icons" style="font-size:18px">close</span>
             </button>
           </div>
@@ -578,17 +578,6 @@ function fmtFecha(iso) {
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
-.pp-header-tipo {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.07em; color: var(--text-tertiary);
-}
-.pp-btn-icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: var(--radius-sm);
-  border: none; background: transparent; color: var(--text-tertiary);
-  cursor: pointer; transition: all 80ms;
-}
-.pp-btn-icon:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
 /* Body */
 .pp-body {

@@ -129,10 +129,12 @@ function calcularPosicion() {
   if (!wrapRef.value) return
   const rect = wrapRef.value.getBoundingClientRect()
   const goUp = (window.innerHeight - rect.bottom) < 220 && rect.top > 220
+  const ddWidth = Math.min(Math.max(rect.width, 220), 280)
+  const leftPos = Math.max(8, Math.min(rect.left, window.innerWidth - ddWidth - 8))
   dropdownStyle.value = {
     position: 'fixed',
-    left: `${rect.left}px`,
-    width: `${Math.min(Math.max(rect.width, 200), 260)}px`,
+    left: `${leftPos}px`,
+    width: `${ddWidth}px`,
     zIndex: 9999,
     ...(goUp
       ? { bottom: `${window.innerHeight - rect.top}px` }
@@ -304,9 +306,9 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 .etq-row-selected { background: var(--bg-row-hover); }
 
 .etq-select-zone {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 8px;
   flex: 1; min-width: 0;
-  padding: 7px 6px 7px 10px;
+  padding: 7px 4px 7px 12px;
   cursor: pointer;
 }
 .etq-check { font-size: 15px; color: var(--accent); flex-shrink: 0; }

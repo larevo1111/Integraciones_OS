@@ -2,12 +2,24 @@
   <aside v-if="tarea" class="tarea-panel">
     <!-- Header -->
     <div class="tarea-panel-header">
-      <!-- Breadcrumb para subtareas -->
-      <div v-if="tarea.parent_id" class="subtarea-breadcrumb" @click="$emit('abrir-padre', tarea.parent_id)">
-        <span class="material-icons" style="font-size:13px">arrow_back</span>
-        <span>{{ padreNombre || 'Tarea padre' }}</span>
+      <!-- Fila 1: tipo + acciones -->
+      <div class="panel-header-row">
+        <div v-if="tarea.parent_id" class="subtarea-breadcrumb" @click="$emit('abrir-padre', tarea.parent_id)">
+          <span class="material-icons" style="font-size:13px">arrow_back</span>
+          <span>{{ padreNombre || 'Tarea padre' }}</span>
+        </div>
+        <span v-else class="panel-header-tipo">Tarea</span>
+        <div class="panel-header-actions">
+          <button class="btn-icon" title="Eliminar" @click="$emit('eliminar', tarea)">
+            <span class="material-icons" style="font-size:16px">delete_outline</span>
+          </button>
+          <button class="btn-icon" title="Cerrar" @click="$emit('cerrar')">
+            <span class="material-icons" style="font-size:18px">close</span>
+          </button>
+        </div>
       </div>
-      <div style="display:flex;align-items:flex-start;gap:8px">
+      <!-- Fila 2: estado + título -->
+      <div class="panel-header-titulo-row">
         <EstadoBadge :estado="tarea.estado" @click="ciclarEstado" style="margin-top:2px;flex-shrink:0" />
         <textarea
           class="tarea-panel-titulo"
@@ -16,7 +28,6 @@
           @blur="e => e.target.value.trim() && e.target.value !== tarea.titulo && actualizar('titulo', e.target.value.trim())"
           @keydown.enter.prevent="e => { e.target.blur() }"
         />
-        <button class="btn-icon" @click="$emit('cerrar')"><span class="material-icons" style="font-size:18px">close</span></button>
       </div>
     </div>
 
@@ -248,11 +259,6 @@
           </div>
         </div>
       </Transition>
-      <div style="display:flex;gap:6px;width:100%">
-        <button class="btn btn-danger btn-sm" @click="$emit('eliminar', tarea)">Eliminar</button>
-        <div style="flex:1" />
-        <button class="btn btn-secondary btn-sm" @click="$emit('cerrar')">Cerrar</button>
-      </div>
     </div>
   </aside>
 

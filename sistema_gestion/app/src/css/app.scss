@@ -589,9 +589,25 @@ body {
   flex-shrink: 0;
 }
 .tarea-panel-header {
-  padding: 14px 16px 12px;
+  padding: 10px 16px 10px;
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+/* Header estándar para paneles (reutilizable) */
+.panel-header-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-header-tipo {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-tertiary);
+}
+.panel-header-actions {
+  display: flex; gap: 4px; margin-left: auto;
+}
+.panel-header-titulo-row {
+  display: flex; align-items: flex-start; gap: 8px;
 }
 .tarea-panel-titulo {
   font-size: 13px;
