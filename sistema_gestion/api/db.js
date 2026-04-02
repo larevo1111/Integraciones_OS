@@ -44,7 +44,8 @@ function crearPools() {
   const base = {
     host: '127.0.0.1', port: LOCAL_PORT,
     password: DB_PASS, waitForConnections: true,
-    connectionLimit: 10, timezone: 'local'
+    connectionLimit: 10, timezone: 'local',
+    dateStrings: true
   }
   poolComunidad   = mysql.createPool({ ...base, user: DB_USER_COMUNIDAD,   database: DB_COMUNIDAD })
   poolIntegracion = mysql.createPool({ ...base, user: DB_USER_INTEGRACION, database: DB_INTEGRACION })

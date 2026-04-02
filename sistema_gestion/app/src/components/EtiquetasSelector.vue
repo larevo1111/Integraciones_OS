@@ -110,7 +110,7 @@ const editandoNombre = ref('')
 const extras = ref([])  // etiquetas creadas localmente (cuando se pasa prop)
 const etiquetasData = computed(() => {
   const base = props.etiquetas !== null ? props.etiquetas : lista.value
-  if (!extras.value.length) return base
+  if (!extras.value.length) return [...base]
   const ids = new Set(base.map(e => e.id))
   return [...base, ...extras.value.filter(e => !ids.has(e.id))]
 })
@@ -230,6 +230,7 @@ async function eliminarEtiqueta() {
     if (props.etiquetas === null) {
       lista.value = lista.value.filter(x => x.id !== id)
     }
+    extras.value = extras.value.filter(x => x.id !== id)
     if (props.modelValue.includes(id)) {
       emit('update:modelValue', props.modelValue.filter(x => x !== id))
     }
