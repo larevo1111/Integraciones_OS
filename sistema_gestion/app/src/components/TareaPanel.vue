@@ -80,6 +80,8 @@
           :etiquetas="etiquetas"
           @update:model-value="actualizarEtiquetas"
           @etiqueta-creada="e => etiquetas.push(e)"
+          @etiqueta-actualizada="e => { const i = etiquetas.findIndex(x => x.id === e.id); if (i !== -1) etiquetas[i] = e }"
+          @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
         />
       </div>
       <div class="field-row" style="align-items:flex-start">
