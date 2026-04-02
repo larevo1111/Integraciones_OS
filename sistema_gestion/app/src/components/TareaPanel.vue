@@ -10,10 +10,13 @@
         </div>
         <span v-else class="panel-header-tipo">Tarea</span>
         <div class="panel-header-actions">
+          <button v-if="hayCambiosPendientes" class="btn-icon" title="Guardar cambios" @click="guardarPendientes">
+            <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+          </button>
           <button class="btn-icon" title="Eliminar" @click="$emit('eliminar', tarea)">
             <span class="material-icons" style="font-size:16px">delete_outline</span>
           </button>
-          <button class="btn-icon" title="Cerrar" @click="$emit('cerrar')">
+          <button class="btn-icon" title="Cerrar" @click="intentarCerrar">
             <span class="material-icons" style="font-size:18px">close</span>
           </button>
         </div>
@@ -201,7 +204,8 @@
         rows="5"
         :value="tarea.descripcion"
         placeholder="Agrega detalles, pasos a seguir..."
-        @blur="actualizar('descripcion', $event.target.value)"
+        @input="camposPendientes.descripcion = $event.target.value"
+        @blur="guardarCampoPendiente('descripcion', $event.target.value)"
       />
 
       <!-- Notas -->
@@ -211,7 +215,8 @@
         rows="3"
         :value="tarea.notas"
         placeholder="Notas rápidas..."
-        @blur="actualizar('notas', $event.target.value)"
+        @input="camposPendientes.notas = $event.target.value"
+        @blur="guardarCampoPendiente('notas', $event.target.value)"
       />
 
       <!-- Acordeón: más campos (al final) -->
@@ -267,7 +272,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
@@ -395,6 +400,42 @@ async function actualizarFechaEstimada(valor) {
     })
     emit('actualizada', data.tarea)
   } catch (e) { console.error(e) }
+}
+
+// ─── Cambios pendientes (descripción, notas) ───
+const camposPendientes = reactive({})
+
+const hayCambiosPendientes = computed(() => {
+  for (const [campo, val] of Object.entries(camposPendientes)) {
+    if (val !== undefined && val !== (props.tarea[campo] || '')) return true
+  }
+  return false
+})
+
+function guardarCampoPendiente(campo, valor) {
+  if (valor !== (props.tarea[campo] || '')) {
+    actualizar(campo, valor)
+  }
+  delete camposPendientes[campo]
+}
+
+async function guardarPendientes() {
+  for (const [campo, val] of Object.entries(camposPendientes)) {
+    if (val !== undefined && val !== (props.tarea[campo] || '')) {
+      await actualizar(campo, val)
+    }
+  }
+  Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
+}
+
+function intentarCerrar() {
+  if (hayCambiosPendientes.value) {
+    if (confirm('¿Guardar los cambios antes de cerrar?')) {
+      guardarPendientes().then(() => emit('cerrar'))
+      return
+    }
+  }
+  emit('cerrar')
 }
 
 async function actualizar(campo, valor) {

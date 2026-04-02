@@ -96,9 +96,11 @@
             @keydown.escape="qaCancelar"
           />
           <template v-if="qaActivo">
-            <button type="button" class="btn btn-ghost btn-sm" @click="qaCancelar">Cancelar</button>
-            <button type="submit" class="btn btn-primary btn-sm" :disabled="!qaTitulo || qaGuardando">
-              {{ qaGuardando ? '...' : 'Agregar' }}
+            <button type="submit" class="btn-icon" :disabled="!qaTitulo || qaGuardando" title="Agregar">
+              <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+            </button>
+            <button type="button" class="btn-icon" @click="qaCancelar" title="Cancelar">
+              <span class="material-icons" style="font-size:18px">close</span>
             </button>
           </template>
         </form>

@@ -199,8 +199,12 @@
                 @keydown.escape="mostrarFormTarea = false; nuevaTareaTitulo = ''"
               />
               <template v-if="mostrarFormTarea">
-                <button type="button" class="btn btn-ghost btn-sm" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''">Cancelar</button>
-                <button type="submit" class="btn btn-primary btn-sm" :disabled="!nuevaTareaTitulo.trim()">Agregar</button>
+                <button type="submit" class="btn-icon" :disabled="!nuevaTareaTitulo.trim()" title="Agregar">
+                  <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+                </button>
+                <button type="button" class="btn-icon" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''" title="Cancelar">
+                  <span class="material-icons" style="font-size:18px">close</span>
+                </button>
               </template>
             </form>
             <template v-if="mostrarFormTarea">
