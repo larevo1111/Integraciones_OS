@@ -1186,7 +1186,15 @@ async function quitarEtiquetasMulti() {
 async function aplicarResponsableMulti(email) {
   cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
-  await _bulkPut(ids, { responsable: email })
+  const allTareas = [...tareas.value, ...completadas.value]
+  await Promise.all(ids.map(id => {
+    const t = allTareas.find(x => x.id === id)
+    const actuales = t?.responsables || (t?.responsable ? [t.responsable] : [])
+    if (actuales.includes(email)) return Promise.resolve()
+    return api(`/api/gestion/tareas/${id}`, {
+      method: 'PUT', body: JSON.stringify({ responsables: [...actuales, email] })
+    }).catch(console.error)
+  }))
   await _postBulk(ids)
 }
 

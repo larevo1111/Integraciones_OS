@@ -85,12 +85,12 @@
         />
       </div>
       <div class="field-row" style="align-items:flex-start">
-        <span class="field-label" style="padding-top:4px">Responsable</span>
+        <span class="field-label" style="padding-top:4px">Responsables</span>
         <ResponsablesSelector
-          :single="true"
-          :model-value="tarea.responsable ? [tarea.responsable] : []"
+          :single="false"
+          :model-value="tarea.responsables || (tarea.responsable ? [tarea.responsable] : [])"
           :usuarios="usuarios"
-          @update:model-value="v => actualizar('responsable', v[0] || null)"
+          @update:model-value="v => actualizar('responsables', v)"
         />
       </div>
       <!-- Fecha estimada (campo principal) -->

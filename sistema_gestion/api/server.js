@@ -408,16 +408,18 @@ app.get('/api/gestion/tareas', async (req, res) => {
   }
 
   // Filtros adicionales (simples)
-  if (responsable)  { where.push('t.responsable = ?');   params.push(responsable) }
-  if (solo_mias === '1') { where.push('t.responsable = ?'); params.push(req.usuario.email) }
+  if (responsable)  { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(responsable) }
+  if (solo_mias === '1') { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(req.usuario.email) }
   if (estado)       { where.push('t.estado = ?');        params.push(estado) }
 
   // responsables: multi (comma-separated emails)
   const responsablesRaw = req.query.responsables
   if (responsablesRaw) {
     const emails = String(responsablesRaw).split(',').map(s => s.trim()).filter(Boolean)
-    if (emails.length === 1) { where.push('t.responsable = ?'); params.push(emails[0]) }
-    else if (emails.length > 1) { where.push(`t.responsable IN (${emails.map(() => '?').join(',')})`); params.push(...emails) }
+    if (emails.length > 0) {
+      where.push(`EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email IN (${emails.map(() => '?').join(',')}))`)
+      params.push(...emails)
+    }
   }
 
   // id_op: búsqueda parcial en OP Effi
@@ -484,7 +486,8 @@ app.get('/api/gestion/tareas', async (req, res) => {
         -- Etiquetas como JSON array
         (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', e.id, 'nombre', e.nombre, 'color', e.color))
          FROM g_etiquetas_tareas et JOIN g_etiquetas e ON e.id = et.etiqueta_id
-         WHERE et.tarea_id = t.id) AS etiquetas_json
+         WHERE et.tarea_id = t.id) AS etiquetas_json,
+        (SELECT GROUP_CONCAT(tr.email SEPARATOR ',') FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id) AS responsables_csv
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
@@ -501,24 +504,29 @@ app.get('/api/gestion/tareas', async (req, res) => {
       etiquetas: t.etiquetas_json ? (typeof t.etiquetas_json === 'string' ? JSON.parse(t.etiquetas_json) : t.etiquetas_json) : []
     }))
 
-    // Enriquecer con nombre del responsable (pool comunidad, diferente BD)
-    const emails = [...new Set(tareasBase.map(t => t.responsable).filter(Boolean))]
+    // Enriquecer con nombres de responsables
+    const allEmails = [...new Set(tareasBase.flatMap(t => (t.responsables_csv || '').split(',').filter(Boolean)))]
     let nombreMap = {}
-    if (emails.length) {
+    if (allEmails.length) {
       try {
         const [users] = await db.comunidad.query(
-          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${emails.map(() => '?').join(',')})`,
-          emails
+          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${allEmails.map(() => '?').join(',')})`,
+          allEmails
         )
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
       } catch {}
     }
-    const tareasConEtiquetas = tareasBase.map(t => ({
-      ...t,
-      responsable_nombre: nombreMap[t.responsable] || null
-    }))
+    const tareasFinales = tareasBase.map(t => {
+      const responsables = t.responsables_csv ? t.responsables_csv.split(',') : []
+      return {
+        ...t,
+        responsables,
+        responsable_nombre: nombreMap[t.responsable] || null,
+        responsables_nombres: responsables.map(e => nombreMap[e] || e.split('@')[0])
+      }
+    })
 
-    res.json({ ok: true, tareas: tareasConEtiquetas })
+    res.json({ ok: true, tareas: tareasFinales })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -531,35 +539,38 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
   const params = [req.empresa]
 
   if (categoria_id) { where.push('t.categoria_id = ?'); params.push(categoria_id) }
-  if (responsable)  { where.push('t.responsable = ?');  params.push(responsable) }
+  if (responsable)  { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(responsable) }
   if (proyecto_id)  { where.push('t.proyecto_id = ?');  params.push(proyecto_id) }
-  if (solo_mias === '1') { where.push('t.responsable = ?'); params.push(req.usuario.email) }
+  if (solo_mias === '1') { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(req.usuario.email) }
 
   try {
     const [tareasBase] = await db.gestion.query(`
       SELECT t.id, t.titulo, t.estado, t.prioridad, t.responsable,
              t.categoria_id, c.nombre AS categoria_nombre, c.color AS categoria_color,
              t.fecha_limite, t.fecha_fin_real, t.tiempo_real_min,
-             t.usuario_creador, t.fecha_ult_modificacion
+             t.usuario_creador, t.fecha_ult_modificacion,
+             (SELECT GROUP_CONCAT(tr.email SEPARATOR ',') FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id) AS responsables_csv
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
       WHERE ${where.join(' AND ')}
       ORDER BY t.fecha_ult_modificacion DESC
       LIMIT 50
     `, params)
-    // Enriquecer con nombre del responsable
-    const emails = [...new Set(tareasBase.map(t => t.responsable).filter(Boolean))]
+    const allEmails = [...new Set(tareasBase.flatMap(t => (t.responsables_csv || '').split(',').filter(Boolean)))]
     let nombreMap = {}
-    if (emails.length) {
+    if (allEmails.length) {
       try {
         const [users] = await db.comunidad.query(
-          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${emails.map(() => '?').join(',')})`,
-          emails
+          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${allEmails.map(() => '?').join(',')})`,
+          allEmails
         )
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
       } catch {}
     }
-    const tareas = tareasBase.map(t => ({ ...t, responsable_nombre: nombreMap[t.responsable] || null }))
+    const tareas = tareasBase.map(t => {
+      const responsables = t.responsables_csv ? t.responsables_csv.split(',') : []
+      return { ...t, responsables, responsable_nombre: nombreMap[t.responsable] || null }
+    })
     res.json({ ok: true, tareas })
   } catch (e) {
     res.status(500).json({ error: e.message })
@@ -594,7 +605,12 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
       WHERE et.tarea_id = ?
     `, [req.params.id])
 
-    res.json({ ok: true, tarea: { ...tarea, tiempos, etiquetas } })
+    // Responsables de la tarea
+    const [resps] = await db.gestion.query(
+      'SELECT email FROM g_tareas_responsables WHERE tarea_id = ?', [req.params.id]
+    )
+
+    res.json({ ok: true, tarea: { ...tarea, tiempos, etiquetas, responsables: resps.map(r => r.email) } })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -610,7 +626,8 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
              t.proyecto_id, t.fecha_limite, t.tiempo_real_min, t.tiempo_estimado_min,
              t.fecha_inicio_real, t.fecha_fin_real,
              (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
-             (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio
+             (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio,
+             (SELECT GROUP_CONCAT(tr.email SEPARATOR ',') FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id) AS responsables_csv
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
       WHERE t.parent_id = ? AND t.empresa = ?
@@ -631,7 +648,11 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
       } catch {}
     }
-    res.json({ ok: true, subtareas: subtareas.map(t => ({ ...t, responsable_nombre: nombreMap[t.responsable] || null })) })
+    res.json({ ok: true, subtareas: subtareas.map(t => ({
+      ...t,
+      responsables: t.responsables_csv ? t.responsables_csv.split(',') : [],
+      responsable_nombre: nombreMap[t.responsable] || null
+    })) })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -640,12 +661,18 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
 // POST /api/gestion/tareas
 app.post('/api/gestion/tareas', async (req, res) => {
   const {
-    titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
+    titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable, responsables,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
     tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas, parent_id
   } = req.body
 
   if (!titulo || !categoria_id) return res.status(400).json({ error: 'Faltan titulo y categoria_id' })
+
+  // Determinar responsable principal (legacy) y lista de responsables
+  const listaResps = Array.isArray(responsables) && responsables.length > 0
+    ? responsables
+    : (responsable ? [responsable] : [req.usuario.email])
+  const respPrincipal = listaResps[0]
 
   try {
     const [result] = await db.gestion.query(`
@@ -659,7 +686,7 @@ app.post('/api/gestion/tareas', async (req, res) => {
       titulo, descripcion || null, categoria_id,
       proyecto_id || null,
       prioridad || 'Media',
-      responsable || req.usuario.email,
+      respPrincipal,
       fecha_limite || null,
       fecha_inicio_estimada || fecha_limite || null,
       fecha_fin_estimada    || fecha_limite || null,
@@ -669,6 +696,10 @@ app.post('/api/gestion/tareas', async (req, res) => {
     ])
 
     const tareaId = result.insertId
+
+    // Insertar responsables en tabla relacional
+    const valsResps = listaResps.map(e => [tareaId, e])
+    await db.gestion.query('INSERT IGNORE INTO g_tareas_responsables (tarea_id, email) VALUES ?', [valsResps])
 
     // Insertar etiquetas si se pasaron
     if (etiquetas && Array.isArray(etiquetas) && etiquetas.length > 0) {
@@ -685,7 +716,7 @@ app.post('/api/gestion/tareas', async (req, res) => {
        WHERE t.id = ?`,
       [tareaId]
     )
-    res.status(201).json({ ok: true, tarea })
+    res.status(201).json({ ok: true, tarea: { ...tarea, responsables: listaResps } })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -694,7 +725,7 @@ app.post('/api/gestion/tareas', async (req, res) => {
 // PUT /api/gestion/tareas/:id
 app.put('/api/gestion/tareas/:id', async (req, res) => {
   const {
-    titulo, descripcion, categoria_id, proyecto_id, estado, prioridad, responsable,
+    titulo, descripcion, categoria_id, proyecto_id, estado, prioridad, responsable, responsables,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
     fecha_inicio_real, fecha_fin_real,
     tiempo_real_min, tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas
@@ -778,6 +809,17 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
       }
     }
 
+    // Actualizar responsables (si se pasó el array — reemplaza todos)
+    if (responsables !== undefined && Array.isArray(responsables)) {
+      await db.gestion.query('DELETE FROM g_tareas_responsables WHERE tarea_id = ?', [req.params.id])
+      if (responsables.length > 0) {
+        const vals = responsables.map(e => [req.params.id, e])
+        await db.gestion.query('INSERT IGNORE INTO g_tareas_responsables (tarea_id, email) VALUES ?', [vals])
+        // Mantener legacy: primer responsable en campo directo
+        await db.gestion.query('UPDATE g_tareas SET responsable = ? WHERE id = ?', [responsables[0], req.params.id])
+      }
+    }
+
     const [[tarea]] = await db.gestion.query(
       `SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
               p.nombre AS proyecto_nombre, p.color AS proyecto_color
@@ -787,13 +829,17 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
        WHERE t.id = ?`,
       [req.params.id]
     )
-    // Incluir etiquetas en la respuesta del PUT (para que el panel no las pierda)
+    // Incluir etiquetas en la respuesta del PUT
     const [etiqPut] = await db.gestion.query(
       `SELECT e.id, e.nombre, e.color FROM g_etiquetas_tareas et
        JOIN g_etiquetas e ON e.id = et.etiqueta_id WHERE et.tarea_id = ?`,
       [req.params.id]
     )
-    res.json({ ok: true, tarea: { ...tarea, etiquetas: etiqPut } })
+    // Incluir responsables en la respuesta del PUT
+    const [respsPut] = await db.gestion.query(
+      'SELECT email FROM g_tareas_responsables WHERE tarea_id = ?', [req.params.id]
+    )
+    res.json({ ok: true, tarea: { ...tarea, etiquetas: etiqPut, responsables: respsPut.map(r => r.email) } })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
