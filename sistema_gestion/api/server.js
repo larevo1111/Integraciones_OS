@@ -782,7 +782,8 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
         sets.push('fecha_inicio_real = NOW()')  // Opción B: siempre actualiza
       }
       if (estado === 'Completada') {
-        sets.push('fecha_fin_real = COALESCE(fecha_fin_real, NOW())')  // solo si no tiene
+        sets.push('fecha_inicio_real = COALESCE(fecha_inicio_real, NOW())')
+        sets.push('fecha_fin_real = COALESCE(fecha_fin_real, NOW())')
       }
     }
     if (prioridad        !== undefined) { sets.push('prioridad = ?');          params.push(prioridad) }
@@ -812,7 +813,7 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
       // Cascada a subtareas cuando cambia estado del padre
       if (estado === 'Completada') {
         await db.gestion.query(
-          `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
+          `UPDATE g_tareas SET estado='Completada', fecha_inicio_real=COALESCE(fecha_inicio_real, NOW()), fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
            WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
           [req.usuario.email, req.params.id, req.empresa]
         )
@@ -1015,6 +1016,7 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
       UPDATE g_tareas
       SET estado = 'Completada',
           tiempo_real_min = ?,
+          fecha_inicio_real = COALESCE(fecha_inicio_real, NOW()),
           fecha_fin_real = NOW(),
           usuario_ult_modificacion = ?
       WHERE id = ? AND empresa = ?
@@ -1022,7 +1024,7 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
 
     // Cascada: completar subtareas pendientes/en progreso
     await db.gestion.query(
-      `UPDATE g_tareas SET estado='Completada', fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
+      `UPDATE g_tareas SET estado='Completada', fecha_inicio_real=COALESCE(fecha_inicio_real, NOW()), fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
        WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
       [req.usuario.email, tareaId, req.empresa]
     )

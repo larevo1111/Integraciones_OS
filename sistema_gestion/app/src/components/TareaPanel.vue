@@ -353,7 +353,8 @@ const duracionReal = computed(() => {
   const ini = new Date(props.tarea.fecha_inicio_real)
   const fin = new Date(props.tarea.fecha_fin_real)
   const diffMs = fin - ini
-  if (diffMs <= 0) return null
+  if (diffMs < 0) return null
+  if (diffMs === 0) return '0m'
   const mins = Math.floor(diffMs / 60000)
   if (mins < 60) return `${mins}m`
   const h = Math.floor(mins / 60)
