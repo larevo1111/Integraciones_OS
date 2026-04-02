@@ -10,6 +10,12 @@
         </button>
       </div>
 
+      <!-- Nombre -->
+      <div class="fpop-section">
+        <p class="fpop-label">Nombre</p>
+        <input type="text" class="input-field fpop-date" v-model="local.nombre" placeholder="Buscar por nombre..." style="width:100%" />
+      </div>
+
       <!-- Sección fechas -->
       <div class="fpop-section">
         <p class="fpop-label">Fechas</p>
@@ -121,13 +127,19 @@
       <!-- OP Effi -->
       <div class="fpop-section">
         <p class="fpop-label">OP Effi</p>
-        <input
-          type="text"
-          class="input-field fpop-date"
-          v-model="local.id_op"
-          placeholder="Número de OP..."
-          style="width:100%"
-        />
+        <input type="text" class="input-field fpop-date" v-model="local.id_op" placeholder="Número de OP..." style="width:100%" />
+      </div>
+
+      <!-- Pedido -->
+      <div class="fpop-section">
+        <p class="fpop-label">Pedido</p>
+        <input type="text" class="input-field fpop-date" v-model="local.id_pedido" placeholder="Número de pedido..." style="width:100%" />
+      </div>
+
+      <!-- Remisión -->
+      <div class="fpop-section">
+        <p class="fpop-label">Remisión</p>
+        <input type="text" class="input-field fpop-date" v-model="local.id_remision" placeholder="Número de remisión..." style="width:100%" />
       </div>
 
       <!-- Footer -->
@@ -160,6 +172,7 @@ const PRIORIDADES = [
 ]
 
 const local = reactive({
+  nombre:       props.valor.nombre        || '',
   fecha_desde:  props.valor.fecha_desde   || '',
   fecha_hasta:  props.valor.fecha_hasta   || '',
   prioridades:  [...(props.valor.prioridades   || [])],
@@ -168,7 +181,9 @@ const local = reactive({
   proyecto_id:  props.valor.proyecto_id   ?? null,
   sinProyecto:  props.valor.sinProyecto   || false,
   responsables: [...(props.valor.responsables  || [])],
-  id_op:        props.valor.id_op         || ''
+  id_op:        props.valor.id_op         || '',
+  id_pedido:    props.valor.id_pedido     || '',
+  id_remision:  props.valor.id_remision   || ''
 })
 
 // Posición del popup debajo del botón ancla
@@ -196,6 +211,7 @@ function toggleArr(arr, val) {
 }
 
 function limpiar() {
+  local.nombre = ''
   local.fecha_desde = ''
   local.fecha_hasta = ''
   local.prioridades.splice(0)
@@ -205,11 +221,14 @@ function limpiar() {
   local.sinProyecto = false
   local.responsables.splice(0)
   local.id_op = ''
+  local.id_pedido = ''
+  local.id_remision = ''
   emit('aplicar', null)
 }
 
 function aplicar() {
   const f = {
+    nombre:       local.nombre.trim() || null,
     fecha_desde:  local.fecha_desde  || null,
     fecha_hasta:  local.fecha_hasta  || null,
     prioridades:  [...local.prioridades],
@@ -218,7 +237,9 @@ function aplicar() {
     proyecto_id:  local.sinProyecto ? 'null' : (local.proyecto_id ?? null),
     sinProyecto:  local.sinProyecto,
     responsables: [...local.responsables],
-    id_op:        local.id_op.trim() || null
+    id_op:        local.id_op.trim() || null,
+    id_pedido:    local.id_pedido.trim() || null,
+    id_remision:  local.id_remision.trim() || null
   }
   emit('aplicar', f)
 }

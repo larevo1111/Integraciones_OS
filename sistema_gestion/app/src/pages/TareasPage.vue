@@ -765,11 +765,11 @@ const filtroPersonalizadoCount = computed(() => {
   if (!filtroPersonalizado.value) return 0
   const f = filtroPersonalizado.value
   return [
-    f.fecha_desde, f.fecha_hasta,
+    f.nombre, f.fecha_desde, f.fecha_hasta,
     ...(f.prioridades || []),
     ...(f.categorias  || []),
     ...(f.etiquetas   || []),
-    f.proyecto_id
+    f.proyecto_id, f.id_op, f.id_pedido, f.id_remision
   ].filter(Boolean).length
 })
 
@@ -1052,7 +1052,10 @@ async function cargarTareas() {
       if (f.etiquetas?.length)        params.set('etiquetas',    f.etiquetas.join(','))
       if (f.proyecto_id)              params.set('proyecto_id',  f.proyecto_id)
       if (f.responsables?.length)     params.set('responsables', f.responsables.join(','))
+      if (f.nombre)                   params.set('nombre',       f.nombre)
       if (f.id_op)                    params.set('id_op',        f.id_op)
+      if (f.id_pedido)                params.set('id_pedido',    f.id_pedido)
+      if (f.id_remision)              params.set('id_remision',  f.id_remision)
     } else if (filtroActivo.value === 'calendario') {
       params.set('fecha_desde', calFechaSel.value)
       params.set('fecha_hasta', calFechaSel.value)

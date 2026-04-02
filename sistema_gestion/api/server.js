@@ -407,7 +407,7 @@ app.get('/api/gestion/perfiles', async (req, res) => {
 // GET /api/gestion/tareas
 // Filtros: ?filtro=hoy|manana|ayer|semana&responsable=email&categoria_id=&estado=&prioridad=&agrupar=categoria|prioridad|fecha|persona
 app.get('/api/gestion/tareas', async (req, res) => {
-  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id, fecha_hoy, id_op } = req.query
+  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id, fecha_hoy, id_op, id_pedido, id_remision, nombre } = req.query
   const empresa = req.empresa
 
   const where  = ['t.empresa = ?', 't.parent_id IS NULL']   // excluir subtareas de la lista principal
@@ -451,8 +451,13 @@ app.get('/api/gestion/tareas', async (req, res) => {
     }
   }
 
-  // id_op: búsqueda parcial en OP Effi
-  if (id_op) { where.push('t.id_op LIKE ?'); params.push(`%${id_op}%`) }
+  // Búsqueda por nombre (parcial)
+  if (nombre) { where.push('t.titulo LIKE ?'); params.push(`%${nombre}%`) }
+
+  // id_op, id_pedido, id_remision: búsqueda parcial
+  if (id_op)       { where.push('t.id_op LIKE ?');       params.push(`%${id_op}%`) }
+  if (id_pedido)   { where.push('t.id_pedido LIKE ?');   params.push(`%${id_pedido}%`) }
+  if (id_remision) { where.push('t.id_remision LIKE ?'); params.push(`%${id_remision}%`) }
 
   // categoria_id: soporte simple y multi (categorias=1,2,3)
   const categoriasRaw = req.query.categorias || categoria_id
