@@ -195,7 +195,7 @@
         <div class="sidebar-user" @click="menuUsuario = !menuUsuario">
           <img :src="auth.usuario?.foto || ''" :alt="auth.usuario?.nombre" class="sidebar-user-foto" @error="e => e.target.style.display='none'" />
           <div class="sidebar-user-info">
-            <div class="sidebar-user-name">{{ auth.usuario?.nombre }} <span v-if="auth.esAdmin" style="font-size:9px;color:var(--text-tertiary);font-weight:400">{{ APP_VERSION }}</span></div>
+            <div class="sidebar-user-name">{{ auth.usuario?.nombre }} <span style="font-size:9px;color:var(--text-tertiary);font-weight:400">{{ APP_VERSION }}</span></div>
             <div class="sidebar-user-empresa">{{ auth.empresa_activa?.siglas || auth.empresa_activa?.uid }}</div>
           </div>
         </div>
@@ -373,7 +373,7 @@
                 <div class="nav-item" @click="cerrarSesion">
                   <span class="nav-item-icon material-icons">logout</span>
                   <span class="nav-item-label">Cerrar sesión</span>
-                  <span v-if="auth.esAdmin" style="font-size:9px;color:var(--text-tertiary);margin-left:auto">{{ APP_VERSION }}</span>
+                  <span style="font-size:9px;color:var(--text-tertiary);margin-left:auto">{{ APP_VERSION }}</span>
                 </div>
               </div>
             </nav>
