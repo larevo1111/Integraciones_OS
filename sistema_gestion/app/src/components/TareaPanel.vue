@@ -211,8 +211,8 @@
       <template v-if="mostrarFechas">
         <div class="field-row">
           <span class="field-label">Inicio estimado</span>
-          <input type="date" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).slice(0,10) : ''"
+          <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).replace(' ', 'T').slice(0,16) : ''"
             @change="actualizar('fecha_inicio_estimada', $event.target.value || null)" />
         </div>
         <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">

@@ -9,7 +9,7 @@
         :style="e.color ? { background: e.color + '22', borderColor: e.color + '66', color: e.color } : {}"
       >
         {{ e.nombre }}
-        <span class="etiqueta-chip-remove" @click.stop="quitar(e.id)">×</span>
+        <span class="etiqueta-chip-remove" @click.stop="quitar(e.id)">&times;</span>
       </span>
 
       <!-- Botón agregar -->
@@ -21,58 +21,69 @@
 
     <!-- Dropdown -->
     <Teleport to="body">
-      <div v-if="abierto" class="etiqueta-dropdown" :style="dropdownStyle" @click.stop>
-        <div class="etiqueta-search-wrap">
+      <div v-if="abierto" class="etq-dropdown" :style="dropdownStyle" @click.stop>
+        <!-- Buscar -->
+        <div class="etq-search-wrap">
           <span class="material-icons" style="font-size:14px">search</span>
-          <input ref="searchRef" v-model="busqueda" class="etiqueta-search" placeholder="Buscar o crear..." @keydown.escape="cerrar" />
+          <input ref="searchRef" v-model="busqueda" class="etq-search" placeholder="Buscar o crear..." @keydown.escape="cerrar" />
         </div>
 
-        <div style="overflow-y:auto;max-height:200px">
+        <!-- Lista -->
+        <div class="etq-lista">
           <div
             v-for="e in etiquetasFiltradas"
             :key="e.id"
-            class="etiqueta-option"
-            :class="{ selected: modelValue.includes(e.id) && editandoId !== e.id }"
+            class="etq-row"
+            :class="{ 'etq-row-selected': modelValue.includes(e.id) }"
           >
-            <!-- Modo normal -->
-            <template v-if="editandoId !== e.id">
-              <span class="etiqueta-dot" :style="{ background: e.color || 'var(--text-tertiary)' }"></span>
-              <span class="etiqueta-option-nombre" @click="toggle(e.id)">{{ e.nombre }}</span>
-              <span v-if="modelValue.includes(e.id)" class="material-icons check-icon">check</span>
-              <button class="etiqueta-menu-btn" @click.stop="iniciarEdicion(e)" title="Editar o eliminar">
-                <span class="material-icons" style="font-size:15px">more_vert</span>
-              </button>
-            </template>
+            <!-- Zona clickeable: selección -->
+            <div class="etq-select-zone" @click="toggle(e.id)">
+              <span v-if="modelValue.includes(e.id)" class="material-icons etq-check">check_circle</span>
+              <span v-else class="material-icons etq-check-empty">radio_button_unchecked</span>
+              <span class="etq-dot" :style="{ background: e.color || 'var(--text-tertiary)' }"></span>
+              <span class="etq-nombre">{{ e.nombre }}</span>
+            </div>
+            <!-- Botón ⋮ separado — NO afecta selección -->
+            <button class="etq-menu-btn" @click.stop="abrirEdicion(e)">
+              <span class="material-icons" style="font-size:15px">more_vert</span>
+            </button>
+          </div>
 
-            <!-- Modo edición inline -->
-            <template v-else>
-              <span class="etiqueta-dot" :style="{ background: e.color || 'var(--text-tertiary)' }"></span>
+          <div v-if="!etiquetasFiltradas.length && busqueda" class="etq-empty">Sin resultados</div>
+        </div>
+
+        <!-- Panel edición (reemplaza la lista cuando está activo) -->
+        <div v-if="editando" class="etq-edit-panel">
+          <div class="etq-edit-header">
+            <button class="etq-edit-back" @click="cancelarEdicion">
+              <span class="material-icons" style="font-size:16px">arrow_back</span>
+            </button>
+            <span class="etq-edit-title">Editar etiqueta</span>
+          </div>
+          <div class="etq-edit-body">
+            <form @submit.prevent="confirmarRename">
               <input
                 ref="editInputRef"
                 v-model="editandoNombre"
-                class="etiqueta-edit-input"
-                @keydown.enter.stop="confirmarRename(e)"
-                @keydown.escape.stop="cancelarEdicion"
-                @click.stop
+                class="etq-edit-input"
+                placeholder="Nombre..."
               />
-              <button class="etiqueta-action-btn" title="Guardar" @click.stop="confirmarRename(e)">
-                <span class="material-icons" style="font-size:14px;color:var(--accent)">check</span>
+            </form>
+            <div class="etq-edit-actions">
+              <button class="etq-edit-btn etq-edit-save" @click="confirmarRename">
+                <span class="material-icons" style="font-size:14px">check</span> Guardar
               </button>
-              <button class="etiqueta-action-btn etiqueta-action-danger" title="Eliminar" @click.stop="eliminarEtiqueta(e)">
-                <span class="material-icons" style="font-size:14px">delete_outline</span>
+              <button class="etq-edit-btn etq-edit-delete" @click="eliminarEtiqueta">
+                <span class="material-icons" style="font-size:14px">delete_outline</span> Eliminar
               </button>
-            </template>
-          </div>
-
-          <div v-if="!etiquetasFiltradas.length && busqueda" class="etiqueta-empty">
-            Sin resultados
+            </div>
           </div>
         </div>
 
         <!-- Crear nueva -->
-        <div v-if="busqueda && !coincidenciaExacta" class="etiqueta-crear" @click="crearEtiqueta">
+        <div v-if="busqueda && !coincidenciaExacta && !editando" class="etq-crear" @click="crearEtiqueta">
           <span class="material-icons" style="font-size:14px">add</span>
-          Crear etiqueta "{{ busqueda }}"
+          Crear "{{ busqueda }}"
         </div>
       </div>
     </Teleport>
@@ -84,8 +95,8 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
 
 const props = defineProps({
-  modelValue: { type: Array, default: () => [] },   // array de IDs
-  etiquetas:  { type: Array, default: null }         // si se pasa, no carga de API
+  modelValue: { type: Array, default: () => [] },
+  etiquetas:  { type: Array, default: null }
 })
 const emit = defineEmits(['update:modelValue', 'etiqueta-creada', 'etiqueta-actualizada', 'etiqueta-eliminada'])
 
@@ -96,7 +107,9 @@ const abierto       = ref(false)
 const busqueda      = ref('')
 const lista         = ref([])
 const dropdownStyle = ref({})
-const editandoId    = ref(null)
+
+// Edición
+const editando       = ref(null)  // objeto etiqueta o null
 const editandoNombre = ref('')
 
 const etiquetasData = computed(() => props.etiquetas !== null ? props.etiquetas : lista.value)
@@ -124,7 +137,7 @@ function calcularPosicion() {
   dropdownStyle.value = {
     position: 'fixed',
     left: `${rect.left}px`,
-    width: `${Math.min(Math.max(rect.width, 200), 240)}px`,
+    width: `${Math.min(Math.max(rect.width, 200), 260)}px`,
     zIndex: 9999,
     ...(goUp
       ? { bottom: `${window.innerHeight - rect.top}px` }
@@ -137,7 +150,7 @@ async function abrirMenu() {
   calcularPosicion()
   abierto.value = true
   busqueda.value = ''
-  editandoId.value = null
+  editando.value = null
   await nextTick()
   searchRef.value?.focus()
 }
@@ -145,11 +158,10 @@ async function abrirMenu() {
 function cerrar() {
   abierto.value = false
   busqueda.value = ''
-  editandoId.value = null
+  editando.value = null
 }
 
 function toggle(id) {
-  if (editandoId.value) return   // no toggle mientras se edita
   const nueva = props.modelValue.includes(id)
     ? props.modelValue.filter(x => x !== id)
     : [...props.modelValue, id]
@@ -169,39 +181,36 @@ async function crearEtiqueta() {
     })
     if (props.etiquetas === null) lista.value.push(data.etiqueta)
     emit('etiqueta-creada', data.etiqueta)
-    toggle(data.etiqueta.id)
+    // Auto-seleccionar la nueva
+    emit('update:modelValue', [...props.modelValue, data.etiqueta.id])
     busqueda.value = ''
   } catch (e) { console.error(e) }
 }
 
-// ─── Edición inline ───────────────────────────────────────────────
-
-async function iniciarEdicion(e) {
-  editandoId.value = e.id
+// ─── Edición ───
+async function abrirEdicion(e) {
+  editando.value = e
   editandoNombre.value = e.nombre
   await nextTick()
-  // editInputRef puede ser array cuando hay múltiples refs en v-for
-  const el = Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value
-  el?.focus()
-  el?.select()
+  editInputRef.value?.focus()
+  editInputRef.value?.select()
 }
 
 function cancelarEdicion() {
-  editandoId.value = null
+  editando.value = null
   editandoNombre.value = ''
 }
 
-async function confirmarRename(e) {
+async function confirmarRename() {
   const nombre = editandoNombre.value.trim()
-  if (!nombre || nombre === e.nombre) { cancelarEdicion(); return }
+  if (!nombre || !editando.value || nombre === editando.value.nombre) { cancelarEdicion(); return }
   try {
-    const data = await api(`/api/gestion/etiquetas/${e.id}`, {
+    const data = await api(`/api/gestion/etiquetas/${editando.value.id}`, {
       method: 'PUT',
       body: JSON.stringify({ nombre })
     })
-    // Actualizar en lista local
     if (props.etiquetas === null) {
-      const idx = lista.value.findIndex(x => x.id === e.id)
+      const idx = lista.value.findIndex(x => x.id === editando.value.id)
       if (idx !== -1) lista.value[idx] = { ...lista.value[idx], nombre }
     }
     emit('etiqueta-actualizada', data.etiqueta)
@@ -209,23 +218,26 @@ async function confirmarRename(e) {
   } catch (err) { console.error(err) }
 }
 
-async function eliminarEtiqueta(e) {
+async function eliminarEtiqueta() {
+  if (!editando.value) return
+  const id = editando.value.id
   try {
-    await api(`/api/gestion/etiquetas/${e.id}`, { method: 'DELETE' })
+    await api(`/api/gestion/etiquetas/${id}`, { method: 'DELETE' })
     if (props.etiquetas === null) {
-      lista.value = lista.value.filter(x => x.id !== e.id)
+      lista.value = lista.value.filter(x => x.id !== id)
     }
-    // Quitar del modelValue si estaba seleccionada
-    if (props.modelValue.includes(e.id)) {
-      emit('update:modelValue', props.modelValue.filter(x => x !== e.id))
+    if (props.modelValue.includes(id)) {
+      emit('update:modelValue', props.modelValue.filter(x => x !== id))
     }
-    emit('etiqueta-eliminada', e.id)
+    emit('etiqueta-eliminada', id)
     cancelarEdicion()
   } catch (err) { console.error(err) }
 }
 
 function onClickOutside(ev) {
-  if (!wrapRef.value?.contains(ev.target)) cerrar()
+  if (abierto.value && !wrapRef.value?.contains(ev.target) && !ev.target.closest('.etq-dropdown')) {
+    cerrar()
+  }
 }
 
 onMounted(() => document.addEventListener('click', onClickOutside))
@@ -235,9 +247,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 <style scoped>
 .etiquetas-selector { display: inline-flex; align-items: center; position: relative; }
 
-.etiquetas-chips {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
-}
+.etiquetas-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 
 .etiqueta-chip {
   display: inline-flex; align-items: center; gap: 3px;
@@ -265,7 +275,8 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 }
 .etiqueta-add-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-.etiqueta-dropdown {
+/* ─── Dropdown ─── */
+.etq-dropdown {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -274,74 +285,102 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   display: flex; flex-direction: column;
   overflow: hidden;
 }
-.etiqueta-search-wrap {
+.etq-search-wrap {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
 }
-.etiqueta-search {
+.etq-search {
   background: transparent; border: none; outline: none;
   font-size: 13px; color: var(--text-primary); flex: 1;
-}
-
-/* Fila de etiqueta */
-.etiqueta-option {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 8px; font-size: 13px; color: var(--text-secondary);
-  cursor: pointer; transition: background 60ms;
-  min-height: 32px;
-}
-.etiqueta-option:hover, .etiqueta-option.selected { background: var(--bg-row-hover); color: var(--text-primary); }
-.etiqueta-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.etiqueta-option-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.check-icon { font-size: 14px; color: var(--accent); flex-shrink: 0; }
-.etiqueta-empty { padding: 8px 12px; font-size: 12px; color: var(--text-tertiary); font-style: italic; }
-
-/* Botón ⋮ — siempre visible */
-.etiqueta-menu-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; flex-shrink: 0;
-  background: transparent; border: none; cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: var(--text-tertiary); opacity: 0.5;
-  transition: background 60ms, color 60ms, opacity 60ms;
-}
-.etiqueta-option:hover .etiqueta-menu-btn { opacity: 1; }
-.etiqueta-menu-btn:hover { background: var(--bg-surface); color: var(--text-primary); opacity: 1; }
-
-/* Input edición inline */
-.etiqueta-edit-input {
-  flex: 1; min-width: 0; background: var(--bg-surface);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 2px 4px; font-size: 11px;
-  color: var(--text-primary); outline: none;
   font-family: var(--font-sans);
 }
 
-/* Botones acción (✓ y 🗑) */
-.etiqueta-action-btn {
+/* ─── Lista ─── */
+.etq-lista { overflow-y: auto; max-height: 200px; }
+
+.etq-row {
+  display: flex; align-items: center;
+  padding: 0 4px 0 0;
+  transition: background 60ms;
+}
+.etq-row:hover { background: var(--bg-row-hover); }
+.etq-row-selected { background: var(--bg-row-hover); }
+
+.etq-select-zone {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1; min-width: 0;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+.etq-check { font-size: 16px; color: var(--accent); flex-shrink: 0; }
+.etq-check-empty { font-size: 16px; color: var(--border-default); flex-shrink: 0; }
+.etq-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.etq-nombre { flex: 1; font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.etq-row-selected .etq-nombre { color: var(--text-primary); }
+
+.etq-menu-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; flex-shrink: 0;
+  width: 28px; height: 28px; flex-shrink: 0;
   background: transparent; border: none; cursor: pointer;
   border-radius: var(--radius-sm);
-  color: var(--text-tertiary); transition: background 60ms, color 60ms;
+  color: var(--text-tertiary);
+  transition: background 60ms, color 60ms;
 }
-.etiqueta-action-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
-.etiqueta-action-danger:hover { color: var(--color-error) !important; }
+.etq-menu-btn:hover { background: var(--bg-surface, var(--bg-row-hover)); color: var(--text-primary); }
 
-/* Móvil: ⋮ siempre visible */
-@media (max-width: 768px) {
-  .etiqueta-menu-btn { opacity: 1; }
+.etq-empty { padding: 8px 12px; font-size: 12px; color: var(--text-tertiary); font-style: italic; }
+
+/* ─── Panel edición (reemplaza lista) ─── */
+.etq-edit-panel {
+  display: flex; flex-direction: column;
 }
+.etq-edit-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.etq-edit-back {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border: none; background: transparent;
+  cursor: pointer; color: var(--text-secondary); border-radius: var(--radius-sm);
+}
+.etq-edit-back:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.etq-edit-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.etq-edit-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.etq-edit-input {
+  width: 100%; padding: 6px 8px; font-size: 13px;
+  background: var(--bg-surface, var(--bg-row-hover));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary); outline: none;
+  font-family: var(--font-sans);
+}
+.etq-edit-input:focus { border-color: var(--accent); }
+.etq-edit-actions { display: flex; gap: 6px; }
+.etq-edit-btn {
+  display: flex; align-items: center; gap: 4px; flex: 1;
+  justify-content: center;
+  padding: 6px 0; border: none; border-radius: var(--radius-sm);
+  font-size: 12px; cursor: pointer; font-family: var(--font-sans);
+  transition: background 80ms;
+}
+.etq-edit-save {
+  background: var(--accent-muted, rgba(0,200,83,0.1)); color: var(--accent);
+}
+.etq-edit-save:hover { background: var(--accent); color: #fff; }
+.etq-edit-delete {
+  background: rgba(239,68,68,0.1); color: #ef4444;
+}
+.etq-edit-delete:hover { background: #ef4444; color: #fff; }
 
-/* Crear nueva */
-.etiqueta-crear {
+/* ─── Crear ─── */
+.etq-crear {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 12px; font-size: 13px; color: var(--accent);
   cursor: pointer; border-top: 1px solid var(--border-subtle);
   transition: background 60ms;
 }
-.etiqueta-crear:hover { background: var(--accent-muted); }
+.etq-crear:hover { background: var(--accent-muted); }
 </style>
