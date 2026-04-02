@@ -212,7 +212,7 @@ const columnas = [
   { key: 'usuario',            label: 'Usuario',     visible: true  },
   { key: 'fecha',              label: 'Fecha',       visible: false },
   { key: 'hora_inicio',        label: 'Inicio',      visible: true  },
-  { key: 'hora_fin',           label: 'Fin',         visible: true  },
+  { key: 'hora_fin',           label: 'Fin',         visible: true, width: '130px' },
   { key: 'tiempo_total_min',   label: 'T. Total',    visible: true  },
   { key: 'tiempo_pausa_min',   label: 'T. Pausas',   visible: true  },
   { key: 'tiempo_laborado_min',label: 'T. Laborado', visible: true  },

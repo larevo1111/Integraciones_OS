@@ -16,6 +16,11 @@
       <div class="toolbar-right">
         <!-- Slot para controles externos (filtros de fecha, etc.) -->
         <slot name="toolbar" />
+        <!-- Exportar -->
+        <button class="toolbar-btn" @click="exportCSV" title="Exportar a Excel">
+          <span class="material-icons" style="font-size:14px">download</span>
+          <span>Excel</span>
+        </button>
         <!-- Campos -->
         <div class="toolbar-btn-wrap" ref="fieldsRef">
           <button class="toolbar-btn" @click.stop="showFields = !showFields">
@@ -121,35 +126,53 @@
           <!-- Filtro -->
           <div class="cp-section">
             <label class="cp-label">Filtrar</label>
-            <div class="cp-filter-row">
-              <select class="cp-select" :value="getFilterOp(colPopup)" @change="setFilterOp(colPopup, $event.target.value)">
-                <option value="eq">Igual a</option>
-                <option value="contains">Contiene</option>
-                <option value="gt">Mayor que</option>
-                <option value="lt">Menor que</option>
-                <option value="gte">Mayor o igual</option>
-                <option value="lte">Menor o igual</option>
-                <option value="between">Entre</option>
-              </select>
-            </div>
-            <div class="cp-filter-inputs">
-              <input
-                ref="colFilterInput"
-                class="cp-input"
-                :placeholder="getFilterOp(colPopup) === 'between' ? 'Desde' : 'Valor'"
-                :value="getFilterVal(colPopup)"
-                @input="setFilterVal(colPopup, $event.target.value)"
-                @keyup.enter="colPopup = null"
-                @keyup.escape="colPopup = null"
-              />
-              <input
-                v-if="getFilterOp(colPopup) === 'between'"
-                class="cp-input"
-                placeholder="Hasta"
-                :value="getFilterVal2(colPopup)"
-                @input="setFilterVal2(colPopup, $event.target.value)"
-              />
-            </div>
+            <!-- Filtro tipo select (checkboxes) -->
+            <template v-if="getColDef(colPopup)?.filterType === 'select'">
+              <div class="cp-select-options">
+                <label
+                  v-for="opt in uniqueValues(colPopup)"
+                  :key="opt"
+                  class="cp-select-opt"
+                  :class="{ active: isSelectActive(colPopup, opt) }"
+                  @click="toggleSelectFilter(colPopup, opt)"
+                >
+                  <span class="cp-check">{{ isSelectActive(colPopup, opt) ? '✓' : '' }}</span>
+                  {{ opt }}
+                </label>
+              </div>
+            </template>
+            <!-- Filtro tipo texto (por defecto) -->
+            <template v-else>
+              <div class="cp-filter-row">
+                <select class="cp-select" :value="getFilterOp(colPopup)" @change="setFilterOp(colPopup, $event.target.value)">
+                  <option value="eq">Igual a</option>
+                  <option value="contains">Contiene</option>
+                  <option value="gt">Mayor que</option>
+                  <option value="lt">Menor que</option>
+                  <option value="gte">Mayor o igual</option>
+                  <option value="lte">Menor o igual</option>
+                  <option value="between">Entre</option>
+                </select>
+              </div>
+              <div class="cp-filter-inputs">
+                <input
+                  ref="colFilterInput"
+                  class="cp-input"
+                  :placeholder="getFilterOp(colPopup) === 'between' ? 'Desde' : 'Valor'"
+                  :value="getFilterVal(colPopup)"
+                  @input="setFilterVal(colPopup, $event.target.value)"
+                  @keyup.enter="colPopup = null"
+                  @keyup.escape="colPopup = null"
+                />
+                <input
+                  v-if="getFilterOp(colPopup) === 'between'"
+                  class="cp-input"
+                  placeholder="Hasta"
+                  :value="getFilterVal2(colPopup)"
+                  @input="setFilterVal2(colPopup, $event.target.value)"
+                />
+              </div>
+            </template>
           </div>
           <!-- Ordenar -->
           <div class="cp-section">
@@ -223,17 +246,45 @@ function getFilterVal2(key) { return columnFilters.value[key]?.val2 || '' }
 function setFilterOp(key, op)  { columnFilters.value = { ...columnFilters.value, [key]: { ...(columnFilters.value[key] || { op:'eq', val:'', val2:'' }), op } } }
 function setFilterVal(key, val)  { columnFilters.value = { ...columnFilters.value, [key]: { ...(columnFilters.value[key] || { op:'eq', val:'', val2:'' }), val } } }
 function setFilterVal2(key, val2) { columnFilters.value = { ...columnFilters.value, [key]: { ...(columnFilters.value[key] || { op:'eq', val:'', val2:'' }), val2 } } }
-function hasFilter(key) { return !!(columnFilters.value[key]?.val?.trim()) }
+function hasFilter(key) {
+  const f = columnFilters.value[key]
+  if (!f) return false
+  if (f.selected?.length) return true
+  return !!(f.val?.trim())
+}
 const activeFilterCount = computed(() => Object.keys(columnFilters.value).filter(k => hasFilter(k)).length)
 function clearAllFilters() { columnFilters.value = {} }
+
+// ── Filtro tipo select ───────────────────────────────
+function getColDef(key) { return localColumns.value.find(c => c.key === key) }
+function uniqueValues(key) {
+  const vals = props.rows.map(r => String(r[key] ?? '').trim()).filter(Boolean)
+  return [...new Set(vals)].sort()
+}
+function isSelectActive(key, val) {
+  return (columnFilters.value[key]?.selected || []).includes(val)
+}
+function toggleSelectFilter(key, val) {
+  const f = { ...(columnFilters.value[key] || { op:'eq', val:'', val2:'', selected:[] }) }
+  const sel = [...(f.selected || [])]
+  const idx = sel.indexOf(val)
+  if (idx >= 0) sel.splice(idx, 1); else sel.push(val)
+  f.selected = sel
+  columnFilters.value = { ...columnFilters.value, [key]: f }
+}
 
 const filteredRows = computed(() => {
   const keys = Object.keys(columnFilters.value).filter(k => hasFilter(k))
   if (!keys.length) return props.rows
   return props.rows.filter(row => keys.every(key => {
     const f   = columnFilters.value[key]
-    const fv  = f.val.trim()
     const raw = row[key]
+    // Filtro select (checkboxes)
+    if (f.selected?.length) {
+      return f.selected.includes(String(raw ?? '').trim())
+    }
+    // Filtro texto
+    const fv  = f.val.trim()
     const n   = v => parseFloat(String(v).replace(',', '.'))
     const val = String(raw ?? '').toLowerCase()
     switch (f.op) {
@@ -322,6 +373,28 @@ function clearColumn(key) {
   const ca = { ...columnAggs.value };    delete ca[key]; columnAggs.value    = ca
   if (sortKey.value === key) sortKey.value = ''
   colPopup.value = null
+}
+
+// ── Export CSV/Excel ─────────────────────────────────
+function exportCSV() {
+  const cols = visibleColumns.value
+  const sep = ','
+  const header = cols.map(c => `"${c.label}"`).join(sep)
+  const body = sortedRows.value.map(row =>
+    cols.map(c => {
+      let v = row[c.key]
+      if (v === null || v === undefined) v = ''
+      return `"${String(v).replace(/"/g, '""')}"`
+    }).join(sep)
+  ).join('\n')
+  const bom = '\uFEFF'
+  const blob = new Blob([bom + header + '\n' + body], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${props.title || 'tabla'}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ── Cerrar popups toolbar al click fuera ──────────────
@@ -560,4 +633,20 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   font-family: var(--font-sans); transition: background 60ms;
 }
 .cp-clear-btn:hover { background: var(--color-error-bg); }
+.cp-select-options { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; }
+.cp-select-opt {
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text-secondary);
+  transition: all 80ms; user-select: none;
+}
+.cp-select-opt:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+.cp-select-opt.active { background: var(--accent-muted); color: var(--accent); }
+.cp-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 3px;
+  border: 1px solid var(--border-default); font-size: 10px;
+  flex-shrink: 0;
+}
+.cp-select-opt.active .cp-check { background: var(--accent); border-color: var(--accent); color: #fff; }
 </style>

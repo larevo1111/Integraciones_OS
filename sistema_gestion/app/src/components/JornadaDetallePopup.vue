@@ -263,15 +263,15 @@ const cargandoTareas = ref(false)
 
 const tareasColumnas = reactive([
   { key: 'titulo',               label: 'Tarea',           visible: true,  width: '160px' },
-  { key: 'categoria_nombre',     label: 'Categoría',       visible: true },
-  { key: 'estado',               label: 'Estado',          visible: false },
+  { key: 'categoria_nombre',     label: 'Categoría',       visible: true, filterType: 'select' },
+  { key: 'estado',               label: 'Estado',          visible: false, filterType: 'select' },
   { key: 'fecha_inicio_real',    label: 'Inicio real',     visible: true },
   { key: 'fecha_fin_real',       label: 'Fin real',        visible: true },
-  { key: 'duracion_real_min',    label: 'Dur. real',       visible: true },
-  { key: 'tiempo_real_min',      label: 'T. cronómetro',   visible: false },
+  { key: 'duracion_real_min',    label: 'Duración',        visible: true },
+  { key: 'tiempo_real_min',      label: 'Cronómetro',      visible: false },
   { key: 'fecha_inicio_estimada',label: 'Inicio est.',     visible: false },
   { key: 'fecha_fin_estimada',   label: 'Fin est.',        visible: false },
-  { key: 'tiempo_estimado_min',  label: 'Dur. estimada',   visible: false },
+  { key: 'tiempo_estimado_min',  label: 'Estimada',        visible: false },
 ])
 
 const tareasRows = computed(() => tareasCompletadas.value.map(t => ({
