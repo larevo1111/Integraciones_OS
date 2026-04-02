@@ -265,6 +265,22 @@
     </div>
   </aside>
 
+  <!-- Modal guardar cambios -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="mostrarConfirmGuardar" class="confirm-overlay" @click.self="mostrarConfirmGuardar = false">
+        <div class="confirm-box">
+          <p class="confirm-msg">¿Guardar los cambios?</p>
+          <div class="confirm-actions">
+            <button class="confirm-btn confirm-btn-accent" @click="confirmarGuardarYCerrar">Guardar</button>
+            <button class="confirm-btn confirm-btn-danger" @click="descartarYCerrar">Descartar</button>
+            <button class="confirm-btn" @click="mostrarConfirmGuardar = false">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+
   <!-- Toast deshacer -->
   <ToastUndo ref="toastRef" />
 </template>
@@ -438,13 +454,24 @@ async function guardarPendientes() {
   Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
 }
 
+const mostrarConfirmGuardar = ref(false)
+
 function intentarCerrar() {
   if (hayCambiosPendientes.value) {
-    if (confirm('¿Guardar los cambios antes de cerrar?')) {
-      guardarPendientes().then(() => emit('cerrar'))
-      return
-    }
+    mostrarConfirmGuardar.value = true
+    return
   }
+  emit('cerrar')
+}
+
+function confirmarGuardarYCerrar() {
+  mostrarConfirmGuardar.value = false
+  guardarPendientes().then(() => emit('cerrar'))
+}
+
+function descartarYCerrar() {
+  mostrarConfirmGuardar.value = false
+  Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
   emit('cerrar')
 }
 
@@ -619,4 +646,46 @@ async function completarSin() {
 .popover-enter-from, .popover-leave-to {
   opacity: 0; transform: translateY(4px);
 }
+
+/* Confirm modal */
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.confirm-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  min-width: 260px;
+  box-shadow: var(--shadow-lg);
+}
+.confirm-msg {
+  font-size: 14px; font-weight: 500;
+  color: var(--text-primary);
+  margin: 0 0 16px;
+}
+.confirm-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.confirm-btn {
+  padding: 6px 14px; border-radius: var(--radius-sm);
+  font-size: 12px; font-family: var(--font-sans);
+  border: 1px solid var(--border-default);
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; transition: all 80ms;
+}
+.confirm-btn:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.confirm-btn-accent {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.confirm-btn-accent:hover { opacity: 0.9; background: var(--accent); color: #fff; }
+.confirm-btn-danger {
+  color: #ef4444; border-color: #ef444466;
+}
+.confirm-btn-danger:hover { background: rgba(239,68,68,0.1); }
+
+.modal-enter-active, .modal-leave-active { transition: opacity 120ms; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
 </style>
