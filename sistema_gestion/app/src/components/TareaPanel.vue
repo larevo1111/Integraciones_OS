@@ -312,18 +312,19 @@ const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'ab
 let tareaIdAnterior = props.tarea?.id || null
 
 watch(() => props.tarea?.id, (nuevoId) => {
-  if (tareaIdAnterior && tareaIdAnterior !== nuevoId) {
-    // Guardar cambios pendientes contra la tarea ANTERIOR
+  if (tareaIdAnterior && tareaIdAnterior !== nuevoId && hayCambiosPendientes.value) {
     const idViejo = tareaIdAnterior
-    for (const [campo, val] of Object.entries(camposPendientes)) {
-      if (val !== undefined) {
-        api(`/api/gestion/tareas/${idViejo}`, {
-          method: 'PUT',
-          body: JSON.stringify({ [campo]: val })
-        }).catch(() => {})
+    if (confirm('¿Guardar los cambios antes de cambiar de tarea?')) {
+      for (const [campo, val] of Object.entries(camposPendientes)) {
+        if (val !== undefined) {
+          api(`/api/gestion/tareas/${idViejo}`, {
+            method: 'PUT',
+            body: JSON.stringify({ [campo]: val })
+          }).catch(() => {})
+        }
       }
-      delete camposPendientes[campo]
     }
+    Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
   }
   tareaIdAnterior = nuevoId
 })
