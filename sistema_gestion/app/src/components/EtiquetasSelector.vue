@@ -55,13 +55,10 @@
         <!-- Panel edición (reemplaza la lista cuando está activo) -->
         <div v-if="editando" class="etq-edit-panel">
           <div class="etq-edit-header">
-            <button class="etq-edit-back" @click="cancelarEdicion">
-              <span class="material-icons" style="font-size:16px">arrow_back</span>
+            <button class="etq-edit-icon" @click="cancelarEdicion" title="Volver">
+              <span class="material-icons" style="font-size:16px">close</span>
             </button>
-            <span class="etq-edit-title">Editar etiqueta</span>
-          </div>
-          <div class="etq-edit-body">
-            <form @submit.prevent="confirmarRename">
+            <form class="etq-edit-form" @submit.prevent="confirmarRename">
               <input
                 ref="editInputRef"
                 v-model="editandoNombre"
@@ -69,14 +66,12 @@
                 placeholder="Nombre..."
               />
             </form>
-            <div class="etq-edit-actions">
-              <button class="etq-edit-btn etq-edit-save" @click="confirmarRename">
-                <span class="material-icons" style="font-size:14px">check</span> Guardar
-              </button>
-              <button class="etq-edit-btn etq-edit-delete" @click="eliminarEtiqueta">
-                <span class="material-icons" style="font-size:14px">delete_outline</span> Eliminar
-              </button>
-            </div>
+            <button class="etq-edit-icon etq-icon-save" @click="confirmarRename" title="Guardar">
+              <span class="material-icons" style="font-size:16px">check</span>
+            </button>
+            <button class="etq-edit-icon etq-icon-delete" @click="eliminarEtiqueta" title="Eliminar">
+              <span class="material-icons" style="font-size:16px">delete_outline</span>
+            </button>
           </div>
         </div>
 
@@ -311,11 +306,11 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 .etq-select-zone {
   display: flex; align-items: center; gap: 6px;
   flex: 1; min-width: 0;
-  padding: 7px 8px;
+  padding: 7px 6px 7px 10px;
   cursor: pointer;
 }
-.etq-check { font-size: 16px; color: var(--accent); flex-shrink: 0; }
-.etq-check-empty { font-size: 16px; color: var(--border-default); flex-shrink: 0; }
+.etq-check { font-size: 15px; color: var(--accent); flex-shrink: 0; }
+.etq-check-empty { font-size: 15px; color: var(--border-default); flex-shrink: 0; }
 .etq-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .etq-nombre { flex: 1; font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .etq-row-selected .etq-nombre { color: var(--text-primary); }
@@ -332,25 +327,15 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 .etq-empty { padding: 8px 12px; font-size: 12px; color: var(--text-tertiary); font-style: italic; }
 
-/* ─── Panel edición (reemplaza lista) ─── */
-.etq-edit-panel {
-  display: flex; flex-direction: column;
-}
+/* ─── Panel edición (fila compacta) ─── */
+.etq-edit-panel { border-top: 1px solid var(--border-subtle); }
 .etq-edit-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 6px;
 }
-.etq-edit-back {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border: none; background: transparent;
-  cursor: pointer; color: var(--text-secondary); border-radius: var(--radius-sm);
-}
-.etq-edit-back:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.etq-edit-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
-.etq-edit-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.etq-edit-form { flex: 1; min-width: 0; }
 .etq-edit-input {
-  width: 100%; padding: 6px 8px; font-size: 13px;
+  width: 100%; padding: 4px 8px; font-size: 12px;
   background: var(--bg-surface, var(--bg-row-hover));
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
@@ -358,22 +343,17 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   font-family: var(--font-sans);
 }
 .etq-edit-input:focus { border-color: var(--accent); }
-.etq-edit-actions { display: flex; gap: 6px; }
-.etq-edit-btn {
-  display: flex; align-items: center; gap: 4px; flex: 1;
-  justify-content: center;
-  padding: 6px 0; border: none; border-radius: var(--radius-sm);
-  font-size: 12px; cursor: pointer; font-family: var(--font-sans);
-  transition: background 80ms;
+.etq-edit-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; flex-shrink: 0;
+  border: none; background: transparent; cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary); transition: background 60ms, color 60ms;
 }
-.etq-edit-save {
-  background: var(--accent-muted, rgba(0,200,83,0.1)); color: var(--accent);
-}
-.etq-edit-save:hover { background: var(--accent); color: #fff; }
-.etq-edit-delete {
-  background: rgba(239,68,68,0.1); color: #ef4444;
-}
-.etq-edit-delete:hover { background: #ef4444; color: #fff; }
+.etq-edit-icon:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.etq-icon-save { color: var(--accent); }
+.etq-icon-save:hover { background: var(--accent-muted); }
+.etq-icon-delete:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
 
 /* ─── Crear ─── */
 .etq-crear {
