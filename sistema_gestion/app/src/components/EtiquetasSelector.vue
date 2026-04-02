@@ -107,7 +107,13 @@ const dropdownStyle = ref({})
 const editando       = ref(null)  // objeto etiqueta o null
 const editandoNombre = ref('')
 
-const etiquetasData = computed(() => props.etiquetas !== null ? props.etiquetas : lista.value)
+const extras = ref([])  // etiquetas creadas localmente (cuando se pasa prop)
+const etiquetasData = computed(() => {
+  const base = props.etiquetas !== null ? props.etiquetas : lista.value
+  if (!extras.value.length) return base
+  const ids = new Set(base.map(e => e.id))
+  return [...base, ...extras.value.filter(e => !ids.has(e.id))]
+})
 const seleccionadas = computed(() => etiquetasData.value.filter(e => props.modelValue.includes(e.id)))
 const etiquetasFiltradas = computed(() => {
   if (!busqueda.value) return etiquetasData.value
@@ -177,6 +183,7 @@ async function crearEtiqueta() {
       body: JSON.stringify({ nombre: busqueda.value.trim() })
     })
     if (props.etiquetas === null) lista.value.push(data.etiqueta)
+    else extras.value.push(data.etiqueta)
     emit('etiqueta-creada', data.etiqueta)
     // Auto-seleccionar la nueva
     emit('update:modelValue', [...props.modelValue, data.etiqueta.id])
