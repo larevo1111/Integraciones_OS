@@ -13,37 +13,6 @@
             @click="onFiltroClick(f.key)"
           >{{ f.label }}</button>
 
-          <!-- Menú usuario -->
-          <div style="position:relative;margin-left:auto;flex-shrink:0" ref="menuUsuarioWrap">
-            <button class="chip chip-agrupar" @click="toggleMenuUsuario">
-              <span class="material-icons" style="font-size:13px">person</span>
-              {{ usuarioFiltroLabel }}
-              <span class="material-icons" style="font-size:13px">expand_more</span>
-            </button>
-            <Teleport to="body">
-              <div v-if="menuUsuarioVisible" class="dropdown-backdrop" @click="menuUsuarioVisible = false" />
-              <div v-if="menuUsuarioVisible" class="dropdown-menu-teleport" :style="dropdownStyle" @mouseleave="menuUsuarioVisible = false">
-                <div
-                  class="dropdown-item-teleport"
-                  :class="{ active: !filtroUsuario }"
-                  @click="filtroUsuario = null; menuUsuarioVisible = false; cargarEquipo()"
-                >
-                  <span class="material-icons" style="font-size:14px">{{ !filtroUsuario ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
-                  Todos
-                </div>
-                <div
-                  v-for="u in usuariosDisponibles"
-                  :key="u.email"
-                  class="dropdown-item-teleport"
-                  :class="{ active: filtroUsuario === u.email }"
-                  @click="filtroUsuario = u.email; menuUsuarioVisible = false; cargarEquipo()"
-                >
-                  <span class="material-icons" style="font-size:14px">{{ filtroUsuario === u.email ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
-                  {{ u.nombre || u.email }}
-                </div>
-              </div>
-            </Teleport>
-          </div>
         </div>
       </div>
 
@@ -66,9 +35,9 @@
         </template>
 
         <!-- Cell renderers personalizados -->
-        <template #cell-usuario="{ row }">
+        <template #cell-_nombre="{ row }">
           <div class="cell-usuario">
-            <span class="u-nombre">{{ primerNombre(row.Nombre_Usuario) || row.usuario }}</span>
+            <span class="u-nombre">{{ row._nombre }}</span>
             <span class="u-email">{{ row.usuario }}</span>
           </div>
         </template>
@@ -93,6 +62,18 @@
         <template #cell-estado="{ row }">
           <span class="badge" :class="badgeClass(row)">{{ estadoLabel(row) }}</span>
         </template>
+        <template #cell-tareas_count="{ row }">
+          <span class="td-mono">{{ row.tareas_count || 0 }}</span>
+        </template>
+        <template #cell-dur_tareas_real="{ row }">
+          <span class="td-mono">{{ formatMins(row.dur_tareas_real) }}</span>
+        </template>
+        <template #cell-dur_tareas_crono="{ row }">
+          <span class="td-mono">{{ formatMins(row.dur_tareas_crono) }}</span>
+        </template>
+        <template #cell-dur_tareas_usuario="{ row }">
+          <span class="td-mono">{{ formatMins(row.dur_tareas_usuario) }}</span>
+        </template>
       </GestionTable>
     </div>
 
@@ -108,7 +89,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import { api } from 'src/services/api'
@@ -161,46 +142,6 @@ function onFechaManual() {
   cargarEquipo()
 }
 
-// ── Filtro por usuario ────────────────────────────────────
-const filtroUsuario     = ref(null)
-const menuUsuarioVisible = ref(false)
-const menuUsuarioWrap    = ref(null)
-const dropdownStyle      = ref({})
-
-const usuariosDisponibles = ref([])
-
-async function cargarUsuarios() {
-  try {
-    const data = await api('/api/gestion/usuarios')
-    usuariosDisponibles.value = (data.usuarios || []).map(u => ({
-      email: u.email,
-      nombre: primerNombre(u.nombre) || u.email,
-    }))
-  } catch { /* silencio */ }
-}
-
-const usuarioFiltroLabel = computed(() => {
-  if (!filtroUsuario.value) return 'Todos'
-  const u = usuariosDisponibles.value.find(u => u.email === filtroUsuario.value)
-  return u?.nombre || filtroUsuario.value
-})
-
-function toggleMenuUsuario() {
-  menuUsuarioVisible.value = !menuUsuarioVisible.value
-  if (menuUsuarioVisible.value && menuUsuarioWrap.value) {
-    nextTick(() => {
-      const el = menuUsuarioWrap.value
-      const r = el.getBoundingClientRect()
-      dropdownStyle.value = {
-        position: 'fixed',
-        top: r.bottom + 4 + 'px',
-        right: (window.innerWidth - r.right) + 'px',
-        zIndex: 9100,
-      }
-    })
-  }
-}
-
 // ── Datos ────────────────────────────────────────────────
 const jornadas   = ref([])
 const cargando   = ref(false)
@@ -209,15 +150,19 @@ const jornadaSel = ref(null)
 const esAdmin = computed(() => (auth.usuario?.nivel || 1) >= 7)
 
 const columnas = [
-  { key: 'usuario',            label: 'Usuario',     visible: true  },
-  { key: 'fecha',              label: 'Fecha',       visible: false },
-  { key: 'hora_inicio',        label: 'Inicio',      visible: true  },
-  { key: 'hora_fin',           label: 'Fin',         visible: true, width: '130px' },
-  { key: 'tiempo_total_min',   label: 'T. Total',    visible: true  },
-  { key: 'tiempo_pausa_min',   label: 'T. Pausas',   visible: true  },
-  { key: 'tiempo_laborado_min',label: 'T. Laborado', visible: true  },
-  { key: 'estado',             label: 'Estado',      visible: true  },
-  { key: 'num_pausas',         label: 'Pausas',      visible: false },
+  { key: '_nombre',             label: 'Usuario',        visible: true,  filterType: 'select' },
+  { key: 'fecha',              label: 'Fecha',          visible: false },
+  { key: 'hora_inicio',        label: 'Inicio',         visible: true,  width: '120px' },
+  { key: 'hora_fin',           label: 'Fin',            visible: true,  width: '120px' },
+  { key: 'tiempo_total_min',   label: 'T. Total',       visible: true  },
+  { key: 'tiempo_pausa_min',   label: 'T. Pausas',      visible: true  },
+  { key: 'tiempo_laborado_min',label: 'T. Laborado',    visible: true  },
+  { key: 'estado',             label: 'Estado',          visible: true,  filterType: 'select' },
+  { key: 'tareas_count',       label: 'Tareas',          visible: true  },
+  { key: 'dur_tareas_real',    label: 'Dur. tareas',     visible: true  },
+  { key: 'dur_tareas_crono',   label: 'Cronómetro',      visible: false },
+  { key: 'dur_tareas_usuario', label: 'Dur. usuario',    visible: false },
+  { key: 'num_pausas',         label: 'Pausas',          visible: false },
 ]
 
 // Cuando el rango es > 1 día, mostrar columna fecha
@@ -226,19 +171,14 @@ const columnasComputed = computed(() => {
   return columnas.map(c => c.key === 'fecha' ? { ...c, visible: multi } : c)
 })
 
-// Filtrar por usuario seleccionado
 const jornadasFiltradas = computed(() => {
-  let list = jornadas.value
-  if (filtroUsuario.value) {
-    list = list.filter(j => j.usuario === filtroUsuario.value)
-  }
-  return list.map(j => ({
+  return jornadas.value.map(j => ({
     ...j,
-    _nombre_display: j.Nombre_Usuario ? primerNombre(j.Nombre_Usuario) : j.usuario,
+    _nombre: j.Nombre_Usuario ? primerNombre(j.Nombre_Usuario) : j.usuario,
   }))
 })
 
-onMounted(() => { cargarUsuarios(); cargarEquipo() })
+onMounted(() => { cargarEquipo() })
 
 async function cargarEquipo() {
   cargando.value = true
@@ -310,27 +250,6 @@ function badgeClass(j) {
   font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;
 }
 .date-input:focus { outline: none; }
-
-/* Dropdown menu (teleported) */
-.dropdown-backdrop {
-  position: fixed; inset: 0; z-index: 9050; background: transparent;
-}
-.dropdown-menu-teleport {
-  background: var(--bg-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  padding: 4px 0;
-  min-width: 160px;
-}
-.dropdown-item-teleport {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 12px;
-  font-size: 12px; color: var(--text-secondary);
-  cursor: pointer; transition: background 80ms;
-}
-.dropdown-item-teleport:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.dropdown-item-teleport.active { color: var(--accent); font-weight: 500; }
 
 /* Cell renderers */
 .cell-usuario { display: flex; flex-direction: column; gap: 1px; line-height: 1.2; }
