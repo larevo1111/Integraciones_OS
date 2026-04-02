@@ -384,7 +384,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v1.6-recargar'
+const APP_VERSION = 'v1.7-nivel'
 const auth             = useAuthStore()
 const router           = useRouter()
 const route            = useRoute()

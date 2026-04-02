@@ -47,6 +47,35 @@ if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
   process.exit(1)
 }
 
+// ─── CACHÉ DE NIVELES DE USUARIO ──────────────────────────────────
+// Se carga al iniciar y se refresca cada 5 minutos
+const nivelCache = {}  // { 'email@...': nivel }
+
+async function refrescarNiveles() {
+  try {
+    const [rows] = await db.comunidad.query('SELECT `Email` AS email, `Nivel_Acceso` AS nivel FROM sys_usuarios')
+    for (const r of rows) nivelCache[r.email] = r.nivel || 1
+    console.log(`[niveles] Caché actualizado: ${rows.length} usuarios`)
+  } catch (e) {
+    console.error('[niveles] Error refrescando caché:', e.message)
+    // Mantener caché anterior — fallback seguro
+  }
+}
+
+function filtrarPorNivel(items, reqUsuario, campoResponsables = 'responsables') {
+  const miEmail = reqUsuario.email
+  const miNivel = reqUsuario.nivel || nivelCache[miEmail] || 1
+  return items.filter(item => {
+    const responsables = item[campoResponsables]
+    if (!responsables || !responsables.length) return true  // sin responsable → visible para todos
+    return responsables.some(email =>
+      email === miEmail || (nivelCache[email] || 1) < miNivel
+    )
+  })
+}
+
+// Inicializar caché después de que DB esté lista (ver al final del archivo)
+
 const app = express()
 app.use(express.json())
 // sw.js e index.html sin caché para que el PWA se actualice
@@ -526,7 +555,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
       }
     })
 
-    res.json({ ok: true, tareas: tareasFinales })
+    res.json({ ok: true, tareas: filtrarPorNivel(tareasFinales, req.usuario) })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -571,7 +600,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
       const responsables = t.responsables_csv ? t.responsables_csv.split(',') : []
       return { ...t, responsables, responsable_nombre: nombreMap[t.responsable] || null }
     })
-    res.json({ ok: true, tareas })
+    res.json({ ok: true, tareas: filtrarPorNivel(tareas, req.usuario) })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -648,11 +677,12 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
       } catch {}
     }
-    res.json({ ok: true, subtareas: subtareas.map(t => ({
+    const subsFinal = subtareas.map(t => ({
       ...t,
       responsables: t.responsables_csv ? t.responsables_csv.split(',') : [],
       responsable_nombre: nombreMap[t.responsable] || null
-    })) })
+    }))
+    res.json({ ok: true, subtareas: filtrarPorNivel(subsFinal, req.usuario) })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -1465,7 +1495,7 @@ app.get('/api/gestion/proyectos', async (req, res) => {
       etiquetas:    p.etiquetas_json ? (typeof p.etiquetas_json === 'string' ? JSON.parse(p.etiquetas_json) : p.etiquetas_json) : []
     }))
 
-    res.json({ ok: true, proyectos: result })
+    res.json({ ok: true, proyectos: filtrarPorNivel(result, req.usuario) })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
@@ -2119,7 +2149,12 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
       jornadas.forEach(j => { j.pausas = pausasPorJornada[j.id] || [] })
     }
 
-    res.json({ ok: true, desde, hasta, jornadas })
+    // Filtrar por nivel: solo jornadas de usuarios con nivel inferior + las propias
+    const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+    const jornadasFiltradas = jornadas.filter(j =>
+      j.usuario === req.usuario.email || (nivelCache[j.usuario] || 1) < miNivel
+    )
+    res.json({ ok: true, desde, hasta, jornadas: jornadasFiltradas })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
@@ -2220,6 +2255,9 @@ async function arrancar() {
     console.log('[server] Conectando SSH tunnel → Hostinger...')
     await db.conectar()
     console.log('[server] Pools MySQL listos (comunidad / gestion / integracion)')
+
+    await refrescarNiveles()
+    setInterval(refrescarNiveles, 5 * 60 * 1000)  // cada 5 min
 
     app.listen(PORT, () => {
       console.log(`[server] OS Gestión API corriendo en puerto ${PORT}`)
