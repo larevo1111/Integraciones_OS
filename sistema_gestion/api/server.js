@@ -810,8 +810,25 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
         params
       )
 
+      // Cerrar cronómetro de la tarea si se completa/cancela
+      if (estado === 'Completada' || estado === 'Cancelada') {
+        await db.gestion.query(
+          `UPDATE g_tarea_tiempo SET fin = NOW(), duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, NOW()) / 60)
+           WHERE tarea_id = ? AND fin IS NULL`,
+          [req.params.id]
+        )
+      }
+
       // Cascada a subtareas cuando cambia estado del padre
       if (estado === 'Completada') {
+        // Cerrar cronómetros de subtareas antes de completarlas
+        await db.gestion.query(
+          `UPDATE g_tarea_tiempo tt
+           JOIN g_tareas t ON t.id = tt.tarea_id
+           SET tt.fin = NOW(), tt.duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, tt.inicio, NOW()) / 60)
+           WHERE t.parent_id = ? AND t.empresa = ? AND t.estado NOT IN ('Completada','Cancelada') AND tt.fin IS NULL`,
+          [req.params.id, req.empresa]
+        )
         await db.gestion.query(
           `UPDATE g_tareas SET estado='Completada', fecha_inicio_real=COALESCE(fecha_inicio_real, NOW()), fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
            WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
@@ -1022,7 +1039,14 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
       WHERE id = ? AND empresa = ?
     `, [tiempoFinal, req.usuario.email, tareaId, req.empresa])
 
-    // Cascada: completar subtareas pendientes/en progreso
+    // Cascada: cerrar cronómetros + completar subtareas pendientes/en progreso
+    await db.gestion.query(
+      `UPDATE g_tarea_tiempo tt
+       JOIN g_tareas t ON t.id = tt.tarea_id
+       SET tt.fin = NOW(), tt.duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, tt.inicio, NOW()) / 60)
+       WHERE t.parent_id = ? AND t.empresa = ? AND t.estado NOT IN ('Completada','Cancelada') AND tt.fin IS NULL`,
+      [tareaId, req.empresa]
+    )
     await db.gestion.query(
       `UPDATE g_tareas SET estado='Completada', fecha_inicio_real=COALESCE(fecha_inicio_real, NOW()), fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
        WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
