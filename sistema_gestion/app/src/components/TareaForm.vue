@@ -11,10 +11,15 @@
 
           <!-- Header -->
           <div class="form-header">
-            <span class="form-title">{{ editar ? 'Editar tarea' : 'Nueva tarea' }}</span>
-            <button class="btn-icon" @click="$emit('update:modelValue', false)">
-              <span class="material-icons">close</span>
-            </button>
+            <span class="panel-header-tipo">{{ editar ? 'Editar tarea' : 'Nueva tarea' }}</span>
+            <div class="panel-header-actions">
+              <button class="btn-icon" title="Guardar" :disabled="!form.titulo || !form.categoria_id || guardando" @click="guardar">
+                <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+              </button>
+              <button class="btn-icon" title="Cerrar" @click="$emit('update:modelValue', false)">
+                <span class="material-icons" style="font-size:18px">close</span>
+              </button>
+            </div>
           </div>
 
           <!-- Body -->
@@ -88,13 +93,6 @@
             </div>
           </div>
 
-          <!-- Footer -->
-          <div class="form-footer">
-            <button class="btn btn-ghost" @click="$emit('update:modelValue', false)">Cancelar</button>
-            <button class="btn btn-primary" :disabled="!form.titulo || !form.categoria_id || guardando" @click="guardar">
-              {{ guardando ? 'Guardando...' : (editar ? 'Guardar cambios' : 'Crear tarea') }}
-            </button>
-          </div>
         </div>
       </div>
     </Transition>
@@ -223,11 +221,10 @@ async function guardar() {
 }
 
 .form-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px 10px;
+  display: flex; align-items: center;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.form-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 
 .form-body {
   flex: 1;
@@ -299,12 +296,6 @@ async function guardar() {
 @media (max-width: 768px) {
   .form-row-2 { grid-template-columns: 1fr; }
   .form-row-3 { grid-template-columns: 1fr 1fr; }
-}
-
-.form-footer {
-  display: flex; justify-content: flex-end; gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 /* Transiciones */
