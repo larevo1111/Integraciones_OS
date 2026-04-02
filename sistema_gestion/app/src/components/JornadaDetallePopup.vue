@@ -271,7 +271,7 @@ const tareasColumnas = reactive([
   { key: 'tiempo_real_min',      label: 'Cronómetro',      visible: false },
   { key: 'fecha_inicio_estimada',label: 'Inicio est.',     visible: false },
   { key: 'fecha_fin_estimada',   label: 'Fin est.',        visible: false },
-  { key: 'tiempo_estimado_min',  label: 'Estimada',        visible: false },
+  { key: 'tiempo_estimado_min',  label: 'Dur. usuario',    visible: false },
 ])
 
 const tareasRows = computed(() => tareasCompletadas.value.map(t => ({
