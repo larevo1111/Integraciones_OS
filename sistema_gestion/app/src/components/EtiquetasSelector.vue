@@ -33,15 +33,13 @@
             :key="e.id"
             class="etiqueta-option"
             :class="{ selected: modelValue.includes(e.id) && editandoId !== e.id }"
-            @mouseenter="hoverId = e.id"
-            @mouseleave="hoverId = null"
           >
             <!-- Modo normal -->
             <template v-if="editandoId !== e.id">
               <span class="etiqueta-dot" :style="{ background: e.color || 'var(--text-tertiary)' }"></span>
               <span class="etiqueta-option-nombre" @click="toggle(e.id)">{{ e.nombre }}</span>
-              <span v-if="modelValue.includes(e.id) && hoverId !== e.id" class="material-icons check-icon">check</span>
-              <button v-if="hoverId === e.id" class="etiqueta-menu-btn" @click.stop="iniciarEdicion(e)" title="Editar o eliminar">
+              <span v-if="modelValue.includes(e.id)" class="material-icons check-icon">check</span>
+              <button class="etiqueta-menu-btn" @click.stop="iniciarEdicion(e)" title="Editar o eliminar">
                 <span class="material-icons" style="font-size:15px">more_vert</span>
               </button>
             </template>
@@ -98,7 +96,6 @@ const abierto       = ref(false)
 const busqueda      = ref('')
 const lista         = ref([])
 const dropdownStyle = ref({})
-const hoverId       = ref(null)
 const editandoId    = ref(null)
 const editandoNombre = ref('')
 
@@ -290,33 +287,35 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 /* Fila de etiqueta */
 .etiqueta-option {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; font-size: 13px; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; font-size: 13px; color: var(--text-secondary);
   cursor: pointer; transition: background 60ms;
   min-height: 32px;
 }
 .etiqueta-option:hover, .etiqueta-option.selected { background: var(--bg-row-hover); color: var(--text-primary); }
 .etiqueta-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.etiqueta-option-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.check-icon { font-size: 14px; margin-left: auto; color: var(--accent); flex-shrink: 0; }
+.etiqueta-option-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.check-icon { font-size: 14px; color: var(--accent); flex-shrink: 0; }
 .etiqueta-empty { padding: 8px 12px; font-size: 12px; color: var(--text-tertiary); font-style: italic; }
 
-/* Botón ⋮ */
+/* Botón ⋮ — siempre visible */
 .etiqueta-menu-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; margin-left: auto; flex-shrink: 0;
+  width: 20px; height: 20px; flex-shrink: 0;
   background: transparent; border: none; cursor: pointer;
   border-radius: var(--radius-sm);
-  color: var(--text-tertiary); transition: background 60ms, color 60ms;
+  color: var(--text-tertiary); opacity: 0.5;
+  transition: background 60ms, color 60ms, opacity 60ms;
 }
-.etiqueta-menu-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.etiqueta-option:hover .etiqueta-menu-btn { opacity: 1; }
+.etiqueta-menu-btn:hover { background: var(--bg-surface); color: var(--text-primary); opacity: 1; }
 
 /* Input edición inline */
 .etiqueta-edit-input {
   flex: 1; min-width: 0; background: var(--bg-surface);
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  padding: 2px 6px; font-size: 12px;
+  padding: 2px 4px; font-size: 11px;
   color: var(--text-primary); outline: none;
   font-family: var(--font-sans);
 }
@@ -324,13 +323,18 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 /* Botones acción (✓ y 🗑) */
 .etiqueta-action-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; flex-shrink: 0;
+  width: 20px; height: 20px; flex-shrink: 0;
   background: transparent; border: none; cursor: pointer;
   border-radius: var(--radius-sm);
   color: var(--text-tertiary); transition: background 60ms, color 60ms;
 }
 .etiqueta-action-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
 .etiqueta-action-danger:hover { color: var(--color-error) !important; }
+
+/* Móvil: ⋮ siempre visible */
+@media (max-width: 768px) {
+  .etiqueta-menu-btn { opacity: 1; }
+}
 
 /* Crear nueva */
 .etiqueta-crear {
