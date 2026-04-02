@@ -105,9 +105,9 @@
               @mouseleave="proyectoHover = null"
             >
               <RouterLink
-                :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
                 class="nav-item nav-item-proyecto"
-                :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
+                :class="{ active: ruta === '/equipo' && String($route.query.proyecto_id) === String(p.id) }"
               >
                 <span class="nav-item-icon">
                   <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
@@ -329,7 +329,7 @@
                 </div>
                 <template v-if="acordeonAbierto['eq-'+sec.tipo]">
                   <div v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id" class="nav-item-proyecto-wrap">
-                    <RouterLink :to="{ path: '/tareas', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
+                    <RouterLink :to="{ path: '/equipo', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span></span>
                       <span class="nav-item-label">{{ p.nombre }}</span>
                       <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>

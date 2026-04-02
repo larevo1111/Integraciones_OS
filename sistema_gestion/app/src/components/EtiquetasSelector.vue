@@ -127,7 +127,7 @@ function calcularPosicion() {
   dropdownStyle.value = {
     position: 'fixed',
     left: `${rect.left}px`,
-    width: `${Math.max(rect.width, 200)}px`,
+    width: `${Math.min(Math.max(rect.width, 200), 240)}px`,
     zIndex: 9999,
     ...(goUp
       ? { bottom: `${window.innerHeight - rect.top}px` }
