@@ -364,6 +364,7 @@
                 <div class="nav-item" @click="cerrarSesion">
                   <span class="nav-item-icon material-icons">logout</span>
                   <span class="nav-item-label">Cerrar sesión</span>
+                  <span v-if="auth.esAdmin" style="font-size:9px;color:var(--text-tertiary);margin-left:auto">{{ APP_VERSION }}</span>
                 </div>
               </div>
             </nav>
