@@ -308,6 +308,26 @@ const props = defineProps({
 })
 const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre'])
 
+// ─── Guardar pendientes al cambiar de tarea ───
+let tareaIdAnterior = props.tarea?.id || null
+
+watch(() => props.tarea?.id, (nuevoId) => {
+  if (tareaIdAnterior && tareaIdAnterior !== nuevoId) {
+    // Guardar cambios pendientes contra la tarea ANTERIOR
+    const idViejo = tareaIdAnterior
+    for (const [campo, val] of Object.entries(camposPendientes)) {
+      if (val !== undefined) {
+        api(`/api/gestion/tareas/${idViejo}`, {
+          method: 'PUT',
+          body: JSON.stringify({ [campo]: val })
+        }).catch(() => {})
+      }
+      delete camposPendientes[campo]
+    }
+  }
+  tareaIdAnterior = nuevoId
+})
+
 // Breadcrumb subtarea
 const padreNombre = ref('')
 watch(() => props.tarea?.parent_id, async (parentId) => {
@@ -413,8 +433,15 @@ const hayCambiosPendientes = computed(() => {
 })
 
 function guardarCampoPendiente(campo, valor) {
+  const id = props.tarea?.id
+  if (!id) { delete camposPendientes[campo]; return }
   if (valor !== (props.tarea[campo] || '')) {
-    actualizar(campo, valor)
+    // Usar ID capturado — protege contra cambio de tarea durante blur
+    api(`/api/gestion/tareas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ [campo]: valor })
+    }).then(data => emit('actualizada', data.tarea))
+     .catch(e => console.error(e))
   }
   delete camposPendientes[campo]
 }
