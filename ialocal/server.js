@@ -140,7 +140,7 @@ app.post('/api/conversaciones', async (req, res) => {
     const { modelo, contexto_max, titulo } = req.body
     const [result] = await pool.execute(
       `INSERT INTO conversaciones (titulo, modelo, contexto_max) VALUES (?, ?, ?)`,
-      [titulo || 'Nueva conversación', modelo || 'qwen2.5-coder:14b', contexto_max || 32768]
+      [titulo || 'Nueva conversación', modelo || 'qwen-coder-ctx', contexto_max || 28672]
     )
     res.json({ id: result.insertId })
   } catch (e) {
