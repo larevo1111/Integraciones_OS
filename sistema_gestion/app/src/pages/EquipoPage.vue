@@ -159,9 +159,9 @@ const columnas = [
   { key: 'tiempo_laborado_min',label: 'T. Laborado',    visible: true  },
   { key: 'estado',             label: 'Estado',          visible: true,  filterType: 'select' },
   { key: 'tareas_count',       label: 'Tareas',          visible: true  },
-  { key: 'dur_tareas_real',    label: 'Dur. tareas',     visible: true  },
-  { key: 'dur_tareas_crono',   label: 'Cronómetro',      visible: false },
-  { key: 'dur_tareas_usuario', label: 'Dur. usuario',    visible: false },
+  { key: 'dur_tareas_real',    label: 'Dur. sistema',     visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de cada tarea (calculado automáticamente)' },
+  { key: 'dur_tareas_crono',   label: 'Dur. cronómetro',  visible: false, hint: 'Duración Cronómetro: tiempo acumulado del cronómetro que cada persona activó manualmente' },
+  { key: 'dur_tareas_usuario', label: 'Dur. usuario',     visible: false, hint: 'Duración Usuario: tiempo que la persona reportó manualmente al completar la tarea' },
   { key: 'num_pausas',         label: 'Pausas',          visible: false },
 ]
 

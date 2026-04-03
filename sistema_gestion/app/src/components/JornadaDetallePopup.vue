@@ -267,11 +267,11 @@ const tareasColumnas = reactive([
   { key: 'estado',               label: 'Estado',          visible: false, filterType: 'select' },
   { key: 'fecha_inicio_real',    label: 'Inicio real',     visible: true },
   { key: 'fecha_fin_real',       label: 'Fin real',        visible: true },
-  { key: 'duracion_real_min',    label: 'Duración',        visible: true },
-  { key: 'tiempo_real_min',      label: 'Cronómetro',      visible: false },
+  { key: 'duracion_real_min',    label: 'Dur. sistema',    visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de la tarea' },
+  { key: 'tiempo_real_min',      label: 'Dur. cronómetro', visible: false, hint: 'Duración Cronómetro: tiempo acumulado del cronómetro activado manualmente' },
   { key: 'fecha_inicio_estimada',label: 'Inicio est.',     visible: false },
   { key: 'fecha_fin_estimada',   label: 'Fin est.',        visible: false },
-  { key: 'tiempo_estimado_min',  label: 'Dur. usuario',    visible: false },
+  { key: 'tiempo_estimado_min',  label: 'Dur. usuario',    visible: false, hint: 'Duración Usuario: tiempo reportado manualmente al completar la tarea' },
 ])
 
 const tareasRows = computed(() => tareasCompletadas.value.map(t => ({

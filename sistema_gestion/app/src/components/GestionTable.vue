@@ -23,11 +23,14 @@
         </button>
         <!-- Campos -->
         <div class="toolbar-btn-wrap" ref="fieldsRef">
-          <button class="toolbar-btn" @click.stop="showFields = !showFields">
+          <button class="toolbar-btn" @click.stop="toggleFields">
             <span class="material-icons" style="font-size:14px">tune</span>
             <span>Campos</span>
           </button>
-          <div v-if="showFields" class="popup fields-popup" @click.stop>
+          <Teleport to="body">
+            <div v-if="showFields && fieldsStyle.position" class="fields-backdrop" @click="showFields = false" />
+          </Teleport>
+          <div v-if="showFields" class="popup fields-popup" :style="fieldsStyle" @click.stop>
             <div class="pp-section-label">Propiedades visibles</div>
             <div class="fields-pills">
               <button
@@ -63,10 +66,12 @@
                 'th-popup-open': colPopup === col.key
               }"
               :style="col.width ? { minWidth: col.width } : {}"
+              :title="col.hint || ''"
               @click.stop="openColPopup(col.key, $event)"
             >
               <div class="th-inner">
                 <span class="th-label">{{ col.label }}</span>
+                <span v-if="col.hint" class="material-icons th-hint-icon">info_outline</span>
                 <span v-if="sortKey === col.key" class="material-icons sort-icon">
                   {{ sortDir === 'asc' ? 'keyboard_arrow_up' : 'keyboard_arrow_down' }}
                 </span>
@@ -235,8 +240,27 @@ function showAll() { localColumns.value.forEach(c => c.visible = true) }
 function hideAll() { localColumns.value.forEach(c => c.visible = false) }
 
 // ── Popup toolbar ─────────────────────────────────────
-const showFields = ref(false)
-const fieldsRef  = ref(null)
+const showFields  = ref(false)
+const fieldsRef   = ref(null)
+const fieldsStyle = ref({})
+
+function toggleFields() {
+  showFields.value = !showFields.value
+  if (showFields.value && fieldsRef.value && window.innerWidth <= 768) {
+    nextTick(() => {
+      const rect = fieldsRef.value.getBoundingClientRect()
+      fieldsStyle.value = {
+        position: 'fixed',
+        top: (rect.bottom + 6) + 'px',
+        left: '10px',
+        right: '10px',
+        minWidth: 'unset',
+      }
+    })
+  } else {
+    fieldsStyle.value = {}
+  }
+}
 
 // ── Filtros por columna ──────────────────────────────
 const columnFilters = ref({})
@@ -520,6 +544,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .sort-icon { font-size: 14px !important; color: var(--accent); }
 .th-sorted { color: var(--accent); }
 .th-filter-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.th-hint-icon  { font-size: 11px !important; color: var(--text-tertiary); opacity: 0.6; flex-shrink: 0; }
 .th-popup-open { background: var(--bg-card-hover); }
 
 .td {
@@ -649,4 +674,5 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   flex-shrink: 0;
 }
 .cp-select-opt.active .cp-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fields-backdrop { position: fixed; inset: 0; z-index: 199; background: transparent; }
 </style>
