@@ -127,19 +127,19 @@
       <!-- OP Effi -->
       <div class="fpop-section">
         <p class="fpop-label">OP Effi</p>
-        <input type="text" class="input-field fpop-date" v-model="local.id_op" placeholder="Número de OP..." style="width:100%" />
+        <OpSelector v-model="local.id_op" />
       </div>
 
       <!-- Pedido -->
       <div class="fpop-section">
         <p class="fpop-label">Pedido</p>
-        <input type="text" class="input-field fpop-date" v-model="local.id_pedido" placeholder="Número de pedido..." style="width:100%" />
+        <PedidoSelector v-model="local.id_pedido" />
       </div>
 
       <!-- Remisión -->
       <div class="fpop-section">
         <p class="fpop-label">Remisión</p>
-        <input type="text" class="input-field fpop-date" v-model="local.id_remision" placeholder="Número de remisión..." style="width:100%" />
+        <RemisionSelector v-model="local.id_remision" />
       </div>
 
       <!-- Footer -->
@@ -153,6 +153,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import OpSelector from 'src/components/OpSelector.vue'
+import RemisionSelector from 'src/components/RemisionSelector.vue'
+import PedidoSelector from 'src/components/PedidoSelector.vue'
 
 const props = defineProps({
   categorias: { type: Array, default: () => [] },
@@ -237,9 +240,9 @@ function aplicar() {
     proyecto_id:  local.sinProyecto ? 'null' : (local.proyecto_id ?? null),
     sinProyecto:  local.sinProyecto,
     responsables: [...local.responsables],
-    id_op:        local.id_op.trim() || null,
-    id_pedido:    local.id_pedido.trim() || null,
-    id_remision:  local.id_remision.trim() || null
+    id_op:        (local.id_op || '').trim() || null,
+    id_pedido:    (local.id_pedido || '').trim() || null,
+    id_remision:  (local.id_remision || '').trim() || null
   }
   emit('aplicar', f)
 }
