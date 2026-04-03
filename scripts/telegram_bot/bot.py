@@ -784,6 +784,50 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith('sa_'):
         await handlers_sa.handle_sa_callback(query, user, nivel, _nombre(user), sa_mod)
 
+    # ── Botón "Abrir con Claude Code" del diagnóstico diario ──────────────
+    elif data.startswith('rd_claude:'):
+        if nivel < 5:
+            await query.answer('Solo nivel 5+ puede usar Claude Code.', show_alert=True)
+            return
+        fecha_rd = data.split(':', 1)[1]
+        uid = str(user.id)
+        empresa = sesion.get('empresa', 'ori_sil_2')
+
+        # Leer último diagnóstico
+        rd_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                               '..', 'logs', 'ultimo_diagnostico.txt')
+        rd_texto = ''
+        try:
+            with open(rd_path) as f:
+                rd_texto = f.read()[:2000]
+        except Exception:
+            pass
+
+        # Crear sesión SA con contexto del diagnóstico
+        prompt_rd = (
+            f'RD - {fecha_rd}\n\n'
+            f'Diagnóstico diario del sistema:\n{rd_texto}\n\n'
+            f'Santi va a preguntarte sobre los resultados. '
+            f'Responde conciso y directo. Si hay fallos, diagnostica y corrige.'
+        )
+        await query.edit_message_reply_markup(reply_markup=None)
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        resp = sa_mod._ejecutar_claude(prompt_rd)
+        if resp.get('ok') and resp.get('session_id'):
+            sa_mod.crear_sesion(uid, empresa, resp['session_id'],
+                                nombre=f'RD - {fecha_rd}')
+            db.guardar_sesion(user.id, user.username or '', _nombre(user),
+                              agente_preferido='superagente')
+            await query.message.reply_text(
+                f'🔧 *RD — {fecha_rd}*\n'
+                f'Claude Code tiene el diagnóstico. Escribí lo que necesites.',
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=handlers_sa.teclado_sa()
+            )
+        else:
+            await query.message.reply_text(
+                f'😔 No se pudo iniciar Claude Code: {resp.get("error", "?")}')
+
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 

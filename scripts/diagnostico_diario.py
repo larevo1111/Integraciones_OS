@@ -23,8 +23,9 @@ sys.path.insert(0, BASE_DIR)
 from dotenv import load_dotenv
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-NOTIF_TOKEN = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN')
-NOTIF_CHAT  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')
+BOT_TOKEN   = os.getenv('TELEGRAM_BOT_TOKEN')          # Bot principal (interactivo)
+NOTIF_TOKEN = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN')    # Bot notificaciones (fallback)
+SANTI_CHAT  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')      # Chat de Santi
 CLAUDE_BIN  = '/home/osserver/.local/bin/claude'
 REPO_DIR    = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
 LOG_FILE    = os.path.join(REPO_DIR, 'logs', 'diagnostico.log')
@@ -80,18 +81,25 @@ def _run(cmd, timeout=15):
         return -1, '', str(e)
 
 
-def _enviar_telegram(mensaje):
-    """Envía mensaje por Telegram vía bot de notificaciones."""
-    if not NOTIF_TOKEN or not NOTIF_CHAT:
+def _enviar_telegram(mensaje, con_boton_claude=False):
+    """Envía reporte por el bot principal (para que Santi pueda responder)."""
+    import requests
+    token = BOT_TOKEN or NOTIF_TOKEN
+    chat = SANTI_CHAT
+    if not token or not chat:
         print('⚠️  Sin tokens Telegram configurados')
         return
-    import requests
+
+    payload = {'chat_id': chat, 'text': mensaje, 'parse_mode': 'HTML'}
+    if con_boton_claude:
+        payload['reply_markup'] = json.dumps({
+            'inline_keyboard': [[
+                {'text': '🔧 Abrir con Claude Code', 'callback_data': f'rd_claude:{HOY}'}
+            ]]
+        })
     try:
-        requests.post(
-            f'https://api.telegram.org/bot{NOTIF_TOKEN}/sendMessage',
-            json={'chat_id': NOTIF_CHAT, 'text': mensaje, 'parse_mode': 'HTML'},
-            timeout=10,
-        )
+        requests.post(f'https://api.telegram.org/bot{token}/sendMessage',
+                       json=payload, timeout=10)
     except Exception as e:
         print(f'Error enviando Telegram: {e}')
 
@@ -387,19 +395,16 @@ def main():
         _log(l)
     _log(f'Total fallos: {total_fallos}')
 
-    # Enviar por Telegram
+    # Enviar por Telegram (bot principal para que Santi pueda responder)
     if not args.silencioso or total_fallos > 0:
-        # Telegram tiene límite de 4096 chars
         if len(reporte) > 4000:
             reporte = reporte[:3990] + '\n...(truncado)'
-        _enviar_telegram(reporte)
+        _enviar_telegram(reporte, con_boton_claude=(total_fallos > 0))
 
-    # Llamar a Claude si hay fallos
-    if args.con_claude and total_fallos > 0:
-        fallos_txt = '\n'.join(fallos_detalle)
-        resultado = llamar_claude(fallos_txt)
-        if resultado:
-            _log(f'Claude respondió: {resultado[:200]}')
+    # Guardar reporte en archivo para que Claude Code lo lea si se invoca
+    reporte_path = os.path.join(REPO_DIR, 'logs', 'ultimo_diagnostico.txt')
+    with open(reporte_path, 'w') as f:
+        f.write(reporte)
 
     return total_fallos
 
