@@ -48,7 +48,6 @@ def obtener_columnas_reales(sql: str) -> str:
 
         resultado = ''
         if tablas_inexistentes:
-            from .esquema import _obtener_ddl_directo
             tablas_validas = _listar_tablas_validas()
             similares = _sugerir_tablas(tablas_inexistentes, tablas_validas)
             resultado += (

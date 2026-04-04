@@ -14,7 +14,7 @@
 ```bash
 # Modelfile
 FROM qwen2.5-coder:14b
-PARAMETER num_ctx 14500
+PARAMETER num_ctx 12288
 PARAMETER num_gpu 49
 ```
 
@@ -22,7 +22,7 @@ PARAMETER num_gpu 49
 ```bash
 cat > /tmp/Modelfile-qwen-ctx << 'EOF'
 FROM qwen2.5-coder:14b
-PARAMETER num_ctx 14500
+PARAMETER num_ctx 12288
 PARAMETER num_gpu 49
 EOF
 ollama create qwen-coder-ctx -f /tmp/Modelfile-qwen-ctx
@@ -218,7 +218,7 @@ Si por cualquier razón el modelo `qwen-coder-ctx` se pierde o se corrompe (ialo
 # Recrear modelo
 cat > /tmp/Modelfile-qwen-ctx << 'EOF'
 FROM qwen2.5-coder:14b
-PARAMETER num_ctx 14500
+PARAMETER num_ctx 12288
 PARAMETER num_gpu 49
 EOF
 ollama create qwen-coder-ctx -f /tmp/Modelfile-qwen-ctx

@@ -63,25 +63,6 @@ def extraer_sql(texto: str) -> str | None:
     return None
 
 
-def extraer_json(texto: str) -> dict | None:
-    """Extrae un JSON de la respuesta si existe."""
-    match = re.search(r'```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```', texto, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except Exception:
-            pass
-
-    # JSON sin markdown
-    match = re.search(r'(\{[^{}]*\}|\[[^\[\]]*\])', texto, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except Exception:
-            pass
-
-    return None
-
 
 def _detectar_formato(texto: str) -> str:
     """Detecta el tipo de formato de la respuesta."""
