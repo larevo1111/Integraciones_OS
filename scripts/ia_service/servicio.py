@@ -385,20 +385,10 @@ def consultar(
         if rag_ctx:
             system_prompt += f'\n\n{rag_ctx}'
 
-    # CAPA 3: Schema BD — tablas del tema si lo tiene, sino schema completo
-    if tipo_cfg.get('requiere_estructura'):
-        if tema_cfg and tema_cfg.get('schema_tablas'):
-            try:
-                tablas_tema = json.loads(tema_cfg['schema_tablas']) if isinstance(tema_cfg['schema_tablas'], str) else tema_cfg['schema_tablas']
-                if tablas_tema:
-                    ddl = esquema.obtener_ddl(tablas=tablas_tema)
-                else:
-                    ddl = esquema.obtener_ddl()
-            except Exception:
-                ddl = esquema.obtener_ddl()
-        else:
-            ddl = esquema.obtener_ddl()
-        system_prompt += f'\n\nEsquema de la base de datos:\n{ddl}'
+    # CAPA 3: Schema BD — ahora unificado dentro del system_prompt (<esquema>)
+    # DDL de esquema.py ya no se inyecta: la sección <esquema> del prompt contiene
+    # tabla + descripción + campos con significado, reemplazando tablas_disponibles
+    # + diccionario_campos + DDL en una sola fuente compacta.
 
     # CAPA 4: Resumen comprimido de la conversación (historial antiguo)
     if resumen_anterior:
@@ -944,6 +934,50 @@ def _corregir_igualdad_nombres(sql: str) -> str:
 _OLLAMA_BASE = 'http://localhost:11434'
 _log = logging.getLogger('ia_service')
 
+# Modelfile para qwen-coder-ctx — configuración optimizada para RTX 3060 12GB.
+# Ver .agent/docs/CONFIG_QWEN_CTX.md para la justificación de cada parámetro.
+_QWEN_CTX_MODELFILE = """\
+FROM qwen2.5-coder:14b
+PARAMETER num_ctx 14500
+PARAMETER num_gpu 49
+"""
+
+
+def _asegurar_qwen_coder_ctx() -> None:
+    """
+    Verifica que el modelo qwen-coder-ctx existe en Ollama.
+    Si no existe (borrado, ollama update, etc.), lo recrea automáticamente.
+    """
+    try:
+        r = requests.post(
+            f'{_OLLAMA_BASE}/api/show',
+            json={'name': 'qwen-coder-ctx'}, timeout=5,
+        )
+        if r.status_code == 200:
+            return  # modelo existe
+    except Exception:
+        pass
+
+    _log.warning('qwen-coder-ctx no existe en Ollama — recreando...')
+    try:
+        import tempfile, os
+        fd, path = tempfile.mkstemp(prefix='Modelfile-qwen-ctx-', suffix='.txt')
+        with os.fdopen(fd, 'w') as f:
+            f.write(_QWEN_CTX_MODELFILE)
+        resultado = subprocess.run(
+            ['ollama', 'create', 'qwen-coder-ctx', '-f', path],
+            capture_output=True, text=True, timeout=60,
+        )
+        os.unlink(path)
+        if resultado.returncode == 0:
+            _log.info('qwen-coder-ctx recreado exitosamente')
+            from .alertas import notificar
+            notificar('🔧 <b>qwen-coder-ctx recreado</b>\nEl modelo no existía y fue recreado automáticamente.')
+        else:
+            _log.error(f'Error recreando qwen-coder-ctx: {resultado.stderr[:200]}')
+    except Exception as e:
+        _log.error(f'Error recreando qwen-coder-ctx: {e}')
+
 # Servicios GPU que compiten con Ollama por VRAM (RTX 3060 12GB).
 # Ningún LLM 14B (~9GB) cabe si otro framework ocupa VRAM.
 _GPU_SERVICES_CONFLICTIVOS = ['os-comfyui.service']
@@ -999,6 +1033,24 @@ def _warmup_ollama(modelo_id: str) -> bool:
     if modelo_id in modelos_cargados:
         return True
 
+    # 2b. Si hay OTRO modelo Ollama cargado (ej: ialocal cargó el base), descargarlo
+    for m in modelos_cargados:
+        if m != modelo_id:
+            _log.info(f'Descargando modelo incorrecto de VRAM: {m}')
+            try:
+                requests.post(
+                    f'{_OLLAMA_BASE}/api/generate',
+                    json={'model': m, 'keep_alive': 0}, timeout=10,
+                )
+                time.sleep(2)
+            except Exception:
+                pass
+
+    # 2c. Si el modelo solicitado es qwen-coder-ctx, verificar que existe
+    # y recrearlo si fue borrado (ej: ollama update, cambio de agente, etc.)
+    if modelo_id == 'qwen-coder-ctx':
+        _asegurar_qwen_coder_ctx()
+
     # 3. Liberar VRAM si hay servicios GPU conflictivos
     _liberar_vram_si_necesario()
 
@@ -1047,6 +1099,33 @@ def _llamar_agente(agente: dict, mensajes: list, temperatura: float = 0.3, max_t
         return openai_compat.llamar(agente, mensajes, temperatura, max_tokens)
 
 
+def _calcular_agregados(filas: list) -> str:
+    """Pre-calcula SUM, MAX, MIN para columnas numéricas. Evita que el LLM sume mal."""
+    if not filas:
+        return ''
+    from decimal import Decimal, InvalidOperation
+    resultados = []
+    for col in filas[0].keys():
+        valores = []
+        for fila in filas:
+            v = fila.get(col)
+            if v is None:
+                continue
+            try:
+                num = float(str(v).replace(',', '.'))
+                valores.append(num)
+            except (ValueError, TypeError):
+                break
+        else:
+            if valores and len(valores) == len(filas):
+                total = sum(valores)
+                if total > 100:  # Solo para valores significativos
+                    resultados.append(
+                        f"   {col}: SUM={total:,.2f} | MAX={max(valores):,.2f} | MIN={min(valores):,.2f}"
+                    )
+    return '\n'.join(resultados) if resultados else '   (sin columnas numéricas detectadas)'
+
+
 def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generado) -> str:
     """Construye el prompt para el paso de redacción."""
     if paso == 'resumir':
@@ -1062,13 +1141,14 @@ def _construir_prompt_respuesta(pregunta, paso, datos_crudos, tabla, sql_generad
             )
         n_total = len(datos_crudos)
         filas_texto = json.dumps(datos_crudos[:50], ensure_ascii=False, default=str)
+        agregados = _calcular_agregados(datos_crudos)
         tiene_tabla = n_total > 2
         instruccion_tabla = (
             f"Hay {n_total} registros en total — el sistema mostrará un botón 'Ver tabla completa' "
             f"para que el usuario pueda verlos todos con filtros. "
             f"Tu respuesta debe ser un resumen ejecutivo BREVE (3-5 líneas máximo) que incluya SIEMPRE:\n"
             f"1. Total de registros ({n_total})\n"
-            f"2. El valor o métrica principal (suma, total, promedio) si hay columnas numéricas\n"
+            f"2. Los totales PRE-CALCULADOS (usa estos valores, NO sumes tú):\n{agregados}\n"
             f"3. Los 2-3 registros más destacados (mayor valor, más reciente, etc.)\n"
             f"Luego indica que puede ver el detalle completo en la tabla.\n"
         ) if tiene_tabla else (

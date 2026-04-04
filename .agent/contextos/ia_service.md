@@ -314,23 +314,34 @@ Solo 3 opciones en `teclado.py`:
 
 Los demás agentes cloud siguen activos en ia_service pero no aparecen en el bot.
 
-## Ollama — pre-flight warmup + VRAM automática (2026-04-01)
+## Ollama — configuración optimizada qwen-coder-ctx (2026-04-04)
 
-Antes de cada llamada a un agente Ollama (`localhost:11434`), `_warmup_ollama()` en servicio.py:
+**Doc completa**: `.agent/docs/CONFIG_QWEN_CTX.md` — parámetros exactos, balance VRAM, script de recuperación.
+
+**Modelo**: `qwen-coder-ctx` = qwen2.5-coder:14b + num_ctx=14500 + num_gpu=49
+**Ollama service**: `OLLAMA_FLASH_ATTENTION=1` + `OLLAMA_KV_CACHE_TYPE=q8_0`
+**Resultado**: 49/49 capas en GPU, 0 offloading a RAM, 2 graph splits, 22.7 tok/s generación.
+
+System prompt unificado (`<esquema>` reemplazó tablas_disponibles + diccionario_campos + DDL):
+- Prompt total por llamada: ~14,244 tokens (cabe justo en 14,500 ctx)
+- DDL de esquema.py ya NO se inyecta en servicio.py
+
+**Warmup automático** (`_warmup_ollama()` en servicio.py):
 1. Verifica que Ollama responde (`/api/ps`)
 2. Si no responde → `sudo systemctl start ollama.service`
-3. Si el modelo no está en VRAM → llama `_liberar_vram_si_necesario()` primero
-4. `_liberar_vram_si_necesario()` detiene servicios GPU conflictivos (`_GPU_SERVICES_CONFLICTIVOS = ['os-comfyui.service']`)
-5. Precarga el modelo con `POST /api/generate` (prompt vacío, keep_alive 10m)
-6. Si todo falla → retorna error limpio sin activar fallback innecesario
+3. Si el modelo no está en VRAM → `_liberar_vram_si_necesario()` (detiene ComfyUI si activo)
+4. Verifica que el modelo cargado sea `qwen-coder-ctx` (no el base)
+5. Si no es el correcto → lo descarga y precarga el correcto
+6. Si `qwen-coder-ctx` no existe → lo recrea automáticamente desde Modelfile
+7. Precarga con `POST /api/generate` (prompt vacío, keep_alive 10m)
 
-**RTX 3060 12GB**: solo puede correr 1 framework GPU a la vez. ComfyUI usa ~9GB, Qwen 14B usa ~9GB. La automatización garantiza que Ollama siempre tenga VRAM disponible.
+**Si se desconfigura** (modelo borrado, otro proceso lo reemplazó, Ollama actualizado):
+→ Ver script de recuperación en `.agent/docs/CONFIG_QWEN_CTX.md §Qué hacer si se desconfigura`
 
-**ComfyUI deshabilitado de auto-start** (`systemctl disable os-comfyui.service`) — solo se activa manualmente cuando se necesita.
-
-Tiempos típicos:
-- Modelo ya en VRAM (hot): ~16s
-- Modelo frío (warmup + precarga): ~37-40s
+Tiempos típicos (2026-04-04):
+- Modelo ya en VRAM (hot): ~27s por llamada (~55s pipeline completo)
+- Modelo frío (warmup + precarga): ~45s primera llamada
+- Benchmark 15/15 SQL correctos, promedio 57s por consulta
 
 ## Detección de período actual (_periodo_actual — 2026-03-30)
 
