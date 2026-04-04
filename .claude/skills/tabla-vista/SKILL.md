@@ -1,3 +1,9 @@
+---
+name: tabla-vista
+description: >
+  Diseño de vistas de tablas en el ERP con OsDataTable. Triggers: tabla, OsDataTable, vista tabla, columnas, filtros, paginación, drill-down.
+---
+
 # Skill: Diseño de Vista de Tablas — ERP Origen Silvestre
 
 > Guía completa para construir cualquier vista con tablas en el ERP.

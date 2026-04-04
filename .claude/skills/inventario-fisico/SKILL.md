@@ -1,5 +1,7 @@
 ---
-description: "Carga el contexto completo de la App de Inventario Físico OS."
+name: inventario-fisico
+description: >
+  App de inventario físico inv.oscomunidad.com. Triggers: inventario, conteo, rango, auditoría, inv.oscomunidad, stock físico, depuración inventario.
 ---
 
 # Skill: Inventario Físico — Origen Silvestre

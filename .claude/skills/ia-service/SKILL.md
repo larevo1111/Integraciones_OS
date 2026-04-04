@@ -1,3 +1,9 @@
+---
+name: ia-service
+description: >
+  Servicio Central de IA de Origen Silvestre. Triggers: ia_service, servicio ia, agente, consultar, ollama, qwen, gemini, bot telegram, ia_service_os.
+---
+
 Carga el contexto completo del Servicio Central de IA de Origen Silvestre.
 
 ## ¿Qué es?

@@ -1,3 +1,9 @@
+---
+name: menu-erp
+description: >
+  Diseño del sidebar de navegación del ERP. Triggers: menú, sidebar, drawer, navegación, sys_menu, módulo.
+---
+
 # Skill: Diseño de Menú — ERP Origen Silvestre
 
 > Guía completa del sidebar de navegación del ERP.

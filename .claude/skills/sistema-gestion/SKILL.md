@@ -1,5 +1,7 @@
 ---
-description: "Carga el contexto completo del Sistema de Gestión OS (Tareas, Jornadas, Proyectos)."
+name: sistema-gestion
+description: >
+  Sistema de Gestión OS (Tareas, Jornadas, Proyectos). Triggers: gestión, tarea, jornada, proyecto, gestion.oscomunidad, cronómetro, equipo.
 ---
 
 # Skill: Sistema de Gestión OS — Origen Silvestre

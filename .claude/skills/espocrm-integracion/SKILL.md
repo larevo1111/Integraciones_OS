@@ -1,3 +1,9 @@
+---
+name: espocrm-integracion
+description: >
+  Integración bidireccional EspoCRM con Effi. Triggers: espocrm, crm, contactos, sincronización, espoCRM, contacto.
+---
+
 # Skill: EspoCRM — Integración Bidireccional con Effi
 
 Guía técnica para trabajar con EspoCRM en el contexto de la integración Integraciones_OS.

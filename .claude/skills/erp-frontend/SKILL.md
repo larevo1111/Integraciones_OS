@@ -1,3 +1,9 @@
+---
+name: erp-frontend
+description: >
+  ERP Frontend de Origen Silvestre (menu.oscomunidad.com). Triggers: erp, frontend, vue, quasar, menu.oscomunidad, OsDataTable, página, endpoint API ERP.
+---
+
 # Skill: ERP Frontend — Origen Silvestre
 
 > Stack completo del ERP web: Vue 3 + Quasar + API Express + MySQL Hostinger.

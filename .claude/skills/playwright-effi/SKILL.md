@@ -1,3 +1,9 @@
+---
+name: playwright-effi
+description: >
+  Patrones de Playwright para exports de Effi. Triggers: playwright, export, scraping, effi, descargar, chromium, browser.
+---
+
 # Skill: Playwright para exports de Effi
 
 Guía de patrones, errores conocidos y lecciones aprendidas para escribir o modificar scripts de exportación de Effi con Playwright.

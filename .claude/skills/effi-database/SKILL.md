@@ -1,3 +1,9 @@
+---
+name: effi-database
+description: >
+  Base de datos effi_data en MariaDB. Triggers: effi_data, mariadb, zeffi_, tabla, columna, query, SQL, base de datos, bd local, staging.
+---
+
 # Skill: Base de Datos effi_data (MariaDB)
 
 Guía de acceso, consultas y patrones para trabajar con la base de datos `effi_data` en MariaDB.

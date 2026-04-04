@@ -1,3 +1,9 @@
+---
+name: effi-negocio
+description: >
+  Modelo de negocio Effi y lógica comercial de Origen Silvestre. Triggers: negocio, vigencia, consignación, canal, tarifa, producción, devolución, cartera, cliente.
+---
+
 # Skill: Modelo de Negocio Effi — Origen Silvestre
 
 Guía del modelo de datos de Effi en el contexto del negocio de Origen Silvestre.

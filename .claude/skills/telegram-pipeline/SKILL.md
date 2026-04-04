@@ -1,3 +1,9 @@
+---
+name: telegram-pipeline
+description: >
+  Notificaciones Telegram del pipeline Effi. Triggers: telegram, bot, pipeline, notificación, alerta pipeline, orquestador.
+---
+
 # Skill: Telegram Bot — Pipeline Effi
 
 Referencia para entender, mantener y modificar las notificaciones Telegram del pipeline Effi → MariaDB.
