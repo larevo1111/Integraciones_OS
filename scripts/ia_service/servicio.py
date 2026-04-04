@@ -16,21 +16,21 @@ import time
 import requests
 
 from .config import get_local_conn
-from . import contexto, ejecutor_sql, formateador, esquema, rag as rag_module
+from . import contexto, ejecutor_sql, formateador, rag as rag_module
 from .proveedores import openai_compat, google, anthropic_prov
 from .seguridad import (
     verificar_rate_usuario, verificar_limites, slugs_router,
-    get_config_simple, nivel_usuario, mejor_agente_para_nivel,
+    nivel_usuario, mejor_agente_para_nivel,
 )
 from .alertas import notificar, verificar_gasto_y_notificar
 from .aprendizaje import (
     procesar_bloque_aprendizaje, guardar_ejemplo_sql,
     obtener_ejemplos_dinamicos, obtener_logica_negocio,
-    generar_resumen, depurar_logica_negocio,
+    generar_resumen,
     registrar_feedback,
 )
 from .utilidades_sql import (
-    obtener_columnas_reales, obtener_fecha_maxima, obtener_cobertura_tablas,
+    obtener_columnas_reales, obtener_fecha_maxima,
 )
 
 
@@ -158,8 +158,8 @@ def consultar(
                            'guardalo', 'guárdalo', 'adelante', 'exacto', 'así', 'asi', 'yes',
                            'sí guárdalo', 'si guardalo', 'sí guárdalo', 'dale guárdalo',
                            'sí dale', 'claro guárdalo', 'ok guárdalo'}
-        import re as _re
-        _pregunta_lower = _re.sub(r'[.,!¡¿?;:]+$', '', pregunta.strip().lower()).strip()
+        import re as _re_local
+        _pregunta_lower = _re_local.sub(r'[.,!¡¿?;:]+$', '', pregunta.strip().lower()).strip()
         _frases_guarda = (
             'lo guardo en mi memoria de negocio', '¿lo guardo así', '¿quieres que lo guarde',
             'quieres que guarde esto', 'guárdalo', '¿lo guardo', 'lo guardo así',
@@ -718,10 +718,6 @@ def consultar(
                 if not imagen_b64:
                     raise Exception("El modelo no devolvió una imagen. Intenta con una descripción más específica.")
 
-            elif paso == 'clasificar':
-                pasos_ejecutados.append('clasificar')
-                # Ya se hizo en 'analizar', nada más que hacer
-
     except Exception as e:
         error = str(e)
         if not respuesta_final:
@@ -831,8 +827,7 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
 
         texto = res['texto'].strip()
         try:
-            import re
-            match = re.search(r'\{[^}]+\}', texto)
+            match = _re.search(r'\{[^}]+\}', texto)
             if match:
                 data = json.loads(match.group())
                 tipo_ret = data.get('tipo', tipo_default)
@@ -1103,7 +1098,6 @@ def _calcular_agregados(filas: list) -> str:
     """Pre-calcula SUM, MAX, MIN para columnas numéricas. Evita que el LLM sume mal."""
     if not filas:
         return ''
-    from decimal import Decimal, InvalidOperation
     resultados = []
     for col in filas[0].keys():
         valores = []
