@@ -131,16 +131,14 @@ def consultar(
     conv_id = conv['id']
     resumen_anterior = conv.get('resumen') or ''
 
-    # ── 2. Enrutar: detectar tipo, tema y si se necesita SQL nuevo ───────
+    # ── 2. Enrutar: detectar tipo, temas y si se necesita SQL nuevo ───────
     requiere_sql = True  # default conservador
-    if not tipo or not tema:
-        # Pasar resumen + historial reciente para que el enrutador asigne el tema
-        # correctamente basándose en el contexto completo de la conversación
+    temas = [tema] if tema else []  # convertir tema único a lista
+    if not tipo or not temas:
         historial_ctx = contexto.obtener_mensajes_recientes_formateados(conv)
         contexto_enrutador = (f'Resumen de la conversación:\n{resumen_anterior}\n\n{historial_ctx}'
                               if resumen_anterior else historial_ctx)
 
-        # Agregar resumen del caché SQL para que el router razone si hay datos suficientes
         _cache_sql = contexto.leer_cache_sql(conv)
         if _cache_sql:
             _muestra = _cache_sql['datos'][:3] if _cache_sql.get('datos') else []
@@ -152,14 +150,12 @@ def consultar(
                 f"\nMuestra (primeras 3): {json.dumps(_muestra, ensure_ascii=False, default=str)}"
             )
 
-        # Detección pre-router: si el bot acaba de preguntar "¿Lo guardo?" y el usuario confirma
-        # → forzar conversacion para que el agente procese la confirmación y emita [GUARDAR_NEGOCIO]
+        # Pre-router: confirmación de guardado
         _confirmaciones = {'sí', 'si', 'dale', 'ok', 'sip', 'claro', 'correcto', 'perfecto',
                            'guardalo', 'guárdalo', 'adelante', 'exacto', 'así', 'asi', 'yes',
                            'sí guárdalo', 'si guardalo', 'sí guárdalo', 'dale guárdalo',
                            'sí dale', 'claro guárdalo', 'ok guárdalo'}
-        import re as _re_local
-        _pregunta_lower = _re_local.sub(r'[.,!¡¿?;:]+$', '', pregunta.strip().lower()).strip()
+        _pregunta_lower = _re.sub(r'[.,!¡¿?;:]+$', '', pregunta.strip().lower()).strip()
         _frases_guarda = (
             'lo guardo en mi memoria de negocio', '¿lo guardo así', '¿quieres que lo guarde',
             'quieres que guarde esto', 'guárdalo', '¿lo guardo', 'lo guardo así',
@@ -167,11 +163,10 @@ def consultar(
         if _pregunta_lower in _confirmaciones and historial_ctx and \
                 any(f in historial_ctx.lower() for f in _frases_guarda):
             tipo = 'conversacion'
-            tema = tema or 'general'
+            temas = ['general']
             requiere_sql = False
 
-        # Detección pre-router: si el usuario pide EXPLÍCITAMENTE buscar en internet
-        # → forzar busqueda_web sin pasar por el router (que puede equivocarse con el contexto)
+        # Pre-router: búsqueda web explícita
         _intento_internet = [
             'busca en internet', 'buscar en internet', 'consulta en internet',
             'consultes en internet', 'búscalo en internet', 'consúltalo en internet',
@@ -182,29 +177,29 @@ def consultar(
         _pregunta_norm = pregunta.lower()
         if not tipo and any(kw in _pregunta_norm for kw in _intento_internet):
             tipo = 'busqueda_web'
-            tema = 'general'
+            temas = ['general']
             requiere_sql = False
 
-        # Detección pre-router: si el bot indicó que está en sesión de aprendizaje activa
-        # (dijo "listo para aprender" o similar en el historial) → continuar en aprendizaje
-        # Evita que el router confunda la instrucción del usuario como analisis_datos
+        # Pre-router: modo aprendizaje activo
         if not tipo and historial_ctx:
             _hctx_lower = historial_ctx.lower()
             _frases_modo_aprendizaje = (
                 'estoy listo para aprender', 'cuéntame qué quieres enseñarme',
                 'qué quieres enseñarme', 'modo aprendizaje', 'cuéntame sobre el concepto',
-                'what do you want to teach me',  # por si viene en inglés
+                'what do you want to teach me',
             )
             if any(f in _hctx_lower for f in _frases_modo_aprendizaje):
                 tipo = 'aprendizaje'
-                tema = tema or 'general'
+                temas = ['general']
                 requiere_sql = False
 
         if not tipo:
-            tipo_enrutado, tema_enrutado, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
+            tipo_enrutado, temas_enrutados, requiere_sql = _enrutar(pregunta, empresa, contexto_enrutador)
             tipo = tipo_enrutado
-            tema = tema_enrutado
+            temas = temas_enrutados
         pasos_ejecutados.append('enrutar')
+
+    tema = temas[0] if temas else 'general'  # tema principal para RAG y compatibilidad
 
     # ── 3. Cargar tipo de consulta ────────────────────────────────────
     tipo_cfg = _cargar_tipo(tipo)
@@ -385,10 +380,11 @@ def consultar(
         if rag_ctx:
             system_prompt += f'\n\n{rag_ctx}'
 
-    # CAPA 3: Schema BD — ahora unificado dentro del system_prompt (<esquema>)
-    # DDL de esquema.py ya no se inyecta: la sección <esquema> del prompt contiene
-    # tabla + descripción + campos con significado, reemplazando tablas_disponibles
-    # + diccionario_campos + DDL en una sola fuente compacta.
+    # CAPA 3: Esquema dinámico — solo las tablas de los temas detectados
+    if tipo_cfg.get('requiere_estructura'):
+        esquema_ctx = _obtener_esquema_por_temas(temas, empresa)
+        if esquema_ctx:
+            system_prompt += f'\n\n<esquema>\n{esquema_ctx}\n</esquema>'
 
     # CAPA 4: Resumen comprimido de la conversación (historial antiguo)
     if resumen_anterior:
@@ -783,14 +779,9 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     Prefiere Groq (velocidad), fallback a Gemma, fallback a valores default.
 
     Returns:
-        (tipo: str, tema: str, requiere_sql: bool)
-        — ej: ('analisis_datos', 'comercial', True)
-
-    requiere_sql=False cuando la pregunta puede responderse con datos ya presentes
-    en el historial de conversación (ej: "explícame ese margen", "cuál recomiendas").
-    En ese caso el orquestador omite generar_sql y ejecutar, ahorrando 2 llamadas al LLM.
+        (tipo: str, temas: list[str], requiere_sql: bool)
+        — ej: ('analisis_datos', ['comercial', 'finanzas'], True)
     """
-    # Construir mensajes una sola vez (igual para todos los agentes candidatos)
     tipo_enrut = _cargar_tipo('enrutamiento')
     system_base = tipo_enrut.get('system_prompt', '') if tipo_enrut else ''
 
@@ -808,34 +799,41 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
     ]
 
     tipo_default = 'conversacion'
-    tema_default = 'general'
+    temas_default = ['general']
     tipos_validos = {'analisis_datos', 'redaccion', 'clasificacion', 'resumen', 'busqueda_web',
                      'generacion_documento', 'generacion_imagen', 'conversacion',
                      'aprendizaje', 'enrutamiento'}
     temas_validos = {t['slug'] for t in temas_disponibles} if temas_disponibles else {'general'}
 
-    # Intentar cada agente candidato hasta obtener respuesta válida
     for slug in slugs_router():
         cand = _cargar_agente(slug)
         if not (cand and cand.get('api_key')):
             continue
 
-        res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=80)
-        _log_aux(cand, res, 'router', pregunta, empresa)  # loguear siempre — ok o error
+        res = _llamar_agente(cand, msgs, temperatura=0.1, max_tokens=120)
+        _log_aux(cand, res, 'router', pregunta, empresa)
         if not res['ok']:
-            continue  # Fallo (rate limit, timeout, etc.) → intentar siguiente agente
+            continue
 
         texto = res['texto'].strip()
         try:
-            match = _re.search(r'\{[^}]+\}', texto)
+            match = _re.search(r'\{[^}]*\}', texto, _re.DOTALL)
             if match:
                 data = json.loads(match.group())
                 tipo_ret = data.get('tipo', tipo_default)
-                tema_ret = data.get('tema', tema_default)
                 req_sql  = bool(data.get('requiere_sql', True))
+
+                # Soportar tanto "temas":[] (nuevo) como "tema":"" (viejo)
+                temas_raw = data.get('temas') or [data.get('tema', 'general')]
+                if isinstance(temas_raw, str):
+                    temas_raw = [temas_raw]
+                temas_ret = [t for t in temas_raw if t in temas_validos][:3]
+                if not temas_ret:
+                    temas_ret = temas_default
+
                 return (
                     tipo_ret if tipo_ret in tipos_validos else tipo_default,
-                    tema_ret if tema_ret in temas_validos  else tema_default,
+                    temas_ret,
                     req_sql,
                 )
         except Exception:
@@ -847,9 +845,9 @@ def _enrutar(pregunta: str, empresa: str = 'ori_sil_2', historial_reciente: str 
                        'clasificacion', 'resumen', 'generacion_documento',
                        'generacion_imagen', 'conversacion'):
             if slug_t in texto_lower:
-                return (slug_t, tema_default, slug_t == 'analisis_datos')
+                return (slug_t, temas_default, slug_t == 'analisis_datos')
 
-    return ('analisis_datos', 'general', True)  # default conservador: si todo falla, intentar SQL
+    return ('analisis_datos', ['general'], True)
 
 
 _cache_agentes = {}  # slug → {'data': dict, 'ts': float}
@@ -888,6 +886,63 @@ def _cargar_tipo(slug: str) -> dict | None:
 
 
 import re as _re
+
+# ── Esquema dinámico por temas ────────────────────────────────────────────────
+_cache_esquema = {}  # nombre_tabla → descripcion
+_cache_esquema_ts = 0
+
+def _obtener_esquema_por_temas(temas: list, empresa: str = 'ori_sil_2') -> str:
+    """
+    Arma la sección <esquema> solo con las tablas de los temas indicados.
+    Lee las tablas asignadas a cada tema (ia_temas.schema_tablas) y sus
+    descripciones (ia_esquema_tablas.descripcion).
+    """
+    global _cache_esquema, _cache_esquema_ts
+    try:
+        conn = get_local_conn()
+
+        # Refrescar caché de descripciones cada 5 minutos
+        if not _cache_esquema or (time.time() - _cache_esquema_ts) > 300:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT nombre_tabla, descripcion FROM ia_esquema_tablas WHERE empresa=%s",
+                    (empresa,)
+                )
+                _cache_esquema = {r['nombre_tabla']: r['descripcion'] for r in cur.fetchall()}
+                _cache_esquema_ts = time.time()
+
+        # Combinar tablas de todos los temas (sin duplicados, preservar orden)
+        tablas = []
+        tablas_set = set()
+        with conn.cursor() as cur:
+            for tema_slug in temas:
+                cur.execute(
+                    "SELECT schema_tablas FROM ia_temas WHERE slug=%s AND empresa=%s AND activo=1",
+                    (tema_slug, empresa)
+                )
+                row = cur.fetchone()
+                if row and row.get('schema_tablas'):
+                    for t in json.loads(row['schema_tablas']):
+                        if t not in tablas_set:
+                            tablas.append(t)
+                            tablas_set.add(t)
+        conn.close()
+
+        if not tablas:
+            # Fallback: si no hay tablas configuradas, devolver todas
+            return '\n\n'.join(_cache_esquema.values())
+
+        # Armar el esquema con las descripciones de las tablas seleccionadas
+        partes = []
+        for t in tablas:
+            desc = _cache_esquema.get(t)
+            if desc:
+                partes.append(desc)
+        return '\n\n'.join(partes)
+    except Exception as e:
+        _log.error(f'Error obteniendo esquema por temas: {e}')
+        # Fallback: devolver todo el esquema
+        return '\n\n'.join(_cache_esquema.values()) if _cache_esquema else ''
 
 # ── Columnas que contienen nombres de persona — nunca usar = exacto ──────────
 _COLS_PERSONA = (
@@ -933,7 +988,7 @@ _log = logging.getLogger('ia_service')
 # Ver .agent/docs/CONFIG_QWEN_CTX.md para la justificación de cada parámetro.
 _QWEN_CTX_MODELFILE = """\
 FROM qwen2.5-coder:14b
-PARAMETER num_ctx 14500
+PARAMETER num_ctx 12288
 PARAMETER num_gpu 49
 """
 
