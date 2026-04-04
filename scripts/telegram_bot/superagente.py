@@ -48,8 +48,11 @@ def _ejecutar_claude(prompt: str, session_id: str = None) -> dict:
     stderr = (proc.stderr or '').strip()
 
     if not stdout:
-        if 'credit balance' in stderr.lower():
+        stderr_lower = stderr.lower()
+        if 'credit balance' in stderr_lower:
             return {'ok': False, 'error': 'La cuenta de Claude alcanzó su límite de uso. Intenta más tarde.'}
+        if 'prompt is too long' in stderr_lower or 'too long' in stderr_lower:
+            return {'ok': False, 'error': 'La conversación es muy larga. Creá una nueva con 📝 Nueva.'}
         return {'ok': False, 'error': stderr[:200] if stderr else 'El Super Agente no respondió.'}
 
     # claude --output-format json puede emitir múltiples líneas; la última es el resultado
