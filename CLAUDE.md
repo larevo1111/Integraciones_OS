@@ -35,18 +35,30 @@ Antes de cualquier tarea, revisar estos archivos en orden:
 
 ## ⚠️ REGLA ABSOLUTA — TIMEZONE
 
-**Todo el sistema opera en hora Colombia (UTC-5). NUNCA usar patrones UTC para obtener fechas.**
+**Todo el sistema opera en hora Colombia (UTC-5). El offset se configura en `.env` como `APP_TIMEZONE=-05:00`.**
 
-Patrones **PROHIBIDOS**:
+### Cómo funciona (ya implementado)
+- **Sistema Gestión (`db.js`)**: cada conexión MySQL ejecuta `SET time_zone = '-05:00'`
+  - `NOW()` devuelve hora Colombia ✅
+  - `new Date()` de Node.js se convierte a Colombia por mysql2 (`timezone: '-05:00'`) ✅
+  - `dateStrings: true` devuelve strings sin conversión adicional ✅
+- **Servidor local**: timezone del OS = `America/Bogota` (verificado con `timedatectl`)
+- **Hostinger MySQL nativo**: opera en UTC — por eso es obligatorio el `SET time_zone`
+
+### Patrones PROHIBIDOS
 - `new Date().toISOString().slice(0, 10)` — devuelve fecha UTC (después de 7pm COL = día siguiente)
-- `CURDATE()` en queries a Hostinger — MySQL Hostinger = UTC puro
-- `NOW()` en queries a Hostinger para comparar fechas
+- `CURDATE()` en queries directas a Hostinger sin pool — MySQL Hostinger = UTC
+- `UTC_TIMESTAMP()` para guardar timestamps de usuario — eso guarda UTC, no Colombia
 
-Patrones **CORRECTOS**:
+### Patrones CORRECTOS
+- **SQL en Sistema Gestión**: `NOW()` ← ya devuelve Colombia gracias al SET time_zone del pool
 - **Frontend JS**: `import { hoyLocal } from 'src/services/fecha'` → `hoyLocal()`
-- **Backend Node (server.js)**: `localDateCO()` (ya definida, usa `timeZone: 'America/Bogota'`)
+- **Backend Node (server.js)**: `localDateCO()` para fechas YYYY-MM-DD
+- **Backend Node**: `new Date()` ← mysql2 lo convierte a Colombia al guardar (pool con timezone)
 - **Python**: `date.today()` (server local = Colombia)
-- **SQL timestamps**: `UTC_TIMESTAMP()` para registrar momentos (se almacenan en UTC)
+
+### Si se cambia de zona horaria
+Cambiar `APP_TIMEZONE` en `sistema_gestion/api/.env` y reiniciar el servicio. Futuro: leer de `sys_empresas.timezone`.
 
 Un git hook en `.githooks/pre-commit` bloquea commits con los patrones prohibidos.
 

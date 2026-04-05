@@ -12,6 +12,14 @@ const path       = require('path')
 const fs         = require('fs')
 const os         = require('os')
 
+// ─── Timezone ──────────────────────────────────────────────────────
+// APP_TIMEZONE define el offset UTC de la operación (ej: -05:00 para Colombia).
+// Se aplica en CADA conexión MySQL con SET time_zone, de modo que NOW() y
+// CURRENT_TIMESTAMP devuelvan hora local de la operación, no UTC del servidor.
+// Cambiar este valor si la empresa opera en otra zona horaria.
+require('dotenv').config({ path: path.join(__dirname, '.env') })
+const APP_TIMEZONE = process.env.APP_TIMEZONE || '-05:00'
+
 // ─── Config ────────────────────────────────────────────────────────
 const SSH_HOST     = '109.106.250.195'
 const SSH_PORT     = 65002
@@ -40,16 +48,27 @@ let poolGestion     = null
 let poolIntegracion = null
 
 // ─── Pools ─────────────────────────────────────────────────────────
+// timezone en mysql2: controla cómo se serializan Date de JS a MySQL.
+// initSql (mysql2 ≥3.x) no existe, así que usamos el evento 'connection'
+// del pool subyacente para forzar SET time_zone en cada conexión nueva.
 function crearPools() {
   const base = {
     host: '127.0.0.1', port: LOCAL_PORT,
     password: DB_PASS, waitForConnections: true,
-    connectionLimit: 10, timezone: 'local',
+    connectionLimit: 10, timezone: APP_TIMEZONE,
     dateStrings: true
   }
   poolComunidad   = mysql.createPool({ ...base, user: DB_USER_COMUNIDAD,   database: DB_COMUNIDAD })
   poolIntegracion = mysql.createPool({ ...base, user: DB_USER_INTEGRACION, database: DB_INTEGRACION })
   poolGestion     = mysql.createPool({ ...base, user: DB_USER_GESTION,     database: DB_GESTION })
+
+  // Forzar SET time_zone en cada conexión nueva para que NOW() devuelva hora local
+  for (const pool of [poolComunidad, poolIntegracion, poolGestion]) {
+    pool.pool.on('connection', conn => {
+      conn.query(`SET time_zone = '${APP_TIMEZONE}'`)
+    })
+  }
+  console.log(`[db] Pools creados — timezone: ${APP_TIMEZONE}`)
 }
 
 function destruirPools() {
