@@ -595,7 +595,7 @@ function isoRelativo(dias) {
 const menuAgrupar            = ref(false)
 const btnAgruparRef          = ref(null)
 const dropdownAgruparStyle   = ref({})
-const filtroActivo      = ref('hoy')
+const filtroActivo      = ref('todas')
 const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
 
 function toggleMenuAgrupar() {
@@ -747,11 +747,11 @@ async function qaAgregar() {
 }
 
 const FILTROS = [
+  { key: 'todas',        label: 'Todas' },
   { key: 'hoy',          label: 'Hoy' },
   { key: 'manana',       label: 'Mañana' },
   { key: 'ayer',         label: 'Ayer' },
   { key: 'semana',       label: 'Esta semana' },
-  { key: 'todas',        label: 'Todas' },
   { key: 'personalizado', label: 'Personalizado' },
   { key: 'calendario',   label: 'Calendario' }
 ]
@@ -791,7 +791,7 @@ function onAplicarFiltro(filtros) {
 
 function onCerrarFiltroPopup() {
   mostrarFiltroPopup.value = false
-  if (!filtroPersonalizado.value) filtroActivo.value = 'hoy'
+  if (!filtroPersonalizado.value) filtroActivo.value = 'todas'
 }
 const AGRUPACIONES = computed(() => {
   const base = [
@@ -836,7 +836,7 @@ const completadasFiltradas = computed(() => {
   if (!all.length) return []
   const f = filtroActivo.value
 
-  if (f === 'todas' || proyectoFiltroId.value) return all
+  if (f === 'todas') return all
 
   if (f === 'hoy')    return all.filter(t => _coincideFecha(t, hoyISO()))
   if (f === 'manana') return all.filter(t => _coincideFecha(t, mananaISO()))
@@ -1041,16 +1041,19 @@ async function cargarTareas() {
     // Siempre enviar fecha local del cliente para evitar desfase de zona horaria con servidor Hostinger
     params.set('fecha_hoy', hoyISO())
     if (props.soloMias) params.set('solo_mias', '1')
-    if (proyectoFiltroId.value) {
-      params.set('proyecto_id', proyectoFiltroId.value)
-    } else if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {
+
+    // Proyecto como filtro global (se combina con los demás filtros)
+    if (proyectoFiltroId.value) params.set('proyecto_id', proyectoFiltroId.value)
+
+    // Filtros de tiempo/personalizado (se aplican encima del proyecto)
+    if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {
       const f = filtroPersonalizado.value
       if (f.fecha_desde)              params.set('fecha_desde',  f.fecha_desde)
       if (f.fecha_hasta)              params.set('fecha_hasta',  f.fecha_hasta)
       if (f.prioridades?.length)      params.set('prioridades',  f.prioridades.join(','))
       if (f.categorias?.length)       params.set('categorias',   f.categorias.join(','))
       if (f.etiquetas?.length)        params.set('etiquetas',    f.etiquetas.join(','))
-      if (f.proyecto_id)              params.set('proyecto_id',  f.proyecto_id)
+      if (f.proyecto_id && !proyectoFiltroId.value) params.set('proyecto_id', f.proyecto_id)
       if (f.responsables?.length)     params.set('responsables', f.responsables.join(','))
       if (f.nombre)                   params.set('nombre',       f.nombre)
       if (f.id_op)                    params.set('id_op',        f.id_op)
