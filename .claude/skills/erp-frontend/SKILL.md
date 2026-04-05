@@ -15,7 +15,7 @@ description: >
 ## 1. ARQUITECTURA
 
 ```
-erp.oscomunidad.com
+menu.oscomunidad.com
       ↓ Cloudflare Tunnel
   localhost:9100
       ↓ Express (frontend/api/server.js)
