@@ -70,6 +70,39 @@
             </div>
           </template>
         </div>
+
+        <!-- Etiquetas -->
+        <div class="sidebar-section sidebar-section-indented">
+          <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-etiquetas')">
+            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
+            <span style="flex:1">Etiquetas</span>
+            <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+          </div>
+          <template v-if="acordeonAbierto['mis-etiquetas']">
+            <div
+              v-for="e in etiquetasGlobal"
+              :key="e.id"
+              class="nav-item-proyecto-wrap"
+              @mouseenter="etiquetaHover = e.id"
+              @mouseleave="etiquetaHover = null"
+            >
+              <RouterLink
+                :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
+                class="nav-item nav-item-proyecto"
+                :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }"
+              >
+                <span class="nav-item-icon">
+                  <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
+                </span>
+                <span class="nav-item-label">{{ e.nombre }}</span>
+                <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
+                  <span class="material-icons" style="font-size:16px">more_vert</span>
+                </button>
+              </RouterLink>
+            </div>
+            <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
+          </template>
+        </div>
         </template>
 
         <!-- ═══ SEPARADOR ═══ -->
@@ -127,6 +160,39 @@
             <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
               Sin {{ sec.label.toLowerCase() }}
             </div>
+          </template>
+        </div>
+
+        <!-- Etiquetas (equipo) -->
+        <div class="sidebar-section sidebar-section-indented">
+          <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-etiquetas')">
+            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
+            <span style="flex:1">Etiquetas</span>
+            <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+          </div>
+          <template v-if="acordeonAbierto['eq-etiquetas']">
+            <div
+              v-for="e in etiquetasGlobal"
+              :key="e.id"
+              class="nav-item-proyecto-wrap"
+              @mouseenter="etiquetaHover = e.id"
+              @mouseleave="etiquetaHover = null"
+            >
+              <RouterLink
+                :to="{ path: '/equipo', query: { etiqueta_id: e.id } }"
+                class="nav-item nav-item-proyecto"
+                :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }"
+              >
+                <span class="nav-item-icon">
+                  <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
+                </span>
+                <span class="nav-item-label">{{ e.nombre }}</span>
+                <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
+                  <span class="material-icons" style="font-size:16px">more_vert</span>
+                </button>
+              </RouterLink>
+            </div>
+            <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
           </template>
         </div>
 
@@ -267,6 +333,17 @@
           Archivar
         </div>
         <div class="ctx-item ctx-item-danger" @click="eliminarProyecto(menuProyecto.proyecto)">
+          <span class="material-icons" style="font-size:15px">delete_outline</span>
+          Eliminar
+        </div>
+      </div>
+      <!-- Menú contextual etiqueta -->
+      <div v-if="menuEtiqueta.visible" class="proyecto-ctx-menu" :style="menuEtiqueta.style" @click.stop>
+        <div class="ctx-item" @click="editarEtiqueta">
+          <span class="material-icons" style="font-size:15px">edit</span>
+          Editar nombre
+        </div>
+        <div class="ctx-item ctx-item-danger" @click="eliminarEtiqueta">
           <span class="material-icons" style="font-size:15px">delete_outline</span>
           Eliminar
         </div>
@@ -454,6 +531,8 @@ const proyectosCompletados = ref([])
 const mostrarCompletados  = ref(false)
 const cargandoProyectos   = ref(false)
 const proyectoHover       = ref(null)
+const etiquetaHover       = ref(null)
+const menuEtiqueta        = ref({ visible: false, etiqueta: null, style: {} })
 
 // Panel lateral
 const panelVisible = ref(false)
@@ -611,6 +690,40 @@ async function eliminarProyecto(p) {
   } catch (e) { console.error(e) }
 }
 
+// ── Menú contextual etiquetas ──
+function abrirMenuEtiqueta(event, etiqueta) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  menuEtiqueta.value = {
+    visible: true,
+    etiqueta,
+    style: { position: 'fixed', top: `${rect.bottom + 4}px`, left: `${rect.left}px`, zIndex: 9999 }
+  }
+  setTimeout(() => document.addEventListener('click', () => { menuEtiqueta.value.visible = false }, { once: true }), 0)
+}
+
+async function editarEtiqueta() {
+  const e = menuEtiqueta.value.etiqueta
+  menuEtiqueta.value.visible = false
+  const nuevoNombre = prompt('Nombre de la etiqueta:', e.nombre)
+  if (!nuevoNombre || nuevoNombre.trim() === e.nombre) return
+  try {
+    const data = await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify({ nombre: nuevoNombre.trim() }) })
+    const idx = etiquetasGlobal.value.findIndex(x => x.id === e.id)
+    if (idx !== -1) etiquetasGlobal.value[idx] = { ...etiquetasGlobal.value[idx], nombre: nuevoNombre.trim() }
+  } catch (err) { console.error(err) }
+}
+
+async function eliminarEtiqueta() {
+  const e = menuEtiqueta.value.etiqueta
+  menuEtiqueta.value.visible = false
+  if (!confirm(`¿Eliminar etiqueta "${e.nombre}"? Se quitará de todas las tareas.`)) return
+  try {
+    await api(`/api/gestion/etiquetas/${e.id}`, { method: 'DELETE' })
+    etiquetasGlobal.value = etiquetasGlobal.value.filter(x => x.id !== e.id)
+    if (String(route.query.etiqueta_id) === String(e.id)) router.replace(route.path)
+  } catch (err) { console.error(err) }
+}
+
 const ruta = computed(() => route.path)
 
 const TITULOS = {
@@ -635,8 +748,18 @@ function cerrarSesion() {
 }
 
 onMounted(() => {
-  if (auth.token) cargarProyectos()
+  if (auth.token) {
+    cargarProyectos()
+    cargarEtiquetas()
+  }
 })
+
+async function cargarEtiquetas() {
+  try {
+    const data = await api('/api/gestion/etiquetas')
+    etiquetasGlobal.value = data.etiquetas || []
+  } catch {}
+}
 </script>
 
 <style scoped>

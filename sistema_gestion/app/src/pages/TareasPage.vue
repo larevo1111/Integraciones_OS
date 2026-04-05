@@ -15,6 +15,17 @@
         <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
       </div>
 
+      <!-- Header de etiqueta activa (breadcrumb) -->
+      <div v-if="etiquetaFiltro && !proyectoFiltro" class="proyecto-header-bar">
+        <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
+          <span class="material-icons" style="font-size:15px">arrow_back</span>
+          {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
+        </a>
+        <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
+        <span class="proyecto-dot-hdr" :style="{ background: etiquetaFiltro.color || '#888' }"></span>
+        <span class="proyecto-header-nombre">{{ etiquetaFiltro.nombre }}</span>
+      </div>
+
       <!-- Barra de filtros -->
       <div class="filtros-bar-wrap">
         <div class="filtros-bar">
@@ -617,6 +628,10 @@ function toggleMenuAgrupar() {
 const proyectoFiltroId = computed(() => route.query.proyecto_id ? Number(route.query.proyecto_id) : null)
 const proyectoFiltro   = computed(() => proyectos.value.find(p => p.id === proyectoFiltroId.value) || null)
 
+// Filtro por etiqueta (desde query param)
+const etiquetaFiltroId = computed(() => route.query.etiqueta_id ? Number(route.query.etiqueta_id) : null)
+const etiquetaFiltro   = computed(() => etiquetas.value.find(e => e.id === etiquetaFiltroId.value) || null)
+
 // Subtareas
 const subtareasExpandidas = ref({})   // { [tareaId]: true }
 const subtareasData       = ref({})   // { [tareaId]: [subtarea, ...] }
@@ -913,6 +928,7 @@ watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
 watch(filtroActivo, () => cargarTareas())
 watch(calMesOffset, () => { if (filtroActivo.value === 'calendario') cargarTareas() })
 watch(() => route.query.proyecto_id, () => cargarTareas())
+watch(() => route.query.etiqueta_id, () => cargarTareas())
 watch(() => props.soloMias, (val) => {
   if (val && agruparPor.value === 'responsable') agruparPor.value = 'categoria'
   cargarTareas()
@@ -1042,8 +1058,9 @@ async function cargarTareas() {
     params.set('fecha_hoy', hoyISO())
     if (props.soloMias) params.set('solo_mias', '1')
 
-    // Proyecto como filtro global (se combina con los demás filtros)
+    // Filtros globales (se combinan con los chips de tiempo)
     if (proyectoFiltroId.value) params.set('proyecto_id', proyectoFiltroId.value)
+    if (etiquetaFiltroId.value) params.set('etiquetas', etiquetaFiltroId.value)
 
     // Filtros de tiempo/personalizado (se aplican encima del proyecto)
     if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {
