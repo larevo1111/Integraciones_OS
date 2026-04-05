@@ -221,18 +221,33 @@ def guardar_ejemplo_sql(empresa: str, pregunta: str, sql: str):
         palabras = extraer_palabras_clave(pregunta)
         conn = get_local_conn()
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO ia_ejemplos_sql (empresa, pregunta, sql_generado, tablas_usadas, palabras_clave)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (empresa, pregunta[:500], sql[:2000], tablas_str, palabras))
-            ejemplo_id = cur.lastrowid
+            # Prevenir duplicados: si ya existe la misma pregunta, actualizar SQL
+            cur.execute(
+                "SELECT id FROM ia_ejemplos_sql WHERE empresa=%s AND pregunta=%s LIMIT 1",
+                (empresa, pregunta[:500])
+            )
+            existente = cur.fetchone()
+            if existente:
+                cur.execute(
+                    "UPDATE ia_ejemplos_sql SET sql_generado=%s, tablas_usadas=%s, "
+                    "palabras_clave=%s, veces_usado=veces_usado+1, ultima_vez=NOW() WHERE id=%s",
+                    (sql[:2000], tablas_str, palabras, existente['id'])
+                )
+                ejemplo_id = existente['id']
+            else:
+                cur.execute("""
+                    INSERT INTO ia_ejemplos_sql (empresa, pregunta, sql_generado, tablas_usadas, palabras_clave)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (empresa, pregunta[:500], sql[:2000], tablas_str, palabras))
+                ejemplo_id = cur.lastrowid
             conn.commit()
         conn.close()
-        threading.Thread(
-            target=embeddings_module.guardar_embedding,
-            args=(ejemplo_id, pregunta),
-            daemon=True
-        ).start()
+        if not existente:
+            threading.Thread(
+                target=embeddings_module.guardar_embedding,
+                args=(ejemplo_id, pregunta),
+                daemon=True
+            ).start()
     except Exception:
         pass
 

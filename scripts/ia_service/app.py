@@ -24,9 +24,21 @@ app = Flask(__name__)
 
 @app.route('/ia/health', methods=['GET'])
 def health():
-    # Limpieza periódica de rate limit windows inactivos
     from ia_service.seguridad import limpiar_rate_windows
     limpiar_rate_windows()
+
+    # Limpieza de datos temporales
+    try:
+        from ia_service.config import get_local_conn
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM bot_tablas_temp WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)")
+            cur.execute("DELETE FROM ia_conversaciones WHERE canal='test' AND updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
     return jsonify({'ok': True, 'servicio': 'ia_service_os', 'version': '1.0'})
 
 

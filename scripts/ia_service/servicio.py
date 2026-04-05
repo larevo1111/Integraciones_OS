@@ -734,6 +734,7 @@ def consultar(
         agente_slug=agente_slug,
         tipo_consulta=tipo,
         canal=canal,
+        usuario_id=usuario_id,
         pregunta=pregunta,
         sql_generado=sql_generado,
         datos_crudos=datos_crudos[:10] if datos_crudos else None,  # primeras 10 filas en log
@@ -1268,16 +1269,17 @@ def _guardar_log(**kwargs) -> int | None:
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO ia_logs
-                   (conversacion_id, agente_slug, tipo_consulta, canal,
+                   (conversacion_id, agente_slug, tipo_consulta, canal, usuario_id,
                     pregunta, sql_generado, datos_crudos, respuesta, formato,
                     tokens_in, tokens_out, costo_usd, latencia_ms,
                     pasos_ejecutados, error)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 (
                     kwargs.get('conversacion_id'),
                     kwargs.get('agente_slug'),
                     kwargs.get('tipo_consulta'),
                     kwargs.get('canal'),
+                    kwargs.get('usuario_id'),
                     kwargs.get('pregunta', '')[:2000],
                     kwargs.get('sql_generado'),
                     json.dumps(kwargs.get('datos_crudos'), ensure_ascii=False, default=str)

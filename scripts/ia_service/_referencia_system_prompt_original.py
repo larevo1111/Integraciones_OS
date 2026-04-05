@@ -1,3 +1,13 @@
+# ══════════════════════════════════════════════════════════════════════
+# ARCHIVO DE REFERENCIA — NO EJECUTAR
+# ══════════════════════════════════════════════════════════════════════
+# Contiene la versión original del system_prompt de analisis_datos.
+# El prompt se gestiona ahora desde:
+#   - ia_tipos_consulta.system_prompt (secciones rol, precision, reglas_sql, ejemplos)
+#   - ia_esquema_tablas (descripciones de tablas — inyección dinámica por tema)
+# Este archivo se conserva como referencia del formato y contenido original.
+# ══════════════════════════════════════════════════════════════════════
+
 """
 Script de mantenimiento: actualiza el system_prompt de analisis_datos en la BD
 con estructura XML para mejorar el parsing del modelo (+30% precisión según Anthropic).
