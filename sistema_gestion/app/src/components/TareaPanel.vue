@@ -229,19 +229,13 @@
             :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).replace(' ', 'T').slice(0,16) : ''"
             @change="actualizar('fecha_inicio_estimada', $event.target.value || null)" />
         </div>
-        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
+        <div v-if="tarea.fecha_inicio_real" class="field-row">
           <span class="field-label">Inicio real</span>
-          <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_inicio_real ? String(tarea.fecha_inicio_real).replace(' ', 'T').slice(0,16) : ''"
-            :disabled="!esCompletada"
-            @change="actualizar('fecha_inicio_real', $event.target.value || null)" />
+          <span style="font-size:12px;color:var(--text-secondary)">{{ fmtDT(tarea.fecha_inicio_real) }}</span>
         </div>
-        <div class="field-row" :class="{ 'field-row-disabled': !esCompletada }">
+        <div v-if="tarea.fecha_fin_real" class="field-row">
           <span class="field-label">Fin real</span>
-          <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
-            :value="tarea.fecha_fin_real ? String(tarea.fecha_fin_real).replace(' ', 'T').slice(0,16) : ''"
-            :disabled="!esCompletada"
-            @change="actualizar('fecha_fin_real', $event.target.value || null)" />
+          <span style="font-size:12px;color:var(--text-secondary)">{{ fmtDT(tarea.fecha_fin_real) }}</span>
         </div>
         <div v-if="duracionReal" class="field-row">
           <span class="field-label">Duración real</span>
@@ -347,6 +341,12 @@ const mostrarFechas = ref(false)
 const esCompletada = computed(() =>
   ['Completada', 'Cancelada'].includes(props.tarea?.estado)
 )
+
+function fmtDT(val) {
+  if (!val) return ''
+  const d = new Date(String(val).replace(' ', 'T'))
+  return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 const duracionReal = computed(() => {
   if (!props.tarea?.fecha_inicio_real || !props.tarea?.fecha_fin_real) return null
