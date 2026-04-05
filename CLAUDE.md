@@ -31,7 +31,7 @@ Antes de cualquier tarea, revisar estos archivos en orden:
 2. `.agent/MANIFESTO.md` — visión, arquitectura, reglas técnicas aprendidas
 3. `.agent/CATALOGO_SCRIPTS.md` — catálogo completo de scripts (propósito, ejecución, tablas)
 4. **Para tareas frontend**: `frontend/design-system/MANUAL_ESTILOS.md` — manual de estilos obligatorio
-5. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`
+5. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`, `/timezone`
 
 ## ⚠️ REGLA ABSOLUTA — TIMEZONE
 

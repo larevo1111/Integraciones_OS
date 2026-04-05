@@ -34,6 +34,7 @@ Skills en formato slash-command (`/nombre`). Claude Code las carga con la herram
 | `/tabla-vista` | `.claude/commands/tabla-vista.md` | Diseño de vistas de tablas en el ERP. |
 | `/menu-erp` | `.claude/commands/menu-erp.md` | Diseño y estructura del menú del ERP. |
 | `/sistema-gestion` | `.claude/commands/sistema-gestion.md` | App Gestión OS: Tareas, Jornadas, Proyectos. Endpoints, BD, componentes, reglas. |
+| `/timezone` | `.claude/skills/timezone/SKILL.md` | Manejo de zona horaria: SET time_zone en pools, NOW()=Colombia, reglas por capa, cómo cambiar. |
 | `/inventario-fisico` | `.claude/commands/inventario-fisico.md` | App Inventario Físico: conteo, rangos, auditoría, grupos, FastAPI. |
 
 ---

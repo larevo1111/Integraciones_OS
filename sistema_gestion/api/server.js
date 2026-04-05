@@ -579,13 +579,25 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
 
   try {
     const [tareasBase] = await db.gestion.query(`
-      SELECT t.id, t.titulo, t.estado, t.prioridad, t.responsable,
+      SELECT t.id, t.parent_id, t.titulo, t.estado, t.prioridad, t.responsable,
              t.categoria_id, c.nombre AS categoria_nombre, c.color AS categoria_color,
-             t.fecha_limite, t.fecha_fin_real, t.tiempo_real_min,
+             t.proyecto_id, p.nombre AS proyecto_nombre, p.color AS proyecto_color,
+             t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
+             t.fecha_inicio_real, t.fecha_fin_real,
+             t.id_op, t.id_remision, t.id_pedido,
+             t.tiempo_real_min, t.tiempo_estimado_min, t.notas,
              t.usuario_creador, t.fecha_ult_modificacion,
+             (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
+             (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio,
+             (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id) AS subtareas_total,
+             (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id AND s.estado IN ('Completada','Cancelada')) AS subtareas_completadas,
+             (SELECT JSON_ARRAYAGG(JSON_OBJECT('id', e.id, 'nombre', e.nombre, 'color', e.color))
+              FROM g_etiquetas_tareas et JOIN g_etiquetas e ON e.id = et.etiqueta_id
+              WHERE et.tarea_id = t.id) AS etiquetas_json,
              (SELECT GROUP_CONCAT(tr.email SEPARATOR ',') FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id) AS responsables_csv
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
+      LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
       WHERE ${where.join(' AND ')}
       ORDER BY t.fecha_ult_modificacion DESC
       LIMIT 50
@@ -2178,6 +2190,38 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
         pausasPorJornada[p.jornada_id].push(p)
       }
       jornadas.forEach(j => { j.pausas = pausasPorJornada[j.id] || [] })
+    }
+
+    // Cargar totales de tareas completadas por usuario+fecha
+    if (jornadas.length > 0) {
+      const pares = jornadas.map(j => [j.usuario, String(j.fecha).slice(0, 10)])
+      const whereClause = pares.map(() => '(tr.email = ? AND DATE(t.fecha_fin_real) = ?)').join(' OR ')
+      const params2 = pares.flat()
+      const [tareasTotales] = await db.gestion.query(`
+        SELECT tr.email AS usuario, DATE(t.fecha_fin_real) AS fecha,
+               COUNT(*) AS tareas_count,
+               COALESCE(SUM(CASE WHEN t.fecha_inicio_real IS NOT NULL AND t.fecha_fin_real IS NOT NULL
+                 THEN TIMESTAMPDIFF(MINUTE, t.fecha_inicio_real, t.fecha_fin_real) ELSE 0 END), 0) AS dur_real,
+               COALESCE(SUM(t.tiempo_real_min), 0) AS dur_cronometro,
+               COALESCE(SUM(t.tiempo_estimado_min), 0) AS dur_usuario
+        FROM g_tareas t
+        JOIN g_tareas_responsables tr ON tr.tarea_id = t.id
+        WHERE t.empresa = ? AND t.estado IN ('Completada','Cancelada')
+          AND (${whereClause})
+        GROUP BY tr.email, DATE(t.fecha_fin_real)
+      `, [req.empresa, ...params2])
+      const tMap = {}
+      for (const r of tareasTotales) {
+        tMap[`${r.usuario}_${String(r.fecha).slice(0,10)}`] = r
+      }
+      jornadas.forEach(j => {
+        const key = `${j.usuario}_${String(j.fecha).slice(0,10)}`
+        const t = tMap[key]
+        j.tareas_count     = t?.tareas_count || 0
+        j.dur_tareas_real  = t?.dur_real || 0
+        j.dur_tareas_crono = t?.dur_cronometro || 0
+        j.dur_tareas_usuario = t?.dur_usuario || 0
+      })
     }
 
     // Filtrar por nivel: solo jornadas de usuarios con nivel inferior + las propias
