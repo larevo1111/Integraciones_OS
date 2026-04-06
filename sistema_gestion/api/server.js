@@ -1699,7 +1699,11 @@ app.delete('/api/gestion/proyectos/:id', async (req, res) => {
 app.get('/api/gestion/etiquetas', async (req, res) => {
   try {
     const [etiquetas] = await db.gestion.query(
-      'SELECT * FROM g_etiquetas WHERE empresa = ? ORDER BY nombre',
+      `SELECT e.*,
+        (SELECT COUNT(*) FROM g_etiquetas_tareas et
+         JOIN g_tareas t ON t.id = et.tarea_id
+         WHERE et.etiqueta_id = e.id AND t.estado NOT IN ('Completada','Cancelada')) AS tareas_pendientes
+       FROM g_etiquetas e WHERE e.empresa = ? ORDER BY e.nombre`,
       [req.empresa]
     )
     res.json({ ok: true, etiquetas })

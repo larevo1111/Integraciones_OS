@@ -95,6 +95,7 @@
                   <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
                 </span>
                 <span class="nav-item-label">{{ e.nombre }}</span>
+                <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
                 <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
                   <span class="material-icons" style="font-size:16px">more_vert</span>
                 </button>
@@ -187,6 +188,7 @@
                   <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
                 </span>
                 <span class="nav-item-label">{{ e.nombre }}</span>
+                <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
                 <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
                   <span class="material-icons" style="font-size:16px">more_vert</span>
                 </button>
@@ -406,6 +408,7 @@
                       :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
                       <span class="nav-item-label">{{ e.nombre }}</span>
+                      <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
                       <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
                     </RouterLink>
                   </div>
@@ -459,6 +462,7 @@
                       :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
                       <span class="nav-item-label">{{ e.nombre }}</span>
+                      <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
                       <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
                     </RouterLink>
                   </div>
