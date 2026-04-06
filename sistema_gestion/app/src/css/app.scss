@@ -441,10 +441,10 @@ body {
 /* ─── FILA TAREA ─── */
 .tarea-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 0 16px;
-  height: 32px;
+  padding: 4px 16px;
+  min-height: 32px;
   cursor: pointer;
   transition: background 60ms;
   border-bottom: 1px solid transparent;
@@ -455,16 +455,17 @@ body {
 
 /* Estado círculo (Linear style) */
 .estado-circle {
-  width: 14px; height: 14px;
+  width: 16px; height: 16px;
   border-radius: var(--radius-full);
-  border: 1.5px solid var(--border-strong);
+  border: 1.5px solid rgba(255,255,255,0.35);
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: border-color 80ms, background 80ms, box-shadow 80ms;
+  margin-top: 2px;
 }
 .estado-circle:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-muted); }
-.estado-circle.pendiente { border-color: var(--border-strong); }
+.estado-circle.pendiente { border-color: rgba(255,255,255,0.35); }
 .estado-circle.en-progreso { border-color: var(--color-info); background: radial-gradient(circle, var(--color-info) 40%, transparent 40%); }
 .estado-circle.completada { border-color: var(--color-success); background: var(--color-success); }
 .estado-circle.completada::after { content: '✓'; font-size: 8px; color: #000; font-weight: 700; }
@@ -491,10 +492,12 @@ body {
   flex: 1;
   font-size: 13px;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .tarea-item.completada .tarea-titulo { text-decoration: line-through; color: var(--text-tertiary); }
 
@@ -1126,25 +1129,23 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   .lista-tareas { padding: 4px 0; }
   .grupo-header { padding: 6px 10px 2px; }
 
-  /* Fila de tarea: altura automática para permitir 2 líneas de título */
+  /* Fila de tarea mobile */
   .tarea-item {
-    padding: 6px 10px;
-    height: auto;
-    min-height: 34px;
-    align-items: flex-start;
+    padding: 7px 10px;
+    min-height: 38px;
+    gap: 8px;
   }
-  /* Círculo: pequeño padding-top para alinear con la primera línea del texto */
-  .tarea-item .estado-col { padding-top: 1px; }
-  .tarea-item .cat-dot    { margin-top: 5px; flex-shrink: 0; }
+  .tarea-item .cat-dot { margin-top: 6px; flex-shrink: 0; }
 
-  /* Título: hasta 2 líneas, luego corta */
+  /* Checkbox más grande en mobile */
+  .estado-circle { width: 18px; height: 18px; border-width: 2px; margin-top: 2px; }
+  .estado-circle.completada::after { font-size: 9px; }
+  .estado-circle.cancelada::after  { font-size: 11px; }
+
+  /* Título: font +1px, 2 líneas */
   .tarea-titulo {
-    white-space: normal;
-    display: -webkit-box;
+    font-size: 14px;
     -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    line-height: 1.35;
   }
 
   /* Meta chips: reducir gap en móvil */
