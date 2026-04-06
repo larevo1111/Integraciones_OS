@@ -800,6 +800,7 @@ async function qaAgregar() {
 
 const FILTROS = [
   { key: 'todas',        label: 'Todas' },
+  { key: 'en_progreso',  label: 'En curso' },
   { key: 'hoy',          label: 'Hoy' },
   { key: 'manana',       label: 'Mañana' },
   { key: 'ayer',         label: 'Ayer' },
@@ -1116,6 +1117,8 @@ async function cargarTareas() {
     } else if (filtroActivo.value === 'calendario') {
       params.set('fecha_desde', calFechaSel.value)
       params.set('fecha_hasta', calFechaSel.value)
+    } else if (filtroActivo.value === 'en_progreso') {
+      params.set('estado', 'En Progreso')
     } else if (filtroActivo.value !== 'todas' && filtroActivo.value !== 'personalizado') {
       params.set('filtro', filtroActivo.value)
     }
