@@ -133,49 +133,72 @@ console.log(`📝 Observación: ${observacion}`);
     console.log(`✅ Archivo seleccionado: ${path.basename(xlsxPath)}`);
     await page.waitForTimeout(1000);
 
-    // Screenshot post-upload
-    await page.screenshot({ path: `/exports/ajuste_post_upload_${Date.now()}.png` });
-
     // 7. Click "Importar conceptos" en el modal de upload (botón #btn_submit del formulario #formulario_IC)
     console.log('🔄 Importando conceptos...');
     await page.locator('#formulario_IC #btn_submit').click();
+
+    // Esperar que el modal de importación se cierre y los conceptos se carguen
+    console.log('🔄 Esperando carga de conceptos...');
     await page.waitForTimeout(5000);
 
-    // Esperar que el modal de importación se cierre
-    // El formulario principal debe volver a ser visible con los conceptos cargados
+    // Verificar cuántas filas de conceptos hay y si tienen datos
+    const conceptosInfo = await page.evaluate(() => {
+      const filas = document.querySelectorAll('#divConceptos .filaConceptos');
+      let conDatos = 0;
+      filas.forEach(f => {
+        const inputs = f.querySelectorAll('input');
+        const tieneValor = Array.from(inputs).some(i => i.value && i.value !== '0' && i.value !== '0.00');
+        if (tieneValor) conDatos++;
+      });
+      return { total: filas.length, conDatos };
+    });
+    console.log(`   Filas de conceptos: ${conceptosInfo.total}, con datos: ${conceptosInfo.conDatos}`);
+
     await page.screenshot({ path: `/exports/ajuste_pre_crear_${Date.now()}.png` });
 
-    // 8. Llenar campo Observación
+    // 8. Llenar campo Observación usando Playwright fill (no evaluate) para disparar eventos
     console.log('🔄 Llenando observación...');
-    await page.evaluate((obs) => {
-      const ta = document.querySelector('#form_CR textarea');
-      if (ta) ta.value = obs;
-    }, observacion);
+    const textarea = page.locator('#form_CR textarea');
+    await textarea.scrollIntoViewIfNeeded();
+    await textarea.click();
+    await textarea.fill(observacion);
     await page.waitForTimeout(500);
 
-    // 9. Click "Crear ajuste de inventario"
-    console.log('🔄 Creando ajuste de inventario...');
-    await page.evaluate(() => {
-      const btns = document.querySelectorAll('#form_CR button, #form_CR input[type="submit"]');
-      for (const btn of btns) {
-        if (btn.textContent.includes('Crear ajuste')) { btn.click(); return; }
-      }
-      // Fallback: submit del form
-      document.querySelector('#form_CR').submit();
-    });
+    // Verificar que se llenó
+    const obsValue = await textarea.inputValue();
+    console.log(`   Observación: "${obsValue.substring(0, 60)}..."`);
 
-    // 10. Esperar resultado
+    // 9. Eliminar filas vacías de conceptos antes de enviar
+    console.log('🔄 Eliminando filas vacías...');
+    const eliminadas = await page.evaluate(() => {
+      const filas = document.querySelectorAll('#divConceptos .filaConceptos');
+      let count = 0;
+      filas.forEach(f => {
+        const inputs = f.querySelectorAll('input');
+        const tieneValor = Array.from(inputs).some(i => i.value && i.value !== '0' && i.value !== '0.00');
+        if (!tieneValor) { f.remove(); count++; }
+      });
+      return count;
+    });
+    if (eliminadas > 0) console.log(`   Eliminadas ${eliminadas} filas vacías`);
+    await page.waitForTimeout(500);
+
+    // 10. Click "Crear ajuste de inventario"
+    console.log('🔄 Creando ajuste de inventario...');
+    await page.locator('button:has-text("Crear ajuste de inventario")').click();
+
+    // 11. Esperar resultado
     await page.waitForTimeout(5000);
 
     // Screenshot del resultado
     const screenshotPath = `/exports/ajuste_resultado_${Date.now()}.png`;
     await page.screenshot({ path: screenshotPath });
 
-    // Verificar si hubo error
-    const hayError = await page.locator('text=/error|falló|inválido/i').count();
-    if (hayError > 0) {
-      const textoError = await page.locator('text=/error|falló|inválido/i').first().textContent();
-      console.error(`❌ import_ajuste_inventario — ERROR en Effi: ${textoError}`);
+    // Verificar si hubo error de validación (mensajes rojos dentro del modal)
+    const erroresValidacion = await page.locator('.modal.in .text-danger, .modal.in .alert-danger, .modal.in .has-error').count();
+    if (erroresValidacion > 0) {
+      const textoError = await page.locator('.modal.in .text-danger, .modal.in .alert-danger').first().textContent().catch(() => 'Error desconocido');
+      console.error(`❌ import_ajuste_inventario — Error de validación: ${textoError.trim()}`);
       process.exit(1);
     }
 
