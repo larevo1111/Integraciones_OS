@@ -1,7 +1,11 @@
 <template>
   <div class="crono-controls">
-    <span v-if="activo" class="crono-dot" />
-    <button class="crono-btn" :class="{ activo }" @click="toggle" :title="activo ? 'Pausar' : 'Iniciar / Reanudar'">
+    <button
+      class="crono-btn" :class="{ activo, disabled: !enProgreso && !activo }"
+      :disabled="!enProgreso && !activo"
+      @click="toggle"
+      :title="activo ? 'Pausar' : (!enProgreso ? 'Poner En Progreso primero' : 'Iniciar / Reanudar')"
+    >
       <span class="material-icons" style="font-size:12px">{{ activo ? 'pause' : 'play_arrow' }}</span>
     </button>
     <button class="crono-btn crono-btn-reset" @click="reiniciar" title="Reiniciar conteo">
@@ -22,6 +26,7 @@ const props = defineProps({
 const emit = defineEmits(['update', 'tick'])
 
 const activo = ref(!!props.tarea?.crono_inicio)
+const enProgreso = computed(() => props.tarea?.estado === 'En Progreso')
 let interval = null
 let inicioLocal = null
 
@@ -133,7 +138,8 @@ defineExpose({ iniciar, totalMinutos })
   border-radius: 4px; background: transparent; cursor: pointer;
   color: var(--text-secondary); transition: all 80ms;
 }
-.crono-btn:hover { background: var(--bg-hover); }
+.crono-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.crono-btn.disabled { opacity: 0.3; cursor: not-allowed; }
 .crono-btn.activo { border-color: var(--accent); color: var(--accent); }
 .crono-btn-reset { color: var(--text-tertiary); }
 .crono-btn-reset:hover { color: var(--text-secondary); }
