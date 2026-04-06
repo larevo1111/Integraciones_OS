@@ -425,6 +425,23 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Dependencias**: `session.js`, archivo XLSX en `/tmp/`, Effi accesible
 - **Notas**: Se ejecuta automáticamente en el pipeline (paso 7b) solo si el paso 7a generó un XLSX con contactos pendientes. Si no hay pendientes, se omite sin error.
 
+### import_ajuste_inventario.js
+- **Propósito**: Crea un ajuste de inventario en Effi importando conceptos desde un Excel
+- **Tipo**: utilidad (no está en el pipeline, se llama bajo demanda)
+- **Ejecución manual**:
+  ```bash
+  node scripts/import_ajuste_inventario.js <bodega_id> <archivo.xlsx> [observacion]
+  node scripts/import_ajuste_inventario.js 1 /tmp/ajuste.xlsx "Ajuste inventario marzo"
+  ```
+- **Parámetros**:
+  - `bodega_id` (obligatorio): ID de bodega en Effi (1=Principal, 17=Productos No Conformes, etc.)
+  - `archivo.xlsx` (obligatorio): Excel con formato plantilla Effi (Código, Descripción, Lote, Serie, Costo, Tipo ajuste 1=Ingreso/2=Egreso, Cantidad)
+  - `observacion` (opcional): texto para el campo Observación. Default: "SYS GENERATED - Ajuste inventario, [fecha hora]"
+- **Flujo Playwright**: Navega a `/app/ajuste_inventario` → Crear → Sucursal Principal + Bodega → Importar conceptos → Subir Excel → Crear ajuste
+- **Salida**: screenshots en `/exports/ajuste_*.png`; `✅ import_ajuste_inventario — Ajuste creado exitosamente`
+- **Dependencias**: `session.js`, archivo XLSX con formato plantilla Effi
+- **Plantilla de referencia**: `plantilla_importacion_ajuste_inventario.xlsx` (raíz del repo)
+
 ---
 
 ## 2. Infraestructura / Utilidades
