@@ -108,7 +108,7 @@
                 </div>
                 <template v-else>
                   <span class="nav-item-label">{{ e.nombre }}</span>
-                  <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
+                  <span v-if="e.mis_tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.mis_tareas_pendientes }}</span>
                   <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
                     <span class="material-icons" style="font-size:16px">more_vert</span>
                   </button>
@@ -450,7 +450,7 @@
                       </div>
                       <template v-else>
                         <span class="nav-item-label">{{ e.nombre }}</span>
-                        <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
+                        <span v-if="e.mis_tareas_pendientes" class="nav-item-count">{{ e.mis_tareas_pendientes }}</span>
                         <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
                       </template>
                     </RouterLink>

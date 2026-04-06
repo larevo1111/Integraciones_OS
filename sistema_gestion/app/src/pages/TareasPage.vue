@@ -1085,6 +1085,7 @@ async function cargarTareas() {
     const completadasParams = new URLSearchParams()
     if (props.soloMias) completadasParams.set('solo_mias', '1')
     if (proyectoFiltroId.value) completadasParams.set('proyecto_id', proyectoFiltroId.value)
+    if (etiquetaFiltroId.value) completadasParams.set('etiquetas', etiquetaFiltroId.value)
     const completadasUrl = `/api/gestion/tareas/completadas?${completadasParams}`
     const [dataTareas, dataCompletadas] = await Promise.all([
       api(`/api/gestion/tareas?${params}`),

@@ -568,7 +568,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
 
 // GET /api/gestion/tareas/completadas
 app.get('/api/gestion/tareas/completadas', async (req, res) => {
-  const { categoria_id, responsable, proyecto_id, solo_mias } = req.query
+  const { categoria_id, responsable, proyecto_id, solo_mias, etiquetas: etiquetasRaw } = req.query
   const where  = ["t.empresa = ?", "t.estado IN ('Completada', 'Cancelada')", "t.parent_id IS NULL"]
   const params = [req.empresa]
 
@@ -576,6 +576,13 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
   if (responsable)  { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(responsable) }
   if (proyecto_id)  { where.push('t.proyecto_id = ?');  params.push(proyecto_id) }
   if (solo_mias === '1') { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(req.usuario.email) }
+  if (etiquetasRaw) {
+    const eids = String(etiquetasRaw).split(',').map(Number).filter(Boolean)
+    if (eids.length) {
+      where.push(`EXISTS (SELECT 1 FROM g_etiquetas_tareas et WHERE et.tarea_id = t.id AND et.etiqueta_id IN (${eids.map(() => '?').join(',')}))`)
+      params.push(...eids)
+    }
+  }
 
   try {
     const [tareasBase] = await db.gestion.query(`
@@ -1702,9 +1709,15 @@ app.get('/api/gestion/etiquetas', async (req, res) => {
       `SELECT e.*,
         (SELECT COUNT(*) FROM g_etiquetas_tareas et
          JOIN g_tareas t ON t.id = et.tarea_id
-         WHERE et.etiqueta_id = e.id AND t.estado NOT IN ('Completada','Cancelada')) AS tareas_pendientes
+         WHERE et.etiqueta_id = e.id AND t.empresa = e.empresa AND t.estado NOT IN ('Completada','Cancelada')
+        ) AS tareas_pendientes,
+        (SELECT COUNT(*) FROM g_etiquetas_tareas et
+         JOIN g_tareas t ON t.id = et.tarea_id
+         WHERE et.etiqueta_id = e.id AND t.empresa = e.empresa AND t.estado NOT IN ('Completada','Cancelada')
+         AND EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)
+        ) AS mis_tareas_pendientes
        FROM g_etiquetas e WHERE e.empresa = ? ORDER BY e.nombre`,
-      [req.empresa]
+      [req.usuario.email, req.empresa]
     )
     res.json({ ok: true, etiquetas })
   } catch (e) { res.status(500).json({ error: e.message }) }
