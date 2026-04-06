@@ -335,6 +335,7 @@
       :proyectos="proyectos"
       :etiquetas="etiquetas"
       :usuarios="usuarios"
+      :defaults="defaultsFromFilters"
       @guardada="onTareaGuardada"
     />
 
@@ -632,6 +633,34 @@ const proyectoFiltro   = computed(() => proyectos.value.find(p => p.id === proye
 const etiquetaFiltroId = computed(() => route.query.etiqueta_id ? Number(route.query.etiqueta_id) : null)
 const etiquetaFiltro   = computed(() => etiquetas.value.find(e => e.id === etiquetaFiltroId.value) || null)
 
+// ── Valores iniciales heredados del filtro activo ──
+const defaultsFromFilters = computed(() => {
+  const d = {}
+  // Filtros globales (query params)
+  if (proyectoFiltroId.value) d.proyecto_id = proyectoFiltroId.value
+  if (etiquetaFiltroId.value) d.etiquetas = [etiquetaFiltroId.value]
+  // Filtros de tiempo → fecha_limite
+  const f = filtroActivo.value
+  if (f === 'hoy')        d.fecha_limite = hoyISO()
+  if (f === 'manana')     d.fecha_limite = mananaISO()
+  if (f === 'ayer')       d.fecha_limite = isoRelativo(-1)
+  if (f === 'calendario') d.fecha_limite = calFechaSel.value
+  // Filtro personalizado
+  if (f === 'personalizado' && filtroPersonalizado.value) {
+    const fp = filtroPersonalizado.value
+    if (fp.categorias?.length === 1)    d.categoria_id = fp.categorias[0]
+    if (fp.prioridades?.length === 1)   d.prioridad = fp.prioridades[0]
+    if (fp.proyecto_id && !d.proyecto_id) d.proyecto_id = fp.proyecto_id
+    if (fp.etiquetas?.length)           d.etiquetas = [...(d.etiquetas || []), ...fp.etiquetas]
+    if (fp.responsables?.length === 1)  d.responsable = fp.responsables[0]
+    if (fp.id_op)                       d.id_op = fp.id_op
+    if (fp.id_pedido)                   d.id_pedido = fp.id_pedido
+    if (fp.id_remision)                 d.id_remision = fp.id_remision
+    if (fp.fecha_desde && !d.fecha_limite) d.fecha_limite = fp.fecha_desde
+  }
+  return d
+})
+
 // Subtareas
 const subtareasExpandidas = ref({})   // { [tareaId]: true }
 const subtareasData       = ref({})   // { [tareaId]: [subtarea, ...] }
@@ -738,16 +767,18 @@ async function qaAgregar() {
   if (!qaTitulo.value || qaGuardando.value) return
   qaGuardando.value = true
   try {
+    const defs = defaultsFromFilters.value
     const body = {
       titulo:       qaTitulo.value,
-      categoria_id: qaCatId.value || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id,
-      proyecto_id:  qaProyectoId.value ?? proyectoFiltroId.value ?? null,
-      id_op:        qaOp.value      || null,
-      id_remision:  qaRemision.value || null,
-      id_pedido:    qaPedido.value   || null,
-      etiquetas:    qaEtiquetas.value,
-      fecha_limite: filtroActivo.value === 'hoy'    ? hoyISO() :
-                    filtroActivo.value === 'manana'  ? mananaISO() : null
+      categoria_id: qaCatId.value || defs.categoria_id || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id,
+      proyecto_id:  qaProyectoId.value ?? defs.proyecto_id ?? null,
+      prioridad:    defs.prioridad || undefined,
+      responsable:  defs.responsable || undefined,
+      id_op:        qaOp.value      || defs.id_op || null,
+      id_remision:  qaRemision.value || defs.id_remision || null,
+      id_pedido:    qaPedido.value   || defs.id_pedido || null,
+      etiquetas:    qaEtiquetas.value.length ? qaEtiquetas.value : (defs.etiquetas || []),
+      fecha_limite: defs.fecha_limite || null
     }
     const data = await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(body) })
     onTareaGuardada(data.tarea)

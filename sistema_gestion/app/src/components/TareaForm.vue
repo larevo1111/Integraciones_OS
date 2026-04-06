@@ -113,7 +113,8 @@ const props = defineProps({
   categorias:  { type: Array, default: () => [] },
   proyectos:   { type: Array, default: () => [] },
   etiquetas:   { type: Array, default: () => [] },
-  usuarios:    { type: Array, default: () => [] }
+  usuarios:    { type: Array, default: () => [] },
+  defaults:    { type: Object, default: () => ({}) }
 })
 const emit = defineEmits(['update:modelValue', 'guardada'])
 
@@ -146,13 +147,16 @@ watch(() => props.modelValue, async (val) => {
       etiquetas:    (props.tareaEditar.etiquetas || []).map(e => e.id)
     }
   } else {
+    const d = props.defaults || {}
     form.value = {
       titulo: '', descripcion: '',
-      categoria_id: props.categorias[0]?.id || null,
-      proyecto_id: null,
-      prioridad: 'Media',
-      responsable: auth.usuario?.email || '',
-      fecha_limite: '', id_op: '', etiquetas: []
+      categoria_id: d.categoria_id || props.categorias[0]?.id || null,
+      proyecto_id: d.proyecto_id || null,
+      prioridad: d.prioridad || 'Media',
+      responsable: d.responsable || auth.usuario?.email || '',
+      fecha_limite: d.fecha_limite || '',
+      id_op: d.id_op || '',
+      etiquetas: d.etiquetas || []
     }
   }
   await nextTick()
