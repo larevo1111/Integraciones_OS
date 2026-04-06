@@ -50,6 +50,12 @@
         <template #cell-hora_fin="{ row }">
           <span class="td-mono">{{ formatHora(row.hora_fin) }}</span>
         </template>
+        <template #cell-hora_inicio_registro="{ row }">
+          <span class="td-mono">{{ formatHora(row.hora_inicio_registro) }}</span>
+        </template>
+        <template #cell-hora_fin_registro="{ row }">
+          <span class="td-mono">{{ formatHora(row.hora_fin_registro) }}</span>
+        </template>
         <template #cell-tiempo_total_usr="{ row }">
           <span class="td-mono">{{ formatMins(row.tiempo_total_usr) }}</span>
         </template>
@@ -161,8 +167,10 @@ const esAdmin = computed(() => (auth.usuario?.nivel || 1) >= 7)
 const columnas = [
   { key: '_nombre',             label: 'Usuario',        visible: true,  filterType: 'select' },
   { key: 'fecha',              label: 'Fecha',          visible: false },
-  { key: 'hora_inicio',        label: 'Inicio',         visible: true,  width: '120px' },
-  { key: 'hora_fin',           label: 'Fin',            visible: true,  width: '120px' },
+  { key: 'hora_inicio',        label: 'Inicio (usr)',    visible: true,  width: '120px' },
+  { key: 'hora_fin',           label: 'Fin (usr)',       visible: true,  width: '120px' },
+  { key: 'hora_inicio_registro', label: 'Inicio (sys)', visible: false, width: '120px' },
+  { key: 'hora_fin_registro',    label: 'Fin (sys)',     visible: false, width: '120px' },
   { key: 'tiempo_total_usr',    label: 'T. Total (usr)',    visible: true  },
   { key: 'tiempo_pausa_usr',   label: 'T. Pausas (usr)',   visible: true  },
   { key: 'tiempo_laborado_usr',label: 'T. Laborado (usr)', visible: true  },

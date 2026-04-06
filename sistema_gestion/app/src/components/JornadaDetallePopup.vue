@@ -31,19 +31,28 @@
               </div>
             </div>
 
-            <!-- Fila: Inicio + Fin -->
+            <!-- Fila: Inicio + Fin (usr) -->
             <div class="row-2col" style="margin-top:10px">
               <div class="field">
-                <span class="field-label">Inicio</span>
+                <span class="field-label">Inicio (usr)</span>
                 <span v-if="!editando" class="field-val">{{ fmt(jornada.hora_inicio) }}</span>
                 <input v-else v-model="editHoraInicio" type="datetime-local" class="field-input" />
-                <span class="field-audit">registro: {{ fmt(jornada.hora_inicio_registro) }}</span>
               </div>
               <div class="field">
-                <span class="field-label">Fin</span>
+                <span class="field-label">Fin (usr)</span>
                 <span v-if="!editando" class="field-val">{{ fmt(jornada.hora_fin) || '—' }}</span>
                 <input v-else v-model="editHoraFin" type="datetime-local" class="field-input" />
-                <span v-if="jornada.hora_fin_registro" class="field-audit">registro: {{ fmt(jornada.hora_fin_registro) }}</span>
+              </div>
+            </div>
+            <!-- Fila: Inicio + Fin (sys) -->
+            <div class="row-2col" style="margin-top:6px">
+              <div class="field">
+                <span class="field-label">Inicio (sys)</span>
+                <span class="field-val">{{ fmt(jornada.hora_inicio_registro) }}</span>
+              </div>
+              <div class="field">
+                <span class="field-label">Fin (sys)</span>
+                <span class="field-val">{{ fmt(jornada.hora_fin_registro) || '—' }}</span>
               </div>
             </div>
 
