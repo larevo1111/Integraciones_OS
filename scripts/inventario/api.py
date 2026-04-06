@@ -2,8 +2,8 @@
 API FastAPI para inventario físico OS.
 Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
 """
-import os, re, jwt, uuid, shutil
-from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form
+import os, re, jwt, uuid, shutil, subprocess, glob as globmod
+from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -586,6 +586,130 @@ def cerrar_inventario(data: GestionInventario):
     registrar_auditoria(0, 'cerrar_inventario', data.usuario, None, data.fecha_inventario,
                         f'{affected} conteos verificados/cerrados')
     return {"ok": True, "cerrados": affected}
+
+
+# ── Sync Effi ──
+
+EXPORT_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'export_inventario.js')
+EXPORTS_INV_DIR = '/exports/inventario'
+sync_effi_status = {"estado": "idle", "mensaje": "", "timestamp": None}
+
+
+def _to_sql_name(s):
+    """Convierte header de Excel a nombre de columna SQL (misma lógica que import_all.js)."""
+    import unicodedata
+    s = unicodedata.normalize('NFD', s)
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    s = re.sub(r'[^a-zA-Z0-9_]', '_', s)
+    s = re.sub(r'_+', '_', s).strip('_').lower()
+    return s[:64] or 'col'
+
+
+def _sync_effi_task():
+    """Tarea en background: export Playwright + import Excel a effi_data."""
+    import openpyxl
+    sync_effi_status["estado"] = "exportando"
+    sync_effi_status["mensaje"] = "Descargando inventario de Effi..."
+    sync_effi_status["timestamp"] = datetime.now().isoformat()
+
+    try:
+        # 1. Ejecutar export_inventario.js
+        result = subprocess.run(
+            ['node', EXPORT_SCRIPT],
+            capture_output=True, text=True, timeout=300,
+            cwd=BASE_DIR
+        )
+        if result.returncode != 0:
+            sync_effi_status["estado"] = "error"
+            sync_effi_status["mensaje"] = f"Export falló: {result.stderr[-200:]}"
+            return
+
+        # 2. Buscar el Excel más reciente
+        sync_effi_status["estado"] = "importando"
+        sync_effi_status["mensaje"] = "Importando a base de datos..."
+
+        archivos = sorted(globmod.glob(os.path.join(EXPORTS_INV_DIR, 'inventario_*.xlsx')))
+        if not archivos:
+            sync_effi_status["estado"] = "error"
+            sync_effi_status["mensaje"] = "No se encontró archivo Excel exportado"
+            return
+
+        xlsx_path = archivos[-1]
+
+        # 3. Leer Excel con openpyxl
+        wb = openpyxl.load_workbook(xlsx_path, read_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        headers_raw = [str(h or '').strip() for h in next(rows_iter)]
+        headers_sql = []
+        seen = {}
+        for h in headers_raw:
+            base = _to_sql_name(h)
+            seen[base] = seen.get(base, 0) + 1
+            headers_sql.append(base if seen[base] == 1 else f"{base}_{seen[base]}")
+
+        filas = []
+        for row in rows_iter:
+            vals = [str(v).strip() if v is not None else None for v in row]
+            if any(v for v in vals):
+                filas.append(vals)
+        wb.close()
+
+        # 4. TRUNCATE + INSERT en effi_data.zeffi_inventario
+        conn = pymysql.connect(**DB_EFFI)
+        with conn.cursor() as cur:
+            col_defs = ', '.join(f'`{c}` TEXT' for c in headers_sql)
+            col_names = ', '.join(f'`{c}`' for c in headers_sql)
+
+            cur.execute("DROP TABLE IF EXISTS `zeffi_inventario`")
+            cur.execute(f"""
+                CREATE TABLE `zeffi_inventario` (
+                    _pk BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    {col_defs}
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            """)
+
+            BATCH = 200
+            for i in range(0, len(filas), BATCH):
+                batch = filas[i:i+BATCH]
+                placeholders = ', '.join(
+                    '(' + ', '.join('%s' for _ in headers_sql) + ')'
+                    for _ in batch
+                )
+                flat = [v for row in batch for v in row]
+                cur.execute(f"INSERT INTO `zeffi_inventario` ({col_names}) VALUES {placeholders}", flat)
+
+            conn.commit()
+        conn.close()
+
+        sync_effi_status["estado"] = "ok"
+        sync_effi_status["mensaje"] = f"{len(filas)} artículos actualizados desde {os.path.basename(xlsx_path)}"
+        sync_effi_status["timestamp"] = datetime.now().isoformat()
+
+    except subprocess.TimeoutExpired:
+        sync_effi_status["estado"] = "error"
+        sync_effi_status["mensaje"] = "Export tardó más de 5 minutos — timeout"
+    except Exception as e:
+        sync_effi_status["estado"] = "error"
+        sync_effi_status["mensaje"] = str(e)[:300]
+
+
+@app.post("/api/inventario/sync-effi")
+def sync_effi(background_tasks: BackgroundTasks):
+    """Lanza export + import de artículos Effi en background."""
+    if sync_effi_status["estado"] in ("exportando", "importando"):
+        raise HTTPException(409, "Ya hay una sincronización en curso")
+    sync_effi_status["estado"] = "iniciando"
+    sync_effi_status["mensaje"] = "Iniciando sincronización..."
+    sync_effi_status["timestamp"] = datetime.now().isoformat()
+    background_tasks.add_task(_sync_effi_task)
+    return {"ok": True, "mensaje": "Sincronización iniciada"}
+
+
+@app.get("/api/inventario/sync-effi/estado")
+def sync_effi_estado():
+    """Estado actual de la sincronización."""
+    return sync_effi_status
 
 
 # Servir frontend estático (después de todas las rutas /api/)

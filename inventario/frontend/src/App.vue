@@ -160,6 +160,10 @@
           <span class="material-icons inv-search-icon">search</span>
           <input v-model="busqueda" class="inv-search-input" type="text" placeholder="Buscar por nombre o código..." @input="debounceSearch">
         </div>
+        <button v-if="puede('asignar_articulo')" class="inv-btn-sync" :class="{ syncing: syncEstado === 'exportando' || syncEstado === 'importando' }" :disabled="syncEstado === 'exportando' || syncEstado === 'importando'" @click="syncEffi" :title="syncMensaje || 'Actualizar catálogo de artículos desde Effi'">
+          <span class="material-icons" :class="{ 'spin': syncEstado === 'exportando' || syncEstado === 'importando' }" style="font-size:16px">sync</span>
+          <span>{{ syncTexto }}</span>
+        </button>
         <button class="inv-btn-scan">
           <span class="material-icons" style="font-size:16px">qr_code_scanner</span>
           Escanear
@@ -605,6 +609,9 @@ const articuloAsignar = ref(null)
 const busquedaAsignar = ref('')
 const resultadosAsignar = ref([])
 const effiSeleccionado = ref(null)
+// Sync Effi
+const syncEstado = ref('idle')
+const syncMensaje = ref('')
 const calculandoTeorico = ref(false)
 const mostrarFoto = ref(false)
 const articuloFoto = ref(null)
@@ -968,6 +975,37 @@ async function confirmarAsignacion() {
   })
   cerrarAsignar()
   cargarArticulos(); cargarResumen()
+}
+
+// ── Sync Effi ──
+const syncTexto = computed(() => {
+  if (syncEstado.value === 'exportando') return 'Descargando...'
+  if (syncEstado.value === 'importando') return 'Importando...'
+  return 'Sync Effi'
+})
+
+let _syncPoll = null
+async function syncEffi() {
+  try {
+    await fetch(API + '/api/inventario/sync-effi', { method: 'POST', headers: authHeaders() })
+    syncEstado.value = 'exportando'
+    syncMensaje.value = 'Descargando inventario de Effi...'
+    _syncPoll = setInterval(pollSync, 3000)
+  } catch { syncEstado.value = 'error'; syncMensaje.value = 'Error al iniciar sync' }
+}
+
+async function pollSync() {
+  try {
+    const res = await fetchApi('/api/inventario/sync-effi/estado')
+    syncEstado.value = res.estado
+    syncMensaje.value = res.mensaje
+    if (res.estado === 'ok' || res.estado === 'error') {
+      clearInterval(_syncPoll)
+      if (res.estado === 'ok') {
+        setTimeout(() => { syncEstado.value = 'idle'; syncMensaje.value = '' }, 5000)
+      }
+    }
+  } catch { clearInterval(_syncPoll) }
 }
 
 // ── Excluidos ──
@@ -1484,6 +1522,14 @@ onUnmounted(() => clearInterval(clockInterval))
 .alerta-btn-confirmar { background: transparent; border: 1px solid var(--border-strong); color: var(--text-secondary); padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; width: 100%; }
 .alerta-btn-confirmar:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
 
+/* ═══ SYNC EFFI ═══ */
+.inv-btn-sync { height: 32px; padding: 0 12px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 4px; color: #60a5fa; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.inv-btn-sync:hover { background: rgba(59,130,246,0.18); }
+.inv-btn-sync.syncing { opacity: 0.7; cursor: wait; }
+.inv-btn-sync:disabled { cursor: wait; }
+@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+.spin { animation: spin 1s linear infinite; }
+
 /* ═══ ASIGNAR ARTÍCULO ═══ */
 .asignar-origen, .asignar-destino { background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; }
 .asignar-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
@@ -1533,6 +1579,8 @@ onUnmounted(() => clearInterval(clockInterval))
   .inv-search-box { height: 28px; padding: 0 6px; }
   .inv-search-input { font-size: 12px; }
   .inv-search-icon { font-size: 14px; }
+  .inv-btn-sync { height: 28px; padding: 0 7px; font-size: 11px; }
+  .inv-btn-sync span:last-child { display: none; }
   .inv-btn-scan { height: 28px; padding: 0 7px; font-size: 11px; }
   .inv-btn-scan span:last-child { display: none; }
 
