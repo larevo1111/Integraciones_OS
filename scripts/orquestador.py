@@ -42,6 +42,7 @@ SYNC_HOSTINGER_SCRIPT             = SCRIPTS_DIR / 'sync_hostinger.py'
 SYNC_ESPOCRM_MARKETING_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_marketing.py'
 SYNC_ESPOCRM_CONTACTOS_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_contactos.py'
 SYNC_ESPOCRM_HOSTINGER_SCRIPT     = SCRIPTS_DIR / 'sync_espocrm_to_hostinger.py'
+SYNC_INV_CATALOGO_SCRIPT          = SCRIPTS_DIR / 'sync_inventario_catalogo.py'
 GENERAR_PLANTILLA_SCRIPT          = SCRIPTS_DIR / 'generar_plantilla_import_effi.py'
 IMPORT_EFFI_SCRIPT                = SCRIPTS_DIR / 'import_clientes_effi.js'
 
@@ -52,6 +53,7 @@ SYNC_TIMEOUT          =  8 * 60   # 8 minutos (sync Hostinger ~300s con trazabil
 SYNC_ESPO_TIMEOUT     =  2 * 60   # 2 minutos (sync EspoCRM marketing)
 SYNC_ESPO_CON_TIMEOUT =  3 * 60   # 3 minutos (sync EspoCRM contactos)
 SYNC_ESPO_HOST_TIMEOUT = 2 * 60   # 2 minutos (sync EspoCRM → Hostinger)
+SYNC_INV_CAT_TIMEOUT   = 2 * 60   # 2 minutos (sync catálogo inventario)
 GENERAR_PLANTILLA_TIMEOUT = 1 * 60  # 1 minuto
 IMPORT_EFFI_TIMEOUT       = 3 * 60  # 3 minutos (Playwright upload)
 
@@ -407,6 +409,14 @@ def main():
     resumen_espo_host = salida_espo_host.strip().splitlines()[-1] if salida_espo_host.strip() else 'sin salida'
     log.info(f'   {resumen_espo_host}  [{dur_espo_host}s]')
 
+    # ── 6e. SYNC CATÁLOGO INVENTARIO → LOCAL + HOSTINGER ──────
+    log.info('▶ sync_inventario_catalogo.py ...')
+    t_inv_cat = datetime.datetime.now()
+    exit_inv_cat, salida_inv_cat = ejecutar(['python3', str(SYNC_INV_CATALOGO_SCRIPT)], SYNC_INV_CAT_TIMEOUT)
+    dur_inv_cat = int((datetime.datetime.now() - t_inv_cat).total_seconds())
+    resumen_inv_cat = salida_inv_cat.strip().splitlines()[-1] if salida_inv_cat.strip() else 'sin salida'
+    log.info(f'   {resumen_inv_cat}  [{dur_inv_cat}s]')
+
     # ── 7a. GENERAR PLANTILLA EFFI ────────────────────────────
     log.info('▶ generar_plantilla_import_effi.py ...')
     t_gen = datetime.datetime.now()
@@ -449,7 +459,7 @@ def main():
                  or exit_espo_host != 0 or exit_gen != 0 or exit_imp_effi != 0
                  or len(errores_exp) > 0)
     estado    = '❌ CON ERRORES' if hay_error else '✅ EXITOSO'
-    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_cat + dur_grupo + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_gen + dur_imp_effi
+    dur_total = dur_exp + dur_imp + dur_rsm + dur_rsm_canal + dur_rsm_cliente + dur_rsm_producto + dur_rsm_rem + dur_rem_canal + dur_rem_cli + dur_rem_prod + dur_cat + dur_grupo + dur_sync + dur_espo + dur_espo_con + dur_espo_host + dur_inv_cat + dur_gen + dur_imp_effi
     log.info(f'🏁 FIN — {estado}  [total {dur_total}s]')
     log.info('=' * 60)
 
@@ -534,6 +544,7 @@ Duración: {dur_total}s  (export {dur_exp}s + import {dur_imp}s + resumen {dur_r
             ('Sync EspoCRM marketing', exit_espo, resumen_espo),
             ('Sync EspoCRM contactos', exit_espo_con, resumen_espo_con),
             ('Sync EspoCRM → Hostinger', exit_espo_host, resumen_espo_host),
+            ('Catálogo inventario', exit_inv_cat, resumen_inv_cat),
             ('Plantilla Effi', exit_gen, resumen_gen),
             ('Import a Effi', exit_imp_effi, resumen_imp_effi),
         ]

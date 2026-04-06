@@ -301,6 +301,27 @@ App independiente de conteo de inventario físico. Separada de sistema_gestion.
 - Decimales: acepta punto y coma como separador. Input `type="text"` con `inputmode="decimal"`
 - Si usuario confirma valor fuera de rango: se guarda pero queda en auditoría
 
+### Tabla `inv_catalogo_articulos` (effi_data local + Hostinger)
+
+Catálogo de artículos de Effi con unidad y grupo precalculados. Se usa para la búsqueda en el modal de asignar artículos NM. Se actualiza cada 2h con el pipeline y bajo demanda con el botón "Sync Effi".
+
+| Campo | Descripción |
+|---|---|
+| `id_effi` | ID del artículo en Effi (PK) |
+| `cod_barras` | Código de barras |
+| `nombre` | Nombre del artículo |
+| `categoria` | Categoría Effi (T01.xx, TPT.xx, T03.xx, etc.) |
+| `vigencia` | Siempre "Vigente" (solo se importan vigentes) |
+| `tipo_articulo` | Tipo de artículo en Effi |
+| `gestion_stock` | "Sí" o "No" |
+| `costo_promedio` | Costo promedio |
+| `stock_total` | Stock total empresa |
+| `unidad` | Detectada por regex del nombre (KG/GRS/UND/LT) |
+| `grupo` | Calculado: MP/PP/PT/INS/DS/DES (cruce con OPs) |
+| `actualizado_en` | Timestamp de última sincronización |
+
+Script: `scripts/sync_inventario_catalogo.py` — mismo patrón que `sync_espocrm_to_hostinger.py`.
+
 ### Scripts
 
 | Script | Descripción |
@@ -309,6 +330,7 @@ App independiente de conteo de inventario físico. Separada de sistema_gestion.
 | `scripts/inventario/depurar_inventario.py` | Clasifica artículos y genera filas por bodega en `inv_conteos` |
 | `scripts/inventario/calcular_rangos.py` | Genera `inv_rangos` (unidad, grupo, rangos) cruzando con OPs |
 | `scripts/inventario/api.py` | FastAPI backend (puerto 9401). Sirve API + frontend estático |
+| `scripts/sync_inventario_catalogo.py` | Sync catálogo artículos con unidad/grupo → local + Hostinger (paso 6e del pipeline) |
 
 ### Archivos frontend
 
@@ -329,7 +351,9 @@ App independiente de conteo de inventario físico. Separada de sistema_gestion.
 - Stepper +/- para ajuste rápido de conteo
 - Tags de grupo (MP/PP/PT/INS/DS) y unidad (KG/GRS/UND/LT) por artículo
 - Validación de rango con alerta y sugerencia de corrección
-- Mini menú (⋮) con: Agregar nota / Tomar foto / Ver foto
+- Mini menú (⋮) con: Agregar nota / Tomar foto / Ver foto / Asignar artículo (NM, nivel 5+)
+- Modal de asignación: busca en `inv_catalogo_articulos`, compara unidades, genera nota automática
+- Botón "Sync Effi" (nivel 5+): export Playwright + import + sync catálogo bajo demanda
 - Auditoría completa: cada conteo, edición, nota y foto queda registrado
 - Responsive: desktop, tablet, móvil
 

@@ -2,7 +2,7 @@
 API FastAPI para inventario físico OS.
 Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
 """
-import os, re, jwt, uuid, shutil, subprocess, glob as globmod
+import os, re, jwt, uuid, shutil, subprocess
 from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -181,6 +181,7 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
     sql += " ORDER BY c.categoria, c.nombre"
     rows = db_query(DB_INV, sql, params)
 
+    sin_grupo = []
     for r in rows:
         r['inventario_teorico'] = float(r['inventario_teorico']) if r['inventario_teorico'] is not None else None
         r['inventario_fisico'] = float(r['inventario_fisico']) if r['inventario_fisico'] is not None else None
@@ -192,11 +193,22 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         r['factor_error'] = int(r['factor_error']) if r['factor_error'] else None
         # Artículos sin entrada en inv_rangos: detectar grupo y unidad al vuelo
         if not r.get('grupo'):
+            sin_grupo.append(r)
             r['unidad'] = detectar_unidad(r.get('nombre') or '')
+
+    # Para los que no tienen grupo, cargar IDs producidos (para detectar PP)
+    if sin_grupo:
+        ids_producidos = set()
+        try:
+            prods = db_query(DB_EFFI, "SELECT DISTINCT cod_articulo FROM zeffi_articulos_producidos WHERE vigencia = 'Orden vigente'")
+            ids_producidos = {str(p['cod_articulo']) for p in prods}
+        except Exception:
+            pass
+
+        for r in sin_grupo:
             if r.get('id_effi', '').startswith('NM-'):
                 r['grupo'] = 'NM'
             else:
-                # Detectar grupo desde categoría (misma lógica que calcular_rangos.py)
                 cat = (r.get('categoria') or '').upper()
                 nom = (r.get('nombre') or '').upper()
                 if 'DESPERDICIO' in nom or 'DESPERDI' in nom:
@@ -209,8 +221,11 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
                     r['grupo'] = 'INS'
                 elif 'DESARROLLO' in cat:
                     r['grupo'] = 'DS'
+                elif str(r.get('id_effi', '')) in ids_producidos:
+                    r['grupo'] = 'PP'
                 else:
                     r['grupo'] = 'MP'
+
     return rows
 
 
@@ -416,17 +431,14 @@ def detectar_unidad(nombre):
 
 @app.get("/api/inventario/articulos/buscar")
 def buscar_articulos_effi(q: str):
-    """Busca artículos en el catálogo de Effi (para agregar a bodega)."""
+    """Busca artículos en inv_catalogo_articulos (local, con unidad y grupo precalculados)."""
     rows = db_query(DB_EFFI, """
-        SELECT id, cod_barras, nombre, categoria
-        FROM zeffi_inventario
-        WHERE vigencia = 'Vigente'
-          AND (nombre LIKE %s OR id LIKE %s OR cod_barras LIKE %s)
+        SELECT id_effi AS id, cod_barras, nombre, categoria, unidad, grupo
+        FROM inv_catalogo_articulos
+        WHERE (nombre LIKE %s OR id_effi LIKE %s OR cod_barras LIKE %s)
         ORDER BY nombre
         LIMIT 20
     """, (f"%{q}%", f"%{q}%", f"%{q}%"))
-    for r in rows:
-        r['unidad'] = detectar_unidad(r['nombre'])
     return rows
 
 
@@ -613,29 +625,19 @@ def cerrar_inventario(data: GestionInventario):
 # ── Sync Effi ──
 
 EXPORT_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'export_inventario.js')
-EXPORTS_INV_DIR = '/exports/inventario'
+IMPORT_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'import_all.js')
+SYNC_CATALOGO_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'sync_inventario_catalogo.py')
 sync_effi_status = {"estado": "idle", "mensaje": "", "timestamp": None}
 
 
-def _to_sql_name(s):
-    """Convierte header de Excel a nombre de columna SQL (misma lógica que import_all.js)."""
-    import unicodedata
-    s = unicodedata.normalize('NFD', s)
-    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
-    s = re.sub(r'[^a-zA-Z0-9_]', '_', s)
-    s = re.sub(r'_+', '_', s).strip('_').lower()
-    return s[:64] or 'col'
-
-
 def _sync_effi_task():
-    """Tarea en background: export Playwright + import Excel a effi_data."""
-    import openpyxl
+    """Tarea en background: export Playwright + import + sync catálogo."""
     sync_effi_status["estado"] = "exportando"
     sync_effi_status["mensaje"] = "Descargando inventario de Effi..."
     sync_effi_status["timestamp"] = datetime.now().isoformat()
 
     try:
-        # 1. Ejecutar export_inventario.js
+        # 1. Export: descargar Excel de Effi
         result = subprocess.run(
             ['node', EXPORT_SCRIPT],
             capture_output=True, text=True, timeout=300,
@@ -646,71 +648,42 @@ def _sync_effi_task():
             sync_effi_status["mensaje"] = f"Export falló: {result.stderr[-200:]}"
             return
 
-        # 2. Buscar el Excel más reciente
+        # 2. Import: Excel → effi_data.zeffi_inventario
         sync_effi_status["estado"] = "importando"
         sync_effi_status["mensaje"] = "Importando a base de datos..."
 
-        archivos = sorted(globmod.glob(os.path.join(EXPORTS_INV_DIR, 'inventario_*.xlsx')))
-        if not archivos:
+        result = subprocess.run(
+            ['node', IMPORT_SCRIPT],
+            capture_output=True, text=True, timeout=300,
+            cwd=BASE_DIR
+        )
+        if result.returncode != 0:
             sync_effi_status["estado"] = "error"
-            sync_effi_status["mensaje"] = "No se encontró archivo Excel exportado"
+            sync_effi_status["mensaje"] = f"Import falló: {result.stderr[-200:]}"
             return
 
-        xlsx_path = archivos[-1]
+        # 3. Sync catálogo: generar inv_catalogo_articulos con unidad y grupo
+        sync_effi_status["mensaje"] = "Generando catálogo con unidades y grupos..."
 
-        # 3. Leer Excel con openpyxl
-        wb = openpyxl.load_workbook(xlsx_path, read_only=True)
-        ws = wb.active
-        rows_iter = ws.iter_rows(values_only=True)
-        headers_raw = [str(h or '').strip() for h in next(rows_iter)]
-        headers_sql = []
-        seen = {}
-        for h in headers_raw:
-            base = _to_sql_name(h)
-            seen[base] = seen.get(base, 0) + 1
-            headers_sql.append(base if seen[base] == 1 else f"{base}_{seen[base]}")
+        result = subprocess.run(
+            ['python3', SYNC_CATALOGO_SCRIPT],
+            capture_output=True, text=True, timeout=120,
+            cwd=BASE_DIR
+        )
+        if result.returncode != 0:
+            sync_effi_status["estado"] = "error"
+            sync_effi_status["mensaje"] = f"Catálogo falló: {result.stderr[-200:]}"
+            return
 
-        filas = []
-        for row in rows_iter:
-            vals = [str(v).strip() if v is not None else None for v in row]
-            if any(v for v in vals):
-                filas.append(vals)
-        wb.close()
-
-        # 4. TRUNCATE + INSERT en effi_data.zeffi_inventario
-        conn = pymysql.connect(**DB_EFFI)
-        with conn.cursor() as cur:
-            col_defs = ', '.join(f'`{c}` TEXT' for c in headers_sql)
-            col_names = ', '.join(f'`{c}`' for c in headers_sql)
-
-            cur.execute("DROP TABLE IF EXISTS `zeffi_inventario`")
-            cur.execute(f"""
-                CREATE TABLE `zeffi_inventario` (
-                    _pk BIGINT AUTO_INCREMENT PRIMARY KEY,
-                    {col_defs}
-                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-            """)
-
-            BATCH = 200
-            for i in range(0, len(filas), BATCH):
-                batch = filas[i:i+BATCH]
-                placeholders = ', '.join(
-                    '(' + ', '.join('%s' for _ in headers_sql) + ')'
-                    for _ in batch
-                )
-                flat = [v for row in batch for v in row]
-                cur.execute(f"INSERT INTO `zeffi_inventario` ({col_names}) VALUES {placeholders}", flat)
-
-            conn.commit()
-        conn.close()
-
+        # Extraer cantidad del output
+        linea = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ''
         sync_effi_status["estado"] = "ok"
-        sync_effi_status["mensaje"] = f"{len(filas)} artículos actualizados desde {os.path.basename(xlsx_path)}"
+        sync_effi_status["mensaje"] = linea or "Catálogo actualizado"
         sync_effi_status["timestamp"] = datetime.now().isoformat()
 
     except subprocess.TimeoutExpired:
         sync_effi_status["estado"] = "error"
-        sync_effi_status["mensaje"] = "Export tardó más de 5 minutos — timeout"
+        sync_effi_status["mensaje"] = "Proceso tardó más de 5 minutos — timeout"
     except Exception as e:
         sync_effi_status["estado"] = "error"
         sync_effi_status["mensaje"] = str(e)[:300]
