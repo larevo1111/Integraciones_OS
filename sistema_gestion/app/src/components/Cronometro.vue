@@ -24,29 +24,29 @@ const emit = defineEmits(['update', 'tick'])
 
 const activo = ref(props.cronometroActivo)
 let interval = null
+let inicioLocal = null  // timestamp local para cálculo inmediato post-play
 
-// Parsear fecha de BD (string Colombia) a Date
 function parseInicio(str) {
   if (!str) return null
   if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
   return new Date(str.replace(' ', 'T') + '-05:00')
 }
 
-// Calcula el total de segundos en cualquier momento
 function calcTotal() {
   let total = props.acumuladoSeg || 0
-  if (activo.value && props.cronometroInicio) {
-    const ini = parseInicio(props.cronometroInicio)
+  if (activo.value) {
+    const ini = inicioLocal || parseInicio(props.cronometroInicio)
     if (ini) total += Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
   }
   return total
 }
 
-const totalSegundos = ref(calcTotal())
+const totalSegundos = ref(0)
 const totalMinutos  = computed(() => Math.floor(totalSegundos.value / 60))
 
 function startInterval() {
   stopInterval()
+  totalSegundos.value = calcTotal()
   interval = setInterval(() => {
     totalSegundos.value = calcTotal()
     emit('tick', totalSegundos.value)
@@ -64,6 +64,7 @@ onMounted(() => {
 
 watch(() => props.cronometroActivo, val => {
   activo.value = val
+  if (!val) inicioLocal = null
   totalSegundos.value = calcTotal()
   if (val) startInterval()
   else stopInterval()
@@ -73,11 +74,17 @@ watch(() => props.acumuladoSeg, () => {
   totalSegundos.value = calcTotal()
 })
 
+watch(() => props.cronometroInicio, val => {
+  if (val) inicioLocal = null  // prop actualizada, ya no necesito el local
+  totalSegundos.value = calcTotal()
+})
+
 onUnmounted(() => stopInterval())
 
 async function iniciar() {
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/iniciar`, { method: 'POST' })
+    inicioLocal = new Date()  // usar timestamp local inmediatamente
     activo.value = true
     totalSegundos.value = calcTotal()
     startInterval()
@@ -95,6 +102,7 @@ async function pausar() {
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
     activo.value = false
+    inicioLocal = null
     totalSegundos.value = data.tarea?.crono_acumulado_seg || calcTotal()
     emit('tick', totalSegundos.value)
     emit('update', 'detenido', data.tarea)
@@ -112,6 +120,7 @@ async function reiniciar() {
     }
     await api(`/api/gestion/tareas/${props.tareaId}/reiniciar-tiempo`, { method: 'POST' })
     activo.value = false
+    inicioLocal = null
     totalSegundos.value = 0
     emit('tick', 0)
     emit('update', 'detenido', null)

@@ -25,9 +25,11 @@
       <div class="panel-header-titulo-row">
         <EstadoBadge :estado="tarea.estado" @click="ciclarEstado" style="margin-top:2px;flex-shrink:0" />
         <textarea
+          ref="tituloTextareaRef"
           class="tarea-panel-titulo"
           :value="tarea.titulo"
           rows="1"
+          @input="autoResizeTitulo"
           @blur="e => e.target.value.trim() && e.target.value !== tarea.titulo && actualizar('titulo', e.target.value.trim())"
           @keydown.enter.prevent="e => { e.target.blur() }"
         />
@@ -181,7 +183,7 @@
             min="0" max="59"
             @change="actualizarTiempoReal('m', $event.target.value)" />
           <span class="t-sep">m</span>
-          <span v-if="tarea.cronometro_activo" class="crono-seg">:{{ String(segsVivo % 60).padStart(2, '0') }}s</span>
+          <span v-if="tarea.cronometro_activo" class="crono-seg">:{{ String(segsVivo % 60).padStart(2, '0') }}</span>
         </div>
       </div>
       <!-- Tiempo estimado -->
@@ -284,7 +286,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
@@ -406,6 +408,17 @@ const LABELS_CAMPO = {
   id_op: 'OP Effi', id_remision: 'Remisión', id_pedido: 'Pedido', descripcion: 'Descripción', notas: 'Notas',
   tiempo_estimado_min: 'T. estimado', tiempo_real_min: 'T. real'
 }
+
+// Título auto-resize
+const tituloTextareaRef = ref(null)
+function autoResizeTitulo() {
+  const el = tituloTextareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+watch(() => props.tarea?.id, () => nextTick(autoResizeTitulo))
+onMounted(() => nextTick(autoResizeTitulo))
 
 // Cronómetro integrado en T. real (segsVivo en segundos para mostrar :ss en vivo)
 const cronometroRef = ref(null)
@@ -599,6 +612,16 @@ async function completarSin() {
 </script>
 
 <style scoped>
+.tarea-panel-titulo {
+  flex: 1; min-width: 0; resize: none; overflow: hidden;
+  background: transparent; border: none; outline: none;
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  font-family: var(--font-sans); line-height: 1.3;
+  padding: 0; margin: 0;
+}
+.panel-header-titulo-row {
+  display: flex; align-items: flex-start; gap: 8px;
+}
 .subtarea-breadcrumb {
   display: flex; align-items: center; gap: 4px;
   padding: 2px 0 6px;
