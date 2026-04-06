@@ -800,8 +800,8 @@ async function qaAgregar() {
 
 const FILTROS = [
   { key: 'todas',        label: 'Todas' },
-  { key: 'en_progreso',  label: 'En curso' },
   { key: 'hoy',          label: 'Hoy' },
+  { key: 'en_progreso',  label: 'En curso' },
   { key: 'manana',       label: 'Mañana' },
   { key: 'ayer',         label: 'Ayer' },
   { key: 'semana',       label: 'Esta semana' },
