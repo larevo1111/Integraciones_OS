@@ -67,7 +67,7 @@
 
     <div class="tarea-meta">
       <!-- Cronómetro activo (corriendo en tiempo real) -->
-      <CronoDisplay v-if="tarea.crono_inicio" :tarea="tarea" />
+      <CronoDisplay :tarea="tarea" />
 
       <!-- Chip categoría: dot coloreado + nombre, fondo tinted -->
       <span
