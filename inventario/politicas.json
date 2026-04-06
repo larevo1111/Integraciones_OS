@@ -10,6 +10,7 @@
     "nuevo_inventario":      { "nivel_minimo": 5, "descripcion": "Crear nuevo evento de inventario" },
     "reiniciar_inventario":  { "nivel_minimo": 5, "descripcion": "Reiniciar conteos de un inventario (borra conteos, mantiene artículos)" },
     "cerrar_inventario":     { "nivel_minimo": 5, "descripcion": "Cerrar inventario (no se pueden editar más conteos)" },
+    "asignar_articulo":      { "nivel_minimo": 5, "descripcion": "Vincular artículo no matriculado con artículo de Effi" },
     "ver_auditoria":         { "nivel_minimo": 5, "descripcion": "Ver historial de cambios" },
     "administrar_rangos":    { "nivel_minimo": 7, "descripcion": "Editar rangos y unidades de artículos" },
     "eliminar_inventario":   { "nivel_minimo": 7, "descripcion": "Eliminar un inventario completo" }

@@ -2,7 +2,7 @@
 API FastAPI para inventario físico OS.
 Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
 """
-import os, jwt, uuid, shutil
+import os, re, jwt, uuid, shutil
 from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -391,6 +391,20 @@ async def agregar_no_matriculado(
     return {"ok": True, "id": new_id}
 
 
+def detectar_unidad(nombre):
+    """Detecta unidad de medida del nombre del artículo (misma lógica que calcular_rangos.py)."""
+    n = (nombre or '').upper()
+    if re.search(r'\bX\s*KG\b|\bKG\b|\bX\s*KILO\b|\bKILO\b|\bKL\b', n):
+        return 'KG'
+    if re.search(r'\bGRS?\b|\bGRAMOS?\b|\b\d+\s*GRS?\b|\b\d+\s*G\b', n):
+        return 'GRS'
+    if re.search(r'\bLT\b|\bLITRO\b|\bLTS\b|\bX\s*LT\b', n):
+        return 'LT'
+    if re.search(r'\bML\b|\bMILILITROS?\b', n):
+        return 'ML'
+    return 'UND'
+
+
 @app.get("/api/inventario/articulos/buscar")
 def buscar_articulos_effi(q: str):
     """Busca artículos en el catálogo de Effi (para agregar a bodega)."""
@@ -402,7 +416,53 @@ def buscar_articulos_effi(q: str):
         ORDER BY nombre
         LIMIT 20
     """, (f"%{q}%", f"%{q}%", f"%{q}%"))
+    for r in rows:
+        r['unidad'] = detectar_unidad(r['nombre'])
     return rows
+
+
+class AsignarArticulo(BaseModel):
+    conteo_id: int
+    id_effi_nuevo: str
+    nombre_effi: str
+    categoria_effi: str = ''
+    cod_barras: str = ''
+    usuario: str
+
+
+@app.post("/api/inventario/articulos/asignar")
+def asignar_no_matriculado(data: AsignarArticulo):
+    """Vincula un artículo NM con un artículo real de Effi."""
+    conn = pymysql.connect(**DB_INV, cursorclass=pymysql.cursors.DictCursor)
+    with conn.cursor() as cur:
+        # Verificar que el conteo existe y es NM
+        cur.execute("SELECT id, id_effi, nombre, categoria FROM inv_conteos WHERE id = %s", (data.conteo_id,))
+        conteo = cur.fetchone()
+        if not conteo:
+            conn.close()
+            raise HTTPException(404, 'Conteo no encontrado')
+        if not conteo['id_effi'].startswith('NM-'):
+            conn.close()
+            raise HTTPException(400, 'Solo se pueden asignar artículos no matriculados')
+
+        nombre_anterior = conteo['nombre']
+        id_anterior = conteo['id_effi']
+
+        # Actualizar el conteo con los datos del artículo Effi
+        cur.execute("""
+            UPDATE inv_conteos
+            SET id_effi = %s, nombre = %s, categoria = %s, cod_barras = %s
+            WHERE id = %s
+        """, (data.id_effi_nuevo, data.nombre_effi, data.categoria_effi, data.cod_barras, data.conteo_id))
+        conn.commit()
+
+    conn.close()
+
+    registrar_auditoria(data.conteo_id, 'asignacion', data.usuario,
+                        f'{id_anterior} — {nombre_anterior}',
+                        f'{data.id_effi_nuevo} — {data.nombre_effi}',
+                        'Artículo no matriculado asignado a artículo Effi')
+    return {"ok": True}
 
 
 @app.get("/api/inventario/resumen")

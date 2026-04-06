@@ -281,6 +281,10 @@
                       <span class="material-icons" style="font-size:14px">image</span>
                       <span>Ver foto</span>
                     </div>
+                    <div v-if="a.id_effi?.startsWith('NM-') && puede('asignar_articulo')" class="action-menu-item" @click="abrirAsignar(a); menuAbierto = null">
+                      <span class="material-icons" style="font-size:14px">link</span>
+                      <span>Asignar artículo</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -456,6 +460,64 @@
       </div>
     </div>
 
+    <!-- MODAL ASIGNAR ARTÍCULO -->
+    <div v-if="mostrarAsignar" class="inv-overlay" @click.self="cerrarAsignar">
+      <div class="inv-modal">
+        <div class="inv-modal-header">
+          <span>Asignar artículo de Effi</span>
+          <button class="action-btn" @click="cerrarAsignar"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <!-- Artículo NM actual -->
+          <div class="asignar-origen">
+            <div class="asignar-label">Artículo no matriculado</div>
+            <div class="asignar-nombre">{{ articuloAsignar?.nombre }}</div>
+            <span class="asignar-unidad-tag">{{ articuloAsignar?.unidad || 'UND' }}</span>
+          </div>
+
+          <div class="asignar-flecha">
+            <span class="material-icons" style="font-size:20px;color:var(--text-tertiary)">arrow_downward</span>
+          </div>
+
+          <!-- Búsqueda -->
+          <input v-model="busquedaAsignar" class="inv-modal-search" type="text" placeholder="Buscar artículo en Effi por nombre o código..." @input="buscarParaAsignar">
+
+          <!-- Resultados -->
+          <div v-if="!effiSeleccionado" class="inv-modal-results">
+            <div v-for="r in resultadosAsignar" :key="r.id" class="inv-modal-result-item" @click="seleccionarEffi(r)">
+              <div>
+                <span class="inv-modal-result-name">{{ r.nombre }}</span>
+                <span class="asignar-unidad-tag asignar-unidad-sm" style="margin-left:6px">{{ r.unidad }}</span>
+              </div>
+              <span class="inv-modal-result-id">{{ r.id }}</span>
+            </div>
+            <div v-if="busquedaAsignar && !resultadosAsignar.length" class="inv-modal-empty">Sin resultados</div>
+          </div>
+
+          <!-- Artículo seleccionado -->
+          <div v-if="effiSeleccionado" class="asignar-destino">
+            <div class="asignar-label">Artículo Effi seleccionado</div>
+            <div class="asignar-nombre">{{ effiSeleccionado.nombre }}</div>
+            <div class="asignar-meta">ID: {{ effiSeleccionado.id }} · Cat: {{ effiSeleccionado.categoria || '—' }}</div>
+
+            <!-- Comparación de unidades -->
+            <div class="asignar-comparacion" :class="unidadesCoinciden ? 'asignar-match' : 'asignar-mismatch'">
+              <span class="material-icons" style="font-size:16px">{{ unidadesCoinciden ? 'check_circle' : 'warning' }}</span>
+              <span>{{ articuloAsignar?.unidad || 'UND' }}</span>
+              <span class="material-icons" style="font-size:14px">arrow_forward</span>
+              <span>{{ effiSeleccionado.unidad }}</span>
+              <span class="asignar-comparacion-msg">{{ unidadesCoinciden ? 'Unidades coinciden' : '¡Unidades diferentes!' }}</span>
+            </div>
+
+            <div class="asignar-btns">
+              <button class="inv-btn-secondary" @click="effiSeleccionado = null; busquedaAsignar = ''">Cambiar</button>
+              <button class="inv-btn-primary" @click="confirmarAsignacion">Confirmar asignación</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ALERTA DE RANGO -->
     <div v-if="alertaRango" class="inv-overlay" @click.self="alertaRango = null">
       <div class="inv-modal inv-modal-sm">
@@ -537,6 +599,12 @@ const mostrarConfirmReiniciar = ref(false)
 const mostrarConfirmCerrar = ref(false)
 const mostrarConfirmEliminar = ref(false)
 const estadoTeorico = ref(null)
+// Asignar artículo NM
+const mostrarAsignar = ref(false)
+const articuloAsignar = ref(null)
+const busquedaAsignar = ref('')
+const resultadosAsignar = ref([])
+const effiSeleccionado = ref(null)
 const calculandoTeorico = ref(false)
 const mostrarFoto = ref(false)
 const articuloFoto = ref(null)
@@ -847,6 +915,59 @@ function cerrarModalAgregar() {
   busquedaExcluidos.value = ''; excluidos.value = []
   manualNombre.value = ''; manualCantidad.value = ''; manualUnidad.value = 'UND'
   manualCosto.value = ''; manualNotas.value = ''; manualFoto.value = null; manualFotoNombre.value = ''
+}
+
+// ── Asignar artículo NM ──
+function abrirAsignar(a) {
+  articuloAsignar.value = a
+  busquedaAsignar.value = ''
+  resultadosAsignar.value = []
+  effiSeleccionado.value = null
+  mostrarAsignar.value = true
+}
+
+function cerrarAsignar() {
+  mostrarAsignar.value = false
+  articuloAsignar.value = null
+  effiSeleccionado.value = null
+  busquedaAsignar.value = ''
+  resultadosAsignar.value = []
+}
+
+let _timerAsignar = null
+function buscarParaAsignar() {
+  clearTimeout(_timerAsignar)
+  if (!busquedaAsignar.value || busquedaAsignar.value.length < 2) { resultadosAsignar.value = []; return }
+  _timerAsignar = setTimeout(async () => {
+    resultadosAsignar.value = await fetchApi(`/api/inventario/articulos/buscar?q=${encodeURIComponent(busquedaAsignar.value)}`)
+  }, 300)
+}
+
+function seleccionarEffi(art) {
+  effiSeleccionado.value = art
+}
+
+const unidadesCoinciden = computed(() => {
+  if (!articuloAsignar.value || !effiSeleccionado.value) return true
+  return (articuloAsignar.value.unidad || 'UND') === effiSeleccionado.value.unidad
+})
+
+async function confirmarAsignacion() {
+  if (!effiSeleccionado.value || !articuloAsignar.value) return
+  await fetch(API + '/api/inventario/articulos/asignar', {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      conteo_id: articuloAsignar.value.id,
+      id_effi_nuevo: effiSeleccionado.value.id,
+      nombre_effi: effiSeleccionado.value.nombre,
+      categoria_effi: effiSeleccionado.value.categoria || '',
+      cod_barras: effiSeleccionado.value.cod_barras || '',
+      usuario: usuario.value
+    })
+  })
+  cerrarAsignar()
+  cargarArticulos(); cargarResumen()
 }
 
 // ── Excluidos ──
@@ -1362,6 +1483,23 @@ onUnmounted(() => clearInterval(clockInterval))
 .alerta-btns { display: flex; flex-direction: column; gap: 8px; }
 .alerta-btn-confirmar { background: transparent; border: 1px solid var(--border-strong); color: var(--text-secondary); padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; width: 100%; }
 .alerta-btn-confirmar:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+
+/* ═══ ASIGNAR ARTÍCULO ═══ */
+.asignar-origen, .asignar-destino { background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; }
+.asignar-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.asignar-nombre { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.asignar-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+.asignar-unidad-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(59,130,246,0.15); color: #60a5fa; margin-top: 6px; }
+.asignar-unidad-sm { margin-top: 0; font-size: 9px; padding: 1px 4px; }
+.asignar-flecha { text-align: center; padding: 8px 0; }
+.asignar-comparacion { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; }
+.asignar-match { background: rgba(34,197,94,0.1); color: #4ade80; }
+.asignar-mismatch { background: rgba(245,158,11,0.1); color: #fbbf24; }
+.asignar-comparacion-msg { font-size: 11px; margin-left: auto; }
+.asignar-btns { display: flex; gap: 8px; margin-top: 14px; }
+.asignar-btns .inv-btn-primary { width: auto; flex: 1; }
+.inv-btn-secondary { background: transparent; border: 1px solid var(--border-strong); color: var(--text-secondary); padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; }
+.inv-btn-secondary:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
 
 /* ═══ TABLET (≤1024px) ═══ */
 @media (max-width: 1024px) {
