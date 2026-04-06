@@ -55,7 +55,7 @@
         <span class="jh-timer jh-timer-pausa">{{ timerFormateado }}</span>
       </div>
       <div class="jh-right">
-        <button class="jh-btn jh-btn-reanudar" @click="reanudarPausa">
+        <button class="jh-btn jh-btn-reanudar" ref="btnReanudar" @click="confirmarReanudar">
           <span class="material-icons" style="font-size:15px">play_arrow</span>
           <span class="jh-btn-label">Reanudar</span>
         </button>
@@ -139,8 +139,9 @@ import { hoyLocal } from 'src/services/fecha'
 const auth  = useAuthStore()
 const store = useJornadaStore()
 
-const btnIniciar = ref(null)
-const btnFin     = ref(null)
+const btnIniciar  = ref(null)
+const btnFin      = ref(null)
+const btnReanudar = ref(null)
 const dialogPausa     = ref(false)
 const dialogPausaRetro = ref(false)
 
@@ -267,16 +268,22 @@ function confirmarFinalizar() {
 function abrirPausa()           { dialogPausa.value = true }
 function abrirPausaRetroactiva() { dialogPausaRetro.value = true }
 
-async function onPausaConfirmada({ tipos, observaciones }) {
-  await store.iniciarPausa(tipos, observaciones)
+async function onPausaConfirmada({ tipos, observaciones, hora_inicio }) {
+  await store.iniciarPausa(tipos, observaciones, hora_inicio)
 }
 
 async function onPausaRetroConfirmada({ tipos, observaciones, hora_inicio, hora_fin }) {
   await store.iniciarPausa(tipos, observaciones, hora_inicio, hora_fin)
 }
 
-async function reanudarPausa() {
-  if (store.pausaActiva) await store.reanudar(store.pausaActiva.id)
+function confirmarReanudar() {
+  popover.titulo = 'Reanudar'
+  popover.anchorEl = btnReanudar.value
+  popover.onConfirmar = async (horaISO) => {
+    popover.visible = false
+    if (store.pausaActiva) await store.reanudar(store.pausaActiva.id, horaISO)
+  }
+  popover.visible = true
 }
 
 async function reabrir() {

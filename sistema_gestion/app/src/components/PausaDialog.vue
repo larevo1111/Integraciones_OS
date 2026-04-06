@@ -17,6 +17,15 @@
           </div>
           <div v-if="errorTipos" class="pd-error">Selecciona al menos un tipo</div>
 
+          <!-- Hora de inicio de pausa (siempre visible) -->
+          <template v-if="!retroactiva">
+            <div class="pd-label" style="margin-top:12px">Hora</div>
+            <div class="pd-hora-wrap">
+              <span class="material-icons" style="font-size:16px;color:var(--text-tertiary)">schedule</span>
+              <input v-model="horaInicio" type="time" step="60" class="pd-time-input" style="width:auto" />
+            </div>
+          </template>
+
           <!-- Campos de tiempo para pausa retroactiva -->
           <template v-if="retroactiva">
             <div class="pd-row-2col" style="margin-top:12px">
@@ -78,13 +87,16 @@ watch(() => props.modelValue, (v) => {
     observaciones.value = ''
     errorTipos.value    = false
     errorTiempo.value   = ''
-    // Valores por defecto para retroactiva: hace 30 y 15 min
+    const ahora = new Date()
     if (props.retroactiva) {
-      const ahora = new Date()
+      // Valores por defecto para retroactiva: hace 30 y 15 min
       const hace30 = new Date(ahora - 30 * 60000)
       const hace15 = new Date(ahora - 15 * 60000)
       horaInicio.value = hace30.toTimeString().slice(0, 5)
       horaFin.value    = hace15.toTimeString().slice(0, 5)
+    } else {
+      // Pausa normal: hora actual para confirmar
+      horaInicio.value = ahora.toTimeString().slice(0, 5)
     }
   }
 })
@@ -115,7 +127,10 @@ function confirmar() {
       hora_fin:    fin.toISOString()
     })
   } else {
-    emit('confirmar', { tipos: seleccionados.value, observaciones: observaciones.value.trim() })
+    // Pausa normal: construir hora_inicio desde el input de hora
+    const fecha = props.fecha || hoyLocal()
+    const horaInicioISO = new Date(`${fecha}T${horaInicio.value}:00`).toISOString()
+    emit('confirmar', { tipos: seleccionados.value, observaciones: observaciones.value.trim(), hora_inicio: horaInicioISO })
   }
   cerrar()
 }
@@ -167,6 +182,9 @@ function confirmar() {
   color: var(--accent);
 }
 
+.pd-hora-wrap {
+  display: flex; align-items: center; gap: 8px;
+}
 .pd-row-2col {
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
 }
