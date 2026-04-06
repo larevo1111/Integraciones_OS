@@ -76,11 +76,12 @@
           <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-etiquetas')">
             <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
             <span style="flex:1">Etiquetas</span>
-            <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+            <span v-if="misEtiquetasCount" class="acordeon-count">{{ misEtiquetasCount }}</span>
           </div>
           <template v-if="acordeonAbierto['mis-etiquetas']">
             <div
               v-for="e in etiquetasGlobal"
+              v-show="e.mis_tareas_total"
               :key="e.id"
               class="nav-item-proyecto-wrap"
               @mouseenter="etiquetaHover = e.id"
@@ -183,11 +184,12 @@
           <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-etiquetas')">
             <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
             <span style="flex:1">Etiquetas</span>
-            <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+            <span v-if="eqEtiquetasCount" class="acordeon-count">{{ eqEtiquetasCount }}</span>
           </div>
           <template v-if="acordeonAbierto['eq-etiquetas']">
             <div
               v-for="e in etiquetasGlobal"
+              v-show="e.tareas_total"
               :key="e.id"
               class="nav-item-proyecto-wrap"
               @mouseenter="etiquetaHover = e.id"
@@ -429,10 +431,10 @@
                 <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-etiquetas')">
                   <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
                   <span style="flex:1">Etiquetas</span>
-                  <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+                  <span v-if="misEtiquetasCount" class="acordeon-count">{{ misEtiquetasCount }}</span>
                 </div>
                 <template v-if="acordeonAbierto['mis-etiquetas']">
-                  <div v-for="e in etiquetasGlobal" :key="e.id" class="nav-item-proyecto-wrap">
+                  <div v-for="e in etiquetasGlobal" v-show="e.mis_tareas_total" :key="e.id" class="nav-item-proyecto-wrap">
                     <RouterLink :to="{ path: '/tareas', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
                       :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
@@ -497,10 +499,10 @@
                 <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-etiquetas')">
                   <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
                   <span style="flex:1">Etiquetas</span>
-                  <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+                  <span v-if="eqEtiquetasCount" class="acordeon-count">{{ eqEtiquetasCount }}</span>
                 </div>
                 <template v-if="acordeonAbierto['eq-etiquetas']">
-                  <div v-for="e in etiquetasGlobal" :key="e.id" class="nav-item-proyecto-wrap">
+                  <div v-for="e in etiquetasGlobal" v-show="e.tareas_total" :key="e.id" class="nav-item-proyecto-wrap">
                     <RouterLink :to="{ path: '/equipo', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
                       :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
@@ -878,6 +880,8 @@ async function cargarEtiquetas() {
     etiquetasGlobal.value = data.etiquetas || []
   } catch {}
 }
+const misEtiquetasCount = computed(() => etiquetasGlobal.value.filter(e => e.mis_tareas_total).length)
+const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tareas_total).length)
 </script>
 
 <style scoped>
