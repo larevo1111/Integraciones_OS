@@ -422,11 +422,11 @@ onMounted(() => nextTick(autoResizeTitulo))
 
 // Cronómetro integrado en T. real (segsVivo en segundos para mostrar :ss en vivo)
 const cronometroRef = ref(null)
-const segsVivo      = ref((props.tarea?.tiempo_real_min || 0) * 60)
+const segsVivo      = ref(props.tarea?.crono_acumulado_seg || (props.tarea?.tiempo_real_min || 0) * 60)
 
 // Sincronizar segsVivo con props cuando no está corriendo
-watch(() => props.tarea?.tiempo_real_min, v => {
-  if (!props.tarea?.cronometro_activo) segsVivo.value = (v || 0) * 60
+watch(() => props.tarea?.crono_acumulado_seg, v => {
+  if (!props.tarea?.cronometro_activo) segsVivo.value = v || 0
 })
 
 // Auto-start cuando estado cambia a "En Progreso"
