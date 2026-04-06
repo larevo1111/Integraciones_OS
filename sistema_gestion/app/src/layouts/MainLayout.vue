@@ -392,6 +392,26 @@
                   <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
                 </template>
               </div>
+
+              <!-- Etiquetas (mis tareas — mobile) -->
+              <div class="sidebar-section sidebar-section-indented">
+                <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-etiquetas')">
+                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
+                  <span style="flex:1">Etiquetas</span>
+                  <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+                </div>
+                <template v-if="acordeonAbierto['mis-etiquetas']">
+                  <div v-for="e in etiquetasGlobal" :key="e.id" class="nav-item-proyecto-wrap">
+                    <RouterLink :to="{ path: '/tareas', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
+                      :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }">
+                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
+                      <span class="nav-item-label">{{ e.nombre }}</span>
+                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                    </RouterLink>
+                  </div>
+                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
+                </template>
+              </div>
               </template>
 
               <div class="sidebar-separator" />
@@ -423,6 +443,26 @@
                     </RouterLink>
                   </div>
                   <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
+                </template>
+              </div>
+
+              <!-- Etiquetas (equipo — mobile) -->
+              <div class="sidebar-section sidebar-section-indented">
+                <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-etiquetas')">
+                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
+                  <span style="flex:1">Etiquetas</span>
+                  <span v-if="etiquetasGlobal.length" class="acordeon-count">{{ etiquetasGlobal.length }}</span>
+                </div>
+                <template v-if="acordeonAbierto['eq-etiquetas']">
+                  <div v-for="e in etiquetasGlobal" :key="e.id" class="nav-item-proyecto-wrap">
+                    <RouterLink :to="{ path: '/equipo', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
+                      :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }">
+                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
+                      <span class="nav-item-label">{{ e.nombre }}</span>
+                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                    </RouterLink>
+                  </div>
+                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
                 </template>
               </div>
               </template>
