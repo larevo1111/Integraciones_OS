@@ -285,29 +285,16 @@ const duracionDisplay = computed(() => {
 const tiempoCronometro = ref('00:00')
 let interval = null
 
-// Parsear cronometro_inicio como Colombia UTC-5 (mysql2 timezone:'local' guarda en hora Colombia)
-function parseInicio(str) {
-  if (!str) return null
-  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
-  return new Date(str.replace(' ', 'T') + '-05:00')
-}
+import { calcTotalSeg, formatCrono } from 'src/services/crono'
 
-function calcularTiempo() {
-  if (!props.tarea.cronometro_activo || !props.tarea.cronometro_inicio) return
-  const ini = parseInicio(props.tarea.cronometro_inicio)
-  if (!ini) return
-  const acum  = props.tarea.crono_acumulado_seg || 0
-  const extra = Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
-  const total = acum + extra
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  tiempoCronometro.value = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+function actualizarCrono() {
+  tiempoCronometro.value = formatCrono(calcTotalSeg(props.tarea))
 }
 
 function iniciarInterval() {
   if (interval) clearInterval(interval)
-  calcularTiempo()
-  interval = setInterval(calcularTiempo, 1000)
+  actualizarCrono()
+  interval = setInterval(actualizarCrono, 1000)
 }
 function detenerInterval() {
   if (interval) { clearInterval(interval); interval = null }

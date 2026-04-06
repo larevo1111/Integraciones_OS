@@ -165,9 +165,7 @@
           <Cronometro
             ref="cronometroRef"
             :tarea-id="tarea.id"
-            :acumulado-seg="tarea.crono_acumulado_seg || 0"
-            :cronometro-activo="!!tarea.cronometro_activo"
-            :cronometro-inicio="tarea.cronometro_inicio"
+            :tarea="tarea"
             @update="onCronometroUpdate"
             @tick="secs => segsVivo = secs"
           />
@@ -420,13 +418,14 @@ function autoResizeTitulo() {
 watch(() => props.tarea?.id, () => nextTick(autoResizeTitulo))
 onMounted(() => nextTick(autoResizeTitulo))
 
-// Cronómetro integrado en T. real (segsVivo en segundos para mostrar :ss en vivo)
+// Cronómetro integrado en T. real (segsVivo = misma fuente que la lista)
+import { calcTotalSeg } from 'src/services/crono'
 const cronometroRef = ref(null)
-const segsVivo      = ref(props.tarea?.crono_acumulado_seg || (props.tarea?.tiempo_real_min || 0) * 60)
+const segsVivo      = ref(calcTotalSeg(props.tarea))
 
 // Sincronizar segsVivo con props cuando no está corriendo
-watch(() => props.tarea?.crono_acumulado_seg, v => {
-  if (!props.tarea?.cronometro_activo) segsVivo.value = v || 0
+watch(() => props.tarea?.crono_acumulado_seg, () => {
+  if (!props.tarea?.crono_inicio) segsVivo.value = calcTotalSeg(props.tarea)
 })
 
 // Auto-start cuando estado cambia a "En Progreso"

@@ -13,42 +13,36 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from 'src/services/api'
+import { calcTotalSeg } from 'src/services/crono'
 
 const props = defineProps({
   tareaId:          { type: Number, required: true },
-  acumuladoSeg:     { type: Number, default: 0 },
-  cronometroActivo: { type: Boolean, default: false },
-  cronometroInicio: { type: String, default: null }
+  tarea:            { type: Object, required: true }
 })
 const emit = defineEmits(['update', 'tick'])
 
-const activo = ref(props.cronometroActivo)
+const activo = ref(!!props.tarea?.crono_inicio)
 let interval = null
-let inicioLocal = null  // timestamp local para cálculo inmediato post-play
+let inicioLocal = null
 
-function parseInicio(str) {
-  if (!str) return null
-  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
-  return new Date(str.replace(' ', 'T') + '-05:00')
-}
-
-function calcTotal() {
-  let total = props.acumuladoSeg || 0
-  if (activo.value) {
-    const ini = inicioLocal || parseInicio(props.cronometroInicio)
-    if (ini) total += Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
+// Calcula total usando la misma función que todos los demás componentes
+function getTotal() {
+  if (inicioLocal && activo.value) {
+    // Post-play inmediato: usar timestamp local hasta que la prop se actualice
+    const acum = props.tarea?.crono_acumulado_seg || 0
+    return acum + Math.max(0, Math.floor((Date.now() - inicioLocal.getTime()) / 1000))
   }
-  return total
+  return calcTotalSeg(props.tarea)
 }
 
-const totalSegundos = ref(0)
+const totalSegundos = ref(getTotal())
 const totalMinutos  = computed(() => Math.floor(totalSegundos.value / 60))
 
 function startInterval() {
   stopInterval()
-  totalSegundos.value = calcTotal()
+  totalSegundos.value = getTotal()
   interval = setInterval(() => {
-    totalSegundos.value = calcTotal()
+    totalSegundos.value = getTotal()
     emit('tick', totalSegundos.value)
   }, 1000)
 }
@@ -57,26 +51,17 @@ function stopInterval() {
 }
 
 onMounted(() => {
-  totalSegundos.value = calcTotal()
+  totalSegundos.value = getTotal()
   if (activo.value) startInterval()
   emit('tick', totalSegundos.value)
 })
 
-watch(() => props.cronometroActivo, val => {
-  activo.value = val
-  if (!val) inicioLocal = null
-  totalSegundos.value = calcTotal()
+watch(() => props.tarea?.crono_inicio, val => {
+  activo.value = !!val
+  if (val) inicioLocal = null  // prop actualizada, no necesito el local
+  totalSegundos.value = getTotal()
   if (val) startInterval()
   else stopInterval()
-})
-
-watch(() => props.acumuladoSeg, () => {
-  totalSegundos.value = calcTotal()
-})
-
-watch(() => props.cronometroInicio, val => {
-  if (val) inicioLocal = null  // prop actualizada, ya no necesito el local
-  totalSegundos.value = calcTotal()
 })
 
 onUnmounted(() => stopInterval())
@@ -84,9 +69,8 @@ onUnmounted(() => stopInterval())
 async function iniciar() {
   try {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/iniciar`, { method: 'POST' })
-    inicioLocal = new Date()  // usar timestamp local inmediatamente
+    inicioLocal = new Date()
     activo.value = true
-    totalSegundos.value = calcTotal()
     startInterval()
     emit('update', 'iniciado', data.tarea)
   } catch (e) { console.error(e) }
@@ -103,7 +87,7 @@ async function pausar() {
     const data = await api(`/api/gestion/tareas/${props.tareaId}/detener`, { method: 'POST' })
     activo.value = false
     inicioLocal = null
-    totalSegundos.value = data.tarea?.crono_acumulado_seg || calcTotal()
+    totalSegundos.value = data.tarea?.crono_acumulado_seg || getTotal()
     emit('tick', totalSegundos.value)
     emit('update', 'detenido', data.tarea)
   } catch (e) {
@@ -134,17 +118,10 @@ defineExpose({ iniciar, totalMinutos })
 </script>
 
 <style scoped>
-.crono-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+.crono-controls { display: flex; align-items: center; gap: 4px; }
 .crono-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--accent, #3b82f6);
-  animation: pulse 1s infinite;
-  flex-shrink: 0;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent, #3b82f6); animation: pulse 1s infinite; flex-shrink: 0;
 }
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -152,13 +129,9 @@ defineExpose({ iniciar, totalMinutos })
 }
 .crono-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: all 80ms;
+  width: 22px; height: 22px; border: 1px solid var(--border-subtle);
+  border-radius: 4px; background: transparent; cursor: pointer;
+  color: var(--text-secondary); transition: all 80ms;
 }
 .crono-btn:hover { background: var(--bg-hover); }
 .crono-btn.activo { border-color: var(--accent); color: var(--accent); }

@@ -1,0 +1,27 @@
+/**
+ * Función única para calcular los segundos totales del cronómetro de una tarea.
+ * Fuente de verdad: crono_acumulado_seg + (NOW - crono_inicio) si está corriendo.
+ * Se usa en TareaItem, TareaPanel y Cronometro — todos leen de aquí.
+ */
+
+function parseInicio(str) {
+  if (!str) return null
+  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
+  return new Date(str.replace(' ', 'T') + '-05:00')
+}
+
+export function calcTotalSeg(tarea) {
+  if (!tarea) return 0
+  let total = tarea.crono_acumulado_seg || 0
+  if (tarea.crono_inicio) {
+    const ini = parseInicio(tarea.crono_inicio)
+    if (ini) total += Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
+  }
+  return total
+}
+
+export function formatCrono(totalSeg) {
+  const m = Math.floor(totalSeg / 60)
+  const s = totalSeg % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
