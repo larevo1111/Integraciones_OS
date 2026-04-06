@@ -577,14 +577,16 @@ function actualizarTiempoReal(parte, val) {
 }
 
 function completar() {
-  const min = props.tarea.tiempo_real_min || 0
+  const totalSeg = calcTotalSeg(props.tarea)
+  const min = Math.floor(totalSeg / 60)
+  tiempoFinalH.value = Math.floor(min / 60)
+  tiempoFinalM.value = min % 60
   if (min > 0) {
-    // Ya tiene tiempo real → completar directo
+    // Tiene tiempo cronometrado → completar directo con ese tiempo
     confirmarCompletar()
     return
   }
-  tiempoFinalH.value = 0
-  tiempoFinalM.value = 0
+  // Sin tiempo → preguntar
   popoverTiempo.value = true
   setTimeout(() => popoverHRef.value?.focus(), 50)
 }

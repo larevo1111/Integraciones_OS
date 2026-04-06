@@ -507,6 +507,7 @@ import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
 import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
+import { calcTotalSeg }     from 'src/services/crono'
 
 const auth  = useAuthStore()
 const route  = useRoute()
@@ -1293,19 +1294,8 @@ const tiempoModal     = ref(null)   // { tarea } cuando está abierto
 const tiempoInput     = ref('')     // minutos ingresados por el usuario
 const tiempoInputRef  = ref(null)   // ref para hacer focus
 
-function _parseColombia(str) {
-  if (!str) return null
-  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
-  return new Date(str.replace(' ', 'T') + '-05:00')
-}
-
 function _minutosActuales(tarea) {
-  let min = tarea.tiempo_real_min || 0
-  if (tarea.cronometro_activo && tarea.cronometro_inicio) {
-    const ini = _parseColombia(tarea.cronometro_inicio)
-    if (ini) min += Math.max(0, Math.floor((Date.now() - ini.getTime()) / 60000))
-  }
-  return min
+  return Math.floor(calcTotalSeg(tarea) / 60)
 }
 
 async function cambiarEstado(tarea) {
