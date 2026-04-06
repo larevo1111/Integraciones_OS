@@ -8,6 +8,11 @@
     @touchmove.passive="onTouchMove"
     @touchcancel="onTouchEnd"
   >
+    <!-- Handle de arrastre (solo visible cuando drag habilitado) -->
+    <span v-if="dragHandle" class="drag-handle" @click.stop>
+      <span class="material-icons" style="font-size:14px">drag_indicator</span>
+    </span>
+
     <!-- Columna izquierda: estado + (badge 0/N + ↳) debajo -->
     <div class="estado-col">
       <EstadoBadge :estado="tarea.estado" @click="$emit('cambiar-estado', tarea)" />
@@ -135,7 +140,8 @@ const props = defineProps({
   usuarioActual:      { type: String, default: '' },
   expandida:          { type: Boolean, default: false },
   mostrarResponsable: { type: Boolean, default: false },
-  compacto:           { type: Boolean, default: false }   // modo móvil: chips y fecha cortos
+  compacto:           { type: Boolean, default: false },   // modo móvil: chips y fecha cortos
+  dragHandle:         { type: Boolean, default: false }    // mostrar handle de arrastre
 })
 
 const responsableIniciales = computed(() => {

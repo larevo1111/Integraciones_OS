@@ -452,6 +452,19 @@ body {
 .tarea-item:hover { background: var(--bg-row-hover); }
 .tarea-item.selected { background: var(--bg-row-selected); }
 .tarea-item.completada { opacity: 0.5; }
+.tarea-item.sortable-ghost { opacity: 0.3; background: var(--accent-muted); }
+.tarea-item.sortable-drag { background: var(--bg-card); box-shadow: var(--shadow-lg); }
+
+/* Handle de arrastre */
+.drag-handle {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-tertiary);
+  cursor: grab;
+  flex-shrink: 0;
+  padding: 2px 0;
+  touch-action: none;
+}
+.drag-handle:active { cursor: grabbing; color: var(--text-secondary); }
 
 /* Estado círculo (Linear style) */
 .estado-circle {
@@ -1244,6 +1257,14 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 .dropdown-item-teleport:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 .dropdown-item-teleport.active { color: var(--accent); }
+.dropdown-section-label {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 /* ─── QUICKADD (reutilizable) ─── */
 .quickadd-row {

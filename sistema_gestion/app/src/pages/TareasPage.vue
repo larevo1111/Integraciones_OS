@@ -42,22 +42,33 @@
             <span v-if="f.key === 'personalizado' && filtroPersonalizadoCount" class="chip-count">{{ filtroPersonalizadoCount }}</span>
           </button>
 
-          <!-- Agrupar por -->
+          <!-- Ordenar / Agrupar -->
           <div style="position:relative;margin-left:auto;flex-shrink:0" ref="btnAgruparWrap">
-            <button class="chip chip-agrupar" @click="toggleMenuAgrupar" ref="btnAgruparRef">
+            <button class="chip chip-agrupar" @click="toggleMenuOrdenar" ref="btnOrdenarRef">
               <span class="material-icons" style="font-size:13px">sort</span>
-              {{ AGRUPACIONES.find(a => a.key === agruparPor)?.label }}
               <span class="material-icons" style="font-size:13px">expand_more</span>
             </button>
             <Teleport to="body">
-              <div v-if="menuAgrupar" class="dropdown-backdrop" @click="menuAgrupar=false" />
-              <div v-if="menuAgrupar" class="dropdown-menu-teleport" :style="dropdownAgruparStyle" @mouseleave="menuAgrupar=false">
+              <div v-if="menuOrdenar" class="dropdown-backdrop" @click="menuOrdenar=false" />
+              <div v-if="menuOrdenar" class="dropdown-menu-teleport dropdown-ordenar" :style="dropdownOrdenarStyle">
+                <div class="dropdown-section-label">Ordenar por</div>
+                <div
+                  v-for="o in ORDENAMIENTOS"
+                  :key="o.key"
+                  class="dropdown-item-teleport"
+                  :class="{ active: ordenarPor === o.key }"
+                  @click="ordenarPor = o.key"
+                >
+                  <span class="material-icons" style="font-size:14px">{{ ordenarPor === o.key ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
+                  {{ o.label }}
+                </div>
+                <div class="dropdown-section-label" style="margin-top:8px">Agrupar por</div>
                 <div
                   v-for="ag in AGRUPACIONES"
                   :key="ag.key"
                   class="dropdown-item-teleport"
                   :class="{ active: agruparPor === ag.key }"
-                  @click="agruparPor = ag.key; menuAgrupar = false"
+                  @click="agruparPor = ag.key"
                 >
                   <span class="material-icons" style="font-size:14px">{{ agruparPor === ag.key ? 'radio_button_checked' : 'radio_button_unchecked' }}</span>
                   {{ ag.label }}
@@ -163,62 +174,65 @@
         </div>
 
         <template v-for="grupo in grupos" :key="grupo.key">
-          <div class="grupo-header">
+          <div v-if="!grupo.sinHeader" class="grupo-header">
             <div class="grupo-color-bar" :style="{ background: grupo.color }" />
             <span class="grupo-nombre">{{ grupo.nombre }}</span>
             <span class="grupo-count">{{ grupo.tareas.length }}</span>
           </div>
-          <template v-for="t in grupo.tareas" :key="t.id">
-            <TareaItem
-              :tarea="t"
-              :seleccionada="tareaSeleccionada?.id === t.id"
-              :seleccionada-multi="seleccionMultiIds.includes(t.id)"
-              :usuario-actual="auth.usuario?.email"
-              :expandida="!!subtareasExpandidas[t.id]"
-              :mostrar-responsable="!props.soloMias"
-              :compacto="isMobile"
-              @click="seleccionar"
-              @cambiar-estado="cambiarEstado"
-              @agregar-subtarea="iniciarSubtarea"
-              @toggle-subtareas="toggleSubtareas"
-              @editar-titulo="editarTituloInline"
-              @seleccionar-multi="onSeleccionarMulti"
-            />
-            <!-- Subtareas expandidas -->
-            <template v-if="subtareasExpandidas[t.id]">
+          <div class="grupo-tareas-list" :data-grupo="grupo.key">
+            <div v-for="t in grupo.tareas" :key="t.id" :data-id="t.id" class="sortable-tarea-wrap">
               <TareaItem
-                v-for="sub in subtareasData[t.id] || []"
-                :key="sub.id"
-                :tarea="sub"
-                :seleccionada="tareaSeleccionada?.id === sub.id"
-                :seleccionada-multi="seleccionMultiIds.includes(sub.id)"
+                :tarea="t"
+                :seleccionada="tareaSeleccionada?.id === t.id"
+                :seleccionada-multi="seleccionMultiIds.includes(t.id)"
                 :usuario-actual="auth.usuario?.email"
+                :expandida="!!subtareasExpandidas[t.id]"
                 :mostrar-responsable="!props.soloMias"
                 :compacto="isMobile"
+                :drag-handle="dragHabilitado"
                 @click="seleccionar"
                 @cambiar-estado="cambiarEstado"
+                @agregar-subtarea="iniciarSubtarea"
+                @toggle-subtareas="toggleSubtareas"
                 @editar-titulo="editarTituloInline"
                 @seleccionar-multi="onSeleccionarMulti"
               />
-              <!-- Inline quickadd para nueva subtarea -->
-              <form v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop @submit.prevent="guardarSubtarea(t)">
-                <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
-                <input
-                  ref="qaSubInputRef"
-                  v-model="qaSubTitulo"
-                  class="subtarea-input"
-                  placeholder="Nueva subtarea..."
-                  @keydown.escape="cancelarSubtarea"
+              <!-- Subtareas expandidas -->
+              <template v-if="subtareasExpandidas[t.id]">
+                <TareaItem
+                  v-for="sub in subtareasData[t.id] || []"
+                  :key="sub.id"
+                  :tarea="sub"
+                  :seleccionada="tareaSeleccionada?.id === sub.id"
+                  :seleccionada-multi="seleccionMultiIds.includes(sub.id)"
+                  :usuario-actual="auth.usuario?.email"
+                  :mostrar-responsable="!props.soloMias"
+                  :compacto="isMobile"
+                  @click="seleccionar"
+                  @cambiar-estado="cambiarEstado"
+                  @editar-titulo="editarTituloInline"
+                  @seleccionar-multi="onSeleccionarMulti"
                 />
-                <button type="submit" class="btn-sub-ok" :disabled="!qaSubTitulo.trim()" title="Agregar">
-                  <span class="material-icons" style="font-size:13px">check</span>
-                </button>
-                <button type="button" class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
-                  <span class="material-icons" style="font-size:13px">close</span>
-                </button>
-              </form>
-            </template>
-          </template>
+                <!-- Inline quickadd para nueva subtarea -->
+                <form v-if="qaSubtareaParentId === t.id" class="subtarea-quickadd" @click.stop @submit.prevent="guardarSubtarea(t)">
+                  <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
+                  <input
+                    ref="qaSubInputRef"
+                    v-model="qaSubTitulo"
+                    class="subtarea-input"
+                    placeholder="Nueva subtarea..."
+                    @keydown.escape="cancelarSubtarea"
+                  />
+                  <button type="submit" class="btn-sub-ok" :disabled="!qaSubTitulo.trim()" title="Agregar">
+                    <span class="material-icons" style="font-size:13px">check</span>
+                  </button>
+                  <button type="button" class="btn-sub-cancel" @click="cancelarSubtarea" title="Cancelar">
+                    <span class="material-icons" style="font-size:13px">close</span>
+                  </button>
+                </form>
+              </template>
+            </div>
+          </div>
         </template>
 
         <!-- Completadas al fondo (colapsables) -->
@@ -508,6 +522,7 @@ import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
 import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
 import { calcTotalSeg }     from 'src/services/crono'
+import Sortable             from 'sortablejs'
 
 const auth  = useAuthStore()
 const route  = useRoute()
@@ -605,17 +620,18 @@ function isoRelativo(dias) {
   d.setDate(d.getDate() + dias)
   return _localISO(d)
 }
-const menuAgrupar            = ref(false)
-const btnAgruparRef          = ref(null)
-const dropdownAgruparStyle   = ref({})
+const menuOrdenar            = ref(false)
+const btnOrdenarRef          = ref(null)
+const dropdownOrdenarStyle   = ref({})
 const filtroActivo      = ref('todas')
+const ordenarPor        = ref(localStorage.getItem('gestion_ordenar') || 'manual')
 const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
 
-function toggleMenuAgrupar() {
-  if (!menuAgrupar.value) {
-    const rect = btnAgruparRef.value?.getBoundingClientRect()
+function toggleMenuOrdenar() {
+  if (!menuOrdenar.value) {
+    const rect = btnOrdenarRef.value?.getBoundingClientRect()
     if (rect) {
-      dropdownAgruparStyle.value = {
+      dropdownOrdenarStyle.value = {
         position: 'fixed',
         top:  `${rect.bottom + 4}px`,
         right: `${window.innerWidth - rect.right}px`,
@@ -623,7 +639,7 @@ function toggleMenuAgrupar() {
       }
     }
   }
-  menuAgrupar.value = !menuAgrupar.value
+  menuOrdenar.value = !menuOrdenar.value
 }
 
 // Filtro por proyecto (desde query param)
@@ -846,8 +862,19 @@ function onCerrarFiltroPopup() {
   mostrarFiltroPopup.value = false
   if (!filtroPersonalizado.value) filtroActivo.value = 'todas'
 }
+const ORDENAMIENTOS = [
+  { key: 'manual',          label: 'Manual' },
+  { key: 'fecha_creacion',  label: 'Fecha creación' },
+  { key: 'fecha_estimada',  label: 'Fecha estimada' },
+  { key: 'prioridad',       label: 'Prioridad' },
+  { key: 'categoria',       label: 'Categoría' },
+  { key: 'proyecto',        label: 'Proyecto' },
+  { key: 'alfabetico',      label: 'Alfabético' }
+]
+
 const AGRUPACIONES = computed(() => {
   const base = [
+    { key: 'ninguno',     label: 'Sin agrupar' },
     { key: 'categoria',   label: 'Categoría' },
     { key: 'prioridad',   label: 'Prioridad' },
     { key: 'fecha',       label: 'Fecha' },
@@ -961,8 +988,82 @@ function calMesSig() { calMesOffset.value++ }
 function calIrHoy() { calMesOffset.value = 0; calFechaSel.value = hoyISO() }
 function calSelDia(iso) { calFechaSel.value = iso; cargarTareas() }
 
+// ── Drag & drop ───────────────────────────────────────────────
+const dragHabilitado = computed(() => ordenarPor.value === 'manual')
+let sortableInstances = []
+
+function initSortables() {
+  destroySortables()
+  if (!dragHabilitado.value) return
+  nextTick(() => {
+    const containers = document.querySelectorAll('.grupo-tareas-list')
+    containers.forEach(el => {
+      const s = Sortable.create(el, {
+        handle: '.drag-handle',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        delay: 150,
+        delayOnTouchOnly: true,
+        onEnd: async (evt) => {
+          const tareaId = Number(evt.item.dataset.id)
+          const children = [...evt.to.children]
+          const idx = children.indexOf(evt.item)
+          // Obtener orden de vecinos para calcular midpoint
+          const grupoKey = evt.to.dataset.grupo
+          const grupo = grupos.value.find(g => g.key == grupoKey)
+          if (!grupo) return
+          // Reconstruir lista con el nuevo orden del DOM
+          const idsEnDom = children.map(c => Number(c.dataset.id))
+          let ordenNuevo
+          if (idsEnDom.length === 1) {
+            ordenNuevo = 10000
+          } else if (idx === 0) {
+            // Primera posición: mayor que el siguiente
+            const sig = grupo.tareas.find(t => t.id === idsEnDom[1])
+            ordenNuevo = (sig?.orden || 10000) + 10000
+          } else if (idx === idsEnDom.length - 1) {
+            // Última posición: menor que el anterior
+            const ant = grupo.tareas.find(t => t.id === idsEnDom[idx - 1])
+            ordenNuevo = Math.max(1, Math.floor((ant?.orden || 10000) / 2))
+          } else {
+            // Medio: midpoint entre anterior y siguiente
+            const ant = grupo.tareas.find(t => t.id === idsEnDom[idx - 1])
+            const sig = grupo.tareas.find(t => t.id === idsEnDom[idx + 1])
+            ordenNuevo = Math.floor(((ant?.orden || 0) + (sig?.orden || 0)) / 2)
+          }
+          // Actualizar en BD
+          try {
+            await api(`/api/gestion/tareas/${tareaId}/reordenar`, {
+              method: 'PUT', body: JSON.stringify({ orden_nuevo: ordenNuevo })
+            })
+            // Actualizar localmente
+            const tarea = tareas.value.find(t => t.id === tareaId)
+            if (tarea) tarea.orden = ordenNuevo
+            // Rebalancear si gap muy pequeño
+            if (ordenNuevo < 2) {
+              await api('/api/gestion/tareas/rebalancear', { method: 'POST' })
+              await cargarTareas()
+            }
+          } catch (e) {
+            console.error('Error reordenar:', e)
+            await cargarTareas() // rollback visual
+          }
+        }
+      })
+      sortableInstances.push(s)
+    })
+  })
+}
+
+function destroySortables() {
+  sortableInstances.forEach(s => s.destroy())
+  sortableInstances = []
+}
+
 watch(tareaSeleccionada, (v, old) => { if (v && (!old || v.id !== old.id)) bsheetEstado.value = 'half' })
 watch(agruparPor, val => localStorage.setItem('gestion_agrupar', val))
+watch(ordenarPor, val => { localStorage.setItem('gestion_ordenar', val); nextTick(initSortables) })
 watch(filtroActivo, () => cargarTareas())
 watch(calMesOffset, () => { if (filtroActivo.value === 'calendario') cargarTareas() })
 watch(() => route.query.proyecto_id, () => cargarTareas())
@@ -977,47 +1078,40 @@ const COLORES_PRIORIDAD  = { Urgente: '#ef4444', Alta: '#f59e0b', Media: '#6b728
 const PRIORIDAD_IDX      = { Urgente: 0, Alta: 1, Media: 2, Baja: 3 }
 
 // Comparadores atómicos
+const cmpOrdenDesc  = (a, b) => (b.orden || 0) - (a.orden || 0)
+const cmpCreacion   = (a, b) => (b.fecha_creacion || '').localeCompare(a.fecha_creacion || '')
+const cmpFechaEst   = (a, b) => (a.fecha_limite || '9999-12-31').localeCompare(b.fecha_limite || '9999-12-31')
 const cmpPrioridad  = (a, b) => (PRIORIDAD_IDX[a.prioridad] ?? 2) - (PRIORIDAD_IDX[b.prioridad] ?? 2)
-const cmpFecha      = (a, b) => (a.fecha_limite || '9999-12-31').localeCompare(b.fecha_limite || '9999-12-31')
 const cmpCategoria  = (a, b) => (a.categoria_nombre || '').localeCompare(b.categoria_nombre || '')
 const cmpProyecto   = (a, b) => (a.proyecto_nombre || 'zzz').localeCompare(b.proyecto_nombre || 'zzz')
 const cmpResponsable = (a, b) => (a.responsable_nombre || a.responsable || '').localeCompare(b.responsable_nombre || b.responsable || '')
+const cmpAlfabetico = (a, b) => (a.titulo || '').localeCompare(b.titulo || '')
 
-function sortWithin(lista, ...cmps) {
-  return [...lista].sort((a, b) => {
-    for (const fn of cmps) {
-      const r = fn(a, b)
-      if (r !== 0) return r
-    }
-    return 0
-  })
+// Comparador principal según criterio de ordenamiento seleccionado
+function getCmpOrden() {
+  switch (ordenarPor.value) {
+    case 'manual':         return cmpOrdenDesc
+    case 'fecha_creacion': return cmpCreacion
+    case 'fecha_estimada': return cmpFechaEst
+    case 'prioridad':      return cmpPrioridad
+    case 'categoria':      return cmpCategoria
+    case 'proyecto':       return cmpProyecto
+    case 'alfabetico':     return cmpAlfabetico
+    default:               return cmpOrdenDesc
+  }
 }
 
-// Orden secundario según agrupación activa y vista
+// Ordena las tareas dentro de cada grupo según el criterio seleccionado
 function ordenSecundario(lista) {
-  if (!props.soloMias) {
-    // Vista Equipo
-    switch (agruparPor.value) {
-      case 'responsable': return sortWithin(lista, cmpCategoria, cmpProyecto)
-      case 'categoria':   return sortWithin(lista, cmpResponsable, cmpProyecto)
-      case 'proyecto':    return sortWithin(lista, cmpResponsable, cmpCategoria)
-      case 'prioridad':   return sortWithin(lista, cmpResponsable, cmpCategoria)
-      case 'fecha':       return sortWithin(lista, cmpResponsable, cmpCategoria)
-    }
-  } else {
-    // Vista Mis Tareas
-    switch (agruparPor.value) {
-      case 'categoria': return sortWithin(lista, cmpPrioridad, cmpFecha)
-      case 'prioridad': return sortWithin(lista, cmpFecha, cmpCategoria)
-      case 'fecha':     return sortWithin(lista, cmpPrioridad, cmpCategoria)
-      case 'proyecto':  return sortWithin(lista, cmpPrioridad, cmpFecha)
-    }
-  }
-  return lista
+  const cmp = getCmpOrden()
+  return [...lista].sort(cmp)
 }
 
 const grupos = computed(() => {
   if (!tareas.value.length) return []
+  if (agruparPor.value === 'ninguno') {
+    return [{ key: '_all', nombre: '', color: 'transparent', tareas: ordenSecundario(tareas.value), sinHeader: true }]
+  }
   if (agruparPor.value === 'categoria') {
     const map = {}
     tareas.value.forEach(t => {
@@ -1133,6 +1227,7 @@ async function cargarTareas() {
     ])
     tareas.value      = dataTareas.tareas || []
     completadas.value = dataCompletadas.tareas || []
+    nextTick(initSortables)
   } catch (e) { console.error(e) } finally { cargando.value = false }
 }
 
@@ -1418,6 +1513,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('click', onDocumentClick, true)
+  destroySortables()
 })
 </script>
 

@@ -510,7 +510,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
         t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
         t.fecha_inicio_real, t.fecha_fin_real,
         t.id_op, t.id_remision, t.id_pedido, t.tiempo_real_min, t.tiempo_estimado_min, t.notas,
-        t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
+        t.orden, t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
         -- ¿Hay cronómetro corriendo?
         (t.crono_inicio IS NOT NULL) AS cronometro_activo,
         t.crono_inicio AS cronometro_inicio,
@@ -527,10 +527,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
       JOIN g_categorias c ON c.id = t.categoria_id
       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
       WHERE ${where.join(' AND ')}
-      ORDER BY
-        FIELD(t.prioridad, 'Urgente', 'Alta', 'Media', 'Baja'),
-        t.fecha_limite ASC,
-        t.fecha_creacion DESC
+      ORDER BY t.orden DESC
     `, params)
 
     // Parsear etiquetas_json
@@ -730,12 +727,16 @@ app.post('/api/gestion/tareas', async (req, res) => {
   const respPrincipal = listaResps[0]
 
   try {
+    // Calcular orden: MAX(orden) + 10000 para que la nueva aparezca primero
+    const [[{ maxOrden }]] = await db.gestion.query('SELECT COALESCE(MAX(orden), 0) AS maxOrden FROM g_tareas WHERE empresa = ?', [req.empresa])
+    const nuevoOrden = maxOrden + 10000
+
     const [result] = await db.gestion.query(`
       INSERT INTO g_tareas
         (empresa, parent_id, titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
          fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-         tiempo_estimado_min, id_op, id_remision, id_pedido, notas, usuario_creador, usuario_ult_modificacion)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         tiempo_estimado_min, id_op, id_remision, id_pedido, notas, orden, usuario_creador, usuario_ult_modificacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       req.empresa, parent_id || null,
       titulo, descripcion || null, categoria_id,
@@ -746,7 +747,7 @@ app.post('/api/gestion/tareas', async (req, res) => {
       fecha_inicio_estimada || fecha_limite || null,
       fecha_fin_estimada    || fecha_limite || null,
       tiempo_estimado_min || null,
-      id_op || null, id_remision || null, id_pedido || null, notas || null,
+      id_op || null, id_remision || null, id_pedido || null, notas || null, nuevoOrden,
       req.usuario.email, req.usuario.email
     ])
 
@@ -942,6 +943,35 @@ app.delete('/api/gestion/tareas/:id', async (req, res) => {
 
 // ── Cronómetro simplificado ──────────────────────────────────────
 // Solo 2 campos en g_tareas: crono_inicio (DATETIME) y crono_acumulado_seg (INT)
+// PUT /api/gestion/tareas/:id/reordenar — Mover tarea a nueva posición (drag & drop)
+app.put('/api/gestion/tareas/:id/reordenar', async (req, res) => {
+  const tareaId = req.params.id
+  const { orden_nuevo } = req.body
+  if (orden_nuevo === undefined) return res.status(400).json({ error: 'Falta orden_nuevo' })
+  try {
+    await db.gestion.query('UPDATE g_tareas SET orden = ?, usuario_ult_modificacion = ? WHERE id = ? AND empresa = ?',
+      [orden_nuevo, req.usuario.email, tareaId, req.empresa])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/tareas/rebalancear — Recalcular todos los valores de orden con gaps frescos
+app.post('/api/gestion/tareas/rebalancear', async (req, res) => {
+  try {
+    await db.gestion.query(`
+      SET @i = 0;
+      UPDATE g_tareas SET orden = (@i := @i + 10000) WHERE empresa = ? ORDER BY orden ASC
+    `, [req.empresa])
+    // Si el SET @i falla en prepared statement, hacemos update manual
+    const [tareas] = await db.gestion.query(
+      'SELECT id FROM g_tareas WHERE empresa = ? ORDER BY orden ASC', [req.empresa])
+    for (let i = 0; i < tareas.length; i++) {
+      await db.gestion.query('UPDATE g_tareas SET orden = ? WHERE id = ?', [(i + 1) * 10000, tareas[i].id])
+    }
+    res.json({ ok: true, total: tareas.length })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // Play: crono_inicio = NOW()
 // Pausa: crono_acumulado_seg += TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), crono_inicio = NULL
 // Reiniciar: crono_acumulado_seg = 0, crono_inicio = NULL
