@@ -47,19 +47,34 @@
               </div>
             </div>
 
-            <!-- Fila: Tiempos -->
+            <!-- Fila: Tiempos usuario -->
             <div class="row-3col" style="margin-top:10px">
               <div class="field">
-                <span class="field-label">T. Laborado</span>
-                <span class="field-val td-laborado">{{ formatMins(jornada.tiempo_laborado_min) }}</span>
+                <span class="field-label">T. Laborado (usr)</span>
+                <span class="field-val td-laborado">{{ formatMins(jornada.tiempo_laborado_usr) }}</span>
               </div>
               <div class="field">
-                <span class="field-label">T. Total</span>
-                <span class="field-val">{{ formatMins(jornada.tiempo_total_min) }}</span>
+                <span class="field-label">T. Total (usr)</span>
+                <span class="field-val">{{ formatMins(jornada.tiempo_total_usr) }}</span>
               </div>
               <div class="field">
-                <span class="field-label">T. Pausas</span>
-                <span class="field-val td-pausa">{{ formatMins(jornada.tiempo_pausa_min) }}</span>
+                <span class="field-label">T. Pausas (usr)</span>
+                <span class="field-val td-pausa">{{ formatMins(jornada.tiempo_pausa_usr) }}</span>
+              </div>
+            </div>
+            <!-- Fila: Tiempos sistema -->
+            <div class="row-3col" style="margin-top:6px">
+              <div class="field">
+                <span class="field-label">T. Laborado (sys)</span>
+                <span class="field-val td-laborado">{{ formatMins(jornada.tiempo_laborado_sys) }}</span>
+              </div>
+              <div class="field">
+                <span class="field-label">T. Total (sys)</span>
+                <span class="field-val">{{ formatMins(jornada.tiempo_total_sys) }}</span>
+              </div>
+              <div class="field">
+                <span class="field-label">T. Pausas (sys)</span>
+                <span class="field-val td-pausa">{{ formatMins(jornada.tiempo_pausa_sys) }}</span>
               </div>
             </div>
 

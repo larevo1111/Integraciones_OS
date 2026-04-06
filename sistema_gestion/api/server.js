@@ -2145,7 +2145,7 @@ app.put('/api/gestion/jornadas/:id/reabrir', requireAuth, async (req, res) => {
 })
 
 // GET /api/gestion/jornadas/equipo — jornadas de hoy para TODOS los usuarios (admin)
-// Incluye cálculos: tiempo_total_min, tiempo_pausa_min, tiempo_laborado_min
+// Incluye cálculos: tiempo_*_usr (horas usuario), tiempo_*_sys (horas registro real)
 app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
   try {
     const hoy   = localDateCO()
@@ -2159,12 +2159,21 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
         COALESCE(
           SUM(CASE WHEN p.hora_fin IS NOT NULL
             THEN TIMESTAMPDIFF(MINUTE, p.hora_inicio, p.hora_fin) ELSE 0 END), 0
-        ) AS tiempo_pausa_min,
+        ) AS tiempo_pausa_usr,
         CASE
           WHEN j.hora_fin IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, j.hora_fin)
-          WHEN j.hora_inicio IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, UTC_TIMESTAMP())
+          WHEN j.hora_inicio IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio, NOW())
           ELSE 0
-        END AS tiempo_total_min
+        END AS tiempo_total_usr,
+        COALESCE(
+          SUM(CASE WHEN p.hora_fin_registro IS NOT NULL
+            THEN TIMESTAMPDIFF(MINUTE, p.hora_inicio_registro, p.hora_fin_registro) ELSE 0 END), 0
+        ) AS tiempo_pausa_sys,
+        CASE
+          WHEN j.hora_fin_registro IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio_registro, j.hora_fin_registro)
+          WHEN j.hora_inicio_registro IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, j.hora_inicio_registro, NOW())
+          ELSE 0
+        END AS tiempo_total_sys
       FROM g_jornadas j
       LEFT JOIN g_jornada_pausas p ON p.jornada_id = j.id
       WHERE j.empresa = ? AND j.fecha BETWEEN ? AND ?
@@ -2187,9 +2196,10 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
       })
     }
 
-    // tiempo_laborado = total - pausas
+    // tiempo_laborado = total - pausas (usr y sys)
     jornadas.forEach(j => {
-      j.tiempo_laborado_min = Math.max(0, (j.tiempo_total_min || 0) - (j.tiempo_pausa_min || 0))
+      j.tiempo_laborado_usr = Math.max(0, (j.tiempo_total_usr || 0) - (j.tiempo_pausa_usr || 0))
+      j.tiempo_laborado_sys = Math.max(0, (j.tiempo_total_sys || 0) - (j.tiempo_pausa_sys || 0))
     })
 
     // Cargar pausas de todas las jornadas del rango

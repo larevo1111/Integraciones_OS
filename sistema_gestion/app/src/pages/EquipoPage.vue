@@ -50,14 +50,23 @@
         <template #cell-hora_fin="{ row }">
           <span class="td-mono">{{ formatHora(row.hora_fin) }}</span>
         </template>
-        <template #cell-tiempo_total_min="{ row }">
-          <span class="td-mono">{{ formatMins(row.tiempo_total_min) }}</span>
+        <template #cell-tiempo_total_usr="{ row }">
+          <span class="td-mono">{{ formatMins(row.tiempo_total_usr) }}</span>
         </template>
-        <template #cell-tiempo_pausa_min="{ row }">
-          <span class="td-mono td-pausa">{{ formatMins(row.tiempo_pausa_min) }}</span>
+        <template #cell-tiempo_pausa_usr="{ row }">
+          <span class="td-mono td-pausa">{{ formatMins(row.tiempo_pausa_usr) }}</span>
         </template>
-        <template #cell-tiempo_laborado_min="{ row }">
-          <span class="td-mono td-laborado">{{ formatMins(row.tiempo_laborado_min) }}</span>
+        <template #cell-tiempo_laborado_usr="{ row }">
+          <span class="td-mono td-laborado">{{ formatMins(row.tiempo_laborado_usr) }}</span>
+        </template>
+        <template #cell-tiempo_total_sys="{ row }">
+          <span class="td-mono">{{ formatMins(row.tiempo_total_sys) }}</span>
+        </template>
+        <template #cell-tiempo_pausa_sys="{ row }">
+          <span class="td-mono td-pausa">{{ formatMins(row.tiempo_pausa_sys) }}</span>
+        </template>
+        <template #cell-tiempo_laborado_sys="{ row }">
+          <span class="td-mono td-laborado">{{ formatMins(row.tiempo_laborado_sys) }}</span>
         </template>
         <template #cell-estado="{ row }">
           <span class="badge" :class="badgeClass(row)">{{ estadoLabel(row) }}</span>
@@ -154,9 +163,12 @@ const columnas = [
   { key: 'fecha',              label: 'Fecha',          visible: false },
   { key: 'hora_inicio',        label: 'Inicio',         visible: true,  width: '120px' },
   { key: 'hora_fin',           label: 'Fin',            visible: true,  width: '120px' },
-  { key: 'tiempo_total_min',   label: 'T. Total',       visible: true  },
-  { key: 'tiempo_pausa_min',   label: 'T. Pausas',      visible: true  },
-  { key: 'tiempo_laborado_min',label: 'T. Laborado',    visible: true  },
+  { key: 'tiempo_total_usr',    label: 'T. Total (usr)',    visible: true  },
+  { key: 'tiempo_pausa_usr',   label: 'T. Pausas (usr)',   visible: true  },
+  { key: 'tiempo_laborado_usr',label: 'T. Laborado (usr)', visible: true  },
+  { key: 'tiempo_total_sys',    label: 'T. Total (sys)',    visible: false },
+  { key: 'tiempo_pausa_sys',   label: 'T. Pausas (sys)',   visible: false },
+  { key: 'tiempo_laborado_sys',label: 'T. Laborado (sys)', visible: false },
   { key: 'estado',             label: 'Estado',          visible: true,  filterType: 'select' },
   { key: 'tareas_count',       label: 'Tareas',          visible: true  },
   { key: 'dur_tareas_real',    label: 'Dur. sistema',     visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de cada tarea (calculado automáticamente)' },

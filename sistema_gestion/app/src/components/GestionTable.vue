@@ -362,7 +362,7 @@ function aggIcon(t) { return { sum:'Σ', avg:'x̄', max:'↑', min:'↓' }[t] ||
 
 // ── Numérico ──────────────────────────────────────────
 function isNumericCol(key) {
-  const numKeys = ['tiempo_total_min','tiempo_pausa_min','tiempo_laborado_min','num_pausas']
+  const numKeys = ['tiempo_total_usr','tiempo_pausa_usr','tiempo_laborado_usr','tiempo_total_sys','tiempo_pausa_sys','tiempo_laborado_sys','num_pausas']
   if (numKeys.includes(key)) return true
   const sample = props.rows.slice(0, 5)
   if (!sample.length) return false
