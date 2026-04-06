@@ -592,13 +592,13 @@ function onPullStart(e) {
 function onPullMove(e) {
   if (!pulling || pageBodyRef.value?.scrollTop > 0) { pulling = false; pullY.value = 0; return }
   const diff = e.touches[0].clientY - pullStartY
-  if (diff > 0) pullY.value = diff * 0.4
+  if (diff > 0) pullY.value = diff * 0.2
   else { pulling = false; pullY.value = 0 }
 }
 function onPullEnd() {
   if (!pulling) return
   pulling = false
-  if (pullY.value >= 50) {
+  if (pullY.value >= 100) {
     pullRefreshing.value = true
     pullY.value = 50
     setTimeout(() => {
