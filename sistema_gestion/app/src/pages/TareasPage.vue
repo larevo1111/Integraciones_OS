@@ -637,7 +637,12 @@ const etiquetaFiltro   = computed(() => etiquetas.value.find(e => e.id === etiqu
 const defaultsFromFilters = computed(() => {
   const d = {}
   // Filtros globales (query params)
-  if (proyectoFiltroId.value) d.proyecto_id = proyectoFiltroId.value
+  if (proyectoFiltroId.value) {
+    d.proyecto_id = proyectoFiltroId.value
+    // Heredar categoría del proyecto si tiene
+    const proy = proyectos.value.find(p => p.id === proyectoFiltroId.value)
+    if (proy?.categoria_id) d.categoria_id = proy.categoria_id
+  }
   if (etiquetaFiltroId.value) d.etiquetas = [etiquetaFiltroId.value]
   // Filtros de tiempo → fecha_limite
   const f = filtroActivo.value

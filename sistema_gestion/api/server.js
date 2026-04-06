@@ -512,8 +512,9 @@ app.get('/api/gestion/tareas', async (req, res) => {
         t.id_op, t.id_remision, t.id_pedido, t.tiempo_real_min, t.tiempo_estimado_min, t.notas,
         t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
         -- ¿Hay cronómetro corriendo?
-        (SELECT COUNT(*) FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL) AS cronometro_activo,
-        (SELECT tt.inicio FROM g_tarea_tiempo tt WHERE tt.tarea_id = t.id AND tt.fin IS NULL LIMIT 1) AS cronometro_inicio,
+        (t.crono_inicio IS NOT NULL) AS cronometro_activo,
+        t.crono_inicio AS cronometro_inicio,
+        t.crono_acumulado_seg,
         -- Conteo subtareas
         (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id) AS subtareas_total,
         (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id AND s.estado IN ('Completada','Cancelada')) AS subtareas_completadas,
@@ -829,28 +830,31 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
         params
       )
 
-      // Cerrar cronómetro de la tarea si se completa/cancela
+      // Detener cronómetro si se completa/cancela
       if (estado === 'Completada' || estado === 'Cancelada') {
         await db.gestion.query(
-          `UPDATE g_tarea_tiempo SET fin = NOW(), duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, NOW()) / 60)
-           WHERE tarea_id = ? AND fin IS NULL`,
+          `UPDATE g_tareas SET
+           crono_acumulado_seg = crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0),
+           crono_inicio = NULL,
+           tiempo_real_min = FLOOR((crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0)) / 60)
+           WHERE id = ? AND crono_inicio IS NOT NULL`,
           [req.params.id]
         )
       }
 
       // Cascada a subtareas cuando cambia estado del padre
       if (estado === 'Completada') {
-        // Cerrar cronómetros de subtareas antes de completarlas
+        // Detener cronómetros de subtareas + completarlas
         await db.gestion.query(
-          `UPDATE g_tarea_tiempo tt
-           JOIN g_tareas t ON t.id = tt.tarea_id
-           SET tt.fin = NOW(), tt.duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, tt.inicio, NOW()) / 60)
-           WHERE t.parent_id = ? AND t.empresa = ? AND t.estado NOT IN ('Completada','Cancelada') AND tt.fin IS NULL`,
-          [req.params.id, req.empresa]
-        )
-        await db.gestion.query(
-          `UPDATE g_tareas SET estado='Completada', fecha_inicio_real=COALESCE(fecha_inicio_real, NOW()), fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
-           WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+          `UPDATE g_tareas SET
+           crono_acumulado_seg = crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0),
+           crono_inicio = NULL,
+           tiempo_real_min = FLOOR((crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0)) / 60),
+           estado = 'Completada',
+           fecha_inicio_real = COALESCE(fecha_inicio_real, NOW()),
+           fecha_fin_real = COALESCE(fecha_fin_real, NOW()),
+           usuario_ult_modificacion = ?
+           WHERE parent_id = ? AND empresa = ? AND estado NOT IN ('Completada','Cancelada')`,
           [req.usuario.email, req.params.id, req.empresa]
         )
       } else if (estado === 'Cancelada') {
@@ -929,76 +933,68 @@ app.delete('/api/gestion/tareas/:id', async (req, res) => {
 
 // ─── CRONÓMETRO ───────────────────────────────────────────────────
 
-// POST /api/gestion/tareas/:id/iniciar
+// ── Cronómetro simplificado ──────────────────────────────────────
+// Solo 2 campos en g_tareas: crono_inicio (DATETIME) y crono_acumulado_seg (INT)
+// Play: crono_inicio = NOW()
+// Pausa: crono_acumulado_seg += TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), crono_inicio = NULL
+// Reiniciar: crono_acumulado_seg = 0, crono_inicio = NULL
+// Tiempo actual = crono_acumulado_seg + (si corriendo: NOW() - crono_inicio)
+
+// POST /api/gestion/tareas/:id/iniciar — Play
 app.post('/api/gestion/tareas/:id/iniciar', async (req, res) => {
   const tareaId = req.params.id
   try {
-    // Verificar que la tarea existe y pertenece a la empresa
     const [[tarea]] = await db.gestion.query(
-      'SELECT id, estado FROM g_tareas WHERE id = ? AND empresa = ?',
+      'SELECT id, estado, crono_inicio FROM g_tareas WHERE id = ? AND empresa = ?',
       [tareaId, req.empresa]
     )
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (tarea.crono_inicio) return res.json({ ok: true, mensaje: 'Ya está corriendo' })
 
-    // Cerrar cualquier cronómetro abierto (seguridad) — new Date() → Colombia time vía timezone:'local'
-    const ahoraIniciar = new Date()
-    await db.gestion.query(`
-      UPDATE g_tarea_tiempo
-      SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
-      WHERE tarea_id = ? AND fin IS NULL
-    `, [ahoraIniciar, ahoraIniciar, tareaId])
-
-    // Iniciar nuevo registro
-    const [result] = await db.gestion.query(
-      'INSERT INTO g_tarea_tiempo (tarea_id, usuario, inicio) VALUES (?, ?, ?)',
-      [tareaId, req.usuario.email, ahoraIniciar]
-    )
-
-    // Actualizar estado a En Progreso
     await db.gestion.query(
-      "UPDATE g_tareas SET estado = 'En Progreso', usuario_ult_modificacion = ? WHERE id = ?",
+      `UPDATE g_tareas SET crono_inicio = NOW(), estado = 'En Progreso',
+       fecha_inicio_real = COALESCE(fecha_inicio_real, NOW()),
+       usuario_ult_modificacion = ? WHERE id = ?`,
       [req.usuario.email, tareaId]
     )
 
-    const [[tiempo]] = await db.gestion.query(
-      'SELECT * FROM g_tarea_tiempo WHERE id = ?', [result.insertId]
-    )
-    res.json({ ok: true, tiempo })
+    const [[actualizada]] = await db.gestion.query('SELECT * FROM g_tareas WHERE id = ?', [tareaId])
+    res.json({ ok: true, tarea: actualizada })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
 })
 
-// POST /api/gestion/tareas/:id/detener
+// POST /api/gestion/tareas/:id/detener — Pausa
 app.post('/api/gestion/tareas/:id/detener', async (req, res) => {
   const tareaId = req.params.id
   try {
-    // Cerrar registro abierto — new Date() → Colombia time vía timezone:'local'
-    const ahoraDetener = new Date()
-    await db.gestion.query(`
-      UPDATE g_tarea_tiempo
-      SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
-      WHERE tarea_id = ? AND fin IS NULL
-    `, [ahoraDetener, ahoraDetener, tareaId])
-
-    // Recalcular tiempo_real_min total
-    const [[{ total }]] = await db.gestion.query(
-      'SELECT COALESCE(SUM(duracion_min), 0) AS total FROM g_tarea_tiempo WHERE tarea_id = ?',
-      [tareaId]
+    const [[tarea]] = await db.gestion.query(
+      'SELECT id, crono_inicio, crono_acumulado_seg FROM g_tareas WHERE id = ? AND empresa = ?',
+      [tareaId, req.empresa]
     )
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tarea.crono_inicio) return res.json({ ok: true, mensaje: 'No está corriendo' })
 
+    // Sumar segundos de este intervalo al acumulado, limpiar inicio
     await db.gestion.query(
-      "UPDATE g_tareas SET estado = 'Pendiente', tiempo_real_min = ?, usuario_ult_modificacion = ? WHERE id = ?",
-      [total, req.usuario.email, tareaId]
+      `UPDATE g_tareas SET
+       crono_acumulado_seg = crono_acumulado_seg + TIMESTAMPDIFF(SECOND, crono_inicio, NOW()),
+       crono_inicio = NULL,
+       tiempo_real_min = FLOOR((crono_acumulado_seg + TIMESTAMPDIFF(SECOND, crono_inicio, NOW())) / 60),
+       usuario_ult_modificacion = ?
+       WHERE id = ?`,
+      [req.usuario.email, tareaId]
     )
 
-    res.json({ ok: true, tiempo_real_min: total })
+    const [[actualizada]] = await db.gestion.query('SELECT * FROM g_tareas WHERE id = ?', [tareaId])
+    res.json({ ok: true, tarea: actualizada, tiempo_real_min: actualizada.tiempo_real_min })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
 })
 
-// POST /api/gestion/tareas/:id/reiniciar-tiempo
+// POST /api/gestion/tareas/:id/reiniciar-tiempo — Reset a 0
 app.post('/api/gestion/tareas/:id/reiniciar-tiempo', async (req, res) => {
   const tareaId = req.params.id
   try {
@@ -1006,15 +1002,10 @@ app.post('/api/gestion/tareas/:id/reiniciar-tiempo', async (req, res) => {
       'SELECT id FROM g_tareas WHERE id = ? AND empresa = ?', [tareaId, req.empresa]
     )
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
-    // Cerrar timer abierto si existe
+
     await db.gestion.query(
-      'UPDATE g_tarea_tiempo SET fin = ? WHERE tarea_id = ? AND fin IS NULL', [new Date(), tareaId]
-    )
-    // Eliminar todos los registros de tiempo de esta tarea
-    await db.gestion.query('DELETE FROM g_tarea_tiempo WHERE tarea_id = ?', [tareaId])
-    // Resetear tiempo_real_min a 0
-    await db.gestion.query(
-      'UPDATE g_tareas SET tiempo_real_min = 0, usuario_ult_modificacion = ? WHERE id = ?',
+      `UPDATE g_tareas SET crono_inicio = NULL, crono_acumulado_seg = 0,
+       tiempo_real_min = 0, usuario_ult_modificacion = ? WHERE id = ?`,
       [req.usuario.email, tareaId]
     )
     res.json({ ok: true, tiempo_real_min: 0 })
@@ -1030,23 +1021,22 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
   const { tiempo_real_min: tiempoManual } = req.body
 
   try {
-    // Cerrar cronómetro si estaba corriendo
-    const ahoraCompletar = new Date()
-    await db.gestion.query(`
-      UPDATE g_tarea_tiempo
-      SET fin = ?, duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, inicio, ?) / 60)
-      WHERE tarea_id = ? AND fin IS NULL
-    `, [ahoraCompletar, ahoraCompletar, tareaId])
+    // Si cronómetro estaba corriendo, sumar al acumulado y detener
+    await db.gestion.query(
+      `UPDATE g_tareas SET
+       crono_acumulado_seg = crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0),
+       crono_inicio = NULL
+       WHERE id = ? AND empresa = ? AND crono_inicio IS NOT NULL`,
+      [tareaId, req.empresa]
+    )
 
-    // Calcular tiempo total (o usar el manual si se proveyó)
-    let tiempoFinal = tiempoManual
-    if (tiempoFinal === undefined || tiempoFinal === null) {
-      const [[{ total }]] = await db.gestion.query(
-        'SELECT COALESCE(SUM(duracion_min), 0) AS total FROM g_tarea_tiempo WHERE tarea_id = ?',
-        [tareaId]
-      )
-      tiempoFinal = total
-    }
+    // Calcular tiempo final: manual o desde acumulado
+    const [[{ acum }]] = await db.gestion.query(
+      'SELECT crono_acumulado_seg AS acum FROM g_tareas WHERE id = ?', [tareaId]
+    )
+    const tiempoFinal = (tiempoManual !== undefined && tiempoManual !== null)
+      ? tiempoManual
+      : Math.floor((acum || 0) / 60)
 
     await db.gestion.query(`
       UPDATE g_tareas
@@ -1058,17 +1048,17 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
       WHERE id = ? AND empresa = ?
     `, [tiempoFinal, req.usuario.email, tareaId, req.empresa])
 
-    // Cascada: cerrar cronómetros + completar subtareas pendientes/en progreso
+    // Cascada: detener cronómetros + completar subtareas pendientes
     await db.gestion.query(
-      `UPDATE g_tarea_tiempo tt
-       JOIN g_tareas t ON t.id = tt.tarea_id
-       SET tt.fin = NOW(), tt.duracion_min = FLOOR(TIMESTAMPDIFF(SECOND, tt.inicio, NOW()) / 60)
-       WHERE t.parent_id = ? AND t.empresa = ? AND t.estado NOT IN ('Completada','Cancelada') AND tt.fin IS NULL`,
-      [tareaId, req.empresa]
-    )
-    await db.gestion.query(
-      `UPDATE g_tareas SET estado='Completada', fecha_inicio_real=COALESCE(fecha_inicio_real, NOW()), fecha_fin_real=COALESCE(fecha_fin_real, NOW()), usuario_ult_modificacion=?
-       WHERE parent_id=? AND empresa=? AND estado NOT IN ('Completada','Cancelada')`,
+      `UPDATE g_tareas SET
+       crono_acumulado_seg = crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0),
+       crono_inicio = NULL,
+       estado = 'Completada',
+       tiempo_real_min = FLOOR((crono_acumulado_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0)) / 60),
+       fecha_inicio_real = COALESCE(fecha_inicio_real, NOW()),
+       fecha_fin_real = COALESCE(fecha_fin_real, NOW()),
+       usuario_ult_modificacion = ?
+       WHERE parent_id = ? AND empresa = ? AND estado NOT IN ('Completada','Cancelada')`,
       [req.usuario.email, tareaId, req.empresa]
     )
 

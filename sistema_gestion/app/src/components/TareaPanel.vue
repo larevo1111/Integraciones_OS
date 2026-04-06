@@ -163,7 +163,7 @@
           <Cronometro
             ref="cronometroRef"
             :tarea-id="tarea.id"
-            :tiempo-base="tarea.tiempo_real_min"
+            :acumulado-seg="tarea.crono_acumulado_seg || 0"
             :cronometro-activo="!!tarea.cronometro_activo"
             :cronometro-inicio="tarea.cronometro_inicio"
             @update="onCronometroUpdate"
@@ -542,13 +542,19 @@ function actualizarTiempoEst(parte, val) {
   actualizar('tiempo_estimado_min', h*60+m)
 }
 
-function onCronometroUpdate(evento, dato) {
+function onCronometroUpdate(evento, tareaData) {
   if (evento === 'detenido') {
-    // dato = tiempo_real_min (número) — /detener ya guardó en DB
-    emit('actualizada', { ...props.tarea, cronometro_activo: 0, tiempo_real_min: dato })
+    if (tareaData) {
+      emit('actualizada', { ...props.tarea, ...tareaData, cronometro_activo: 0, crono_inicio: null })
+    } else {
+      // Reiniciar — dato es null
+      emit('actualizada', { ...props.tarea, cronometro_activo: 0, crono_inicio: null, crono_acumulado_seg: 0, tiempo_real_min: 0 })
+    }
   } else {
-    // dato = cronometro_inicio ISO string (para que TareaItem muestre bien el tiempo)
-    emit('actualizada', { ...props.tarea, cronometro_activo: 1, cronometro_inicio: dato })
+    // Iniciado — tareaData es la tarea actualizada del backend
+    if (tareaData) {
+      emit('actualizada', { ...props.tarea, ...tareaData, cronometro_activo: 1 })
+    }
   }
 }
 

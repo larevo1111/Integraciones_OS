@@ -294,11 +294,11 @@ function parseInicio(str) {
 
 function calcularTiempo() {
   if (!props.tarea.cronometro_activo || !props.tarea.cronometro_inicio) return
-  const ini   = parseInicio(props.tarea.cronometro_inicio)
+  const ini = parseInicio(props.tarea.cronometro_inicio)
   if (!ini) return
-  const base  = (props.tarea.tiempo_real_min || 0) * 60
+  const acum  = props.tarea.crono_acumulado_seg || 0
   const extra = Math.max(0, Math.floor((Date.now() - ini.getTime()) / 1000))
-  const total = base + extra
+  const total = acum + extra
   const m = Math.floor(total / 60)
   const s = total % 60
   tiempoCronometro.value = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
