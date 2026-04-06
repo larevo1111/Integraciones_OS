@@ -585,7 +585,7 @@ let pullStartY       = 0
 let pulling          = false
 
 function onPullStart(e) {
-  if (window.__dragActivo || pageBodyRef.value?.scrollTop > 0) return
+  if (e.target.closest('.drag-handle') || pageBodyRef.value?.scrollTop > 0) return
   pullStartY = e.touches[0].clientY
   pulling = true
 }

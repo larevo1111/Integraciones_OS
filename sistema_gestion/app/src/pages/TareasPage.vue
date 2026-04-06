@@ -1005,9 +1005,7 @@ function initSortables() {
         dragClass: 'sortable-drag',
         delay: 150,
         delayOnTouchOnly: true,
-        onStart: () => { window.__dragActivo = true },
         onEnd: async (evt) => {
-          window.__dragActivo = false
           const tareaId = Number(evt.item.dataset.id)
           const children = [...evt.to.children]
           const idx = children.indexOf(evt.item)
