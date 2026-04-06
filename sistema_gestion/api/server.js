@@ -797,13 +797,20 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     if (estado           !== undefined) {
       sets.push('estado = ?')
       params.push(estado)
-      // Auto-fechas reales según cambio de estado
+      // Auto-fechas reales y cronómetro según cambio de estado
       if (estado === 'En Progreso') {
-        sets.push('fecha_inicio_real = NOW()')  // Opción B: siempre actualiza
+        sets.push('fecha_inicio_real = COALESCE(fecha_inicio_real, NOW())')
+        sets.push('crono_inicio = COALESCE(crono_inicio, NOW())')
       }
       if (estado === 'Completada') {
         sets.push('fecha_inicio_real = COALESCE(fecha_inicio_real, NOW())')
         sets.push('fecha_fin_real = COALESCE(fecha_fin_real, NOW())')
+      }
+      if (estado === 'Pendiente') {
+        // Reiniciar cronómetro al volver a Pendiente
+        sets.push('crono_inicio = NULL')
+        sets.push('crono_acumulado_seg = 0')
+        sets.push('tiempo_real_min = 0')
       }
     }
     if (prioridad        !== undefined) { sets.push('prioridad = ?');          params.push(prioridad) }

@@ -169,7 +169,6 @@
             @update="onCronometroUpdate"
           />
           <CronoDisplay :tarea="tarea" />
-          <span v-if="!tarea.crono_inicio && tiempoRealDisplay" class="crono-pausado">{{ tiempoRealDisplay }}</span>
         </div>
       </div>
       <!-- Tiempo estimado -->
@@ -411,19 +410,6 @@ onMounted(() => nextTick(autoResizeTitulo))
 import { calcTotalSeg, formatCrono } from 'src/services/crono'
 const cronometroRef = ref(null)
 
-// Display de tiempo cuando el cronómetro está pausado (tiene acumulado pero no está corriendo)
-const tiempoRealDisplay = computed(() => {
-  const seg = props.tarea?.crono_acumulado_seg || 0
-  if (!seg) return ''
-  return formatCrono(seg)
-})
-
-// Auto-start cuando estado cambia a "En Progreso"
-watch(() => props.tarea?.estado, (nuevo, viejo) => {
-  if (nuevo === 'En Progreso' && viejo !== 'En Progreso' && !props.tarea?.cronometro_activo) {
-    cronometroRef.value?.iniciar()
-  }
-})
 
 // Popover completar
 const popoverTiempo   = ref(false)
