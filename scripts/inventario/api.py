@@ -190,18 +190,27 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         r['rango_min'] = float(r['rango_min']) if r['rango_min'] is not None else None
         r['rango_max'] = float(r['rango_max']) if r['rango_max'] is not None else None
         r['factor_error'] = int(r['factor_error']) if r['factor_error'] else None
-        # Artículos no matriculados: asignar grupo NM si no tienen entrada en inv_rangos
-        if not r.get('grupo') and r.get('id_effi', '').startswith('NM-'):
-            r['grupo'] = 'NM'
-            cat = r.get('categoria') or ''
-            if 'KG' in cat:
-                r['unidad'] = 'KG'
-            elif 'LT' in cat:
-                r['unidad'] = 'LT'
-            elif 'GRS' in cat:
-                r['unidad'] = 'GRS'
+        # Artículos sin entrada en inv_rangos: detectar grupo y unidad al vuelo
+        if not r.get('grupo'):
+            r['unidad'] = detectar_unidad(r.get('nombre') or '')
+            if r.get('id_effi', '').startswith('NM-'):
+                r['grupo'] = 'NM'
             else:
-                r['unidad'] = 'UND'
+                # Detectar grupo desde categoría (misma lógica que calcular_rangos.py)
+                cat = (r.get('categoria') or '').upper()
+                nom = (r.get('nombre') or '').upper()
+                if 'DESPERDICIO' in nom or 'DESPERDI' in nom:
+                    r['grupo'] = 'DES'
+                elif cat.startswith('NO MATRICULADO'):
+                    r['grupo'] = 'NM'
+                elif cat.startswith('TPT'):
+                    r['grupo'] = 'PT'
+                elif cat.startswith('T03'):
+                    r['grupo'] = 'INS'
+                elif 'DESARROLLO' in cat:
+                    r['grupo'] = 'DS'
+                else:
+                    r['grupo'] = 'MP'
     return rows
 
 
@@ -436,7 +445,7 @@ def asignar_no_matriculado(data: AsignarArticulo):
     conn = pymysql.connect(**DB_INV, cursorclass=pymysql.cursors.DictCursor)
     with conn.cursor() as cur:
         # Verificar que el conteo existe y es NM
-        cur.execute("SELECT id, id_effi, nombre, categoria FROM inv_conteos WHERE id = %s", (data.conteo_id,))
+        cur.execute("SELECT id, id_effi, nombre, categoria, notas FROM inv_conteos WHERE id = %s", (data.conteo_id,))
         conteo = cur.fetchone()
         if not conteo:
             conn.close()
@@ -447,13 +456,26 @@ def asignar_no_matriculado(data: AsignarArticulo):
 
         nombre_anterior = conteo['nombre']
         id_anterior = conteo['id_effi']
+        unidad_anterior = detectar_unidad(nombre_anterior)
+        unidad_effi = detectar_unidad(data.nombre_effi)
 
-        # Actualizar el conteo con los datos del artículo Effi
+        # Nota de asignación
+        ahora = datetime.now().strftime('%Y-%m-%d %H:%M')
+        nota = (
+            f"[Asignación {ahora} por {data.usuario}]\n"
+            f"Antes: {id_anterior} — {nombre_anterior} ({unidad_anterior})\n"
+            f"Asignado a: {data.id_effi_nuevo} — {data.nombre_effi} ({unidad_effi})\n"
+            f"Categoría Effi: {data.categoria_effi or '—'}"
+        )
+        # Preservar nota existente si la hay
+        nota_final = f"{conteo['notas']}\n\n{nota}" if conteo.get('notas') else nota
+
+        # Actualizar el conteo con los datos del artículo Effi + nota
         cur.execute("""
             UPDATE inv_conteos
-            SET id_effi = %s, nombre = %s, categoria = %s, cod_barras = %s
+            SET id_effi = %s, nombre = %s, categoria = %s, cod_barras = %s, notas = %s
             WHERE id = %s
-        """, (data.id_effi_nuevo, data.nombre_effi, data.categoria_effi, data.cod_barras, data.conteo_id))
+        """, (data.id_effi_nuevo, data.nombre_effi, data.categoria_effi, data.cod_barras, nota_final, data.conteo_id))
         conn.commit()
 
     conn.close()
