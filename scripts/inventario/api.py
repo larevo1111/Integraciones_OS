@@ -190,6 +190,18 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         r['rango_min'] = float(r['rango_min']) if r['rango_min'] is not None else None
         r['rango_max'] = float(r['rango_max']) if r['rango_max'] is not None else None
         r['factor_error'] = int(r['factor_error']) if r['factor_error'] else None
+        # Artículos no matriculados: asignar grupo NM si no tienen entrada en inv_rangos
+        if not r.get('grupo') and r.get('id_effi', '').startswith('NM-'):
+            r['grupo'] = 'NM'
+            cat = r.get('categoria') or ''
+            if 'KG' in cat:
+                r['unidad'] = 'KG'
+            elif 'LT' in cat:
+                r['unidad'] = 'LT'
+            elif 'GRS' in cat:
+                r['unidad'] = 'GRS'
+            else:
+                r['unidad'] = 'UND'
     return rows
 
 
