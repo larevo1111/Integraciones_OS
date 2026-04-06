@@ -94,9 +94,18 @@
                 <span class="nav-item-icon">
                   <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
                 </span>
-                <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
-                  <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
-                </form>
+                <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
+                  <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                  <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                    <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
+                  </form>
+                  <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
+                    <span class="material-icons" style="font-size:15px">check</span>
+                  </button>
+                  <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
+                    <span class="material-icons" style="font-size:15px">close</span>
+                  </button>
+                </div>
                 <template v-else>
                   <span class="nav-item-label">{{ e.nombre }}</span>
                   <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
@@ -192,9 +201,18 @@
                 <span class="nav-item-icon">
                   <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
                 </span>
-                <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
-                  <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
-                </form>
+                <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
+                  <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                  <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                    <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
+                  </form>
+                  <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
+                    <span class="material-icons" style="font-size:15px">check</span>
+                  </button>
+                  <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
+                    <span class="material-icons" style="font-size:15px">close</span>
+                  </button>
+                </div>
                 <template v-else>
                   <span class="nav-item-label">{{ e.nombre }}</span>
                   <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
@@ -418,9 +436,18 @@
                     <RouterLink :to="{ path: '/tareas', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
                       :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
-                      <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
-                        <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
-                      </form>
+                      <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
+                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" />
+                        </form>
+                        <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
+                          <span class="material-icons" style="font-size:15px">check</span>
+                        </button>
+                        <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
+                          <span class="material-icons" style="font-size:15px">close</span>
+                        </button>
+                      </div>
                       <template v-else>
                         <span class="nav-item-label">{{ e.nombre }}</span>
                         <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
@@ -477,9 +504,18 @@
                     <RouterLink :to="{ path: '/equipo', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
                       :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
-                      <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
-                        <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
-                      </form>
+                      <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
+                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" />
+                        </form>
+                        <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
+                          <span class="material-icons" style="font-size:15px">check</span>
+                        </button>
+                        <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
+                          <span class="material-icons" style="font-size:15px">close</span>
+                        </button>
+                      </div>
                       <template v-else>
                         <span class="nav-item-label">{{ e.nombre }}</span>
                         <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
@@ -766,25 +802,32 @@ function abrirMenuEtiqueta(event, etiqueta) {
 }
 
 const etiquetaEditandoId = ref(null)
+const etiquetaEditColor  = ref(null)
 
 function editarEtiqueta() {
   const e = menuEtiqueta.value.etiqueta
   menuEtiqueta.value.visible = false
   etiquetaEditandoId.value = e.id
+  etiquetaEditColor.value = null
   nextTick(() => {
     const input = document.querySelector('.etiqueta-edit-input')
     if (input) { input.focus(); input.select() }
   })
 }
 
-async function guardarNombreEtiqueta(e, nuevoNombre) {
+async function guardarEtiquetaEdit(e) {
+  const input = document.querySelector('.etiqueta-edit-input')
+  const nombre = (input?.value || '').trim()
+  const color = etiquetaEditColor.value
   etiquetaEditandoId.value = null
-  const nombre = nuevoNombre.trim()
-  if (!nombre || nombre === e.nombre) return
+  const body = {}
+  if (nombre && nombre !== e.nombre) body.nombre = nombre
+  if (color && color !== e.color) body.color = color
+  if (!Object.keys(body).length) return
   try {
-    await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify({ nombre }) })
+    const data = await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify(body) })
     const idx = etiquetasGlobal.value.findIndex(x => x.id === e.id)
-    if (idx !== -1) etiquetasGlobal.value[idx] = { ...etiquetasGlobal.value[idx], nombre }
+    if (idx !== -1) etiquetasGlobal.value[idx] = { ...etiquetasGlobal.value[idx], ...body }
   } catch (err) { console.error(err) }
 }
 
@@ -962,12 +1005,31 @@ async function cargarEtiquetas() {
 .ctx-item-warn:hover { color: var(--color-warning); }
 .ctx-item-danger:hover { color: var(--color-error); }
 .ctx-backdrop { position: fixed; inset: 0; z-index: 9998; }
+.etiqueta-edit-row {
+  display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;
+}
 .etiqueta-edit-input {
   width: 100%; background: var(--bg-input); border: 1px solid var(--accent);
   border-radius: var(--radius-sm); color: var(--text-primary);
   font-size: 12px; padding: 2px 6px; height: 22px;
   font-family: var(--font-sans); outline: none;
 }
+.etiqueta-edit-color {
+  width: 20px; height: 20px; padding: 0; border: 1px solid var(--border-default);
+  border-radius: 50%; cursor: pointer; background: none; flex-shrink: 0;
+  -webkit-appearance: none; appearance: none;
+}
+.etiqueta-edit-color::-webkit-color-swatch-wrapper { padding: 0; }
+.etiqueta-edit-color::-webkit-color-swatch { border: none; border-radius: 50%; }
+.etiqueta-edit-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: none; border-radius: var(--radius-sm);
+  background: transparent; cursor: pointer; flex-shrink: 0; padding: 0;
+}
+.etiqueta-edit-ok { color: var(--accent); }
+.etiqueta-edit-ok:hover { background: var(--accent-muted); }
+.etiqueta-edit-cancel { color: var(--text-tertiary); }
+.etiqueta-edit-cancel:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
 /* Menú usuario */
 .usuario-menu {
