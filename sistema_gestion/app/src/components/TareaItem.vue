@@ -67,10 +67,7 @@
 
     <div class="tarea-meta">
       <!-- Cronómetro activo (corriendo en tiempo real) -->
-      <span v-if="tarea.cronometro_activo" class="cronometro-activo">
-        <span class="cronometro-dot" />
-        {{ tiempoCronometro }}
-      </span>
+      <CronoDisplay v-if="tarea.crono_inicio" :tarea="tarea" />
 
       <!-- Chip categoría: dot coloreado + nombre, fondo tinted -->
       <span
@@ -129,6 +126,7 @@
 <script setup>
 import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
+import CronoDisplay from './CronoDisplay.vue'
 
 const props = defineProps({
   tarea:              { type: Object, required: true },
@@ -282,28 +280,7 @@ const duracionDisplay = computed(() => {
   return `${m}m`
 })
 
-const tiempoCronometro = ref('00:00')
-let interval = null
-
-import { calcTotalSeg, formatCrono } from 'src/services/crono'
-
-function actualizarCrono() {
-  tiempoCronometro.value = formatCrono(calcTotalSeg(props.tarea))
-}
-
-function iniciarInterval() {
-  if (interval) clearInterval(interval)
-  actualizarCrono()
-  interval = setInterval(actualizarCrono, 1000)
-}
-function detenerInterval() {
-  if (interval) { clearInterval(interval); interval = null }
-  tiempoCronometro.value = '00:00'
-}
-
-onMounted(() => {
-  if (props.tarea.cronometro_activo) iniciarInterval()
-})
+// Cronómetro: CronoDisplay se encarga de todo
 
 // Reaccionar a cambios de cronometro_activo después del mount
 watch(() => props.tarea.cronometro_activo, (val) => {

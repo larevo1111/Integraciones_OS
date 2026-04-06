@@ -167,21 +167,9 @@
             :tarea-id="tarea.id"
             :tarea="tarea"
             @update="onCronometroUpdate"
-            @tick="secs => segsVivo = secs"
           />
-          <input type="number" class="input-field t-input" style="margin-left:4px"
-            :value="Math.floor(segsVivo / 3600)"
-            :disabled="!!tarea.cronometro_activo"
-            min="0"
-            @change="actualizarTiempoReal('h', $event.target.value)" />
-          <span class="t-sep">h</span>
-          <input type="number" class="input-field t-input"
-            :value="Math.floor((segsVivo % 3600) / 60)"
-            :disabled="!!tarea.cronometro_activo"
-            min="0" max="59"
-            @change="actualizarTiempoReal('m', $event.target.value)" />
-          <span class="t-sep">m</span>
-          <span v-if="tarea.cronometro_activo" class="crono-seg">:{{ String(segsVivo % 60).padStart(2, '0') }}</span>
+          <CronoDisplay :tarea="tarea" />
+          <span v-if="!tarea.crono_inicio && tiempoRealDisplay" class="crono-pausado">{{ tiempoRealDisplay }}</span>
         </div>
       </div>
       <!-- Tiempo estimado -->
@@ -288,6 +276,7 @@ import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
+import CronoDisplay         from './CronoDisplay.vue'
 import ProyectoSelector     from './ProyectoSelector.vue'
 import CategoriaSelector    from './CategoriaSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
@@ -418,14 +407,15 @@ function autoResizeTitulo() {
 watch(() => props.tarea?.id, () => nextTick(autoResizeTitulo))
 onMounted(() => nextTick(autoResizeTitulo))
 
-// Cronómetro integrado en T. real (segsVivo = misma fuente que la lista)
-import { calcTotalSeg } from 'src/services/crono'
+// Cronómetro
+import { calcTotalSeg, formatCrono } from 'src/services/crono'
 const cronometroRef = ref(null)
-const segsVivo      = ref(calcTotalSeg(props.tarea))
 
-// Sincronizar segsVivo con props cuando no está corriendo
-watch(() => props.tarea?.crono_acumulado_seg, () => {
-  if (!props.tarea?.crono_inicio) segsVivo.value = calcTotalSeg(props.tarea)
+// Display de tiempo cuando el cronómetro está pausado (tiene acumulado pero no está corriendo)
+const tiempoRealDisplay = computed(() => {
+  const seg = props.tarea?.crono_acumulado_seg || 0
+  if (!seg) return ''
+  return formatCrono(seg)
 })
 
 // Auto-start cuando estado cambia a "En Progreso"
@@ -622,6 +612,10 @@ async function completarSin() {
 }
 .panel-header-titulo-row {
   display: flex; align-items: flex-start; gap: 8px;
+}
+.crono-pausado {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 .subtarea-breadcrumb {
   display: flex; align-items: center; gap: 4px;

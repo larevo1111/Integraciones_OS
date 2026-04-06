@@ -1,7 +1,7 @@
 /**
- * Función única para calcular los segundos totales del cronómetro de una tarea.
- * Fuente de verdad: crono_acumulado_seg + (NOW - crono_inicio) si está corriendo.
- * Se usa en TareaItem, TareaPanel y Cronometro — todos leen de aquí.
+ * Cronómetro — fuente de verdad única.
+ * calcTotalSeg(tarea) → total de segundos (acumulado + intervalo activo)
+ * formatCrono(seg) → "HH:MM:SS"
  */
 
 function parseInicio(str) {
@@ -21,7 +21,8 @@ export function calcTotalSeg(tarea) {
 }
 
 export function formatCrono(totalSeg) {
-  const m = Math.floor(totalSeg / 60)
+  const h = Math.floor(totalSeg / 3600)
+  const m = Math.floor((totalSeg % 3600) / 60)
   const s = totalSeg % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
