@@ -94,11 +94,16 @@
                 <span class="nav-item-icon">
                   <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
                 </span>
-                <span class="nav-item-label">{{ e.nombre }}</span>
-                <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
-                <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
-                  <span class="material-icons" style="font-size:16px">more_vert</span>
-                </button>
+                <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
+                  <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
+                </form>
+                <template v-else>
+                  <span class="nav-item-label">{{ e.nombre }}</span>
+                  <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
+                  <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
+                    <span class="material-icons" style="font-size:16px">more_vert</span>
+                  </button>
+                </template>
               </RouterLink>
             </div>
             <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
@@ -187,11 +192,16 @@
                 <span class="nav-item-icon">
                   <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
                 </span>
-                <span class="nav-item-label">{{ e.nombre }}</span>
-                <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
-                <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
-                  <span class="material-icons" style="font-size:16px">more_vert</span>
-                </button>
+                <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
+                  <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
+                </form>
+                <template v-else>
+                  <span class="nav-item-label">{{ e.nombre }}</span>
+                  <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
+                  <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
+                    <span class="material-icons" style="font-size:16px">more_vert</span>
+                  </button>
+                </template>
               </RouterLink>
             </div>
             <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
@@ -340,6 +350,7 @@
         </div>
       </div>
       <!-- Menú contextual etiqueta -->
+      <div v-if="menuEtiqueta.visible" class="ctx-backdrop" @click="menuEtiqueta.visible = false" />
       <div v-if="menuEtiqueta.visible" class="proyecto-ctx-menu" :style="menuEtiqueta.style" @click.stop>
         <div class="ctx-item" @click="editarEtiqueta">
           <span class="material-icons" style="font-size:15px">edit</span>
@@ -407,9 +418,14 @@
                     <RouterLink :to="{ path: '/tareas', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
                       :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
-                      <span class="nav-item-label">{{ e.nombre }}</span>
-                      <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
-                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                      <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
+                        <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
+                      </form>
+                      <template v-else>
+                        <span class="nav-item-label">{{ e.nombre }}</span>
+                        <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
+                        <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                      </template>
                     </RouterLink>
                   </div>
                   <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
@@ -461,9 +477,14 @@
                     <RouterLink :to="{ path: '/equipo', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
                       :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }">
                       <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
-                      <span class="nav-item-label">{{ e.nombre }}</span>
-                      <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
-                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                      <form v-if="etiquetaEditandoId === e.id" @submit.prevent="guardarNombreEtiqueta(e, $event.target.elements[0].value)" style="flex:1;min-width:0" @click.prevent.stop>
+                        <input class="etiqueta-edit-input" :value="e.nombre" @blur="guardarNombreEtiqueta(e, $event.target.value)" @keydown.escape="etiquetaEditandoId = null" />
+                      </form>
+                      <template v-else>
+                        <span class="nav-item-label">{{ e.nombre }}</span>
+                        <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
+                        <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
+                      </template>
                     </RouterLink>
                   </div>
                   <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
@@ -507,7 +528,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, provide, onMounted } from 'vue'
+import { ref, reactive, computed, provide, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
@@ -742,18 +763,28 @@ function abrirMenuEtiqueta(event, etiqueta) {
     etiqueta,
     style: { position: 'fixed', top: `${rect.bottom + 4}px`, left: `${rect.left}px`, zIndex: 9999 }
   }
-  setTimeout(() => document.addEventListener('click', () => { menuEtiqueta.value.visible = false }, { once: true }), 0)
 }
 
-async function editarEtiqueta() {
+const etiquetaEditandoId = ref(null)
+
+function editarEtiqueta() {
   const e = menuEtiqueta.value.etiqueta
   menuEtiqueta.value.visible = false
-  const nuevoNombre = prompt('Nombre de la etiqueta:', e.nombre)
-  if (!nuevoNombre || nuevoNombre.trim() === e.nombre) return
+  etiquetaEditandoId.value = e.id
+  nextTick(() => {
+    const input = document.querySelector('.etiqueta-edit-input')
+    if (input) { input.focus(); input.select() }
+  })
+}
+
+async function guardarNombreEtiqueta(e, nuevoNombre) {
+  etiquetaEditandoId.value = null
+  const nombre = nuevoNombre.trim()
+  if (!nombre || nombre === e.nombre) return
   try {
-    const data = await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify({ nombre: nuevoNombre.trim() }) })
+    await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify({ nombre }) })
     const idx = etiquetasGlobal.value.findIndex(x => x.id === e.id)
-    if (idx !== -1) etiquetasGlobal.value[idx] = { ...etiquetasGlobal.value[idx], nombre: nuevoNombre.trim() }
+    if (idx !== -1) etiquetasGlobal.value[idx] = { ...etiquetasGlobal.value[idx], nombre }
   } catch (err) { console.error(err) }
 }
 
@@ -930,6 +961,13 @@ async function cargarEtiquetas() {
 .ctx-item-success:hover { color: var(--accent); }
 .ctx-item-warn:hover { color: var(--color-warning); }
 .ctx-item-danger:hover { color: var(--color-error); }
+.ctx-backdrop { position: fixed; inset: 0; z-index: 9998; }
+.etiqueta-edit-input {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--accent);
+  border-radius: var(--radius-sm); color: var(--text-primary);
+  font-size: 12px; padding: 2px 6px; height: 22px;
+  font-family: var(--font-sans); outline: none;
+}
 
 /* Menú usuario */
 .usuario-menu {
