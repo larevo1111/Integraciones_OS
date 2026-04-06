@@ -1709,11 +1709,11 @@ app.get('/api/gestion/etiquetas', async (req, res) => {
       `SELECT e.*,
         (SELECT COUNT(*) FROM g_etiquetas_tareas et
          JOIN g_tareas t ON t.id = et.tarea_id
-         WHERE et.etiqueta_id = e.id AND t.empresa = e.empresa AND t.estado NOT IN ('Completada','Cancelada')
+         WHERE et.etiqueta_id = e.id AND t.estado NOT IN ('Completada','Cancelada')
         ) AS tareas_pendientes,
         (SELECT COUNT(*) FROM g_etiquetas_tareas et
          JOIN g_tareas t ON t.id = et.tarea_id
-         WHERE et.etiqueta_id = e.id AND t.empresa = e.empresa AND t.estado NOT IN ('Completada','Cancelada')
+         WHERE et.etiqueta_id = e.id AND t.estado NOT IN ('Completada','Cancelada')
          AND EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)
         ) AS mis_tareas_pendientes
        FROM g_etiquetas e WHERE e.empresa = ? ORDER BY e.nombre`,
