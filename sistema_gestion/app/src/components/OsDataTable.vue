@@ -48,7 +48,7 @@
         </div>
 
         <!-- Exportar -->
-        <div v-if="exportable" class="toolbar-btn-wrap" ref="exportRef">
+        <div class="toolbar-btn-wrap" ref="exportRef">
           <button class="toolbar-btn" @click.stop="showExport = !showExport">
             <DownloadIcon :size="14" />
             <span>Exportar</span>
@@ -270,7 +270,6 @@ const props = defineProps({
   recurso:  { type: String,  default: '' },
   mes:      { type: String,  default: '' },
   tooltips: { type: Object,  default: () => ({}) },
-  exportable: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['row-click'])
@@ -499,10 +498,77 @@ function hideAll() { localColumns.value.forEach(c => c.visible = false) }
 // ── Exportar ─────────────────────────────────────────
 function doExport(format) {
   showExport.value = false
-  const visibleKeys = visibleColumns.value.map(c => c.key)
-  const params = new URLSearchParams({ format, fields: JSON.stringify(visibleKeys) })
-  if (props.mes) params.set('mes', props.mes)
-  window.open(`/api/export/${props.recurso}?${params}`, '_blank')
+  // Si hay recurso definido, usar endpoint del servidor (ERP)
+  if (props.recurso) {
+    const visibleKeys = visibleColumns.value.map(c => c.key)
+    const params = new URLSearchParams({ format, fields: JSON.stringify(visibleKeys) })
+    if (props.mes) params.set('mes', props.mes)
+    window.open(`/api/export/${props.recurso}?${params}`, '_blank')
+    return
+  }
+  // Fallback client-side: exportar datos ya cargados
+  const cols  = visibleColumns.value
+  const data  = sortedRows.value
+  const fname = (props.title || 'tabla').replace(/[^a-z0-9]+/gi, '_').toLowerCase()
+
+  if (format === 'csv') {
+    const header = cols.map(c => `"${c.label.replace(/"/g, '""')}"`).join(',')
+    const rows   = data.map(r => cols.map(c => {
+      const v = r[c.key]
+      if (v === null || v === undefined) return ''
+      const s = String(v).replace(/"/g, '""')
+      return `"${s}"`
+    }).join(','))
+    const csv = '\uFEFF' + [header, ...rows].join('\n')
+    downloadBlob(csv, `${fname}.csv`, 'text/csv;charset=utf-8')
+  } else if (format === 'xlsx') {
+    // XLSX simple como HTML-Excel (compatible con Excel)
+    let html = '<table><thead><tr>'
+    cols.forEach(c => html += `<th>${escapeHtml(c.label)}</th>`)
+    html += '</tr></thead><tbody>'
+    data.forEach(r => {
+      html += '<tr>'
+      cols.forEach(c => html += `<td>${escapeHtml(r[c.key] ?? '')}</td>`)
+      html += '</tr>'
+    })
+    html += '</tbody></table>'
+    downloadBlob(html, `${fname}.xls`, 'application/vnd.ms-excel')
+  } else if (format === 'pdf') {
+    // PDF simple vía window.print con estilo
+    const win = window.open('', '_blank')
+    let html = `<html><head><title>${escapeHtml(props.title || 'Tabla')}</title>
+      <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; font-size: 12px; }
+        h1 { font-size: 16px; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+        th { background: #f0f0f0; font-weight: 600; }
+      </style></head><body>
+      <h1>${escapeHtml(props.title || 'Tabla')}</h1><table><thead><tr>`
+    cols.forEach(c => html += `<th>${escapeHtml(c.label)}</th>`)
+    html += '</tr></thead><tbody>'
+    data.forEach(r => {
+      html += '<tr>'
+      cols.forEach(c => html += `<td>${escapeHtml(formatCell(r[c.key], c.key))}</td>`)
+      html += '</tr>'
+    })
+    html += '</tbody></table></body></html>'
+    win.document.write(html)
+    win.document.close()
+    setTimeout(() => win.print(), 300)
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 100)
 }
 
 // ── Formato numérico estándar ────────────────────────
@@ -716,7 +782,19 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .export-desc  { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 
 /* ── TABLA ── */
-.table-scroll { overflow-x: auto; }
+.table-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.table-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
+.table-scroll::-webkit-scrollbar-track { background: transparent; }
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+}
+.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 .os-table     { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .th {

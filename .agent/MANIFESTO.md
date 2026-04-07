@@ -38,14 +38,19 @@
 - **Copia en Sistema Gestión**: `sistema_gestion/app/src/components/OsDataTable.vue`
 - **Documentación**: `.claude/skills/tabla-vista/SKILL.md`
 
-**Features built-in** (NO reimplementar ninguna):
+**Features built-in** (NO reimplementar ninguna, TODAS siempre visibles):
+- Título de la tabla + badge de conteo
+- Badges de filtros y subtotales activos
+- **Botón "Campos"** — SIEMPRE visible (mostrar/ocultar columnas)
+- **Botón "Exportar"** — SIEMPRE visible (CSV / Excel / PDF). Si no hay `recurso` backend, exporta client-side
 - Filtros por columna (popup, NO modal): Igual a, Contiene, Mayor que, Menor que, Mayor/menor o igual, Entre
 - Subtotales por columna: Suma, Promedio, Máximo, Mínimo (solo numéricas)
 - Ordenamiento por columna (asc/desc)
-- Campos mostrar/ocultar (botón "Campos")
 - Skeleton loading
-- Export CSV/XLSX/PDF (si `exportable=true` y existe endpoint)
+- Footer con total de filas
 - Formato automático: `_min`/`_seg` → "Xh Ym", `fin_`/`ventas`/`ticket` → "$1.234", `_pct`/`_margen` → "45%"
+
+**TODOS los elementos del toolbar son SIEMPRE visibles sin excepción.** Está prohibido usar props tipo `exportable`, `hideExport`, `showFields: false` o cualquier mecanismo que oculte funcionalidad del toolbar.
 
 **Uso**:
 ```vue
@@ -62,6 +67,8 @@
 - Usar `<q-table>` cuando aplicaría OsDataTable
 - Duplicar lógica de filtros/ordenamiento/subtotales en componentes locales
 - Modificar solo la copia local en vez del canónico (si es una mejora, va al original primero)
+- **Ocultar botón Exportar o Campos con props, v-if, o cualquier otra forma**
+- Pasar props tipo `exportable=false`, `hideExport`, etc. — no existen, todos los elementos son obligatorios
 
 **⚠️ VERIFICACIÓN OBLIGATORIA ANTES DE MARCAR CUALQUIER TAREA FRONTEND COMO LISTA:**
 1. Verificar que TODAS las variables CSS usadas existen en `frontend/app/src/css/app.scss` — si no existen, agregarlas o usar variable equivalente
