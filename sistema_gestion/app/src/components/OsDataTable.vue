@@ -131,7 +131,12 @@
               v-for="(row, idx) in sortedRows"
               :key="row._pk || row.mes || row._key || idx"
               class="data-row"
-              @click="emit('row-click', row)"
+              :class="{ 'multi-sel': isSelected(row) }"
+              @click="onRowClick(row, $event)"
+              @touchstart.passive="onRowTouchStart(row)"
+              @touchend="onRowTouchEnd"
+              @touchmove.passive="onRowTouchEnd"
+              @touchcancel="onRowTouchEnd"
             >
               <td v-for="col in visibleColumns" :key="col.key" class="td" :class="{ 'td-nowrap': col.nowrap }">
                 <slot :name="`cell-${col.key}`" :row="row" :col="col" :value="row[col.key]">
@@ -274,9 +279,50 @@ const props = defineProps({
   recurso:  { type: String,  default: '' },
   mes:      { type: String,  default: '' },
   tooltips: { type: Object,  default: () => ({}) },
+  selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['row-click'])
+const emit = defineEmits(['row-click', 'select-toggle'])
+
+function isSelected(row) {
+  return props.selectedIds.includes(row.id)
+}
+
+function onRowClick(row, e) {
+  // En modo multi-select activo: click toglea
+  if (props.selectedIds.length > 0) {
+    e.stopPropagation()
+    emit('select-toggle', row)
+    return
+  }
+  // Ctrl/Cmd + click: inicia multi-select
+  if (e.ctrlKey || e.metaKey) {
+    e.stopPropagation()
+    emit('select-toggle', row)
+    return
+  }
+  // Si vino de un long-press recién disparado, ignorar el click subsiguiente
+  if (_longPressTriggered) {
+    _longPressTriggered = false
+    e.stopPropagation()
+    return
+  }
+  emit('row-click', row)
+}
+
+let _longPressTriggered = false
+let _longPressTimer = null
+function onRowTouchStart(row) {
+  _longPressTriggered = false
+  _longPressTimer = setTimeout(() => {
+    _longPressTimer = null
+    _longPressTriggered = true
+    emit('select-toggle', row)
+  }, 500)
+}
+function onRowTouchEnd() {
+  if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null }
+}
 
 // ── Columnas locales (copia para mutar visible) ──────
 const localColumns = ref([])
@@ -815,6 +861,11 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 /* ── FILAS ── */
 .data-row { cursor: pointer; transition: background 60ms; }
 .data-row:hover { background: var(--bg-row-hover); }
+.data-row.multi-sel {
+  background: rgba(59, 130, 246, 0.10) !important;
+  outline: 1px solid rgba(59, 130, 246, 0.4);
+  outline-offset: -1px;
+}
 
 .td {
   padding: 8px 12px;

@@ -6,7 +6,9 @@
       :columns="columnas"
       :rows="filasFiltradas"
       :loading="cargando"
+      :selected-ids="ms.selectedIds.value"
       @row-click="abrirDetalle"
+      @select-toggle="ms.toggle"
     >
       <template #toolbar>
         <select v-model="filtroEstado" class="filtro-select">
@@ -58,6 +60,19 @@
       @guardado="onGuardado"
       @eliminado="onEliminado"
     />
+
+    <!-- Barra de acciones múltiples -->
+    <MultiActionBar
+      :count="ms.selectedIds.value.length"
+      :acciones="['estado','prioridad','categoria','etiquetas','responsable','eliminar']"
+      :estados="CONFIG[tipo].estados"
+      :categorias="categorias"
+      :etiquetas="etiquetas"
+      :usuarios="usuarios"
+      @cerrar="ms.clear"
+      @aplicar="onAplicarMulti"
+      @crear-etiqueta="onCrearEtiquetaMulti"
+    />
   </div>
 </template>
 
@@ -66,6 +81,8 @@ import { ref, computed, watch, onMounted, inject } from 'vue'
 import { api } from 'src/services/api'
 import OsDataTable from 'src/components/OsDataTable.vue'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
+import MultiActionBar from 'src/components/MultiActionBar.vue'
+import { useMultiSelect } from 'src/composables/useMultiSelect'
 
 const props = defineProps({
   tipo: { type: String, required: true },
@@ -120,6 +137,45 @@ const filasFiltradas = computed(() => {
 const panelVisible = ref(false)
 const panelItem    = ref(null)
 const recargarSidebar = inject('recargarSidebar', () => {})
+
+// ── Multi-select ──
+const ms = useMultiSelect({
+  endpointBase: '/api/gestion/proyectos',
+  onAfter: async () => { await cargar(); recargarSidebar() }
+})
+
+async function onAplicarMulti({ tipo, valor }) {
+  switch (tipo) {
+    case 'estado':      return ms.bulkPut({ estado: valor })
+    case 'prioridad':   return ms.bulkPut({ prioridad: valor })
+    case 'categoria':   return ms.bulkPut({ categoria_id: valor })
+    case 'fecha':       return ms.bulkPut({ fecha_estimada_fin: valor || null })
+    case 'responsable': return ms.bulkPutWith(async id => {
+      const it = items.value.find(x => x.id === id)
+      const actuales = it?.responsables || []
+      if (actuales.includes(valor)) return null
+      return { responsables: [...actuales, valor] }
+    })
+    case 'etiqueta':    return ms.bulkPutWith(async id => {
+      const it = items.value.find(x => x.id === id)
+      const actuales = (it?.etiquetas || []).map(e => e.id || e)
+      if (actuales.includes(valor)) return null
+      return { etiquetas: [...actuales, valor] }
+    })
+    case 'quitar-etiquetas': return ms.bulkPut({ etiquetas: [] })
+    case 'eliminar':
+      if (!confirm(`¿Eliminar ${ms.selectedIds.value.length} elemento(s)?`)) return
+      return ms.bulkDelete()
+  }
+}
+
+async function onCrearEtiquetaMulti(nombre) {
+  try {
+    const data = await api('/api/gestion/etiquetas', { method: 'POST', body: JSON.stringify({ nombre }) })
+    etiquetas.value.push(data.etiqueta)
+    await onAplicarMulti({ tipo: 'etiqueta', valor: data.etiqueta.id })
+  } catch (e) { console.error(e) }
+}
 
 async function cargar() {
   cargando.value = true
