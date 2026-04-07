@@ -234,12 +234,28 @@ class ConteoUpdate(BaseModel):
     contado_por: str
 
 
+def verificar_bloqueo(fecha_inventario, accion='conteo'):
+    """Verifica si una acción está permitida según el estado de cierre.
+    accion: 'conteo' (bloqueado por cerrar-conteo) o 'gestion' (bloqueado por cerrar-inventario).
+    Lanza HTTPException 423 si está bloqueado.
+    """
+    rows = db_query(DB_INV, "SELECT conteo_cerrado_en, inventario_cerrado_en FROM inv_fechas WHERE fecha_inventario = %s", (fecha_inventario,))
+    if not rows:
+        return  # Sin registro = abierto
+    r = rows[0]
+    if r['inventario_cerrado_en']:
+        raise HTTPException(423, "Inventario cerrado completamente — no se pueden hacer cambios")
+    if accion == 'conteo' and r['conteo_cerrado_en']:
+        raise HTTPException(423, "Conteo físico cerrado — no se pueden modificar conteos")
+
+
 @app.put("/api/inventario/articulos/{id}/conteo")
 def registrar_conteo(id: int, data: ConteoUpdate):
     """Registra el conteo físico de un artículo."""
-    rows = db_query(DB_INV, "SELECT inventario_teorico, inventario_fisico, contado_por FROM inv_conteos WHERE id = %s", (id,))
+    rows = db_query(DB_INV, "SELECT inventario_teorico, inventario_fisico, contado_por, fecha_inventario FROM inv_conteos WHERE id = %s", (id,))
     if not rows:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
+    verificar_bloqueo(rows[0]['fecha_inventario'], 'conteo')
 
     anterior = rows[0]
     teorico = float(anterior['inventario_teorico'] or 0)
@@ -609,17 +625,103 @@ def eliminar_inventario(data: GestionInventario):
     return {"ok": True, "eliminados": affected}
 
 
-@app.post("/api/inventario/cerrar")
-def cerrar_inventario(data: GestionInventario):
-    """Cierra un inventario (marca estado = 'cerrado' en pendientes)."""
+@app.post("/api/inventario/cerrar-conteo")
+def cerrar_conteo(data: GestionInventario):
+    """Cierra el conteo físico. Bloquea la edición de cantidades pero permite gestión."""
+    # Verificar que no esté ya cerrado
+    rows = db_query(DB_INV, "SELECT conteo_cerrado_en FROM inv_fechas WHERE fecha_inventario = %s", (data.fecha_inventario,))
+    if rows and rows[0]['conteo_cerrado_en']:
+        raise HTTPException(409, "El conteo ya está cerrado")
+
+    # Marcar conteos como verificados
     affected = db_execute(DB_INV, """
         UPDATE inv_conteos
         SET estado = 'verificado'
         WHERE fecha_inventario = %s AND excluido = 0 AND estado = 'contado'
     """, (data.fecha_inventario,))
-    registrar_auditoria(0, 'cerrar_inventario', data.usuario, None, data.fecha_inventario,
-                        f'{affected} conteos verificados/cerrados')
+
+    # Crear o actualizar registro en inv_fechas
+    db_execute(DB_INV, """
+        INSERT INTO inv_fechas (fecha_inventario, conteo_cerrado_en, conteo_cerrado_por)
+        VALUES (%s, NOW(), %s)
+        ON DUPLICATE KEY UPDATE conteo_cerrado_en = NOW(), conteo_cerrado_por = %s
+    """, (data.fecha_inventario, data.usuario, data.usuario))
+
+    registrar_auditoria(0, 'cerrar_conteo', data.usuario, None, data.fecha_inventario,
+                        f'{affected} conteos verificados — conteo físico bloqueado')
     return {"ok": True, "cerrados": affected}
+
+
+@app.post("/api/inventario/cerrar-inventario")
+def cerrar_inventario_completo(data: GestionInventario):
+    """Cierra el inventario completo. Bloquea TODO (incluso la gestión)."""
+    rows = db_query(DB_INV, "SELECT conteo_cerrado_en, inventario_cerrado_en FROM inv_fechas WHERE fecha_inventario = %s", (data.fecha_inventario,))
+    if not rows or not rows[0]['conteo_cerrado_en']:
+        raise HTTPException(400, "Debe cerrar primero el conteo físico antes de cerrar el inventario completo")
+    if rows[0]['inventario_cerrado_en']:
+        raise HTTPException(409, "El inventario ya está cerrado")
+
+    db_execute(DB_INV, """
+        UPDATE inv_fechas
+        SET inventario_cerrado_en = NOW(), inventario_cerrado_por = %s
+        WHERE fecha_inventario = %s
+    """, (data.usuario, data.fecha_inventario))
+
+    registrar_auditoria(0, 'cerrar_inventario', data.usuario, None, data.fecha_inventario,
+                        'Inventario cerrado completamente')
+    return {"ok": True}
+
+
+@app.post("/api/inventario/reabrir-conteo")
+def reabrir_conteo(data: GestionInventario):
+    """Reabre el conteo físico (solo si el inventario completo no está cerrado)."""
+    rows = db_query(DB_INV, "SELECT conteo_cerrado_en, inventario_cerrado_en FROM inv_fechas WHERE fecha_inventario = %s", (data.fecha_inventario,))
+    if not rows or not rows[0]['conteo_cerrado_en']:
+        raise HTTPException(409, "El conteo no está cerrado")
+    if rows[0]['inventario_cerrado_en']:
+        raise HTTPException(400, "No se puede reabrir el conteo porque el inventario completo está cerrado")
+
+    # Borrar el flag de cierre
+    db_execute(DB_INV, """
+        UPDATE inv_fechas
+        SET conteo_cerrado_en = NULL, conteo_cerrado_por = NULL
+        WHERE fecha_inventario = %s
+    """, (data.fecha_inventario,))
+
+    # Restaurar estado: los que están 'verificado' vuelven a 'contado' (solo si tienen valor físico)
+    affected = db_execute(DB_INV, """
+        UPDATE inv_conteos
+        SET estado = 'contado'
+        WHERE fecha_inventario = %s AND excluido = 0 AND estado = 'verificado' AND inventario_fisico IS NOT NULL
+    """, (data.fecha_inventario,))
+
+    registrar_auditoria(0, 'reabrir_conteo', data.usuario, None, data.fecha_inventario,
+                        f'Conteo físico reabierto — {affected} conteos restaurados a contado')
+    return {"ok": True, "restaurados": affected}
+
+
+@app.get("/api/inventario/estado-cierre")
+def estado_cierre(fecha: str):
+    """Devuelve el estado de cierres del inventario."""
+    rows = db_query(DB_INV, "SELECT * FROM inv_fechas WHERE fecha_inventario = %s", (fecha,))
+    if not rows:
+        return {"conteo_cerrado": False, "inventario_cerrado": False}
+    r = rows[0]
+    return {
+        "conteo_cerrado": r['conteo_cerrado_en'] is not None,
+        "conteo_cerrado_en": str(r['conteo_cerrado_en']) if r['conteo_cerrado_en'] else None,
+        "conteo_cerrado_por": r['conteo_cerrado_por'],
+        "inventario_cerrado": r['inventario_cerrado_en'] is not None,
+        "inventario_cerrado_en": str(r['inventario_cerrado_en']) if r['inventario_cerrado_en'] else None,
+        "inventario_cerrado_por": r['inventario_cerrado_por'],
+    }
+
+
+# Endpoint legacy (redirige al nuevo)
+@app.post("/api/inventario/cerrar")
+def cerrar_inventario_legacy(data: GestionInventario):
+    """DEPRECATED: usar /cerrar-conteo. Mantenido por compatibilidad."""
+    return cerrar_conteo(data)
 
 
 # ── Gestión de inconsistencias ──
@@ -876,6 +978,9 @@ class GestionUpdate(BaseModel):
 @app.put("/api/inventario/gestion/{gestion_id}")
 def actualizar_gestion(gestion_id: int, data: GestionUpdate):
     """Actualiza estado, causa y observaciones de un artículo en gestión."""
+    fecha_rows = db_query(DB_INV, "SELECT fecha_inventario FROM inv_gestion WHERE id = %s", (gestion_id,))
+    if fecha_rows:
+        verificar_bloqueo(fecha_rows[0]['fecha_inventario'], 'gestion')
     TRANSICIONES = {
         'pendiente': ['analizado', 'en_revision', 'justificada', 'requiere_ajuste'],
         'analizado': ['justificada', 'requiere_ajuste', 'en_revision'],

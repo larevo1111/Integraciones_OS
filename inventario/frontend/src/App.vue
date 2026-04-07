@@ -33,16 +33,22 @@
             </div>
           </div>
           <div v-if="puede('reiniciar_inventario') && FECHA === f.fecha_inventario" class="inv-panel-item-actions">
-            <button class="inv-panel-action" :class="{ 'inv-panel-action-spin': calculandoTeorico }" :disabled="calculandoTeorico" @click.stop="calcularTeorico" :title="estadoTeorico && estadoTeorico.calculado ? 'Recalcular teórico (' + formatFechaHora(estadoTeorico.calculado_en) + ')' : 'Calcular inventario teórico'">
+            <button class="inv-panel-action" :class="{ 'inv-panel-action-spin': calculandoTeorico }" :disabled="calculandoTeorico || estadoCierre.inventario_cerrado" @click.stop="calcularTeorico" :title="estadoTeorico && estadoTeorico.calculado ? 'Recalcular teórico (' + formatFechaHora(estadoTeorico.calculado_en) + ')' : 'Calcular inventario teórico'">
               <span class="material-icons" :class="{ spin: calculandoTeorico }" style="font-size:13px">analytics</span>
             </button>
-            <button class="inv-panel-action" @click.stop="confirmarReiniciar" title="Reiniciar conteos">
+            <button v-if="!estadoCierre.conteo_cerrado" class="inv-panel-action" @click.stop="confirmarReiniciar" title="Reiniciar conteos">
               <span class="material-icons" style="font-size:13px">restart_alt</span>
             </button>
-            <button class="inv-panel-action" @click.stop="confirmarCerrar" title="Cerrar inventario">
+            <button v-if="!estadoCierre.conteo_cerrado" class="inv-panel-action" @click.stop="confirmarCerrarConteo" title="Cerrar conteo físico">
               <span class="material-icons" style="font-size:13px">lock</span>
             </button>
-            <button v-if="puede('eliminar_inventario')" class="inv-panel-action inv-panel-action-danger" @click.stop="confirmarEliminar" title="Eliminar inventario">
+            <button v-if="estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado" class="inv-panel-action" @click.stop="confirmarReabrirConteo" title="Reabrir conteo físico">
+              <span class="material-icons" style="font-size:13px">lock_open</span>
+            </button>
+            <button v-if="estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado" class="inv-panel-action inv-panel-action-warn" @click.stop="confirmarCerrarInventario" title="Cerrar inventario completo">
+              <span class="material-icons" style="font-size:13px">verified</span>
+            </button>
+            <button v-if="puede('eliminar_inventario') && !estadoCierre.inventario_cerrado" class="inv-panel-action inv-panel-action-danger" @click.stop="confirmarEliminar" title="Eliminar inventario">
               <span class="material-icons" style="font-size:13px">delete_outline</span>
             </button>
           </div>
@@ -92,18 +98,57 @@
     </div>
 
     <!-- MODAL CONFIRMAR CERRAR -->
-    <div v-if="mostrarConfirmCerrar" class="inv-overlay" @click.self="mostrarConfirmCerrar = false">
+    <!-- MODAL: Cerrar conteo físico -->
+    <div v-if="mostrarConfirmCerrarConteo" class="inv-overlay" @click.self="mostrarConfirmCerrarConteo = false">
       <div class="inv-modal inv-modal-sm">
         <div class="inv-modal-header">
           <span class="material-icons" style="font-size:18px;color:var(--accent)">lock</span>
-          <span>Cerrar inventario</span>
-          <button class="action-btn" @click="mostrarConfirmCerrar = false"><span class="material-icons">close</span></button>
+          <span>Cerrar conteo físico</span>
+          <button class="action-btn" @click="mostrarConfirmCerrarConteo = false"><span class="material-icons">close</span></button>
         </div>
         <div class="inv-modal-body">
-          <p class="alerta-mensaje">Se marcarán todos los conteos como verificados. El inventario quedará cerrado para edición.</p>
+          <p class="alerta-mensaje">Se bloquea la edición de conteos físicos. La pestaña <strong>Gestión</strong> sigue funcionando para analizar y resolver inconsistencias.</p>
+          <p class="alerta-mensaje" style="color:var(--text-tertiary);font-size:11px">Podés reabrir el conteo después si fuera necesario.</p>
           <div class="alerta-btns">
-            <button class="alerta-btn-confirmar" @click="mostrarConfirmCerrar = false">Cancelar</button>
-            <button class="inv-btn-primary" @click="ejecutarCerrar">Cerrar inventario</button>
+            <button class="alerta-btn-confirmar" @click="mostrarConfirmCerrarConteo = false">Cancelar</button>
+            <button class="inv-btn-primary" @click="ejecutarCerrarConteo">Cerrar conteo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Cerrar inventario completo -->
+    <div v-if="mostrarConfirmCerrarInventario" class="inv-overlay" @click.self="mostrarConfirmCerrarInventario = false">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header inv-modal-header-warn">
+          <span class="material-icons" style="font-size:18px;color:#fbbf24">verified</span>
+          <span>Cerrar inventario completo</span>
+          <button class="action-btn" @click="mostrarConfirmCerrarInventario = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <p class="alerta-mensaje"><strong>Esta acción cierra TODO el inventario.</strong></p>
+          <p class="alerta-mensaje" style="color:var(--text-tertiary);font-size:11px">Ya no se podrá modificar ningún dato: ni conteos, ni gestión de inconsistencias, ni resoluciones, ni ajustes. Solo se podrá ver el informe final.</p>
+          <div class="alerta-btns">
+            <button class="alerta-btn-confirmar" @click="mostrarConfirmCerrarInventario = false">Cancelar</button>
+            <button class="inv-btn-primary" style="background:#fbbf24" @click="ejecutarCerrarInventario">Cerrar inventario completo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Reabrir conteo -->
+    <div v-if="mostrarConfirmReabrirConteo" class="inv-overlay" @click.self="mostrarConfirmReabrirConteo = false">
+      <div class="inv-modal inv-modal-sm">
+        <div class="inv-modal-header">
+          <span class="material-icons" style="font-size:18px;color:var(--accent)">lock_open</span>
+          <span>Reabrir conteo físico</span>
+          <button class="action-btn" @click="mostrarConfirmReabrirConteo = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body">
+          <p class="alerta-mensaje">Se permitirá editar conteos físicos nuevamente.</p>
+          <div class="alerta-btns">
+            <button class="alerta-btn-confirmar" @click="mostrarConfirmReabrirConteo = false">Cancelar</button>
+            <button class="inv-btn-primary" @click="ejecutarReabrirConteo">Reabrir conteo</button>
           </div>
         </div>
       </div>
@@ -139,7 +184,15 @@
           <div class="inv-avatar">{{ iniciales }}</div>
           <div class="inv-user-info">
             <span class="inv-user-name">{{ usuario }}</span>
-            <span class="inv-title">Inventario {{ fechaDisplay }}</span>
+            <span class="inv-title">
+              Inventario {{ fechaDisplay }}
+              <span v-if="estadoCierre.inventario_cerrado" class="cierre-badge cierre-badge-full" title="Inventario cerrado completamente">
+                <span class="material-icons" style="font-size:11px">verified</span> CERRADO
+              </span>
+              <span v-else-if="estadoCierre.conteo_cerrado" class="cierre-badge cierre-badge-conteo" title="Conteo físico cerrado">
+                <span class="material-icons" style="font-size:11px">lock</span> CONTEO CERRADO
+              </span>
+            </span>
           </div>
         </div>
         <div class="inv-header-right">
@@ -268,12 +321,12 @@
                   <span class="teorico-label">Teo</span>
                   <span class="teorico-value">{{ fmtNum(a.inventario_teorico) }}</span>
                 </div>
-                <div class="stepper">
-                  <button class="stepper-btn stepper-down" @click="ajustarConteo(a, -1)" tabindex="-1">
+                <div class="stepper" :class="{ 'stepper-bloqueado': conteoBloqueado }">
+                  <button class="stepper-btn stepper-down" :disabled="conteoBloqueado" @click="ajustarConteo(a, -1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">remove</span>
                   </button>
-                  <input class="count-input" :class="claseInput(a)" type="text" inputmode="decimal" placeholder="—" :value="displayConteo(a)" @blur="onConteoConValidacion(a, $event)" @input="onInputDebounce(a, $event)" @keyup.enter="$event.target.blur()">
-                  <button class="stepper-btn stepper-up" @click="ajustarConteo(a, 1)" tabindex="-1">
+                  <input class="count-input" :class="claseInput(a)" :readonly="conteoBloqueado" type="text" inputmode="decimal" placeholder="—" :value="displayConteo(a)" @blur="onConteoConValidacion(a, $event)" @input="onInputDebounce(a, $event)" @keyup.enter="$event.target.blur()">
+                  <button class="stepper-btn stepper-up" :disabled="conteoBloqueado" @click="ajustarConteo(a, 1)" tabindex="-1">
                     <span class="material-icons" style="font-size:12px">add</span>
                   </button>
                 </div>
@@ -382,7 +435,7 @@
 
         <!-- BARRA ACCIONES GESTIÓN -->
         <div class="ges-actions-bar">
-          <button class="ges-action-btn" :disabled="gesAnalizando" @click="lanzarAnalisis">
+          <button class="ges-action-btn" :disabled="gesAnalizando || gestionBloqueada" @click="lanzarAnalisis">
             <span class="material-icons" :class="{ spin: gesAnalizando }" style="font-size:15px">psychology</span>
             {{ gesAnalizando ? `Analizando ${gesProgreso}/${gesTotal}...` : 'Analizar inconsistencias' }}
           </button>
@@ -476,7 +529,7 @@
     </div><!-- /inv-content -->
 
     <!-- FAB -->
-    <button v-if="puede('agregar_articulo')" class="inv-fab" @click="mostrarAgregar = true"><span class="material-icons">add</span></button>
+    <button v-if="puede('agregar_articulo') && !conteoBloqueado" class="inv-fab" @click="mostrarAgregar = true"><span class="material-icons">add</span></button>
 
     <!-- POPUP COLUMNA — idéntico a GestionTable -->
     <Teleport to="body">
@@ -719,8 +772,8 @@
                 <label>Observaciones</label>
                 <textarea v-model="gesFormObs" class="ges-textarea" rows="3" placeholder="Notas de la revisión..."></textarea>
               </div>
-              <button class="inv-btn-primary" @click="guardarResolucion" :disabled="gesGuardando" style="margin-top:8px">
-                {{ gesGuardando ? 'Guardando...' : 'Guardar' }}
+              <button class="inv-btn-primary" @click="guardarResolucion" :disabled="gesGuardando || gestionBloqueada" style="margin-top:8px">
+                {{ gesGuardando ? 'Guardando...' : (gestionBloqueada ? 'Inventario cerrado' : 'Guardar') }}
               </button>
             </div>
           </div>
@@ -864,7 +917,6 @@ const mostrarNuevoInv = ref(false)
 const nuevaFechaInv = ref('')
 const creandoInv = ref(false)
 const mostrarConfirmReiniciar = ref(false)
-const mostrarConfirmCerrar = ref(false)
 const mostrarConfirmEliminar = ref(false)
 const estadoTeorico = ref(null)
 // Asignar artículo NM
@@ -875,6 +927,13 @@ const resultadosAsignar = ref([])
 const effiSeleccionado = ref(null)
 // Vista activa
 const vistaActiva = ref('conteo')
+// Estado de cierres
+const estadoCierre = ref({ conteo_cerrado: false, inventario_cerrado: false })
+const conteoBloqueado = computed(() => estadoCierre.value.conteo_cerrado || estadoCierre.value.inventario_cerrado)
+const gestionBloqueada = computed(() => estadoCierre.value.inventario_cerrado)
+const mostrarConfirmCerrarConteo = ref(false)
+const mostrarConfirmCerrarInventario = ref(false)
+const mostrarConfirmReabrirConteo = ref(false)
 // Gestión
 const gesDash = ref(null)
 const gesArticulos = ref([])
@@ -950,7 +1009,7 @@ function cambiarFecha(f) {
   busqueda.value = ''
   columnFilters.value = {}
   sortKey.value = ''
-  cargarBodegas(); cargarResumen(); cargarArticulos(); cargarEstadoTeorico()
+  cargarBodegas(); cargarResumen(); cargarArticulos(); cargarEstadoTeorico(); cargarEstadoCierre()
   panelAbierto.value = false
 }
 
@@ -1507,7 +1566,6 @@ async function crearInventario() {
 }
 
 function confirmarReiniciar() { mostrarConfirmReiniciar.value = true }
-function confirmarCerrar() { mostrarConfirmCerrar.value = true }
 function confirmarEliminar() { mostrarConfirmEliminar.value = true }
 
 async function ejecutarReiniciar() {
@@ -1536,15 +1594,49 @@ async function ejecutarEliminar() {
   }
 }
 
-async function ejecutarCerrar() {
-  await fetch(API + '/api/inventario/cerrar', {
+async function cargarEstadoCierre() {
+  try {
+    estadoCierre.value = await fetchApi(`/api/inventario/estado-cierre?fecha=${FECHA.value}`)
+  } catch { estadoCierre.value = { conteo_cerrado: false, inventario_cerrado: false } }
+}
+
+function confirmarCerrarConteo() { mostrarConfirmCerrarConteo.value = true }
+function confirmarCerrarInventario() { mostrarConfirmCerrarInventario.value = true }
+function confirmarReabrirConteo() { mostrarConfirmReabrirConteo.value = true }
+
+async function ejecutarCerrarConteo() {
+  await fetch(API + '/api/inventario/cerrar-conteo', {
     method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
   })
-  mostrarConfirmCerrar.value = false
+  mostrarConfirmCerrarConteo.value = false
+  await cargarEstadoCierre()
   await cargarArticulos()
   await cargarResumen()
-  await cargarFechas()
+}
+
+async function ejecutarCerrarInventario() {
+  const res = await fetch(API + '/api/inventario/cerrar-inventario', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    alert('Error: ' + (err.detail || 'No se pudo cerrar el inventario'))
+    return
+  }
+  mostrarConfirmCerrarInventario.value = false
+  await cargarEstadoCierre()
+}
+
+async function ejecutarReabrirConteo() {
+  await fetch(API + '/api/inventario/reabrir-conteo', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+  })
+  mostrarConfirmReabrirConteo.value = false
+  await cargarEstadoCierre()
+  await cargarArticulos()
 }
 
 // ── Inventario teórico ──
@@ -1949,6 +2041,16 @@ onUnmounted(() => clearInterval(clockInterval))
 .ges-sev-menor { background: rgba(59,130,246,0.1); color: #60a5fa; }
 
 .ges-grupos-table { margin-bottom: 8px; }
+
+/* ═══ CIERRES ═══ */
+.cierre-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.3px; }
+.cierre-badge-conteo { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+.cierre-badge-full { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+.stepper-bloqueado { opacity: 0.55; }
+.stepper-bloqueado .stepper-btn { cursor: not-allowed; }
+.stepper-bloqueado .count-input { cursor: not-allowed; background: rgba(0,0,0,0.2); }
+.inv-panel-action-warn { color: #fbbf24 !important; }
+.inv-panel-action-warn:hover { background: rgba(245,158,11,0.15) !important; }
 
 /* ═══ ACORDEONES GESTIÓN ═══ */
 .ges-scroll-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
