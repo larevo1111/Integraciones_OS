@@ -1,6 +1,6 @@
 # Manual de Inventario Fisico — Origen Silvestre
 
-**Version**: 1.0 — 2026-03-31
+**Version**: 2.0 — 2026-04-06
 **Scope**: App web de conteo de inventario fisico vs teorico. Independiente del ERP y del sistema de gestion.
 **URL**: inv.oscomunidad.com
 **Puerto**: 9401
@@ -14,19 +14,23 @@
 2. [Stack tecnico](#2-stack)
 3. [Infraestructura](#3-infraestructura)
 4. [Base de datos os_inventario](#4-bd)
-5. [Tablas fuente de effi_data](#5-tablas-fuente)
-6. [Regla critica: timestamps Effi en UTC](#6-timestamps)
-7. [Scripts](#7-scripts)
-8. [API — endpoints](#8-api)
-9. [Frontend](#9-frontend)
-10. [Grupos de articulos](#10-grupos)
-11. [Unidades y validacion de rango](#11-unidades)
-12. [Niveles de acceso y politicas](#12-acceso)
-13. [Inventario teorico — formula completa](#13-teorico)
-14. [Flujo: crear un nuevo inventario](#14-flujo-crear)
-15. [Flujo: conteo fisico](#15-flujo-conteo)
-16. [Build y deploy](#16-build)
-17. [Troubleshooting](#17-troubleshooting)
+5. [Tabla inv_catalogo_articulos](#5-catalogo)
+6. [Tablas fuente de effi_data](#6-tablas-fuente)
+7. [Regla critica: timestamps Effi en UTC](#7-timestamps)
+8. [Scripts](#8-scripts)
+9. [API — endpoints](#9-api)
+10. [Frontend](#10-frontend)
+11. [Grupos de articulos](#11-grupos)
+12. [Unidades y validacion de rango](#12-unidades)
+13. [Niveles de acceso y politicas](#13-acceso)
+14. [Inventario teorico — formula completa](#14-teorico)
+15. [Flujo: crear un nuevo inventario](#15-flujo-crear)
+16. [Flujo: conteo fisico](#16-flujo-conteo)
+17. [Flujo: asignar articulo no matriculado](#17-flujo-asignar)
+18. [Flujo: sync catalogo Effi](#18-flujo-sync)
+19. [Flujo: ajuste de inventario en Effi](#19-flujo-ajuste)
+20. [Build y deploy](#20-build)
+21. [Troubleshooting](#21-troubleshooting)
 
 ---
 
@@ -166,7 +170,41 @@ Resultado del calculo de inventario teorico a fecha de corte.
 
 ---
 
-## 5. Tablas fuente de effi_data {#5-tablas-fuente}
+## 5. Tabla inv_catalogo_articulos {#5-catalogo}
+
+Catalogo de articulos de Effi con unidad y grupo precalculados. Vive en `effi_data` (local) y en `u768061575_os_integracion` (Hostinger). Mismo patron que `crm_contactos`.
+
+**Se actualiza de 2 formas:**
+1. Cada 2 horas — paso 6e del pipeline (`sync_inventario_catalogo.py`)
+2. Bajo demanda — boton "Sync Effi" en la app de inventario
+
+**Script:** `scripts/sync_inventario_catalogo.py`
+
+| Campo | Tipo | Descripcion |
+|---|---|---|
+| id_effi | VARCHAR(20) PK | ID del articulo en Effi |
+| cod_barras | VARCHAR(50) | Codigo de barras |
+| nombre | VARCHAR(255) | Nombre del articulo |
+| categoria | VARCHAR(100) | Categoria Effi (T01.xx, TPT.xx, etc.) |
+| vigencia | VARCHAR(20) | Siempre "Vigente" (solo se importan vigentes) |
+| tipo_articulo | VARCHAR(50) | Tipo de articulo en Effi |
+| gestion_stock | VARCHAR(10) | "Si" o "No" |
+| costo_promedio | DECIMAL(15,2) | Costo promedio |
+| stock_total | DECIMAL(15,2) | Stock total empresa |
+| unidad | VARCHAR(5) | Detectada por regex del nombre (KG/GRS/UND/LT/ML) |
+| grupo | VARCHAR(5) | Calculado: MP/PP/PT/INS/DS/DES (cruce con OPs) |
+| actualizado_en | DATETIME | Timestamp de ultima sincronizacion |
+
+**Por que existe esta tabla y no se usa `zeffi_inventario` directamente:**
+`import_all.js` hace DROP TABLE + CREATE en cada ejecucion del pipeline (cada 2h). Cualquier columna extra (unidad, grupo) se pierde. `inv_catalogo_articulos` usa CREATE IF NOT EXISTS + TRUNCATE + INSERT — la estructura sobrevive. Mismo patron que `crm_contactos` de EspoCRM.
+
+**Quien la usa:**
+- El endpoint `/api/inventario/articulos/buscar` (modal de asignar articulos NM)
+- El boton "Sync Effi" en la toolbar del frontend
+
+---
+
+## 6. Tablas fuente de effi_data {#6-tablas-fuente}
 
 El sistema lee datos de 6 tablas de la BD `effi_data` (staging del pipeline Effi).
 
@@ -240,7 +278,7 @@ Productos terminados generados por cada OP.
 
 ---
 
-## 6. Regla critica: timestamps Effi en UTC {#6-timestamps}
+## 7. Regla critica: timestamps Effi en UTC {#7-timestamps}
 
 **Todas las timestamps de tablas Effi (zeffi_*) estan en UTC, NO en hora Colombia.**
 
@@ -263,7 +301,7 @@ Bug real documentado: OPs procesadas a las 7pm Colombia aparecian como "1 de abr
 
 ---
 
-## 7. Scripts {#7-scripts}
+## 8. Scripts {#8-scripts}
 
 ### depurar_inventario.py
 
@@ -346,9 +384,99 @@ Archivo de configuracion (no es script). Define reglas de exclusion para `depura
 
 Para agregar una exclusion nueva: agregar entrada en `excluir_categorias` con patron SQL LIKE y razon.
 
+### sync_inventario_catalogo.py
+
+Sincroniza articulos de `zeffi_inventario` a `inv_catalogo_articulos` con unidad y grupo precalculados. Guarda en effi_data local + Hostinger.
+
+```bash
+python3 scripts/sync_inventario_catalogo.py
+```
+
+- Lee articulos vigentes de `zeffi_inventario`
+- Cruza con `zeffi_articulos_producidos` para detectar grupo PP
+- Detecta unidad por regex del nombre
+- DROP + CREATE + INSERT en `effi_data.inv_catalogo_articulos` (local)
+- DROP + CREATE + INSERT en `u768061575_os_integracion.inv_catalogo_articulos` (Hostinger via SSH tunnel)
+- Paso 6e del pipeline (despues de sync EspoCRM → Hostinger)
+- Tambien se ejecuta desde el boton "Sync Effi" de la app
+
+### import_ajuste_inventario.js
+
+Script Playwright para crear ajustes de inventario en Effi. Importa conceptos desde un Excel.
+
+```bash
+node scripts/import_ajuste_inventario.js <bodega_id> <archivo.xlsx> [observacion]
+```
+
+**Parametros:**
+- `bodega_id` (obligatorio): ID de bodega en Effi
+- `archivo.xlsx` (obligatorio): Excel con formato plantilla Effi
+- `observacion` (opcional): texto para Observacion. Default: "SYS GENERATED - Ajuste inventario, [fecha hora]"
+
+**IDs de bodegas de Effi:**
+
+| ID | Bodega |
+|---|---|
+| 1 | Principal |
+| 2 | Villa de aburra |
+| 3 | Apica |
+| 4 | El Salvador |
+| 5 | Feria Santa Elena |
+| 6 | DON LUIS SAN MIGUEL |
+| 7 | LA TIERRITA |
+| 8 | Jenifer |
+| 10 | REGINALDO |
+| 13 | Desarrollo de Producto |
+| 14 | Ricardo |
+| 15 | Mercado Libre |
+| 16 | Santiago |
+| 17 | Productos No Conformes Bod PPAL |
+| 18 | FERIA CAMPESINA SAN CARLOS |
+
+**Formato del Excel (7 columnas obligatorias):**
+
+| Columna | Descripcion | Ejemplo |
+|---|---|---|
+| Código Effi: Artículo * | ID del articulo en Effi | 275 |
+| Descripción * | Nombre (Effi lo autocompleta del codigo) | CHOCOBEETAL X KG |
+| Lote | Lote (opcional) | |
+| Serie | Serie (opcional) | |
+| Costo * | Costo unitario (>= 0, obligatorio > 0 si no existe) | 1 |
+| Tipo de ajuste * | 1 = Ingreso, 2 = Egreso | 1 |
+| Cantidad * | Cantidad a ajustar | 0.5 |
+
+**Plantilla de referencia:** `plantilla_importacion_ajuste_inventario.xlsx` (raiz del repo)
+
+**Flujo Playwright:**
+1. Navega a `effi.com.co/app/ajuste_inventario`
+2. Click "Crear" → abre modal
+3. Selecciona Sucursal (Principal) y Bodega via jQuery Chosen API
+4. Click "Importar conceptos" (`#importarConceptos_CR`)
+5. Sube Excel en el modal de importacion
+6. Click "Importar conceptos" (`#formulario_IC #btn_submit`)
+7. Elimina filas vacias de conceptos (Effi agrega una por defecto)
+8. Llena campo Observacion
+9. Click "Crear ajuste de inventario"
+10. Verifica errores de validacion
+11. Screenshots en `/exports/ajuste_*.png`
+
+**Caso de uso: traslado entre bodegas**
+
+Effi no tiene un modulo de traslado directo accesible por API. Para mover stock de bodega A a bodega B, se hacen 2 ajustes:
+
+```bash
+# 1. Egreso de la bodega origen
+node scripts/import_ajuste_inventario.js 13 /tmp/egreso.xlsx "SYS GENERATED - Traslado Desarrollo -> Principal"
+
+# 2. Ingreso a la bodega destino
+node scripts/import_ajuste_inventario.js 1 /tmp/ingreso.xlsx "SYS GENERATED - Traslado Desarrollo -> Principal"
+```
+
+El Excel de egreso usa Tipo de ajuste = 2, el de ingreso usa Tipo de ajuste = 1. Mismos articulos y cantidades.
+
 ---
 
-## 8. API — endpoints {#8-api}
+## 9. API — endpoints {#9-api}
 
 Archivo: `scripts/inventario/api.py`. FastAPI corriendo en puerto 9401.
 
@@ -363,7 +491,7 @@ Archivo: `scripts/inventario/api.py`. FastAPI corriendo en puerto 9401.
 | GET | /api/inventario/articulos | ?fecha=...&bodega=...&filtro=...&busqueda=... | Articulos para contar. filtro: pendientes/contados/diferencias |
 | GET | /api/inventario/excluidos | ?fecha=YYYY-MM-DD | Articulos excluidos del inventario |
 | GET | /api/inventario/resumen | ?fecha=...&bodega=... | Totales: total/contados/pendientes/ok/con_diferencia |
-| GET | /api/inventario/articulos/buscar | ?q=texto | Busca articulos en catalogo Effi (para agregar) |
+| GET | /api/inventario/articulos/buscar | ?q=texto | Busca en inv_catalogo_articulos (con unidad y grupo) |
 | GET | /api/inventario/fotos/{nombre} | — | Sirve archivo de foto |
 | GET | /api/inventario/teorico/estado | ?fecha=YYYY-MM-DD | Info del ultimo calculo teorico |
 
@@ -377,6 +505,7 @@ Archivo: `scripts/inventario/api.py`. FastAPI corriendo en puerto 9401.
 | POST | /api/inventario/articulos/agregar | `{fecha_inventario, bodega, id_effi, contado_por}` | Nombre del articulo |
 | PUT | /api/inventario/articulos/{id}/reactivar | `{usuario}` | OK |
 | POST | /api/inventario/articulos/no-matriculado | Form: fecha, bodega, nombre, unidad, cantidad, costo, notas, usuario, foto | ID nuevo |
+| POST | /api/inventario/articulos/asignar | `{conteo_id, id_effi_nuevo, nombre_effi, categoria_effi, cod_barras, usuario}` | OK + nota automatica |
 
 ### Gestion (nivel >= 5)
 
@@ -387,6 +516,8 @@ Archivo: `scripts/inventario/api.py`. FastAPI corriendo en puerto 9401.
 | POST | /api/inventario/cerrar | `{fecha_inventario, usuario}` | Cantidad cerrados |
 | POST | /api/inventario/eliminar | `{fecha_inventario, usuario}` | Cantidad eliminados |
 | POST | /api/inventario/calcular-teorico | `{fecha_inventario, usuario}` | Output del calculo |
+| POST | /api/inventario/sync-effi | — | Lanza export+import+sync catalogo en background |
+| GET | /api/inventario/sync-effi/estado | — | Estado de la sincronizacion (idle/exportando/importando/ok/error) |
 
 ### Autenticacion
 
@@ -400,7 +531,7 @@ FastAPI sirve el build de produccion desde `inventario/static/`. Monta `/assets`
 
 ---
 
-## 9. Frontend {#9-frontend}
+## 10. Frontend {#10-frontend}
 
 ### Estructura
 
@@ -456,6 +587,15 @@ Boton con icono de tres puntos en cada fila. Opciones:
 - Agregar nota
 - Tomar foto
 - Ver foto (si existe)
+- Asignar articulo (solo para articulos NM-*, nivel >= 5) — abre modal de asignacion
+
+### Boton Sync Effi
+
+Boton azul en la toolbar (nivel >= 5). Actualiza el catalogo de articulos de Effi bajo demanda.
+- Click → lanza en background: export Playwright + import_all + sync_inventario_catalogo
+- Spinner animado mientras corre. Estados: Descargando / Importando / OK / Error
+- Se desactiva mientras hay sync en curso
+- Util cuando se matricula un articulo nuevo en Effi y se necesita que aparezca en el modal de asignar
 
 ### Responsive
 
@@ -469,7 +609,7 @@ Funciona en desktop, tablet y movil. Layout adaptativo.
 
 ---
 
-## 10. Grupos de articulos {#10-grupos}
+## 11. Grupos de articulos {#11-grupos}
 
 Campo `grupo` en `inv_rangos`. Asignado automaticamente por `calcular_rangos.py`.
 
@@ -494,7 +634,7 @@ Prioridad de clasificacion (la primera que matchea gana):
 
 ---
 
-## 11. Unidades y validacion de rango {#11-unidades}
+## 12. Unidades y validacion de rango {#12-unidades}
 
 ### Deteccion de unidad
 
@@ -532,7 +672,7 @@ Cuando el usuario ingresa un valor fuera de rango:
 
 ---
 
-## 12. Niveles de acceso y politicas {#12-acceso}
+## 13. Niveles de acceso y politicas {#13-acceso}
 
 Fuente de verdad: `inventario/politicas.json`.
 
@@ -556,6 +696,7 @@ Los niveles vienen del JWT (campo `nivel`), que se hereda de `sys_usuarios.Nivel
 | agregar_nota | 1 | Agregar notas a articulos |
 | tomar_foto | 1 | Tomar foto de articulo |
 | agregar_articulo | 3 | Agregar articulo no listado a una bodega |
+| asignar_articulo | 5 | Vincular articulo NM con articulo de Effi |
 | nuevo_inventario | 5 | Crear evento de inventario con fecha de corte |
 | reiniciar_inventario | 5 | Borrar conteos (mantiene articulos) |
 | cerrar_inventario | 5 | Cerrar inventario (bloquea edicion) |
@@ -582,7 +723,7 @@ Cada boton o seccion usa `v-if="puede('nombre_accion')"`.
 
 ---
 
-## 13. Inventario teorico — formula completa {#13-teorico}
+## 14. Inventario teorico — formula completa {#14-teorico}
 
 ### Formula
 
@@ -647,7 +788,7 @@ Filtrar por `vigencia = 'Orden vigente'` (NO "Vigente" — diferencia critica).
 
 ---
 
-## 14. Flujo: crear un nuevo inventario {#14-flujo-crear}
+## 15. Flujo: crear un nuevo inventario {#15-flujo-crear}
 
 Requisito: nivel >= 5 (Supervisor).
 
@@ -666,7 +807,7 @@ Antes de crear el inventario, es recomendable correr `snapshot_inventario.sh` pa
 
 ---
 
-## 15. Flujo: conteo fisico {#15-flujo-conteo}
+## 16. Flujo: conteo fisico {#16-flujo-conteo}
 
 Requisito: nivel >= 1 (Contador).
 
@@ -689,7 +830,106 @@ Acciones adicionales durante el conteo:
 
 ---
 
-## 16. Build y deploy {#16-build}
+## 17. Flujo: asignar articulo no matriculado {#17-flujo-asignar}
+
+Requisito: nivel >= 5 (Supervisor). Solo para articulos con ID que empieza con "NM-".
+
+**Contexto:** Cuando un producto encontrado durante el conteo no existe en Effi, se agrega como "No Matriculado" (NM). Despues, un supervisor puede vincularlo con un articulo real de Effi.
+
+1. El supervisor ve un articulo con tag "No Matriculado" (celeste)
+2. Abre el menu de tres puntos (⋮) → click en "Asignar articulo"
+3. Se abre el modal de asignacion mostrando el articulo NM arriba (nombre + unidad)
+4. Busca el articulo de Effi por nombre o codigo en el campo de busqueda
+5. Los resultados muestran nombre, ID, categoria y **unidad detectada**
+6. Al seleccionar un articulo, aparece comparacion visual de unidades:
+   - Verde: "Unidades coinciden" (KG = KG)
+   - Amarillo: "¡Unidades diferentes!" (UND ≠ KG)
+7. Puede cambiar la seleccion con boton "Cambiar"
+8. Click "Confirmar asignacion"
+
+**Que hace al confirmar:**
+- Actualiza `id_effi`, `nombre`, `categoria`, `cod_barras` del conteo
+- Genera nota automatica con: fecha, hora, usuario, nombre anterior, unidad anterior, ID Effi nuevo, nombre Effi, unidad Effi, categoria
+- Registra auditoria (accion: `asignacion`)
+- El articulo deja de ser NM y toma la categoria/grupo del articulo Effi
+
+**Nota sobre unidad y grupo post-asignacion:**
+El articulo asignado puede no tener entrada en `inv_rangos`. El backend detecta grupo y unidad al vuelo: usa `detectar_unidad()` (regex del nombre) y cruza con `zeffi_articulos_producidos` para detectar PP. Si no matchea, aplica la logica de categorias (TPT→PT, T03→INS, etc.).
+
+---
+
+## 18. Flujo: sync catalogo Effi {#18-flujo-sync}
+
+Requisito: nivel >= 5 (Supervisor).
+
+**Cuando usarlo:** Si se matriculo un articulo nuevo en Effi y se necesita que aparezca en la busqueda del modal de asignar (o en cualquier funcionalidad que lea de `inv_catalogo_articulos`).
+
+1. Click en boton "Sync Effi" (azul, en la toolbar)
+2. El icono empieza a girar y el texto cambia a "Descargando..."
+3. El backend ejecuta en background:
+   - `node scripts/export_inventario.js` — Playwright descarga Excel de Effi (~1 min)
+   - `node scripts/import_all.js` — importa todos los Excel a effi_data
+   - `python3 scripts/sync_inventario_catalogo.py` — genera inv_catalogo_articulos con unidad y grupo
+4. El frontend hace polling cada 3 segundos a `/api/inventario/sync-effi/estado`
+5. Al terminar: muestra mensaje de exito con cantidad de articulos, vuelve a idle
+6. Si hay error: muestra mensaje de error
+
+**El proceso tarda 2-3 minutos.** No se puede clickear dos veces (bloqueado mientras hay sync).
+
+**Tambien se ejecuta automaticamente** cada 2h como paso 6e del pipeline (orquestador.py).
+
+---
+
+## 19. Flujo: ajuste de inventario en Effi {#19-flujo-ajuste}
+
+Script Playwright para crear ajustes de inventario directamente en Effi.
+
+**Cuando usarlo:** Despues de analizar las diferencias del inventario fisico vs teorico, para corregir el stock en Effi.
+
+### Ajuste simple (una bodega)
+
+```bash
+node scripts/import_ajuste_inventario.js <bodega_id> <archivo.xlsx> [observacion]
+```
+
+Ejemplo:
+```bash
+node scripts/import_ajuste_inventario.js 1 /tmp/ajuste_principal.xlsx "SYS GENERATED - Ajuste inventario marzo, Santiago Sierra, 2026-04-06"
+```
+
+### Traslado entre bodegas (2 ajustes)
+
+Effi no tiene modulo de traslado accesible por script. Para mover stock de bodega A a B:
+
+```bash
+# 1. Generar Excel de egreso (Tipo de ajuste = 2) y de ingreso (Tipo de ajuste = 1)
+# 2. Ejecutar ambos ajustes
+node scripts/import_ajuste_inventario.js 13 /tmp/egreso_desarrollo.xlsx "SYS GENERATED - Traslado Desarrollo -> Principal"
+node scripts/import_ajuste_inventario.js 1  /tmp/ingreso_principal.xlsx "SYS GENERATED - Traslado Desarrollo -> Principal"
+```
+
+### Generar Excel de ajuste desde Python
+
+```python
+import openpyxl
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = 'Conceptos'
+ws.append(['Código Effi: Artículo *', 'Descripción *', 'Lote', 'Serie', 'Costo *', 'Tipo de ajuste *', 'Cantidad *'])
+ws.append([275, 'CHOCOBEETAL X KG', '', '', 1, 1, 0.5])  # 1=Ingreso
+ws.append([405, 'CHOCOBEETAL OS 130 GRS', '', '', 1, 2, 3])  # 2=Egreso
+wb.save('/tmp/ajuste.xlsx')
+```
+
+**Reglas del Excel:**
+- Costo debe ser > 0 (al menos 1) — Effi lo requiere
+- Lote y Serie: string vacio si no aplica (no None/null)
+- Tipo de ajuste: 1 = Ingreso (aumenta stock), 2 = Egreso (disminuye stock)
+- El script elimina automaticamente filas vacias que Effi agrega por defecto
+
+---
+
+## 20. Build y deploy {#20-build}
 
 ### Build del frontend
 
@@ -733,7 +973,7 @@ python3 scripts/inventario/calcular_inventario_teorico.py --fecha 2026-03-31
 
 ---
 
-## 17. Troubleshooting {#17-troubleshooting}
+## 21. Troubleshooting {#21-troubleshooting}
 
 ### La API no responde
 
@@ -790,7 +1030,10 @@ El script `depurar_inventario.py` hace DELETE + INSERT para la fecha. Si se ejec
 ## Documentacion relacionada
 
 - `.agent/contextos/inventario_fisico.md` — contexto del modulo con estado actual y pendientes
-- `.agent/skills/inventario.md` — skill con comandos frecuentes y gotchas
+- `.agent/skills/inventario-fisico/SKILL.md` — skill con stack, BD, endpoints, flujos y gotchas
 - `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — manual completo de tablas Effi de produccion e inventarios
 - `inventario/POLITICAS_ACCESO.md` — documentacion de politicas de acceso
 - `inventario/politicas.json` — configuracion de permisos
+- `plantilla_importacion_ajuste_inventario.xlsx` — plantilla Excel para ajustes de inventario en Effi
+- `scripts/sync_inventario_catalogo.py` — sync catalogo articulos (paso 6e del pipeline)
+- `scripts/import_ajuste_inventario.js` — script Playwright para crear ajustes en Effi

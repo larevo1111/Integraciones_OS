@@ -578,16 +578,17 @@ Todo archivo subido por usuarios (imágenes, documentos, audio, etc.) va aquí. 
 - `inventario/POLITICAS_ACCESO.md` — Políticas de acceso y seguridad del módulo de inventario.
 - `inventario/politicas.json` — Config de permisos por acción y nivel de usuario.
 
-### Sistema de Inventario Físico (2026-03-31)
+### Sistema de Inventario Físico (actualizado 2026-04-06)
 App independiente para conteo de inventario. Separada de sistema_gestion.
-- **Manual completo**: `.agent/manuales/inventario_fisico_manual.md` — 17 secciones, v1.0
+- **Manual completo**: `.agent/manuales/inventario_fisico_manual.md` — **21 secciones, v2.0**
 - **App**: `inv.oscomunidad.com` — Vue 3 + Vite frontend, FastAPI backend (puerto 9401)
-- **BD**: `os_inventario` — 4 tablas: `inv_conteos` (conteos), `inv_rangos` (unidades/grupos/rangos), `inv_auditorias` (historial), `inv_teorico` (calculo teorico)
-- **Scripts**: `depurar_inventario.py` (genera conteos), `calcular_rangos.py` (unidades/grupos), `calcular_inventario_teorico.py` (stock teorico), `api.py` (servidor)
+- **BD**: `os_inventario` — 4 tablas: `inv_conteos`, `inv_rangos`, `inv_auditorias`, `inv_teorico`
+- **Catálogo**: `inv_catalogo_articulos` (effi_data local + Hostinger) — artículos con unidad y grupo precalculados, sync cada 2h + botón Sync Effi
+- **Scripts inventario**: `depurar_inventario.py`, `calcular_rangos.py`, `calcular_inventario_teorico.py`, `api.py`
+- **Scripts sync/ajuste**: `sync_inventario_catalogo.py` (paso 6e pipeline), `import_ajuste_inventario.js` (Playwright, crea ajustes en Effi)
 - **Auth**: Google OAuth, JWT compartido con sistema_gestion
-- **Grupos**: MP (materia prima), PP (producto en proceso), PT (producto terminado), INS (insumos), DS (desarrollo), DES (desperdicio), NM (no matriculado)
-- **Validación**: Unidades KG/GRS/UND/LT con rangos min/max y detección de error x1000 (kg↔g)
-- **Auditoría**: Todo cambio registrado (conteo, edición, nota, foto, reinicio, cierre)
+- **Grupos**: MP, PP, PT, INS, DS, DES, NM — detectados automáticamente
+- **Funcionalidades clave**: conteo físico, asignación artículos NM→Effi, sync catálogo, ajustes inventario Effi, validación unidades, auditoría completa
 - **Systemd**: `os-inventario-api.service`, cloudflared `inv.oscomunidad.com`
 
 ### Protocolo de documentación de scripts
