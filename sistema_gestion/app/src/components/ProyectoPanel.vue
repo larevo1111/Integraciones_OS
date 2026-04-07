@@ -607,6 +607,7 @@ function fmtFecha(iso) {
   min-height: 28px; padding: 0; resize: none;
   overflow: hidden; line-height: 1.4;
   word-break: break-word;
+  flex-shrink: 0;
 }
 .pp-titulo::placeholder { color: var(--text-tertiary); }
 
