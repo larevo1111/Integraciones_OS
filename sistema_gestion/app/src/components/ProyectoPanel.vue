@@ -310,8 +310,13 @@ const tituloRef = ref(null)
 function autoResizeTitulo(e) {
   const el = e?.target || tituloRef.value
   if (!el) return
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
+  // Doble rAF para esperar a que el layout se resuelva (ancho del panel)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+    })
+  })
 }
 
 // ─── DRAG (mobile bottom sheet) ───

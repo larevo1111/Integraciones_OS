@@ -133,7 +133,7 @@
               class="data-row"
               @click="emit('row-click', row)"
             >
-              <td v-for="col in visibleColumns" :key="col.key" class="td">
+              <td v-for="col in visibleColumns" :key="col.key" class="td" :class="{ 'td-nowrap': col.nowrap }">
                 <slot :name="`cell-${col.key}`" :row="row" :col="col" :value="row[col.key]">
                   <span class="cell-value">{{ formatCell(row[col.key], col.key) }}</span>
                 </slot>
@@ -751,10 +751,16 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .data-row:hover { background: var(--bg-row-hover); }
 
 .td {
-  padding: 0 12px;
-  height: 36px;
+  padding: 8px 12px;
+  min-height: 36px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
+  vertical-align: middle;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.td-nowrap {
   white-space: nowrap;
   max-width: 240px; overflow: hidden; text-overflow: ellipsis;
 }
