@@ -753,12 +753,12 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .td {
   padding: 8px 12px;
   min-height: 36px;
+  min-width: 160px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   vertical-align: middle;
   line-height: 1.4;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 .td-nowrap {
   white-space: nowrap;
