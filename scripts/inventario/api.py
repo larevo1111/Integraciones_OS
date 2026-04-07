@@ -909,6 +909,59 @@ def actualizar_gestion(gestion_id: int, data: GestionUpdate):
     return {"ok": True}
 
 
+# ── Análisis de inconsistencias ──
+
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+from analisis_inconsistencias import analizar_todos as _analizar_todos
+
+analisis_status = {"estado": "idle", "progreso": 0, "total": 0, "articulo": "", "resultado": None}
+
+
+def _analisis_background(fecha, usuario, usar_ia):
+    """Tarea en background para analizar todos los artículos."""
+    analisis_status["estado"] = "analizando"
+    analisis_status["progreso"] = 0
+
+    def callback(progreso, total, articulo):
+        analisis_status["progreso"] = progreso
+        analisis_status["total"] = total
+        analisis_status["articulo"] = articulo[:40]
+
+    try:
+        resultado = _analizar_todos(fecha, usar_ia=usar_ia, callback=callback)
+        analisis_status["estado"] = "ok"
+        analisis_status["resultado"] = resultado
+        registrar_auditoria(0, 'gestion_analisis', usuario, None, fecha,
+                            f'{resultado["analizados"]} analizados, {resultado["con_causa"]} con causa')
+    except Exception as e:
+        analisis_status["estado"] = "error"
+        analisis_status["resultado"] = {"error": str(e)}
+
+
+@app.post("/api/inventario/gestion/analizar")
+def analizar_inconsistencias(data: GestionCalcular, background_tasks: BackgroundTasks):
+    """Lanza análisis de inconsistencias en background (determinista + IA)."""
+    if analisis_status["estado"] == "analizando":
+        raise HTTPException(409, "Ya hay un análisis en curso")
+
+    usar_ia = True  # Por defecto usa IA para los que no resuelve la capa determinista
+    analisis_status["estado"] = "iniciando"
+    analisis_status["progreso"] = 0
+    analisis_status["total"] = 0
+    analisis_status["articulo"] = ""
+    analisis_status["resultado"] = None
+
+    background_tasks.add_task(_analisis_background, data.fecha_inventario, data.usuario, usar_ia)
+    return {"ok": True, "mensaje": "Análisis iniciado en background"}
+
+
+@app.get("/api/inventario/gestion/analisis-estado")
+def estado_analisis():
+    """Estado del análisis en curso."""
+    return analisis_status
+
+
 # ── Sync Effi ──
 
 EXPORT_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'export_inventario.js')
