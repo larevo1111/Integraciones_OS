@@ -321,6 +321,7 @@
 
       <!-- ═══ VISTA GESTIÓN ═══ -->
       <template v-if="vistaActiva === 'gestion'">
+      <div class="ges-scroll-container">
 
         <!-- DASHBOARD KPIs -->
         <div class="ges-dashboard" v-if="gesDash">
@@ -469,6 +470,7 @@
           </div>
         </div>
 
+      </div><!-- /ges-scroll-container -->
       </template><!-- /VISTA GESTIÓN -->
 
     </div><!-- /inv-content -->
@@ -1949,6 +1951,7 @@ onUnmounted(() => clearInterval(clockInterval))
 .ges-grupos-table { margin-bottom: 8px; }
 
 /* ═══ ACORDEONES GESTIÓN ═══ */
+.ges-scroll-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
 .ges-acordeones { padding: 0 16px 20px; }
 .ges-grupo-acordeon { border: 1px solid var(--border-subtle); border-radius: 6px; margin-bottom: 8px; background: var(--bg-card); overflow: hidden; }
 .ges-grupo-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background 0.15s; }
