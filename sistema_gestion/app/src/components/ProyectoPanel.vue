@@ -602,10 +602,11 @@ function fmtFecha(iso) {
 /* Título */
 .pp-titulo {
   width: 100%; border: none; background: transparent;
-  font-size: 18px; font-weight: 600; color: var(--text-primary);
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
   font-family: var(--font-sans); outline: none;
-  min-height: 32px; padding: 0; resize: none;
+  min-height: 28px; padding: 0; resize: none;
   overflow: hidden; line-height: 1.4;
+  word-break: break-word;
 }
 .pp-titulo::placeholder { color: var(--text-tertiary); }
 
@@ -755,7 +756,7 @@ function fmtFecha(iso) {
   }
   .pp-handle-close:hover { color: var(--text-primary); }
   .pp-field-label { width: 90px; }
-  .pp-titulo { font-size: 16px; }
+  .pp-titulo { font-size: 14px; }
   .pp-chips { gap: 6px; }
   .pp-chip { padding: 4px 12px; font-size: 12px; }
   .pp-subtarea-wrap { flex: 1; min-height: 0; overflow-y: auto; }
