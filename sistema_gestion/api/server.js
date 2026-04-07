@@ -65,6 +65,7 @@ async function refrescarNiveles() {
 function filtrarPorNivel(items, reqUsuario, campoResponsables = 'responsables') {
   const miEmail = reqUsuario.email
   const miNivel = reqUsuario.nivel || nivelCache[miEmail] || 1
+  if (miNivel >= 9) return items  // Nivel 9 ve TODO sin excepción
   return items.filter(item => {
     const responsables = item[campoResponsables]
     if (!responsables || !responsables.length) return true  // sin responsable → visible para todos
