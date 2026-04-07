@@ -592,6 +592,31 @@ body {
 }
 
 /* ─── SECCIÓN COMPLETADAS ─── */
+/* Acordeón atrasadas */
+.atrasadas-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px 4px;
+  cursor: pointer;
+  color: var(--color-error, #ef5350);
+  font-size: 12px;
+  font-weight: 600;
+}
+.atrasadas-header:hover { opacity: 0.8; }
+.atrasadas-icon { color: var(--color-error, #ef5350); }
+.atrasadas-count {
+  background: var(--color-error, #ef5350);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  min-width: 18px;
+  text-align: center;
+  line-height: 18px;
+}
+
 .completadas-header {
   display: flex;
   align-items: center;

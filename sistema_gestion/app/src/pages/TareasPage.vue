@@ -168,10 +168,49 @@
 
       <!-- Lista de tareas -->
       <div class="page-body lista-tareas" v-if="!cargando">
-        <div v-if="!grupos.length && !completadasFiltradas.length" class="empty-state">
+        <div v-if="!grupos.length && !gruposAtrasadas.length && !completadasFiltradas.length" class="empty-state">
           <span class="material-icons" style="font-size:32px">check_circle_outline</span>
           <p>No hay tareas con estos filtros</p>
         </div>
+
+        <!-- Acordeón de atrasadas -->
+        <template v-if="tareasAtrasadas.length">
+          <div class="atrasadas-header" @click="mostrarAtrasadas = !mostrarAtrasadas">
+            <span class="material-icons" style="font-size:16px">{{ mostrarAtrasadas ? 'expand_more' : 'chevron_right' }}</span>
+            <span class="material-icons atrasadas-icon" style="font-size:14px">warning</span>
+            Atrasadas
+            <span class="atrasadas-count">{{ tareasAtrasadas.length }}</span>
+          </div>
+          <template v-if="mostrarAtrasadas">
+            <template v-for="grupo in gruposAtrasadas" :key="'atr-'+grupo.key">
+              <div v-if="!grupo.sinHeader" class="grupo-header">
+                <div class="grupo-color-bar" :style="{ background: grupo.color }" />
+                <span class="grupo-nombre">{{ grupo.nombre }}</span>
+                <span class="grupo-count">{{ grupo.tareas.length }}</span>
+              </div>
+              <div class="grupo-tareas-list" :data-grupo="'atr-'+grupo.key">
+                <div v-for="t in grupo.tareas" :key="t.id" :data-id="t.id" class="sortable-tarea-wrap">
+                  <TareaItem
+                    :tarea="t"
+                    :seleccionada="tareaSeleccionada?.id === t.id"
+                    :seleccionada-multi="seleccionMultiIds.includes(t.id)"
+                    :usuario-actual="auth.usuario?.email"
+                    :expandida="!!subtareasExpandidas[t.id]"
+                    :mostrar-responsable="!props.soloMias"
+                    :compacto="isMobile"
+                    :drag-handle="dragHabilitado"
+                    @click="seleccionar"
+                    @cambiar-estado="cambiarEstado"
+                    @agregar-subtarea="iniciarSubtarea"
+                    @toggle-subtareas="toggleSubtareas"
+                    @editar-titulo="editarTituloInline"
+                    @seleccionar-multi="onSeleccionarMulti"
+                  />
+                </div>
+              </div>
+            </template>
+          </template>
+        </template>
 
         <template v-for="grupo in grupos" :key="grupo.key">
           <div v-if="!grupo.sinHeader" class="grupo-header">
@@ -1107,14 +1146,30 @@ function ordenSecundario(lista) {
   return [...lista].sort(cmp)
 }
 
-const grupos = computed(() => {
-  if (!tareas.value.length) return []
+// Filtros donde mostrar acordeón de atrasadas
+const FILTROS_CON_ATRASADAS = ['todas', 'hoy', 'manana', 'semana']
+const mostrarAtrasadas = ref(false)
+
+// Separar atrasadas de la lista principal
+const hoyStr = computed(() => hoyISO())
+const tareasAtrasadas = computed(() => {
+  if (!FILTROS_CON_ATRASADAS.includes(filtroActivo.value)) return []
+  return tareas.value.filter(t => t.fecha_limite && t.fecha_limite < hoyStr.value)
+})
+const tareasNormales = computed(() => {
+  if (!FILTROS_CON_ATRASADAS.includes(filtroActivo.value)) return tareas.value
+  return tareas.value.filter(t => !t.fecha_limite || t.fecha_limite >= hoyStr.value)
+})
+
+// Función reutilizable para construir grupos desde una lista de tareas
+function buildGrupos(lista) {
+  if (!lista.length) return []
   if (agruparPor.value === 'ninguno') {
-    return [{ key: '_all', nombre: '', color: 'transparent', tareas: ordenSecundario(tareas.value), sinHeader: true }]
+    return [{ key: '_all', nombre: '', color: 'transparent', tareas: ordenSecundario(lista), sinHeader: true }]
   }
   if (agruparPor.value === 'categoria') {
     const map = {}
-    tareas.value.forEach(t => {
+    lista.forEach(t => {
       const k = t.categoria_id
       if (!map[k]) map[k] = { key: k, nombre: t.categoria_nombre, color: t.categoria_color, tareas: [] }
       map[k].tareas.push(t)
@@ -1123,7 +1178,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'prioridad') {
     const map = {}
-    tareas.value.forEach(t => {
+    lista.forEach(t => {
       const p = t.prioridad || 'Media'
       if (!map[p]) map[p] = { key: p, nombre: p, color: COLORES_PRIORIDAD[p], tareas: [] }
       map[p].tareas.push(t)
@@ -1132,7 +1187,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'fecha') {
     const map = {}
-    tareas.value.forEach(t => {
+    lista.forEach(t => {
       const f = t.fecha_limite || 'Sin fecha'
       if (!map[f]) map[f] = { key: f, nombre: formatGrupoFecha(f), color: '#6b7280', tareas: [] }
       map[f].tareas.push(t)
@@ -1147,7 +1202,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'proyecto') {
     const map = {}
-    tareas.value.forEach(t => {
+    lista.forEach(t => {
       const k = t.proyecto_id || 'sin-proyecto'
       if (!map[k]) map[k] = { key: k, nombre: t.proyecto_nombre || 'Sin proyecto', color: t.proyecto_color || '#607D8B', tareas: [] }
       map[k].tareas.push(t)
@@ -1159,7 +1214,7 @@ const grupos = computed(() => {
   }
   if (agruparPor.value === 'responsable') {
     const map = {}
-    tareas.value.forEach(t => {
+    lista.forEach(t => {
       const k = t.responsable || 'sin-asignar'
       const nombre = t.responsable_nombre || t.responsable || 'Sin asignar'
       if (!map[k]) map[k] = { key: k, nombre, color: '#607D8B', tareas: [] }
@@ -1171,7 +1226,10 @@ const grupos = computed(() => {
     return all.map(g => ({ ...g, tareas: ordenSecundario(g.tareas) }))
   }
   return []
-})
+}
+
+const gruposAtrasadas = computed(() => buildGrupos(tareasAtrasadas.value))
+const grupos = computed(() => buildGrupos(tareasNormales.value))
 
 function formatGrupoFecha(iso) {
   if (iso === 'Sin fecha') return 'Sin fecha'
