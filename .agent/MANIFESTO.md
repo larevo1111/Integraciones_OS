@@ -228,6 +228,13 @@ Cuando la IA falla en una consulta:
 **Regla de conexiones a BD:**
 Las instrucciones de conexión están documentadas como skills. Si no existe la skill, Claude Code puede explorar — pero tiene la **obligación de documentar lo aprendido como skill nueva** antes de dar la tarea por terminada. El conocimiento no queda en el chat: se institucionaliza.
 
+**Convención de backups de BD:**
+Todos los backups SQL del servidor se guardan en `/home/osserver/Proyectos_Antigravity/backups/{nombre_bd}/{YYYY-MM-DD_HHMMSS}.sql`.
+- Esta carpeta vive **fuera de cualquier repo git** del proyecto — sirve a todas las BDs del servidor (effi_data, os_inventario, ia_service_os, os_whatsapp, espocrm, etc.)
+- Comando estándar: `mysqldump -u osadmin -pEpist2487. --single-transaction --routines --triggers {bd} > {backup_dir}/$(date +%Y-%m-%d_%H%M%S).sql`
+- **Cuándo crear backup**: antes de cambios destructivos (DROP, TRUNCATE), antes de migraciones de schema, cuando Santi lo pida, antes de cerrar definitivamente un inventario.
+- Detalle completo: `feedback_backups_bd.md` en la memoria de Claude.
+
 ---
 
 ## 4. TONO Y COMUNICACIÓN
