@@ -1150,15 +1150,22 @@ function ordenSecundario(lista) {
 const FILTROS_CON_ATRASADAS = ['todas', 'hoy', 'manana', 'semana']
 const mostrarAtrasadas = ref(false)
 
-// Separar atrasadas de la lista principal
+// Atrasadas: se cargan por separado para filtros de fecha, o se separan de tareas.value para "Todas"
+const atrasadasData = ref([])
 const hoyStr = computed(() => hoyISO())
+
 const tareasAtrasadas = computed(() => {
   if (!FILTROS_CON_ATRASADAS.includes(filtroActivo.value)) return []
-  return tareas.value.filter(t => t.fecha_limite && t.fecha_limite < hoyStr.value)
+  if (filtroActivo.value === 'todas') {
+    return tareas.value.filter(t => t.fecha_limite && t.fecha_limite < hoyStr.value)
+  }
+  return atrasadasData.value
 })
 const tareasNormales = computed(() => {
-  if (!FILTROS_CON_ATRASADAS.includes(filtroActivo.value)) return tareas.value
-  return tareas.value.filter(t => !t.fecha_limite || t.fecha_limite >= hoyStr.value)
+  if (filtroActivo.value === 'todas') {
+    return tareas.value.filter(t => !t.fecha_limite || t.fecha_limite >= hoyStr.value)
+  }
+  return tareas.value
 })
 
 // Función reutilizable para construir grupos desde una lista de tareas
@@ -1279,12 +1286,28 @@ async function cargarTareas() {
     if (proyectoFiltroId.value) completadasParams.set('proyecto_id', proyectoFiltroId.value)
     if (etiquetaFiltroId.value) completadasParams.set('etiquetas', etiquetaFiltroId.value)
     const completadasUrl = `/api/gestion/tareas/completadas?${completadasParams}`
-    const [dataTareas, dataCompletadas] = await Promise.all([
+
+    // Atrasadas: llamada separada para filtros de fecha (en "Todas" se separan del array principal)
+    const necesitaAtrasadas = ['hoy', 'manana', 'semana'].includes(filtroActivo.value)
+    let atrasadasPromise = null
+    if (necesitaAtrasadas) {
+      const ap = new URLSearchParams()
+      ap.set('fecha_hoy', hoyISO())
+      ap.set('fecha_hasta', isoRelativo(-1))
+      if (props.soloMias) ap.set('solo_mias', '1')
+      if (proyectoFiltroId.value) ap.set('proyecto_id', proyectoFiltroId.value)
+      if (etiquetaFiltroId.value) ap.set('etiquetas', etiquetaFiltroId.value)
+      atrasadasPromise = api(`/api/gestion/tareas?${ap}`)
+    }
+
+    const [dataTareas, dataCompletadas, dataAtrasadas] = await Promise.all([
       api(`/api/gestion/tareas?${params}`),
-      api(completadasUrl)
+      api(completadasUrl),
+      atrasadasPromise || Promise.resolve(null)
     ])
     tareas.value      = dataTareas.tareas || []
     completadas.value = dataCompletadas.tareas || []
+    atrasadasData.value = dataAtrasadas?.tareas || []
     nextTick(initSortables)
   } catch (e) { console.error(e) } finally { cargando.value = false }
 }
