@@ -74,7 +74,19 @@
 1. Verificar que TODAS las variables CSS usadas existen en `frontend/app/src/css/app.scss` — si no existen, agregarlas o usar variable equivalente
 2. Verificar que el endpoint API devuelve los datos correctos con `curl` o query directa
 3. Hacer el build y confirmar que compila sin errores
-4. NO declarar una tarea como completada sin haber verificado los puntos anteriores
+4. **Verificar visualmente con Chrome DevTools MCP** (navegar a la URL real y tomar screenshot)
+5. NO declarar una tarea como completada sin haber verificado los puntos anteriores
+
+### Verificación visual rápida con Chrome DevTools MCP
+
+Para autenticarse en `gestion.oscomunidad.com` / `ia.oscomunidad.com` sin OAuth:
+
+1. Generar JWT: `scripts/gen_jwt_dev.sh` (token válido 7 días para SYSOP / empresa OS)
+2. Inyectar en localStorage con `mcp__chrome-devtools__evaluate_script`
+3. Navegar a la ruta: `mcp__chrome-devtools__navigate_page`
+4. Verificar: `mcp__chrome-devtools__take_screenshot` o `take_snapshot`
+
+Ver detalle completo en `memory/feedback_chrome_devtools_jwt.md`. Esto reemplaza los scripts de Playwright para verificación interactiva. Playwright queda solo para tests automatizados sin supervisión.
 
 **⚠️ BUILD OBLIGATORIO:** Después de cualquier modificación Vue/Quasar, los fuentes NO se sirven directamente. El servidor sirve `dist/spa/` compilado. Sin rebuild = cambios invisibles en producción.
 
