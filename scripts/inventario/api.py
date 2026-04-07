@@ -2,7 +2,7 @@
 API FastAPI para inventario físico OS.
 Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
 """
-import os, re, jwt, uuid, shutil, subprocess
+import os, re, json, jwt, uuid, shutil, subprocess
 from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -620,6 +620,293 @@ def cerrar_inventario(data: GestionInventario):
     registrar_auditoria(0, 'cerrar_inventario', data.usuario, None, data.fecha_inventario,
                         f'{affected} conteos verificados/cerrados')
     return {"ok": True, "cerrados": affected}
+
+
+# ── Gestión de inconsistencias ──
+
+CAUSAS_PREDEFINIDAS = [
+    'Faltó remisionar o facturar',
+    'OP no ejecutada',
+    'Error unidades en OP',
+    'Error unidades en compra',
+    'Faltó registrar compra',
+    'Valores incorrectos en OP',
+    'Valores incorrectos en despacho',
+    'Valores incorrectos en compra',
+    'Producto dañado',
+    'Obsoleto',
+    'Artículo redundante',
+    'Otro',
+]
+
+
+class GestionCalcular(BaseModel):
+    fecha_inventario: str
+    usuario: str
+
+
+@app.post("/api/inventario/gestion/calcular")
+def calcular_gestion(data: GestionCalcular):
+    """Pobla/recalcula inv_gestion agregando conteos por artículo para la fecha."""
+    # 1. Agregar conteos por artículo (sum de bodegas)
+    rows = db_query(DB_INV, """
+        SELECT c.id_effi,
+               c.nombre,
+               GROUP_CONCAT(DISTINCT c.bodega ORDER BY c.bodega) AS bodegas,
+               SUM(COALESCE(c.inventario_teorico, 0)) AS total_teorico,
+               SUM(COALESCE(c.inventario_fisico, 0)) AS total_fisico,
+               SUM(COALESCE(c.diferencia, 0)) AS total_diferencia,
+               MAX(COALESCE(c.costo_promedio, 0)) AS costo_promedio,
+               r.grupo, r.unidad
+        FROM inv_conteos c
+        LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+        WHERE c.fecha_inventario = %s AND c.excluido = 0 AND c.estado IN ('contado', 'verificado')
+        GROUP BY c.id_effi
+    """, (data.fecha_inventario,))
+
+    if not rows:
+        return {"ok": False, "mensaje": "No hay conteos para esa fecha"}
+
+    # 2. Calcular valor total del inventario (para umbrales de severidad)
+    valor_total = sum(abs(float(r['total_teorico'] or 0) * float(r['costo_promedio'] or 0)) for r in rows)
+    if valor_total == 0:
+        valor_total = 1  # evitar division por cero
+
+    # 3. Calcular impacto y severidad por artículo
+    conn = pymysql.connect(**DB_INV)
+    insertados = 0
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM inv_gestion WHERE fecha_inventario = %s", (data.fecha_inventario,))
+        for r in rows:
+            dif = float(r['total_diferencia'] or 0)
+            costo = float(r['costo_promedio'] or 0)
+            impacto = dif * costo
+            pct = abs(impacto) / valor_total * 100 if valor_total > 0 else 0
+
+            if dif == 0:
+                severidad = 'ok'
+            elif pct >= 2.0:
+                severidad = 'critica'
+            elif pct >= 0.5:
+                severidad = 'significativa'
+            else:
+                severidad = 'menor'
+
+            # Detectar grupo/unidad al vuelo si no viene de inv_rangos
+            grupo = r.get('grupo') or ''
+            unidad = r.get('unidad') or detectar_unidad(r['nombre'] or '')
+            if not grupo:
+                cat_rows = db_query(DB_EFFI, "SELECT categoria FROM inv_catalogo_articulos WHERE id_effi = %s", (r['id_effi'],))
+                cat = (cat_rows[0]['categoria'] if cat_rows else '') or ''
+                cat_up = cat.upper()
+                nom_up = (r['nombre'] or '').upper()
+                if 'DESPERDICIO' in nom_up:
+                    grupo = 'DES'
+                elif r['id_effi'].startswith('NM-'):
+                    grupo = 'NM'
+                elif cat_up.startswith('TPT'):
+                    grupo = 'PT'
+                elif cat_up.startswith('T03'):
+                    grupo = 'INS'
+                elif 'DESARROLLO' in cat_up:
+                    grupo = 'DS'
+                else:
+                    grupo = 'MP'
+
+            bodegas_json = json.dumps(r['bodegas'].split(',')) if r.get('bodegas') else '["—"]'
+
+            cur.execute("""
+                INSERT INTO inv_gestion
+                    (fecha_inventario, id_effi, nombre, grupo, unidad, bodegas,
+                     total_teorico, total_fisico, total_diferencia, costo_promedio,
+                     impacto_economico, severidad)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (data.fecha_inventario, r['id_effi'], r['nombre'], grupo, unidad, bodegas_json,
+                  r['total_teorico'], r['total_fisico'], r['total_diferencia'], costo,
+                  round(impacto, 2), severidad))
+            insertados += 1
+
+        conn.commit()
+    conn.close()
+
+    registrar_auditoria(0, 'gestion_calcular', data.usuario, None, data.fecha_inventario,
+                        f'{insertados} artículos procesados, valor total ${valor_total:,.0f}')
+    return {"ok": True, "articulos": insertados, "valor_total": round(valor_total, 2)}
+
+
+@app.get("/api/inventario/gestion/dashboard")
+def gestion_dashboard(fecha: str):
+    """KPIs + valorización por grupo para el dashboard de gestión."""
+    rows = db_query(DB_INV, "SELECT * FROM inv_gestion WHERE fecha_inventario = %s", (fecha,))
+    if not rows:
+        return {"vacio": True}
+
+    valor_teorico = sum(float(r['total_teorico'] or 0) * float(r['costo_promedio'] or 0) for r in rows)
+    valor_fisico = sum(float(r['total_fisico'] or 0) * float(r['costo_promedio'] or 0) for r in rows)
+    impacto_total = sum(float(r['impacto_economico'] or 0) for r in rows)
+
+    con_dif = [r for r in rows if float(r['total_diferencia'] or 0) != 0]
+    faltantes = len([r for r in con_dif if float(r['total_diferencia'] or 0) < 0])
+    sobrantes = len([r for r in con_dif if float(r['total_diferencia'] or 0) > 0])
+    exactos = len(rows) - len(con_dif)
+
+    # Por severidad
+    por_severidad = {}
+    for sev in ['ok', 'menor', 'significativa', 'critica']:
+        items = [r for r in rows if r['severidad'] == sev]
+        por_severidad[sev] = {
+            'count': len(items),
+            'impacto': round(sum(float(r['impacto_economico'] or 0) for r in items), 2)
+        }
+
+    # Por grupo
+    grupos = {}
+    for r in rows:
+        g = r['grupo'] or 'SIN'
+        if g not in grupos:
+            grupos[g] = {'grupo': g, 'total': 0, 'exactos': 0, 'valor_teorico': 0, 'valor_fisico': 0, 'impacto': 0}
+        grupos[g]['total'] += 1
+        if float(r['total_diferencia'] or 0) == 0:
+            grupos[g]['exactos'] += 1
+        grupos[g]['valor_teorico'] += float(r['total_teorico'] or 0) * float(r['costo_promedio'] or 0)
+        grupos[g]['valor_fisico'] += float(r['total_fisico'] or 0) * float(r['costo_promedio'] or 0)
+        grupos[g]['impacto'] += float(r['impacto_economico'] or 0)
+
+    for g in grupos.values():
+        g['valor_teorico'] = round(g['valor_teorico'], 2)
+        g['valor_fisico'] = round(g['valor_fisico'], 2)
+        g['impacto'] = round(g['impacto'], 2)
+        g['pct_exactitud'] = round(g['exactos'] / g['total'] * 100, 1) if g['total'] > 0 else 0
+
+    # Por estado
+    por_estado = {}
+    for est in ['pendiente', 'analizado', 'justificada', 'requiere_ajuste', 'ajustada']:
+        por_estado[est] = len([r for r in rows if r['estado'] == est])
+
+    # Orden de grupos para el informe
+    orden_grupos = ['MP', 'INS', 'PP', 'PT', 'DS', 'DES', 'NM', 'SIN']
+    grupos_ordenados = sorted(grupos.values(), key=lambda g: orden_grupos.index(g['grupo']) if g['grupo'] in orden_grupos else 99)
+
+    return {
+        "valor_teorico": round(valor_teorico, 2),
+        "valor_fisico": round(valor_fisico, 2),
+        "impacto_total": round(impacto_total, 2),
+        "total_articulos": len(rows),
+        "con_diferencia": len(con_dif),
+        "faltantes": faltantes,
+        "sobrantes": sobrantes,
+        "exactos": exactos,
+        "por_severidad": por_severidad,
+        "por_grupo": grupos_ordenados,
+        "por_estado": por_estado
+    }
+
+
+@app.get("/api/inventario/gestion")
+def listar_gestion(fecha: str, severidad: Optional[str] = None, estado: Optional[str] = None,
+                   grupo: Optional[str] = None, bodega: Optional[str] = None, solo_diferencias: bool = True):
+    """Lista artículos de gestión con filtros. Por defecto solo los que tienen diferencia."""
+    sql = "SELECT * FROM inv_gestion WHERE fecha_inventario = %s"
+    params = [fecha]
+
+    if solo_diferencias:
+        sql += " AND total_diferencia != 0"
+    if severidad:
+        sql += " AND severidad = %s"
+        params.append(severidad)
+    if estado:
+        sql += " AND estado = %s"
+        params.append(estado)
+    if grupo:
+        sql += " AND grupo = %s"
+        params.append(grupo)
+    if bodega:
+        sql += " AND bodegas LIKE %s"
+        params.append(f'%{bodega}%')
+
+    sql += " ORDER BY ABS(impacto_economico) DESC"
+    rows = db_query(DB_INV, sql, params)
+
+    for r in rows:
+        for campo in ['total_teorico', 'total_fisico', 'total_diferencia', 'costo_promedio', 'impacto_economico']:
+            r[campo] = float(r[campo]) if r[campo] is not None else 0
+        r['fecha_revision'] = str(r['fecha_revision']) if r['fecha_revision'] else None
+        r['analizado_en'] = str(r['analizado_en']) if r['analizado_en'] else None
+        r['bodegas'] = json.loads(r['bodegas']) if r['bodegas'] else []
+    return rows
+
+
+@app.get("/api/inventario/gestion/{gestion_id}/detalle")
+def detalle_gestion(gestion_id: int):
+    """Detalle de un artículo: conteos por bodega + datos de gestión."""
+    rows = db_query(DB_INV, "SELECT * FROM inv_gestion WHERE id = %s", (gestion_id,))
+    if not rows:
+        raise HTTPException(404, "No encontrado")
+    g = rows[0]
+
+    # Conteos por bodega
+    conteos = db_query(DB_INV, """
+        SELECT bodega, inventario_teorico, inventario_fisico, diferencia, contado_por, fecha_conteo
+        FROM inv_conteos
+        WHERE fecha_inventario = %s AND id_effi = %s AND excluido = 0
+        ORDER BY bodega
+    """, (g['fecha_inventario'], g['id_effi']))
+
+    for c in conteos:
+        for campo in ['inventario_teorico', 'inventario_fisico', 'diferencia']:
+            c[campo] = float(c[campo]) if c[campo] is not None else None
+        c['fecha_conteo'] = str(c['fecha_conteo']) if c['fecha_conteo'] else None
+
+    for campo in ['total_teorico', 'total_fisico', 'total_diferencia', 'costo_promedio', 'impacto_economico']:
+        g[campo] = float(g[campo]) if g[campo] is not None else 0
+    g['fecha_revision'] = str(g['fecha_revision']) if g['fecha_revision'] else None
+    g['analizado_en'] = str(g['analizado_en']) if g['analizado_en'] else None
+    g['bodegas'] = json.loads(g['bodegas']) if g['bodegas'] else []
+
+    return {"gestion": g, "conteos": conteos, "causas_disponibles": CAUSAS_PREDEFINIDAS}
+
+
+class GestionUpdate(BaseModel):
+    estado: str
+    causa_final: Optional[str] = None
+    observaciones: Optional[str] = None
+    usuario: str
+
+
+@app.put("/api/inventario/gestion/{gestion_id}")
+def actualizar_gestion(gestion_id: int, data: GestionUpdate):
+    """Actualiza estado, causa y observaciones de un artículo en gestión."""
+    TRANSICIONES = {
+        'pendiente': ['analizado', 'en_revision', 'justificada', 'requiere_ajuste'],
+        'analizado': ['justificada', 'requiere_ajuste', 'en_revision'],
+        'en_revision': ['justificada', 'requiere_ajuste', 'pendiente'],
+        'justificada': ['en_revision', 'requiere_ajuste'],
+        'requiere_ajuste': ['ajustada', 'en_revision', 'justificada'],
+        'ajustada': ['en_revision'],
+    }
+
+    rows = db_query(DB_INV, "SELECT estado FROM inv_gestion WHERE id = %s", (gestion_id,))
+    if not rows:
+        raise HTTPException(404, "No encontrado")
+
+    estado_actual = rows[0]['estado']
+    if data.estado not in TRANSICIONES.get(estado_actual, []):
+        raise HTTPException(400, f"Transición no permitida: {estado_actual} → {data.estado}")
+
+    if data.estado == 'justificada' and not data.causa_final:
+        raise HTTPException(400, "Se requiere causa para justificar")
+
+    db_execute(DB_INV, """
+        UPDATE inv_gestion
+        SET estado = %s, causa_final = %s, observaciones = %s,
+            revisado_por = %s, fecha_revision = NOW()
+        WHERE id = %s
+    """, (data.estado, data.causa_final, data.observaciones, data.usuario, gestion_id))
+
+    registrar_auditoria(gestion_id, 'gestion_estado', data.usuario,
+                        estado_actual, data.estado,
+                        f'Causa: {data.causa_final or "—"} | {data.observaciones or ""}')
+    return {"ok": True}
 
 
 # ── Sync Effi ──
