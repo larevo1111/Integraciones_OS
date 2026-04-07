@@ -571,9 +571,10 @@ async function confirmarCompletar() {
   const totalMin = tiempoFinalH.value*60 + tiempoFinalM.value
   popoverTiempo.value = false
   try {
-    const data = await api(`/api/gestion/tareas/${props.tarea.id}/completar`, {
-      method: 'POST',
-      body: JSON.stringify({ tiempo_real_min: totalMin || undefined })
+    const body = { estado: 'Completada' }
+    if (totalMin > 0) body.tiempo_real_min = totalMin
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
+      method: 'PUT', body: JSON.stringify(body)
     })
     emit('actualizada', data.tarea)
   } catch(e) { console.error(e) }
@@ -582,7 +583,9 @@ async function confirmarCompletar() {
 async function completarSin() {
   popoverTiempo.value = false
   try {
-    const data = await api(`/api/gestion/tareas/${props.tarea.id}/completar`, { method: 'POST' })
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
+      method: 'PUT', body: JSON.stringify({ estado: 'Completada' })
+    })
     emit('actualizada', data.tarea)
   } catch(e) { console.error(e) }
 }
