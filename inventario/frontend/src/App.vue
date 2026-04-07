@@ -170,6 +170,19 @@
         </button>
       </div>
 
+      <!-- TAB SWITCHER -->
+      <div v-if="puede('ver_gestion')" class="inv-tabs">
+        <button class="inv-tab" :class="{ active: vistaActiva === 'conteo' }" @click="vistaActiva = 'conteo'">
+          <span class="material-icons" style="font-size:15px">inventory_2</span> Conteo
+        </button>
+        <button class="inv-tab" :class="{ active: vistaActiva === 'gestion' }" @click="vistaActiva = 'gestion'; cargarGestion()">
+          <span class="material-icons" style="font-size:15px">analytics</span> Gestión
+        </button>
+      </div>
+
+      <!-- ═══ VISTA CONTEO ═══ -->
+      <template v-if="vistaActiva === 'conteo'">
+
       <!-- FILTROS + BODEGAS -->
       <div class="inv-filters-row">
         <!-- Filtros estado -->
@@ -303,6 +316,147 @@
         </tbody>
       </table>
     </div>
+
+      </template><!-- /VISTA CONTEO -->
+
+      <!-- ═══ VISTA GESTIÓN ═══ -->
+      <template v-if="vistaActiva === 'gestion'">
+
+        <!-- DASHBOARD KPIs -->
+        <div class="ges-dashboard" v-if="gesDash">
+          <div class="ges-kpis">
+            <div class="ges-kpi">
+              <div class="ges-kpi-label">Valor Teórico</div>
+              <div class="ges-kpi-value">${{ fmtMoney(gesDash.valor_teorico) }}</div>
+            </div>
+            <div class="ges-kpi">
+              <div class="ges-kpi-label">Valor Físico</div>
+              <div class="ges-kpi-value">${{ fmtMoney(gesDash.valor_fisico) }}</div>
+            </div>
+            <div class="ges-kpi ges-kpi-impacto" :class="gesDash.impacto_total < 0 ? 'neg' : 'pos'">
+              <div class="ges-kpi-label">Impacto</div>
+              <div class="ges-kpi-value">${{ fmtMoney(gesDash.impacto_total) }}</div>
+            </div>
+            <div class="ges-kpi">
+              <div class="ges-kpi-label">Con diferencia</div>
+              <div class="ges-kpi-value">{{ gesDash.con_diferencia }} <small>/ {{ gesDash.total_articulos }}</small></div>
+            </div>
+          </div>
+
+          <!-- Severidad mini cards -->
+          <div class="ges-severidad-row">
+            <div class="ges-sev-card ges-sev-critica" @click="gesFiltroSev = gesFiltroSev === 'critica' ? null : 'critica'; cargarGesArticulos()">
+              <span class="ges-sev-count">{{ gesDash.por_severidad?.critica?.count || 0 }}</span>
+              <span class="ges-sev-label">Críticas</span>
+            </div>
+            <div class="ges-sev-card ges-sev-significativa" @click="gesFiltroSev = gesFiltroSev === 'significativa' ? null : 'significativa'; cargarGesArticulos()">
+              <span class="ges-sev-count">{{ gesDash.por_severidad?.significativa?.count || 0 }}</span>
+              <span class="ges-sev-label">Significativas</span>
+            </div>
+            <div class="ges-sev-card ges-sev-menor" @click="gesFiltroSev = gesFiltroSev === 'menor' ? null : 'menor'; cargarGesArticulos()">
+              <span class="ges-sev-count">{{ gesDash.por_severidad?.menor?.count || 0 }}</span>
+              <span class="ges-sev-label">Menores</span>
+            </div>
+          </div>
+
+          <!-- Valorización por grupo -->
+          <div class="ges-grupos-table">
+            <table class="ges-table-mini">
+              <thead>
+                <tr>
+                  <th>Grupo</th><th>Art.</th><th>Teórico</th><th>Físico</th><th>Impacto</th><th>% Exact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="g in gesDash.por_grupo" :key="g.grupo" @click="gesFiltroGrupo = gesFiltroGrupo === g.grupo ? null : g.grupo; cargarGesArticulos()">
+                  <td><span class="grupo-tag" :class="'grupo-' + (g.grupo || 'mp').toLowerCase()">{{ g.grupo }}</span></td>
+                  <td>{{ g.total }}</td>
+                  <td class="text-right">${{ fmtMoney(g.valor_teorico) }}</td>
+                  <td class="text-right">${{ fmtMoney(g.valor_fisico) }}</td>
+                  <td class="text-right" :class="g.impacto < 0 ? 'text-red' : g.impacto > 0 ? 'text-green' : ''">${{ fmtMoney(g.impacto) }}</td>
+                  <td class="text-right">{{ g.pct_exactitud }}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- FILTROS GESTIÓN -->
+        <div class="inv-filters-row">
+          <button class="inv-pill" :class="{ active: !gesFiltroSev }" @click="gesFiltroSev = null; cargarGesArticulos()">Todas</button>
+          <button class="inv-pill ges-pill-critica" :class="{ active: gesFiltroSev === 'critica' }" @click="gesFiltroSev = gesFiltroSev === 'critica' ? null : 'critica'; cargarGesArticulos()">Críticas</button>
+          <button class="inv-pill ges-pill-significativa" :class="{ active: gesFiltroSev === 'significativa' }" @click="gesFiltroSev = gesFiltroSev === 'significativa' ? null : 'significativa'; cargarGesArticulos()">Significativas</button>
+          <button class="inv-pill ges-pill-menor" :class="{ active: gesFiltroSev === 'menor' }" @click="gesFiltroSev = gesFiltroSev === 'menor' ? null : 'menor'; cargarGesArticulos()">Menores</button>
+
+          <span class="inv-separator"></span>
+
+          <button class="inv-pill" :class="{ active: !gesFiltroEstado }" @click="gesFiltroEstado = null; cargarGesArticulos()">Todos</button>
+          <button class="inv-pill" :class="{ active: gesFiltroEstado === 'pendiente' }" @click="gesFiltroEstado = gesFiltroEstado === 'pendiente' ? null : 'pendiente'; cargarGesArticulos()">Pendientes</button>
+          <button class="inv-pill" :class="{ active: gesFiltroEstado === 'analizado' }" @click="gesFiltroEstado = gesFiltroEstado === 'analizado' ? null : 'analizado'; cargarGesArticulos()">Analizados</button>
+          <button class="inv-pill" :class="{ active: gesFiltroEstado === 'justificada' }" @click="gesFiltroEstado = gesFiltroEstado === 'justificada' ? null : 'justificada'; cargarGesArticulos()">Justificadas</button>
+          <button class="inv-pill" :class="{ active: gesFiltroEstado === 'requiere_ajuste' }" @click="gesFiltroEstado = gesFiltroEstado === 'requiere_ajuste' ? null : 'requiere_ajuste'; cargarGesArticulos()">Req. ajuste</button>
+        </div>
+
+        <!-- BARRA ACCIONES GESTIÓN -->
+        <div class="ges-actions-bar">
+          <button class="ges-action-btn" :disabled="gesAnalizando" @click="lanzarAnalisis">
+            <span class="material-icons" :class="{ spin: gesAnalizando }" style="font-size:15px">psychology</span>
+            {{ gesAnalizando ? `Analizando ${gesProgreso}/${gesTotal}...` : 'Analizar inconsistencias' }}
+          </button>
+        </div>
+
+        <!-- TABLA GESTIÓN -->
+        <div class="inv-table-container">
+          <table class="inv-table ges-table">
+            <thead>
+              <tr>
+                <th class="th" style="width:40px">Sev</th>
+                <th class="th" style="width:50px">ID</th>
+                <th class="th">Artículo</th>
+                <th class="th" style="width:40px">Grp</th>
+                <th class="th text-right" style="width:65px">Teórico</th>
+                <th class="th text-right" style="width:65px">Físico</th>
+                <th class="th text-right" style="width:65px">Dif</th>
+                <th class="th text-right" style="width:90px">Impacto $</th>
+                <th class="th" style="width:180px">Causa IA</th>
+                <th class="th" style="width:90px">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in gesArticulos" :key="a.id" class="ges-row" @click="abrirDetalleGestion(a)">
+                <td class="td"><span class="ges-sev-dot" :class="'sev-' + a.severidad" :title="a.severidad"></span></td>
+                <td class="td td-id">{{ a.id_effi }}</td>
+                <td class="td">
+                  <span>{{ a.nombre }}</span>
+                  <span v-if="a.unidad" class="unidad-tag" :class="'unidad-' + (a.unidad || '').toLowerCase()">{{ a.unidad }}</span>
+                </td>
+                <td class="td"><span class="grupo-tag grupo-tag-short" :class="'grupo-' + (a.grupo || 'mp').toLowerCase()">{{ a.grupo }}</span></td>
+                <td class="td text-right">{{ a.total_teorico }}</td>
+                <td class="td text-right">{{ a.total_fisico }}</td>
+                <td class="td text-right" :class="a.total_diferencia < 0 ? 'text-red' : a.total_diferencia > 0 ? 'text-green' : ''">{{ a.total_diferencia }}</td>
+                <td class="td text-right" :class="a.impacto_economico < 0 ? 'text-red' : 'text-green'">${{ fmtMoney(a.impacto_economico) }}</td>
+                <td class="td">
+                  <div v-if="a.causa_ia" class="ges-causa">
+                    <span class="ges-causa-text">{{ a.causa_ia }}</span>
+                    <span class="ges-conf-badge" :class="a.confianza_ia >= 80 ? 'conf-alta' : a.confianza_ia >= 50 ? 'conf-media' : 'conf-baja'">{{ a.confianza_ia }}%</span>
+                  </div>
+                  <span v-else class="ges-sin-causa">—</span>
+                </td>
+                <td class="td">
+                  <span class="ges-estado-chip" :class="'est-' + a.estado">{{ gesEstadoLabel(a.estado) }}</span>
+                </td>
+              </tr>
+              <tr v-if="!gesArticulos.length">
+                <td colspan="10" class="td td-empty">
+                  <span class="material-icons" style="font-size:24px;opacity:0.3">check_circle</span>
+                  <span>No hay artículos con los filtros seleccionados</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </template><!-- /VISTA GESTIÓN -->
 
     </div><!-- /inv-content -->
 
@@ -609,6 +763,19 @@ const articuloAsignar = ref(null)
 const busquedaAsignar = ref('')
 const resultadosAsignar = ref([])
 const effiSeleccionado = ref(null)
+// Vista activa
+const vistaActiva = ref('conteo')
+// Gestión
+const gesDash = ref(null)
+const gesArticulos = ref([])
+const gesFiltroSev = ref(null)
+const gesFiltroEstado = ref(null)
+const gesFiltroGrupo = ref(null)
+const gesAnalizando = ref(false)
+const gesProgreso = ref(0)
+const gesTotal = ref(0)
+const gesDetalleVisible = ref(false)
+const gesDetalleData = ref(null)
 // Sync Effi
 const syncEstado = ref('idle')
 const syncMensaje = ref('')
@@ -1006,6 +1173,74 @@ async function pollSync() {
       }
     }
   } catch { clearInterval(_syncPoll) }
+}
+
+// ── Gestión ──
+function fmtMoney(val) {
+  if (val == null) return '0'
+  const n = Math.abs(val)
+  if (n >= 1000000) return (val < 0 ? '-' : '') + (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return (val < 0 ? '-' : '') + (n / 1000).toFixed(0) + 'K'
+  return val.toFixed(0)
+}
+
+function gesEstadoLabel(est) {
+  const map = { pendiente: 'Pendiente', analizado: 'Analizado', justificada: 'Justificada', requiere_ajuste: 'Req. ajuste', ajustada: 'Ajustada' }
+  return map[est] || est
+}
+
+async function cargarGestion() {
+  await cargarGesDashboard()
+  await cargarGesArticulos()
+}
+
+async function cargarGesDashboard() {
+  gesDash.value = await fetchApi(`/api/inventario/gestion/dashboard?fecha=${FECHA.value}`)
+  if (gesDash.value?.vacio) {
+    // Poblar si no existe
+    await fetch(API + '/api/inventario/gestion/calcular', {
+      method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+    })
+    gesDash.value = await fetchApi(`/api/inventario/gestion/dashboard?fecha=${FECHA.value}`)
+  }
+}
+
+async function cargarGesArticulos() {
+  let url = `/api/inventario/gestion?fecha=${FECHA.value}`
+  if (gesFiltroSev.value) url += `&severidad=${gesFiltroSev.value}`
+  if (gesFiltroEstado.value) url += `&estado=${gesFiltroEstado.value}`
+  if (gesFiltroGrupo.value) url += `&grupo=${gesFiltroGrupo.value}`
+  gesArticulos.value = await fetchApi(url)
+}
+
+let _analisisPoll = null
+async function lanzarAnalisis() {
+  gesAnalizando.value = true
+  gesProgreso.value = 0; gesTotal.value = 0
+  await fetch(API + '/api/inventario/gestion/analizar', {
+    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
+  })
+  _analisisPoll = setInterval(pollAnalisis, 2000)
+}
+
+async function pollAnalisis() {
+  try {
+    const res = await fetchApi('/api/inventario/gestion/analisis-estado')
+    gesProgreso.value = res.progreso
+    gesTotal.value = res.total
+    if (res.estado === 'ok' || res.estado === 'error') {
+      clearInterval(_analisisPoll)
+      gesAnalizando.value = false
+      await cargarGestion()
+    }
+  } catch { clearInterval(_analisisPoll); gesAnalizando.value = false }
+}
+
+async function abrirDetalleGestion(a) {
+  gesDetalleData.value = await fetchApi(`/api/inventario/gestion/${a.id}/detalle`)
+  gesDetalleVisible.value = true
 }
 
 // ── Excluidos ──
@@ -1521,6 +1756,75 @@ onUnmounted(() => clearInterval(clockInterval))
 .alerta-btns { display: flex; flex-direction: column; gap: 8px; }
 .alerta-btn-confirmar { background: transparent; border: 1px solid var(--border-strong); color: var(--text-secondary); padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer; width: 100%; }
 .alerta-btn-confirmar:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
+
+/* ═══ TABS ═══ */
+.inv-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); padding: 0 16px; background: var(--bg-sidebar); }
+.inv-tab { display: flex; align-items: center; gap: 5px; padding: 8px 16px; font-size: 13px; font-weight: 500; color: var(--text-tertiary); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+.inv-tab:hover { color: var(--text-secondary); }
+.inv-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ═══ GESTIÓN DASHBOARD ═══ */
+.ges-dashboard { padding: 12px 16px; }
+.ges-kpis { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ges-kpi { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 14px; flex: 1; min-width: 120px; }
+.ges-kpi-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+.ges-kpi-value { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-top: 2px; }
+.ges-kpi-value small { font-size: 12px; color: var(--text-tertiary); font-weight: 400; }
+.ges-kpi-impacto.neg .ges-kpi-value { color: #f87171; }
+.ges-kpi-impacto.pos .ges-kpi-value { color: #4ade80; }
+
+.ges-severidad-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.ges-sev-card { flex: 1; padding: 8px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.15s; }
+.ges-sev-card:hover { filter: brightness(1.2); }
+.ges-sev-count { font-size: 20px; font-weight: 700; }
+.ges-sev-label { font-size: 11px; color: var(--text-secondary); }
+.ges-sev-critica { background: rgba(239,68,68,0.1); color: #f87171; }
+.ges-sev-significativa { background: rgba(245,158,11,0.1); color: #fbbf24; }
+.ges-sev-menor { background: rgba(59,130,246,0.1); color: #60a5fa; }
+
+.ges-grupos-table { margin-bottom: 8px; }
+.ges-table-mini { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ges-table-mini th { padding: 5px 8px; text-align: left; color: var(--text-tertiary); font-weight: 500; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--border-subtle); }
+.ges-table-mini td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; }
+.ges-table-mini tr:hover td { background: rgba(255,255,255,0.02); }
+.text-right { text-align: right; }
+.text-red { color: #f87171; }
+.text-green { color: #4ade80; }
+
+/* ═══ GESTIÓN TABLA ═══ */
+.ges-actions-bar { display: flex; gap: 8px; padding: 4px 16px; }
+.ges-action-btn { display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 4px; color: #c084fc; font-size: 12px; font-weight: 500; cursor: pointer; }
+.ges-action-btn:hover { background: rgba(168,85,247,0.18); }
+.ges-action-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.ges-table { table-layout: fixed; }
+.ges-row { cursor: pointer; }
+.ges-row:hover td { background: rgba(255,255,255,0.03); }
+
+.ges-sev-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.sev-ok { background: #4ade80; }
+.sev-menor { background: #60a5fa; }
+.sev-significativa { background: #fbbf24; }
+.sev-critica { background: #f87171; }
+
+.ges-causa { display: flex; align-items: center; gap: 4px; }
+.ges-causa-text { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.ges-conf-badge { font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+.conf-alta { background: rgba(34,197,94,0.15); color: #4ade80; }
+.conf-media { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.conf-baja { background: rgba(239,68,68,0.15); color: #f87171; }
+.ges-sin-causa { color: var(--text-tertiary); font-size: 11px; }
+
+.ges-estado-chip { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+.est-pendiente { background: rgba(107,114,128,0.15); color: #9ca3af; }
+.est-analizado { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.est-justificada { background: rgba(34,197,94,0.15); color: #4ade80; }
+.est-requiere_ajuste { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.est-ajustada { background: rgba(168,85,247,0.15); color: #c084fc; }
+
+.ges-pill-critica.active { background: rgba(239,68,68,0.2); color: #f87171; border-color: rgba(239,68,68,0.4); }
+.ges-pill-significativa.active { background: rgba(245,158,11,0.2); color: #fbbf24; border-color: rgba(245,158,11,0.4); }
+.ges-pill-menor.active { background: rgba(59,130,246,0.2); color: #60a5fa; border-color: rgba(59,130,246,0.4); }
 
 /* ═══ SYNC EFFI ═══ */
 .inv-btn-sync { height: 32px; padding: 0 12px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 4px; color: #60a5fa; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
