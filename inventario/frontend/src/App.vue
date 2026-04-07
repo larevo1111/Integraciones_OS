@@ -32,21 +32,21 @@
               <span class="inv-panel-item-pct">{{ f.contados }}/{{ f.inventariables }}</span>
             </div>
           </div>
-          <div v-if="puede('reiniciar_inventario') && FECHA === f.fecha_inventario" class="inv-panel-item-actions">
-            <button class="inv-panel-action" :class="{ 'inv-panel-action-spin': calculandoTeorico }" :disabled="calculandoTeorico || estadoCierre.inventario_cerrado" @click.stop="calcularTeorico" :title="estadoTeorico && estadoTeorico.calculado ? 'Recalcular teórico (' + formatFechaHora(estadoTeorico.calculado_en) + ')' : 'Calcular inventario teórico'">
+          <div v-if="puede('cerrar_conteo') && FECHA === f.fecha_inventario" class="inv-panel-item-actions">
+            <button v-if="puede('nuevo_inventario')" class="inv-panel-action" :class="{ 'inv-panel-action-spin': calculandoTeorico }" :disabled="calculandoTeorico || estadoCierre.inventario_cerrado" @click.stop="calcularTeorico" :title="estadoTeorico && estadoTeorico.calculado ? 'Recalcular teórico (' + formatFechaHora(estadoTeorico.calculado_en) + ')' : 'Calcular inventario teórico'">
               <span class="material-icons" :class="{ spin: calculandoTeorico }" style="font-size:13px">analytics</span>
             </button>
-            <button v-if="!estadoCierre.conteo_cerrado" class="inv-panel-action" @click.stop="confirmarReiniciar" title="Reiniciar conteos">
-              <span class="material-icons" style="font-size:13px">restart_alt</span>
-            </button>
-            <button v-if="!estadoCierre.conteo_cerrado" class="inv-panel-action" @click.stop="confirmarCerrarConteo" title="Cerrar conteo físico">
+            <button v-if="puede('cerrar_conteo') && !estadoCierre.conteo_cerrado" class="inv-panel-action" @click.stop="confirmarCerrarConteo" title="Cerrar conteo físico">
               <span class="material-icons" style="font-size:13px">lock</span>
             </button>
-            <button v-if="estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado" class="inv-panel-action" @click.stop="confirmarReabrirConteo" title="Reabrir conteo físico">
+            <button v-if="puede('reabrir_conteo') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado" class="inv-panel-action" @click.stop="confirmarReabrirConteo" title="Reabrir conteo físico">
               <span class="material-icons" style="font-size:13px">lock_open</span>
             </button>
-            <button v-if="estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado" class="inv-panel-action inv-panel-action-warn" @click.stop="confirmarCerrarInventario" title="Cerrar inventario completo">
+            <button v-if="puede('cerrar_inventario') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado" class="inv-panel-action inv-panel-action-warn" @click.stop="confirmarCerrarInventario" title="Cerrar inventario completo">
               <span class="material-icons" style="font-size:13px">verified</span>
+            </button>
+            <button v-if="puede('reiniciar_inventario') && !estadoCierre.conteo_cerrado" class="inv-panel-action inv-panel-action-danger" @click.stop="confirmarReiniciar" title="Reiniciar conteos (borra TODO — solo Admin)">
+              <span class="material-icons" style="font-size:13px">restart_alt</span>
             </button>
             <button v-if="puede('eliminar_inventario') && !estadoCierre.inventario_cerrado" class="inv-panel-action inv-panel-action-danger" @click.stop="confirmarEliminar" title="Eliminar inventario">
               <span class="material-icons" style="font-size:13px">delete_outline</span>
@@ -79,19 +79,22 @@
       </div>
     </div>
 
-    <!-- MODAL CONFIRMAR REINICIAR -->
-    <div v-if="mostrarConfirmReiniciar" class="inv-overlay" @click.self="mostrarConfirmReiniciar = false">
+    <!-- MODAL CONFIRMAR REINICIAR (con doble confirmación) -->
+    <div v-if="mostrarConfirmReiniciar" class="inv-overlay" @click.self="cerrarModalReiniciar">
       <div class="inv-modal inv-modal-sm">
         <div class="inv-modal-header inv-modal-header-warn">
-          <span class="material-icons" style="font-size:18px;color:var(--color-warning)">warning</span>
+          <span class="material-icons" style="font-size:18px;color:#f87171">warning</span>
           <span>Reiniciar inventario</span>
-          <button class="action-btn" @click="mostrarConfirmReiniciar = false"><span class="material-icons">close</span></button>
+          <button class="action-btn" @click="cerrarModalReiniciar"><span class="material-icons">close</span></button>
         </div>
         <div class="inv-modal-body">
-          <p class="alerta-mensaje">Se borrarán todos los conteos del inventario {{ fechaDisplay }}. Los artículos se mantienen pero los valores vuelven a pendiente. Esta acción no se puede deshacer.</p>
+          <p class="alerta-mensaje" style="color:#f87171"><strong>⚠️ Acción destructiva e irreversible</strong></p>
+          <p class="alerta-mensaje">Se borrarán <strong>TODOS los conteos físicos</strong>, notas y fotos del inventario <strong>{{ fechaDisplay }}</strong>. Los artículos se mantienen pero todos los valores vuelven a pendiente.</p>
+          <p class="alerta-mensaje" style="color:var(--text-tertiary);font-size:11px">Para confirmar, escribí <strong style="color:#f87171">REINICIAR</strong> abajo:</p>
+          <input v-model="textoConfirmReiniciar" type="text" placeholder="Escribir REINICIAR" class="inv-form-input" style="margin-bottom:10px;text-align:center;font-weight:600;letter-spacing:2px">
           <div class="alerta-btns">
-            <button class="alerta-btn-confirmar" @click="mostrarConfirmReiniciar = false">Cancelar</button>
-            <button class="inv-btn-danger" @click="ejecutarReiniciar">Reiniciar conteos</button>
+            <button class="alerta-btn-confirmar" @click="cerrarModalReiniciar">Cancelar</button>
+            <button class="inv-btn-danger" :disabled="textoConfirmReiniciar !== 'REINICIAR'" @click="ejecutarReiniciar">Reiniciar conteos</button>
           </div>
         </div>
       </div>
@@ -917,6 +920,7 @@ const mostrarNuevoInv = ref(false)
 const nuevaFechaInv = ref('')
 const creandoInv = ref(false)
 const mostrarConfirmReiniciar = ref(false)
+const textoConfirmReiniciar = ref('')
 const mostrarConfirmEliminar = ref(false)
 const estadoTeorico = ref(null)
 // Asignar artículo NM
@@ -1568,12 +1572,18 @@ async function crearInventario() {
 function confirmarReiniciar() { mostrarConfirmReiniciar.value = true }
 function confirmarEliminar() { mostrarConfirmEliminar.value = true }
 
+function cerrarModalReiniciar() {
+  mostrarConfirmReiniciar.value = false
+  textoConfirmReiniciar.value = ''
+}
+
 async function ejecutarReiniciar() {
+  if (textoConfirmReiniciar.value !== 'REINICIAR') return
   await fetch(API + '/api/inventario/reiniciar', {
     method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ fecha_inventario: FECHA.value, usuario: usuario.value })
   })
-  mostrarConfirmReiniciar.value = false
+  cerrarModalReiniciar()
   await cargarArticulos()
   await cargarResumen()
   await cargarBodegas()

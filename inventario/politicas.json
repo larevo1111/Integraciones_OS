@@ -8,7 +8,7 @@
     "tomar_foto":            { "nivel_minimo": 1, "descripcion": "Tomar foto de artículo" },
     "agregar_articulo":      { "nivel_minimo": 3, "descripcion": "Agregar artículo no listado a una bodega" },
     "nuevo_inventario":      { "nivel_minimo": 5, "descripcion": "Crear nuevo evento de inventario" },
-    "reiniciar_inventario":  { "nivel_minimo": 5, "descripcion": "Reiniciar conteos de un inventario (borra conteos, mantiene artículos)" },
+    "reiniciar_inventario":  { "nivel_minimo": 7, "descripcion": "Reiniciar conteos de un inventario (borra TODOS los conteos, notas y fotos — solo Admin)" },
     "cerrar_conteo":         { "nivel_minimo": 5, "descripcion": "Cerrar conteo físico (bloquea edición de cantidades, permite gestión)" },
     "cerrar_inventario":     { "nivel_minimo": 5, "descripcion": "Cerrar inventario completo (bloquea TODO incluso gestión)" },
     "reabrir_conteo":        { "nivel_minimo": 5, "descripcion": "Reabrir conteo físico cerrado" },
@@ -22,7 +22,7 @@
   "perfiles": {
     "1": { "nombre": "Contador",   "descripcion": "Personal operativo. Cuenta y documenta." },
     "3": { "nombre": "Coordinador","descripcion": "Puede agregar artículos no listados." },
-    "5": { "nombre": "Supervisor", "descripcion": "Gestiona inventarios (crear, reiniciar, cerrar)." },
+    "5": { "nombre": "Supervisor", "descripcion": "Gestiona inventarios (crear, cerrar conteo, reabrir conteo, cerrar inventario)." },
     "7": { "nombre": "Admin",      "descripcion": "Control total. Puede eliminar y configurar." }
   }
 }
