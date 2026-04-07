@@ -604,7 +604,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
       JOIN g_categorias c ON c.id = t.categoria_id
       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
       WHERE ${where.join(' AND ')}
-      ORDER BY t.fecha_ult_modificacion DESC
+      ORDER BY t.fecha_fin_real DESC
       LIMIT 50
     `, params)
     const allEmails = [...new Set(tareasBase.flatMap(t => (t.responsables_csv || '').split(',').filter(Boolean)))]
