@@ -618,6 +618,101 @@
       </div>
     </div>
 
+    <!-- MODAL DETALLE GESTIÓN -->
+    <div v-if="gesDetalleVisible && gesDetalleData" class="inv-overlay" @click.self="gesDetalleVisible = false">
+      <div class="inv-modal ges-modal-detalle">
+        <div class="inv-modal-header">
+          <span>{{ gesDetalleData.gestion.nombre }}</span>
+          <button class="action-btn" @click="gesDetalleVisible = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body ges-detalle-body">
+          <!-- Info del artículo -->
+          <div class="ges-detalle-info">
+            <span class="grupo-tag" :class="'grupo-' + (gesDetalleData.gestion.grupo || 'mp').toLowerCase()">{{ gesDetalleData.gestion.grupo }}</span>
+            <span class="unidad-tag">{{ gesDetalleData.gestion.unidad }}</span>
+            <span class="ges-detalle-costo">Costo: ${{ Number(gesDetalleData.gestion.costo_promedio).toLocaleString() }}</span>
+            <span class="ges-sev-dot" :class="'sev-' + gesDetalleData.gestion.severidad" style="margin-left:auto"></span>
+            <span style="font-size:11px;color:var(--text-tertiary)">{{ gesDetalleData.gestion.severidad }}</span>
+          </div>
+
+          <!-- Conteos por bodega -->
+          <div class="ges-detalle-section">
+            <div class="ges-detalle-label">Conteos por bodega</div>
+            <table class="ges-table-mini">
+              <thead><tr><th>Bodega</th><th class="text-right">Teórico</th><th class="text-right">Físico</th><th class="text-right">Diferencia</th><th>Contado por</th></tr></thead>
+              <tbody>
+                <tr v-for="c in gesDetalleData.conteos" :key="c.bodega">
+                  <td>{{ c.bodega }}</td>
+                  <td class="text-right">{{ c.inventario_teorico }}</td>
+                  <td class="text-right">{{ c.inventario_fisico }}</td>
+                  <td class="text-right" :class="(c.diferencia || 0) < 0 ? 'text-red' : (c.diferencia || 0) > 0 ? 'text-green' : ''">{{ c.diferencia }}</td>
+                  <td style="font-size:11px;color:var(--text-tertiary)">{{ c.contado_por }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="ges-detalle-totales">
+              Impacto: <strong :class="gesDetalleData.gestion.impacto_economico < 0 ? 'text-red' : 'text-green'">${{ Number(gesDetalleData.gestion.impacto_economico).toLocaleString() }}</strong>
+            </div>
+          </div>
+
+          <!-- Análisis IA -->
+          <div v-if="gesDetalleData.gestion.causa_ia" class="ges-detalle-section ges-detalle-ia">
+            <div class="ges-detalle-label">
+              <span class="material-icons" style="font-size:14px;vertical-align:middle">psychology</span> Análisis automático
+            </div>
+            <div class="ges-ia-causa">
+              <span>{{ gesDetalleData.gestion.causa_ia }}</span>
+              <span class="ges-conf-badge" :class="gesDetalleData.gestion.confianza_ia >= 80 ? 'conf-alta' : gesDetalleData.gestion.confianza_ia >= 50 ? 'conf-media' : 'conf-baja'">
+                {{ gesDetalleData.gestion.confianza_ia }}%
+              </span>
+            </div>
+            <div class="ges-ia-explicacion">{{ gesDetalleData.gestion.explicacion_ia }}</div>
+            <div v-if="gesDetalleData.gestion.evidencia_ia" class="ges-ia-evidencias">
+              <div v-for="(ev, i) in parseEvidencia(gesDetalleData.gestion.evidencia_ia)" :key="i" class="ges-ia-ev-item">
+                <span class="material-icons" style="font-size:12px">arrow_right</span>
+                <span>{{ ev.detalle }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="ges-detalle-section ges-sin-analisis">
+            <span class="material-icons" style="font-size:16px;opacity:0.3">psychology</span>
+            Sin análisis. Presiona "Analizar inconsistencias" en la barra de acciones.
+          </div>
+
+          <!-- Resolución -->
+          <div class="ges-detalle-section">
+            <div class="ges-detalle-label">Resolución</div>
+            <div class="ges-resolucion-form">
+              <div class="ges-form-row">
+                <label>Estado</label>
+                <select v-model="gesFormEstado" class="ges-select">
+                  <option value="pendiente">Pendiente</option>
+                  <option value="analizado">Analizado</option>
+                  <option value="justificada">Justificada</option>
+                  <option value="requiere_ajuste">Requiere ajuste</option>
+                  <option value="ajustada">Ajustada</option>
+                </select>
+              </div>
+              <div class="ges-form-row">
+                <label>Causa</label>
+                <select v-model="gesFormCausa" class="ges-select">
+                  <option value="">— Seleccionar —</option>
+                  <option v-for="c in gesDetalleData.causas_disponibles" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </div>
+              <div class="ges-form-row">
+                <label>Observaciones</label>
+                <textarea v-model="gesFormObs" class="ges-textarea" rows="3" placeholder="Notas de la revisión..."></textarea>
+              </div>
+              <button class="inv-btn-primary" @click="guardarResolucion" :disabled="gesGuardando" style="margin-top:8px">
+                {{ gesGuardando ? 'Guardando...' : 'Guardar' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL ASIGNAR ARTÍCULO -->
     <div v-if="mostrarAsignar" class="inv-overlay" @click.self="cerrarAsignar">
       <div class="inv-modal">
@@ -776,6 +871,10 @@ const gesProgreso = ref(0)
 const gesTotal = ref(0)
 const gesDetalleVisible = ref(false)
 const gesDetalleData = ref(null)
+const gesFormEstado = ref('')
+const gesFormCausa = ref('')
+const gesFormObs = ref('')
+const gesGuardando = ref(false)
 // Sync Effi
 const syncEstado = ref('idle')
 const syncMensaje = ref('')
@@ -1240,7 +1339,37 @@ async function pollAnalisis() {
 
 async function abrirDetalleGestion(a) {
   gesDetalleData.value = await fetchApi(`/api/inventario/gestion/${a.id}/detalle`)
+  gesFormEstado.value = gesDetalleData.value.gestion.estado
+  gesFormCausa.value = gesDetalleData.value.gestion.causa_final || ''
+  gesFormObs.value = gesDetalleData.value.gestion.observaciones || ''
   gesDetalleVisible.value = true
+}
+
+function parseEvidencia(ev) {
+  if (!ev) return []
+  try { return typeof ev === 'string' ? JSON.parse(ev) : ev } catch { return [] }
+}
+
+async function guardarResolucion() {
+  if (!gesDetalleData.value) return
+  gesGuardando.value = true
+  try {
+    await fetch(API + `/api/inventario/gestion/${gesDetalleData.value.gestion.id}`, {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        estado: gesFormEstado.value,
+        causa_final: gesFormCausa.value || null,
+        observaciones: gesFormObs.value || null,
+        usuario: usuario.value
+      })
+    })
+    gesDetalleVisible.value = false
+    await cargarGestion()
+  } catch (e) {
+    console.error('Error guardando resolución:', e)
+  }
+  gesGuardando.value = false
 }
 
 // ── Excluidos ──
@@ -1825,6 +1954,26 @@ onUnmounted(() => clearInterval(clockInterval))
 .ges-pill-critica.active { background: rgba(239,68,68,0.2); color: #f87171; border-color: rgba(239,68,68,0.4); }
 .ges-pill-significativa.active { background: rgba(245,158,11,0.2); color: #fbbf24; border-color: rgba(245,158,11,0.4); }
 .ges-pill-menor.active { background: rgba(59,130,246,0.2); color: #60a5fa; border-color: rgba(59,130,246,0.4); }
+
+/* ═══ GESTIÓN MODAL DETALLE ═══ */
+.ges-modal-detalle { width: 560px; max-height: 85vh; }
+.ges-detalle-body { padding: 12px 16px; overflow-y: auto; max-height: 70vh; }
+.ges-detalle-info { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 10px; }
+.ges-detalle-costo { font-size: 12px; color: var(--text-tertiary); }
+.ges-detalle-section { margin-bottom: 14px; }
+.ges-detalle-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 500; }
+.ges-detalle-totales { font-size: 12px; color: var(--text-secondary); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-subtle); }
+.ges-detalle-ia { background: rgba(168,85,247,0.05); border: 1px solid rgba(168,85,247,0.15); border-radius: 6px; padding: 10px; }
+.ges-ia-causa { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 6px; }
+.ges-ia-explicacion { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.ges-ia-evidencias { margin-top: 8px; }
+.ges-ia-ev-item { display: flex; align-items: start; gap: 4px; font-size: 11px; color: var(--text-tertiary); margin-bottom: 2px; }
+.ges-sin-analisis { text-align: center; padding: 16px; color: var(--text-tertiary); font-size: 12px; }
+.ges-resolucion-form { display: flex; flex-direction: column; gap: 8px; }
+.ges-form-row { display: flex; flex-direction: column; gap: 3px; }
+.ges-form-row label { font-size: 11px; color: var(--text-tertiary); }
+.ges-select { background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 4px; padding: 6px 8px; color: var(--text-primary); font-size: 13px; }
+.ges-textarea { background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 4px; padding: 6px 8px; color: var(--text-primary); font-size: 13px; resize: vertical; }
 
 /* ═══ SYNC EFFI ═══ */
 .inv-btn-sync { height: 32px; padding: 0 12px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); border-radius: 4px; color: #60a5fa; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
