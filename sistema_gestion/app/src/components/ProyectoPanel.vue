@@ -463,7 +463,11 @@ function initForm() {
   }
 }
 
-watch(() => props.item, (v, old) => { if (v && (!old || v.id !== old?.id)) ppSheetEstado.value = 'half'; initForm() }, { immediate: true })
+watch(() => props.item, (v, old) => {
+  if (v && (!old || v.id !== old?.id)) ppSheetEstado.value = 'half'
+  initForm()
+  nextTick(() => autoResizeTitulo())
+}, { immediate: true })
 
 onMounted(async () => {
   await nextTick()

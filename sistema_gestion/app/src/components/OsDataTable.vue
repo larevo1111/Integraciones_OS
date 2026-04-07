@@ -22,6 +22,8 @@
         </template>
       </div>
       <div class="toolbar-right">
+        <!-- Slot para controles externos (filtros de fecha, etc.) -->
+        <slot name="toolbar" />
         <!-- Campos (Display) -->
         <div class="toolbar-btn-wrap" ref="fieldsRef">
           <button class="toolbar-btn" @click.stop="showFields = !showFields">
@@ -132,7 +134,9 @@
               @click="emit('row-click', row)"
             >
               <td v-for="col in visibleColumns" :key="col.key" class="td">
-                <span class="cell-value">{{ formatCell(row[col.key], col.key) }}</span>
+                <slot :name="`cell-${col.key}`" :row="row" :col="col" :value="row[col.key]">
+                  <span class="cell-value">{{ formatCell(row[col.key], col.key) }}</span>
+                </slot>
               </td>
             </tr>
             <!-- Vacío -->
@@ -782,19 +786,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .export-desc  { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 
 /* ── TABLA ── */
-.table-scroll {
-  overflow-x: auto;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-}
-.table-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
-.table-scroll::-webkit-scrollbar-track { background: transparent; }
-.table-scroll::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 5px;
-}
-.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+.table-scroll { overflow-x: auto; }
 .os-table     { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .th {

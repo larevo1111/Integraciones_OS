@@ -22,6 +22,8 @@
         </template>
       </div>
       <div class="toolbar-right">
+        <!-- Slot para controles externos (filtros de fecha, etc.) -->
+        <slot name="toolbar" />
         <!-- Campos (Display) -->
         <div class="toolbar-btn-wrap" ref="fieldsRef">
           <button class="toolbar-btn" @click.stop="showFields = !showFields">
@@ -132,7 +134,9 @@
               @click="emit('row-click', row)"
             >
               <td v-for="col in visibleColumns" :key="col.key" class="td">
-                <span class="cell-value">{{ formatCell(row[col.key], col.key) }}</span>
+                <slot :name="`cell-${col.key}`" :row="row" :col="col" :value="row[col.key]">
+                  <span class="cell-value">{{ formatCell(row[col.key], col.key) }}</span>
+                </slot>
               </td>
             </tr>
             <!-- Vacío -->

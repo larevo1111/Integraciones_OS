@@ -16,7 +16,7 @@
         </div>
       </div>
 
-      <GestionTable
+      <OsDataTable
         title="Jornadas"
         :rows="jornadasFiltradas"
         :columns="columnasComputed"
@@ -89,7 +89,7 @@
         <template #cell-dur_tareas_usuario="{ row }">
           <span class="td-mono">{{ formatMins(row.dur_tareas_usuario) }}</span>
         </template>
-      </GestionTable>
+      </OsDataTable>
     </div>
 
     <!-- Popup de detalle -->
@@ -109,7 +109,7 @@ import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import { api } from 'src/services/api'
 import { hoyLocal, localISO } from 'src/services/fecha'
-import GestionTable from 'src/components/GestionTable.vue'
+import OsDataTable from 'src/components/OsDataTable.vue'
 import JornadaDetallePopup from 'src/components/JornadaDetallePopup.vue'
 
 const auth         = useAuthStore()
@@ -259,7 +259,7 @@ function badgeClass(j) {
 .page-wrap    { display: flex; flex-direction: column; min-height: 100%; background: var(--bg-app); }
 .page-content { padding: 0; display: flex; flex-direction: column; }
 
-/* Toolbar extras (date inputs dentro de GestionTable) */
+/* Toolbar extras (date inputs dentro de OsDataTable) */
 .date-wrap {
   display: inline-flex; align-items: center; gap: 5px;
   height: 28px; padding: 0 10px; border-radius: var(--radius-md);

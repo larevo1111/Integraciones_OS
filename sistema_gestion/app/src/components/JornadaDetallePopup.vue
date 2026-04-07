@@ -677,7 +677,6 @@ function durPausa(p) {
 .sec-tareas { margin: 0 -18px; }
 .sec-tareas :deep(.os-table-wrapper) { border: none; border-radius: 0; }
 .sec-tareas :deep(.table-toolbar) { padding: 8px 18px; }
-.sec-tareas :deep(.table-scroll) { max-height: 260px; }
 
 /* Botón edit dentro de fila */
 .btn-edit-pausa {

@@ -1,7 +1,7 @@
 <template>
   <div class="items-page">
     <!-- Tabla -->
-    <GestionTable
+    <OsDataTable
       :title="CONFIG[tipo].title"
       :columns="columnas"
       :rows="filasFiltradas"
@@ -44,7 +44,7 @@
       <template #cell-responsables_str="{ value }">
         {{ value ? value.split(',').map(e => e.split('@')[0]).join(', ') : '—' }}
       </template>
-    </GestionTable>
+    </OsDataTable>
 
     <!-- Panel lateral -->
     <ProyectoPanel
@@ -64,7 +64,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, inject } from 'vue'
 import { api } from 'src/services/api'
-import GestionTable from 'src/components/GestionTable.vue'
+import OsDataTable from 'src/components/OsDataTable.vue'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 
 const props = defineProps({
