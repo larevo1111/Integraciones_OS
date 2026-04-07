@@ -392,7 +392,7 @@
         </div>
 
         <!-- ACORDEONES POR GRUPO -->
-        <div class="ges-acordeones">
+        <div class="ges-acordeones" v-if="gesDash?.por_grupo">
           <div v-for="g in gesDash.por_grupo.filter(x => x.total > 0)" :key="g.grupo" class="ges-grupo-acordeon">
             <!-- Encabezado grupo (siempre visible) -->
             <div class="ges-grupo-header" @click="toggleGrupoExpandido(g.grupo)">
