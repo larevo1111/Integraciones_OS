@@ -218,17 +218,12 @@
 
           <!-- Sección: Tareas completadas -->
           <div class="sec sec-tareas">
-            <GestionTable
+            <OsDataTable
               title="Tareas completadas"
               :columns="tareasColumnas"
               :rows="tareasRows"
               :loading="cargandoTareas"
-            >
-              <template #cell-categoria_nombre="{ row }">
-                <span class="cat-dot" :style="{ background: row.categoria_color || 'var(--text-tertiary)' }"></span>
-                {{ row.categoria_nombre }}
-              </template>
-            </GestionTable>
+            />
           </div>
 
           <!-- Sección: Acciones admin -->
@@ -271,7 +266,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue'
 import { api } from 'src/services/api'
-import GestionTable from 'src/components/GestionTable.vue'
+import OsDataTable from 'src/components/OsDataTable.vue'
 
 const props = defineProps({
   jornada: { type: Object, required: true },
@@ -300,15 +295,15 @@ const tareasColumnas = reactive([
 
 const tareasRows = computed(() => tareasCompletadas.value.map(t => ({
   ...t,
+  // Fechas formateadas para visualización
   fecha_inicio_real:     fmtDT(t.fecha_inicio_real),
   fecha_fin_real:        fmtDT(t.fecha_fin_real),
   fecha_inicio_estimada: fmtDT(t.fecha_inicio_estimada),
   fecha_fin_estimada:    fmtDT(t.fecha_fin_estimada),
-  duracion_real_min:     formatMins(t.duracion_real_min),
-  tiempo_real_min:       formatMins(t.tiempo_real_min),
-  tiempo_estimado_min:   formatMins(t.tiempo_estimado_min),
-  // conservar color para el slot
-  categoria_color:       t.categoria_color,
+  // Minutos como número raw — OsDataTable formatea y permite sumar
+  duracion_real_min:     t.duracion_real_min ?? 0,
+  tiempo_real_min:       t.tiempo_real_min ?? 0,
+  tiempo_estimado_min:   t.tiempo_estimado_min ?? 0,
 })))
 
 // Estado

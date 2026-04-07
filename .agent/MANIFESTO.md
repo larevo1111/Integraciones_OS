@@ -30,6 +30,39 @@
 3. **Seguir el manual al pie de la letra**: colores, tipografía, espaciado, componentes — todo definido ahí.
 4. **Si el elemento NO está en el manual**: DETENERSE. Preguntar a Santi y definir juntos antes de implementar. Luego actualizar el manual.
 
+### ⚠️ TABLA OFICIAL DEL PROYECTO: OsDataTable
+
+**`OsDataTable.vue` es LA ÚNICA tabla del proyecto. Tanto ERP como Sistema Gestión la usan.**
+
+- **Ruta canónica**: `frontend/app/src/components/OsDataTable.vue`
+- **Copia en Sistema Gestión**: `sistema_gestion/app/src/components/OsDataTable.vue`
+- **Documentación**: `.claude/skills/tabla-vista/SKILL.md`
+
+**Features built-in** (NO reimplementar ninguna):
+- Filtros por columna (popup, NO modal): Igual a, Contiene, Mayor que, Menor que, Mayor/menor o igual, Entre
+- Subtotales por columna: Suma, Promedio, Máximo, Mínimo (solo numéricas)
+- Ordenamiento por columna (asc/desc)
+- Campos mostrar/ocultar (botón "Campos")
+- Skeleton loading
+- Export CSV/XLSX/PDF (si `exportable=true` y existe endpoint)
+- Formato automático: `_min`/`_seg` → "Xh Ym", `fin_`/`ventas`/`ticket` → "$1.234", `_pct`/`_margen` → "45%"
+
+**Uso**:
+```vue
+<OsDataTable
+  title="Resumen por mes"
+  :rows="datos"
+  :columns="[{ key: 'mes', label: 'Mes', visible: true }, ...]"
+  :loading="cargando"
+/>
+```
+
+**PROHIBIDO**:
+- Crear componentes tabla nuevos (`MiTabla.vue`, `CustomTable.vue`, `GestionTable.vue`, etc.)
+- Usar `<q-table>` cuando aplicaría OsDataTable
+- Duplicar lógica de filtros/ordenamiento/subtotales en componentes locales
+- Modificar solo la copia local en vez del canónico (si es una mejora, va al original primero)
+
 **⚠️ VERIFICACIÓN OBLIGATORIA ANTES DE MARCAR CUALQUIER TAREA FRONTEND COMO LISTA:**
 1. Verificar que TODAS las variables CSS usadas existen en `frontend/app/src/css/app.scss` — si no existen, agregarlas o usar variable equivalente
 2. Verificar que el endpoint API devuelve los datos correctos con `curl` o query directa
