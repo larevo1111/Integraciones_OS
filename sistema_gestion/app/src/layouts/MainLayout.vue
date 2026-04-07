@@ -574,7 +574,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.2.2'
+const APP_VERSION = 'v2.2.3'
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)
@@ -592,13 +592,13 @@ function onPullStart(e) {
 function onPullMove(e) {
   if (!pulling || pageBodyRef.value?.scrollTop > 0) { pulling = false; pullY.value = 0; return }
   const diff = e.touches[0].clientY - pullStartY
-  if (diff > 0) pullY.value = diff * 0.15
+  if (diff > 0) pullY.value = diff * 0.21
   else { pulling = false; pullY.value = 0 }
 }
 function onPullEnd() {
   if (!pulling) return
   pulling = false
-  if (pullY.value >= 130) {
+  if (pullY.value >= 78) {
     pullRefreshing.value = true
     pullY.value = 50
     setTimeout(() => {
