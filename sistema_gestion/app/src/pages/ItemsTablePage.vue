@@ -187,6 +187,8 @@ onMounted(() => { cargar(); cargarDatos() })
 
 <style scoped>
 .items-page { padding: 0; }
+.items-page :deep(.os-table th:first-child),
+.items-page :deep(.os-table td:first-child) { min-width: 240px; }
 .btn-crear {
   display: inline-flex; align-items: center; gap: 4px;
   height: 28px; padding: 0 12px; border-radius: var(--radius-md);
