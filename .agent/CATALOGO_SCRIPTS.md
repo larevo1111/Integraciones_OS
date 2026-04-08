@@ -720,15 +720,31 @@ python3 bot.py
 - **⚠️ NUNCA usar u768061575_osserver para os_comunidad** — Access Denied garantizado
 
 ### scripts/notif_jornadas_abiertas.py
-- **Propósito**: Notifica por Telegram a usuarios con jornada abierta a las 8pm. Resumen al admin.
-- **Ejecución**: cron `0 20 * * 1-5` (8pm lunes a viernes, hora Colombia)
+- **Propósito**: Notifica por WhatsApp a usuarios con jornada abierta al final del día. Resumen al admin.
+- **Ejecución**: cron `0 20 * * *` (8pm todos los días, hora Colombia)
   ```bash
   cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts
   python3 notif_jornadas_abiertas.py
   ```
-- **Flujo**: SSH tunnel → Hostinger `u768061575_os_gestion` → consulta `g_jornadas WHERE hora_fin IS NULL` → lookup `telegram_id` en `ia_service_os.ia_usuarios` → envía Telegram individual + resumen admin
-- **Dependencias**: `sshtunnel`, `pymysql`, `requests`, `.env` (TELEGRAM_BOT_TOKEN)
-- **Tablas**: `g_jornadas` (Hostinger), `ia_usuarios` (local)
+- **Flujo**: SSH tunnel → `u768061575_os_gestion` → consulta `g_jornadas WHERE fecha=hoy AND hora_fin IS NULL` → lookup `telefono` en `u768061575_os_comunidad.sys_usuarios` (estado='Activo') → envía WhatsApp vía `wa_bridge` (POST `localhost:3100/api/send/text`) + resumen al admin Santiago (573022921455)
+- **Dependencias**: `sshtunnel`, `pymysql`, `requests`, `.env`, `wa-bridge.service` corriendo en puerto 3100
+- **Tablas**: `g_jornadas` (Hostinger os_gestion), `sys_usuarios` (Hostinger os_comunidad)
+
+### scripts/notif_jornada_no_iniciada.py
+- **Propósito**: Notifica por WhatsApp a usuarios activos que no iniciaron jornada hoy a las 9am.
+- **Ejecución**: cron `0 9 * * 1-5` (9am lunes a viernes, hora Colombia)
+  ```bash
+  cd /home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts
+  python3 notif_jornada_no_iniciada.py           # ejecución real
+  python3 notif_jornada_no_iniciada.py --dry-run # testing sin enviar
+  ```
+- **Criterios**:
+  - Usuario activo = tuvo al menos una jornada en los últimos 7 días
+  - NO tiene jornada de hoy (ni abierta ni cerrada)
+  - Existe en `sys_usuarios` con `estado='Activo'` y tiene `telefono` registrado
+- **Flujo**: SSH tunnel → `u768061575_os_gestion` → consulta usuarios con jornada en últimos 7 días excluyendo los de hoy → lookup `telefono` en `sys_usuarios` → envía WhatsApp vía `wa_bridge` + resumen al admin
+- **Dependencias**: `sshtunnel`, `pymysql`, `requests`, `.env`, `wa-bridge.service` corriendo en puerto 3100
+- **Tablas**: `g_jornadas` (Hostinger os_gestion), `sys_usuarios` (Hostinger os_comunidad)
 
 ### sistema_gestion/app (Vue+Quasar)
 - **Propósito**: Frontend SPA — LoginPage, TareasPage, EquipoPage (jornadas), MainLayout (sidebar/drawer)
