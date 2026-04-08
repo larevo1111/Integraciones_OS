@@ -323,18 +323,24 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* Badge expandir subtareas — sin chip, solo texto sutil */
+/* Badge expandir subtareas — texto sutil pero target táctil grande */
 .subtareas-badge {
-  display: inline-flex; align-items: center; gap: 1px;
-  padding: 0 2px; height: 12px;
-  border: none; border-radius: 0; background: transparent;
-  font-size: 8px; color: var(--text-tertiary);
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 4px 6px; min-height: 22px;
+  border: none; border-radius: var(--radius-sm); background: transparent;
+  font-size: 10px; color: var(--text-secondary);
   cursor: pointer; flex-shrink: 0;
-  transition: color 80ms;
+  transition: color 80ms, background 80ms;
   white-space: nowrap; line-height: 1;
 }
 .subtareas-badge:hover, .subtareas-badge.expandida {
   color: var(--accent);
+  background: var(--bg-row-hover);
+}
+@media (max-width: 768px) {
+  .subtareas-badge {
+    min-height: 32px; padding: 6px 8px; font-size: 11px;
+  }
 }
 
 /* Botón ↳ junto al badge (para tareas padre con subtareas) */
@@ -400,9 +406,13 @@ onUnmounted(() => {
   line-height: inherit;
 }
 
-/* Subtarea: indentación */
-.is-subtarea { padding-left: 28px !important; }
-.is-subtarea .tarea-titulo { font-size: 12px; color: var(--text-secondary); }
+/* Subtarea: indentación + tipografía un poco más grande y mejor contraste */
+.is-subtarea { padding-left: 40px !important; }
+.is-subtarea .tarea-titulo { font-size: 14px; color: var(--text-primary); }
+@media (max-width: 768px) {
+  .is-subtarea { padding-left: 32px !important; }
+  .is-subtarea .tarea-titulo { font-size: 15px; }
+}
 
 /* Multi-selección */
 .tarea-item.multi-sel {

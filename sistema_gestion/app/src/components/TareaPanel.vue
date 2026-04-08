@@ -184,6 +184,35 @@
 
       <div class="divider" />
 
+      <!-- Subtareas (solo si no es a su vez una subtarea) -->
+      <div v-if="!tarea.parent_id" class="subtareas-section">
+        <div class="subtareas-header">
+          <span class="input-label" style="margin:0">Subtareas <span v-if="subtareas.length" style="color:var(--text-tertiary);font-weight:400">({{ subtareas.length }})</span></span>
+        </div>
+        <form class="subtarea-quickadd" @submit.prevent="crearSubtarea">
+          <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">subdirectory_arrow_right</span>
+          <input
+            ref="subInputRef"
+            v-model="nuevaSubtitulo"
+            class="subtarea-input"
+            placeholder="Agregar subtarea..."
+            @keydown.escape="nuevaSubtitulo = ''"
+          />
+          <button v-if="nuevaSubtitulo.trim()" type="submit" class="btn-sub-ok" title="Agregar">
+            <span class="material-icons" style="font-size:13px">check</span>
+          </button>
+        </form>
+        <div v-for="s in subtareas" :key="s.id" class="sub-link" @click="$emit('abrir-subtarea', s)">
+          <button class="sub-link-circle" :class="{ done: s.estado === 'Completada', cancelada: s.estado === 'Cancelada' }" @click.stop="toggleEstadoSubtarea(s)">
+            <span v-if="s.estado === 'Completada'" class="material-icons" style="font-size:11px">check</span>
+            <span v-else-if="s.estado === 'Cancelada'" class="material-icons" style="font-size:11px">close</span>
+          </button>
+          <span class="sub-link-title" :class="{ done: s.estado === 'Completada' }">{{ s.titulo }}</span>
+        </div>
+      </div>
+
+      <div v-if="!tarea.parent_id" class="divider" />
+
       <!-- Descripción -->
       <p class="input-label">Descripción</p>
       <textarea
@@ -306,7 +335,50 @@ const props = defineProps({
   proyectos:  { type: Array, default: () => [] },
   etiquetas:  { type: Array, default: () => [] }
 })
-const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre'])
+const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre', 'abrir-subtarea', 'subtareas-cambiadas'])
+
+// ── Subtareas ──
+const subtareas    = ref([])
+const nuevaSubtitulo = ref('')
+
+async function cargarSubtareas() {
+  if (!props.tarea?.id || props.tarea.parent_id) { subtareas.value = []; return }
+  try {
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}/subtareas`)
+    subtareas.value = data.subtareas || data.tareas || []
+  } catch { subtareas.value = [] }
+}
+
+async function crearSubtarea() {
+  const titulo = nuevaSubtitulo.value.trim()
+  if (!titulo || !props.tarea?.id) return
+  try {
+    const body = {
+      titulo,
+      parent_id: props.tarea.id,
+      categoria_id: props.tarea.categoria_id,
+      proyecto_id: props.tarea.proyecto_id,
+      responsable: props.tarea.responsable,
+      responsables: props.tarea.responsables || (props.tarea.responsable ? [props.tarea.responsable] : [])
+    }
+    await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(body) })
+    nuevaSubtitulo.value = ''
+    await cargarSubtareas()
+    emit('subtareas-cambiadas')
+  } catch (e) { console.error(e) }
+}
+
+async function toggleEstadoSubtarea(s) {
+  const ciclo = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente', 'Cancelada': 'Pendiente' }
+  const next = ciclo[s.estado] || 'Pendiente'
+  try {
+    await api(`/api/gestion/tareas/${s.id}`, { method: 'PUT', body: JSON.stringify({ estado: next }) })
+    await cargarSubtareas()
+    emit('subtareas-cambiadas')
+  } catch (e) { console.error(e) }
+}
+
+watch(() => props.tarea?.id, cargarSubtareas, { immediate: true })
 
 // Limpiar pendientes al cambiar de tarea
 watch(() => props.tarea?.id, () => {
@@ -614,6 +686,48 @@ async function completarSin() {
   user-select: none;
 }
 .subtarea-breadcrumb:hover { color: var(--accent); }
+
+/* Sección Subtareas en TareaPanel */
+.subtareas-section { display: flex; flex-direction: column; gap: 4px; }
+.subtareas-header { display: flex; align-items: center; }
+.subtarea-quickadd {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  background: var(--bg-row-hover);
+}
+.subtarea-input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  font-size: 13px; color: var(--text-primary); font-family: var(--font-sans);
+}
+.subtarea-input::placeholder { color: var(--text-tertiary); }
+.btn-sub-ok {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: none; border-radius: var(--radius-sm);
+  background: var(--accent); color: #fff; cursor: pointer;
+}
+.sub-link {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background 80ms;
+}
+.sub-link:hover { background: var(--bg-row-hover); }
+.sub-link-circle {
+  display: flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,0.55);
+  border-radius: var(--radius-full);
+  background: transparent; color: #000; cursor: pointer; padding: 0;
+}
+.sub-link-circle.done { background: var(--color-success); border-color: var(--color-success); }
+.sub-link-circle.cancelada { background: var(--text-tertiary); border-color: var(--text-tertiary); color: var(--bg-app); }
+.sub-link-title {
+  font-size: 14px; color: var(--text-primary); flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sub-link-title.done { text-decoration: line-through; color: var(--text-tertiary); }
+@media (max-width: 768px) {
+  .sub-link-title { font-size: 15px; }
+}
 
 .prioridad-chips {
   display: flex; gap: 4px; flex-wrap: wrap;

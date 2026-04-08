@@ -321,6 +321,8 @@
         @eliminar="eliminar"
         @crear-item="tipo => abrirPanelItem(tipo)"
         @abrir-padre="abrirPadre"
+        @abrir-subtarea="abrirSubtarea"
+        @subtareas-cambiadas="onSubtareasCambiadas"
         class="d-desktop-only"
       />
     </Transition>
@@ -362,6 +364,8 @@
               @eliminar="eliminar"
               @crear-item="tipo => abrirPanelItem(tipo)"
               @abrir-padre="abrirPadre"
+              @abrir-subtarea="abrirSubtarea"
+              @subtareas-cambiadas="onSubtareasCambiadas"
             />
           </div>
         </div>
@@ -1562,6 +1566,16 @@ async function abrirPadre(parentId) {
     } catch { return }
   }
   tareaSeleccionada.value = padre
+}
+
+function abrirSubtarea(sub) {
+  // Abrir cualquier subtarea en el panel (mismo flujo que abrir padre)
+  tareaSeleccionada.value = sub
+}
+
+async function onSubtareasCambiadas() {
+  // Refrescar contadores de subtareas en la lista padre
+  await cargarTareas()
 }
 
 function onTareaGuardada(tarea) {

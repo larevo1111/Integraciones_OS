@@ -472,7 +472,7 @@ body {
 .estado-circle {
   width: 16px; height: 16px;
   border-radius: var(--radius-full);
-  border: 1.5px solid rgba(255,255,255,0.35);
+  border: 1.5px solid rgba(255,255,255,0.50);
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
@@ -480,20 +480,17 @@ body {
   margin-top: 2px;
 }
 .estado-circle:hover { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-muted); }
-.estado-circle.pendiente { border-color: rgba(255,255,255,0.35); }
+.estado-circle.pendiente { border-color: rgba(255,255,255,0.50); }
 .estado-circle.en-progreso { border-color: var(--color-info); background: radial-gradient(circle, var(--color-info) 40%, transparent 40%); }
 .estado-circle.completada { border-color: var(--color-success); background: var(--color-success); }
 .estado-circle.completada::after { content: '✓'; font-size: 8px; color: #000; font-weight: 700; }
 .estado-circle.cancelada { border-color: var(--text-tertiary); background: var(--text-tertiary); }
 .estado-circle.cancelada::after { content: '×'; font-size: 10px; color: var(--bg-app); font-weight: 700; }
 
-/* Círculo de subtarea — ligeramente más pequeño para diferenciar visualmente del padre */
+/* Círculo de subtarea — mismo tamaño que padre, mejor contraste */
 .is-subtarea .estado-circle {
-  width: 11px !important;
-  height: 11px !important;
+  border-color: rgba(255,255,255,0.55);
 }
-.is-subtarea .estado-circle.completada::after { font-size: 7px; }
-.is-subtarea .estado-circle.cancelada::after  { font-size: 8px; }
 
 /* Dot de categoría */
 .cat-dot {
