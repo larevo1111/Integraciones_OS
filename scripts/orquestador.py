@@ -124,13 +124,20 @@ def ejecutar(cmd, timeout, cwd=None):
 # ─── Parsers de resultado ──────────────────────────────────────────────────────
 
 def parsear_export(salida: str) -> tuple[str, list[str], list[str]]:
-    """Extrae la línea de resumen del export y cuenta errores."""
+    """Extrae la línea de resumen del export y cuenta SOLO errores definitivos.
+
+    Los scripts de export tienen `console.error('❌ Error: ...')` que se imprime
+    en cada fallo intermedio. Pero export_all.sh reintenta y muchos succeed en
+    el segundo intento. Solo contamos como error real las líneas
+    'Falló definitivamente' que export_all.sh imprime cuando el reintento
+    también falla.
+    """
     resumen: str = ''
     for linea in salida.splitlines():
         if 'RESULTADO:' in linea:
             resumen = linea.strip()
-    # Excluir la línea de resumen al buscar errores/warnings reales
-    errores:  list[str] = [l.strip() for l in salida.splitlines() if '❌' in l and 'RESULTADO:' not in l]
+    # Solo errores REALES (reintento también falló)
+    errores:  list[str] = [l.strip() for l in salida.splitlines() if 'Falló definitivamente' in l]
     warnings: list[str] = [l.strip() for l in salida.splitlines() if '⚠️' in l and 'RESULTADO:' not in l]
     return resumen or '(sin resumen)', errores, warnings
 
