@@ -34,7 +34,7 @@
               <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
             </button>
             <div v-if="abierto === 'estado'" class="multi-bar-menu">
-              <div v-for="e in estados" :key="e" class="multi-menu-item" @click="emitir('estado', e)">{{ e }}</div>
+              <div v-for="e in estadosFiltrados" :key="e" class="multi-menu-item" @click="emitir('estado', e)">{{ e }}</div>
             </div>
           </div>
 
@@ -124,17 +124,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
   count:      { type: Number, default: 0 },
   acciones:   { type: Array,  default: () => ['fecha','estado','categoria','proyecto','etiquetas','responsable','eliminar'] },
-  estados:    { type: Array,  default: () => ['Pendiente','En Progreso','Completada','Cancelada'] },
+  estados:    { type: Array,  default: () => ['Pendiente','En Progreso','Cancelada'] },
   categorias: { type: Array,  default: () => [] },
   proyectos:  { type: Array,  default: () => [] },
   etiquetas:  { type: Array,  default: () => [] },
   usuarios:   { type: Array,  default: () => [] },
 })
+
+// Multiselect NUNCA permite Completada (exige modal individual)
+const estadosFiltrados = computed(() =>
+  props.estados.filter(e => e !== 'Completada')
+)
 
 const emit = defineEmits(['cerrar', 'aplicar', 'crear-etiqueta'])
 

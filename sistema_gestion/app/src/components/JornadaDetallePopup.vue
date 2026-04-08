@@ -281,16 +281,17 @@ const tareasCompletadas = ref([])
 const cargandoTareas = ref(false)
 
 const tareasColumnas = reactive([
-  { key: 'titulo',               label: 'Tarea',           visible: true,  width: '160px' },
-  { key: 'categoria_nombre',     label: 'Categoría',       visible: true, filterType: 'select' },
-  { key: 'estado',               label: 'Estado',          visible: false, filterType: 'select' },
-  { key: 'fecha_inicio_real',    label: 'Inicio real',     visible: true },
-  { key: 'fecha_fin_real',       label: 'Fin real',        visible: true },
-  { key: 'duracion_real_min',    label: 'Dur. sistema',    visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de la tarea' },
-  { key: 'tiempo_real_min',      label: 'Dur. cronómetro', visible: false, hint: 'Duración Cronómetro: tiempo acumulado del cronómetro activado manualmente' },
-  { key: 'fecha_inicio_estimada',label: 'Inicio est.',     visible: false },
-  { key: 'fecha_fin_estimada',   label: 'Fin est.',        visible: false },
-  { key: 'tiempo_estimado_min',  label: 'Dur. usuario',    visible: false, hint: 'Duración Usuario: tiempo reportado manualmente al completar la tarea' },
+  { key: 'titulo',                  label: 'Tarea',              visible: true,  width: '160px' },
+  { key: 'categoria_nombre',        label: 'Categoría',          visible: true, filterType: 'select' },
+  { key: 'estado',                  label: 'Estado',             visible: false, filterType: 'select' },
+  { key: 'fecha_inicio_real',       label: 'Inicio real',        visible: true },
+  { key: 'fecha_fin_real',          label: 'Fin real',           visible: true },
+  { key: 'duracion_usuario_seg',    label: 'Dur. usuario',       visible: true,  hint: 'Duración confirmada por el usuario en el modal' },
+  { key: 'duracion_cronometro_seg', label: 'Dur. cronómetro',    visible: false, hint: 'Duración acumulada del cronómetro' },
+  { key: 'duracion_sistema_seg',    label: 'Dur. sistema',       visible: false, hint: 'Diferencia entre inicio y fin real' },
+  { key: 'fecha_inicio_estimada',   label: 'Inicio est.',        visible: false },
+  { key: 'fecha_fin_estimada',      label: 'Fin est.',           visible: false },
+  { key: 'tiempo_estimado_min',     label: 'T. estimado (min)',  visible: false },
 ])
 
 const tareasRows = computed(() => tareasCompletadas.value.map(t => ({
@@ -300,10 +301,11 @@ const tareasRows = computed(() => tareasCompletadas.value.map(t => ({
   fecha_fin_real:        fmtDT(t.fecha_fin_real),
   fecha_inicio_estimada: fmtDT(t.fecha_inicio_estimada),
   fecha_fin_estimada:    fmtDT(t.fecha_fin_estimada),
-  // Minutos como número raw — OsDataTable formatea y permite sumar
-  duracion_real_min:     t.duracion_real_min ?? 0,
-  tiempo_real_min:       t.tiempo_real_min ?? 0,
-  tiempo_estimado_min:   t.tiempo_estimado_min ?? 0,
+  // Las 3 duraciones en segundos (raw, OsDataTable las suma)
+  duracion_usuario_seg:    t.duracion_usuario_seg ?? 0,
+  duracion_cronometro_seg: t.duracion_cronometro_seg ?? 0,
+  duracion_sistema_seg:    t.duracion_sistema_seg ?? 0,
+  tiempo_estimado_min:     t.tiempo_estimado_min ?? 0,
 })))
 
 // Estado

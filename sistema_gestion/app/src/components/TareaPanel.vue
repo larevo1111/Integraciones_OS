@@ -48,7 +48,7 @@
             class="prioridad-chip"
             :class="{ active: tarea.estado === e.key }"
             :style="tarea.estado === e.key ? { background: e.color + '22', borderColor: e.color, color: e.color } : {}"
-            @click="e.key === 'Completada' && tarea.estado !== 'Completada' ? completar() : actualizar('estado', e.key)"
+            @click="cambiarEstado(e.key)"
           >
             <span class="p-dot" :style="{ background: e.color }"></span>
             {{ e.label }}
@@ -239,6 +239,20 @@
         <span style="font-size:10px;color:var(--text-tertiary)">Más campos</span>
       </div>
       <template v-if="mostrarFechas">
+        <!-- Las 3 duraciones, siempre visibles, en formato HH:MM:SS -->
+        <div class="field-row">
+          <span class="field-label">Duración usuario</span>
+          <span style="font-size:12px;color:var(--text-primary);font-variant-numeric:tabular-nums">{{ duracionUsuarioFmt }}</span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Duración cronómetro</span>
+          <span style="font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums">{{ duracionCronometroFmt }}</span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Duración sistema</span>
+          <span style="font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums">{{ duracionSistemaFmt }}</span>
+        </div>
+        <div class="divider" style="margin:8px 0"></div>
         <div class="field-row">
           <span class="field-label">Inicio estimado</span>
           <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
@@ -252,10 +266,6 @@
         <div v-if="tarea.fecha_fin_real" class="field-row">
           <span class="field-label">Fin real</span>
           <span style="font-size:12px;color:var(--text-secondary)">{{ fmtDT(tarea.fecha_fin_real) }}</span>
-        </div>
-        <div v-if="duracionReal" class="field-row">
-          <span class="field-label">Duración real</span>
-          <span style="font-size:12px;color:var(--text-secondary)">{{ duracionReal }}</span>
         </div>
       </template>
     </div>
@@ -271,7 +281,7 @@
             <span style="font-size:10px;color:var(--text-tertiary)">h</span>
             <input type="number" class="input-field" style="width:42px;height:26px;font-size:11px" v-model.number="tiempoFinalM" min="0" max="59" placeholder="0" />
             <span style="font-size:10px;color:var(--text-tertiary)">m</span>
-            <button class="btn btn-ghost btn-sm" style="padding:0 6px" @click="popoverTiempo=false;completarSin()">Saltar</button>
+            <button class="btn btn-ghost btn-sm" style="padding:0 6px" @click="popoverTiempo=false">Cancelar</button>
             <button class="btn btn-accent btn-sm" style="padding:0 8px" @click="confirmarCompletar">✓</button>
           </div>
         </div>
@@ -300,7 +310,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
@@ -408,23 +418,6 @@ function fmtDT(val) {
   return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-const duracionReal = computed(() => {
-  if (!props.tarea?.fecha_inicio_real || !props.tarea?.fecha_fin_real) return null
-  const ini = new Date(props.tarea.fecha_inicio_real)
-  const fin = new Date(props.tarea.fecha_fin_real)
-  const diffMs = fin - ini
-  if (diffMs < 0) return null
-  if (diffMs === 0) return '0m'
-  const mins = Math.floor(diffMs / 60000)
-  if (mins < 60) return `${mins}m`
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`
-  const d = Math.floor(h / 24)
-  const hResto = h % 24
-  return hResto ? `${d}d ${hResto}h` : `${d}d`
-})
-
 // Mostrar OP Effi solo si la categoría seleccionada es Producción
 const esProduccion = computed(() => {
   if (!props.tarea?.categoria_id) return false
@@ -464,7 +457,7 @@ const LABELS_CAMPO = {
   estado: 'Estado', prioridad: 'Prioridad', categoria_id: 'Categoría',
   proyecto_id: 'Proyecto', responsable: 'Responsable', fecha_limite: 'Fecha',
   id_op: 'OP Effi', id_remision: 'Remisión', id_pedido: 'Pedido', descripcion: 'Descripción', notas: 'Notas',
-  tiempo_estimado_min: 'T. estimado', tiempo_real_min: 'T. real'
+  tiempo_estimado_min: 'T. estimado'
 }
 
 // Título auto-resize
@@ -479,8 +472,31 @@ watch(() => props.tarea?.id, () => nextTick(autoResizeTitulo))
 onMounted(() => nextTick(autoResizeTitulo))
 
 // Cronómetro
-import { calcTotalSeg, formatCrono } from 'src/services/crono'
+import { formatHHMMSS, calcDuracionVivo, calcDuracionSistema } from 'src/services/crono'
 const cronometroRef = ref(null)
+
+// Las 3 duraciones formateadas para "Más campos" — reactivas con tick para En Progreso
+const _tickRef = ref(0)
+let _tickInterval = null
+function _startTick() {
+  _stopTick()
+  _tickInterval = setInterval(() => { _tickRef.value++ }, 1000)
+}
+function _stopTick() { if (_tickInterval) { clearInterval(_tickInterval); _tickInterval = null } }
+watch(() => [props.tarea?.estado, props.tarea?.crono_inicio], () => {
+  if (props.tarea?.estado === 'En Progreso') _startTick()
+  else _stopTick()
+}, { immediate: true })
+onUnmounted(_stopTick)
+
+const duracionUsuarioFmt    = computed(() => { _tickRef.value; return formatHHMMSS(calcDuracionVivo(props.tarea)) })
+const duracionCronometroFmt = computed(() => {
+  _tickRef.value
+  // En En Progreso, igual al usuario (con vivo). En otros estados, valor guardado
+  if (props.tarea?.estado === 'En Progreso') return formatHHMMSS(calcDuracionVivo(props.tarea))
+  return formatHHMMSS(props.tarea?.duracion_cronometro_seg || 0)
+})
+const duracionSistemaFmt    = computed(() => { _tickRef.value; return formatHHMMSS(calcDuracionSistema(props.tarea)) })
 
 
 // Popover completar
@@ -577,11 +593,26 @@ async function actualizar(campo, valor) {
   } catch (e) { console.error(e) }
 }
 
+// 5S — Una sola función para cambiar estado, llama al endpoint correcto
+async function cambiarEstado(nuevoEstado) {
+  if (!props.tarea) return
+  if (nuevoEstado === 'Completada') { completar(); return }
+  const endpoints = {
+    'En Progreso': 'iniciar',
+    'Cancelada':   'cancelar',
+    'Pendiente':   'revertir'
+  }
+  const endpoint = endpoints[nuevoEstado]
+  if (!endpoint) return
+  try {
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}/${endpoint}`, { method: 'POST' })
+    if (data?.tarea) emit('actualizada', data.tarea)
+  } catch (e) { console.error(e) }
+}
+
 function ciclarEstado() {
   const ciclo = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente', 'Cancelada': 'Pendiente' }
-  const next = ciclo[props.tarea.estado] || 'Pendiente'
-  if (next === 'Completada') { completar(); return }
-  actualizar('estado', next)
+  cambiarEstado(ciclo[props.tarea.estado] || 'Pendiente')
 }
 
 
@@ -602,63 +633,28 @@ function actualizarTiempoEst(parte, val) {
   actualizar('tiempo_estimado_min', h*60+m)
 }
 
-function onCronometroUpdate(evento, tareaData) {
-  if (evento === 'detenido') {
-    if (tareaData) {
-      emit('actualizada', { ...props.tarea, ...tareaData, cronometro_activo: 0, crono_inicio: null })
-    } else {
-      // Reiniciar — dato es null
-      emit('actualizada', { ...props.tarea, cronometro_activo: 0, crono_inicio: null, crono_acumulado_seg: 0, tiempo_real_min: 0 })
-    }
-  } else {
-    // Iniciado — tareaData es la tarea actualizada del backend
-    if (tareaData) {
-      emit('actualizada', { ...props.tarea, ...tareaData, cronometro_activo: 1 })
-    }
-  }
+function onCronometroUpdate(tareaActualizada) {
+  if (tareaActualizada) emit('actualizada', tareaActualizada)
 }
 
-function actualizarTiempoReal(parte, val) {
-  const h = parte === 'h' ? parseInt(val)||0 : Math.floor((props.tarea.tiempo_real_min||0)/60)
-  const m = parte === 'm' ? parseInt(val)||0 : (props.tarea.tiempo_real_min||0)%60
-  actualizar('tiempo_real_min', h*60+m)
-}
-
+// completar() — siempre abre el popover para que el usuario confirme la duración
 function completar() {
-  const totalSeg = calcTotalSeg(props.tarea)
-  const min = Math.floor(totalSeg / 60)
-  tiempoFinalH.value = Math.floor(min / 60)
-  tiempoFinalM.value = min % 60
-  if (min > 0) {
-    // Tiene tiempo cronometrado → completar directo con ese tiempo
-    confirmarCompletar()
-    return
-  }
-  // Sin tiempo → preguntar
+  const totalSeg = calcDuracionVivo(props.tarea)
+  tiempoFinalH.value = Math.floor(totalSeg / 3600)
+  tiempoFinalM.value = Math.floor((totalSeg % 3600) / 60)
   popoverTiempo.value = true
   setTimeout(() => popoverHRef.value?.focus(), 50)
 }
 
 async function confirmarCompletar() {
-  const totalMin = tiempoFinalH.value*60 + tiempoFinalM.value
+  const dusrSeg = (tiempoFinalH.value || 0) * 3600 + (tiempoFinalM.value || 0) * 60
   popoverTiempo.value = false
   try {
-    const body = { estado: 'Completada' }
-    if (totalMin > 0) body.tiempo_real_min = totalMin
-    const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
-      method: 'PUT', body: JSON.stringify(body)
+    const data = await api(`/api/gestion/tareas/${props.tarea.id}/completar`, {
+      method: 'POST',
+      body: JSON.stringify({ duracion_usuario_seg: dusrSeg })
     })
-    emit('actualizada', data.tarea)
-  } catch(e) { console.error(e) }
-}
-
-async function completarSin() {
-  popoverTiempo.value = false
-  try {
-    const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
-      method: 'PUT', body: JSON.stringify({ estado: 'Completada' })
-    })
-    emit('actualizada', data.tarea)
+    if (data?.tarea) emit('actualizada', data.tarea)
   } catch(e) { console.error(e) }
 }
 </script>

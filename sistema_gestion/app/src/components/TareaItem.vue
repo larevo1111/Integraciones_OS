@@ -93,13 +93,6 @@
         :style="{ color: colorPrioridad }"
       ><span class="material-icons" style="font-size:11px">flag</span></span>
 
-      <!-- Chip duración real -->
-      <span
-        v-if="tarea.tiempo_real_min > 0 && !tarea.cronometro_activo"
-        class="meta-chip meta-chip-dur"
-        title="Tiempo real"
-      >{{ duracionDisplay }}</span>
-
       <!-- Chip fecha -->
       <span
         v-if="fechaDisplay"
@@ -129,7 +122,7 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, nextTick, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
 import CronoDisplay from './CronoDisplay.vue'
 
@@ -276,26 +269,9 @@ const clasesFecha = computed(() => {
   return ''
 })
 
-const duracionDisplay = computed(() => {
-  const min = props.tarea.tiempo_real_min || 0
-  if (!min) return ''
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  if (h && m) return `${h}h ${m}m`
-  if (h) return `${h}h`
-  return `${m}m`
-})
-
-// Cronómetro: CronoDisplay se encarga de todo
-
-// Reaccionar a cambios de cronometro_activo después del mount
-watch(() => props.tarea.cronometro_activo, (val) => {
-  if (val) iniciarInterval()
-  else     detenerInterval()
-})
+// Cronómetro: CronoDisplay se encarga de todo (lectura del estado de la tarea)
 
 onUnmounted(() => {
-  if (interval) clearInterval(interval)
   if (longPressTimer) clearTimeout(longPressTimer)
 })
 </script>

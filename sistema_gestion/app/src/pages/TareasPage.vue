@@ -432,7 +432,7 @@
                 <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
               </button>
               <div v-if="multiMenuEstado" class="multi-bar-menu">
-                <div v-for="e in ['Pendiente','En Progreso','Completada','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
+                <div v-for="e in ['Pendiente','En Progreso','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
               </div>
             </div>
 
@@ -564,7 +564,7 @@ import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
 import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
-import { calcTotalSeg }     from 'src/services/crono'
+import { calcDuracionVivo } from 'src/services/crono'
 import Sortable             from 'sortablejs'
 
 const auth  = useAuthStore()
@@ -1375,8 +1375,13 @@ async function aplicarFechaMulti(fecha) {
 
 async function aplicarEstadoMulti(estado) {
   cerrarMenusMulti(null)
+  const endpoints = { 'En Progreso': 'iniciar', 'Cancelada': 'cancelar', 'Pendiente': 'revertir' }
+  const endpoint = endpoints[estado]
+  if (!endpoint) return  // 'Completada' no permitido
   const ids = [...seleccionMultiIds.value]
-  await _bulkPut(ids, { estado })
+  await Promise.all(ids.map(id =>
+    api(`/api/gestion/tareas/${id}/${endpoint}`, { method: 'POST' }).catch(console.error)
+  ))
   await _postBulk(ids)
 }
 
@@ -1477,57 +1482,49 @@ const tiempoModal     = ref(null)   // { tarea } cuando está abierto
 const tiempoInput     = ref('')     // minutos ingresados por el usuario
 const tiempoInputRef  = ref(null)   // ref para hacer focus
 
-function _minutosActuales(tarea) {
-  return Math.floor(calcTotalSeg(tarea) / 60)
-}
-
+// 5S — Una sola función para el ciclo del check (Pendiente→EnProgreso→Completada→Pendiente)
 async function cambiarEstado(tarea) {
-  // Ciclo del check: Pendiente→EnProgreso→Completada→Pendiente
-  // Cancelada: el check no la reactiva (se gestiona desde el panel de estado)
   const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente' }
   const nextEstado = CICLO[tarea.estado] || 'Pendiente'
-  // Al completar: abrir mini-modal con tiempo actual pre-llenado
+  // Al completar: abrir modal para que el usuario confirme la duración
   if (nextEstado === 'Completada') {
     tiempoModal.value = { tarea }
-    tiempoInput.value = _minutosActuales(tarea) || ''
+    // Pre-llenar con la duración del cronómetro actual (en segundos → input en minutos)
+    const segActuales = calcDuracionVivo(tarea)
+    tiempoInput.value = Math.floor(segActuales / 60) || ''
     nextTick(() => { tiempoInputRef.value?.focus(); tiempoInputRef.value?.select() })
     return
   }
-  // Al revertir Completada→Pendiente, resetear tiempo_real_min acumulado
-  const tiempoReset = (tarea.estado === 'Completada' && nextEstado === 'Pendiente') ? 0 : null
-  await _aplicarEstado(tarea, nextEstado, tiempoReset)
-  // Auto-iniciar cronómetro al poner En Progreso (si panel no está abierto con esta tarea)
-  if (nextEstado === 'En Progreso' && !tarea.cronometro_activo && tareaSeleccionada.value?.id !== tarea.id) {
-    try {
-      const data = await api(`/api/gestion/tareas/${tarea.id}/iniciar`, { method: 'POST' })
-      if (data?.tiempo?.inicio) {
-        const idx = tareas.value.findIndex(t => t.id === tarea.id)
-        if (idx !== -1) tareas.value[idx] = { ...tareas.value[idx], cronometro_activo: 1, cronometro_inicio: data.tiempo.inicio }
-      }
-    } catch (e) { console.error(e) }
-  }
+  // Otros estados: llamar al endpoint específico
+  await _llamarEndpointEstado(tarea, nextEstado)
 }
 
-async function _aplicarEstado(tarea, estado, tiempo_real_min) {
-  const body = { estado }
-  if (tiempo_real_min != null) body.tiempo_real_min = tiempo_real_min
+const ENDPOINTS_ESTADO = {
+  'En Progreso': 'iniciar',
+  'Cancelada':   'cancelar',
+  'Pendiente':   'revertir'
+}
+
+async function _llamarEndpointEstado(tarea, nuevoEstado) {
+  const endpoint = ENDPOINTS_ESTADO[nuevoEstado]
+  if (!endpoint) return
   try {
-    const data = await api(`/api/gestion/tareas/${tarea.id}`, { method: 'PUT', body: JSON.stringify(body) })
-    onTareaActualizada(data.tarea)
+    const data = await api(`/api/gestion/tareas/${tarea.id}/${endpoint}`, { method: 'POST' })
+    if (data?.tarea) onTareaActualizada(data.tarea)
   } catch (e) { console.error(e) }
 }
 
 async function confirmarTiempoModal() {
   const { tarea } = tiempoModal.value
-  const min = parseInt(tiempoInput.value) || null
+  const min = parseInt(tiempoInput.value) || 0
   tiempoModal.value = null
-  await _aplicarEstado(tarea, 'Completada', min)
-}
-
-function omitirTiempoModal() {
-  const { tarea } = tiempoModal.value
-  tiempoModal.value = null
-  _aplicarEstado(tarea, 'Completada', null)
+  try {
+    const data = await api(`/api/gestion/tareas/${tarea.id}/completar`, {
+      method: 'POST',
+      body: JSON.stringify({ duracion_usuario_seg: min * 60 })
+    })
+    if (data?.tarea) onTareaActualizada(data.tarea)
+  } catch (e) { console.error(e) }
 }
 
 function cancelarTiempoModal() {

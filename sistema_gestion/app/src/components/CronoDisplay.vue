@@ -7,19 +7,22 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { calcTotalSeg, formatCrono } from 'src/services/crono'
+import { formatHHMMSS, calcDuracionVivo } from 'src/services/crono'
 
 const props = defineProps({
   tarea: { type: Object, required: true }
 })
 
-const visible = computed(() => props.tarea.crono_inicio || (props.tarea.crono_acumulado_seg > 0))
+// Una sola regla: visible si NO es Pendiente
+const visible = computed(() => props.tarea && props.tarea.estado !== 'Pendiente')
 
-const texto = ref(formatCrono(calcTotalSeg(props.tarea)))
+const segundos = ref(calcDuracionVivo(props.tarea))
+const texto = computed(() => formatHHMMSS(segundos.value))
+
 let interval = null
 
 function actualizar() {
-  texto.value = formatCrono(calcTotalSeg(props.tarea))
+  segundos.value = calcDuracionVivo(props.tarea)
 }
 
 function start() {
@@ -31,14 +34,21 @@ function stop() {
   if (interval) { clearInterval(interval); interval = null }
 }
 
-onMounted(() => { if (props.tarea.crono_inicio) start(); else actualizar() })
-onUnmounted(() => stop())
-
-watch(() => props.tarea.crono_inicio, val => {
-  if (val) start()
-  else { stop(); actualizar() }
+onMounted(() => {
+  actualizar()
+  if (props.tarea?.estado === 'En Progreso' && props.tarea?.crono_inicio) start()
 })
-watch(() => props.tarea.crono_acumulado_seg, () => actualizar())
+
+onUnmounted(stop)
+
+watch(
+  () => [props.tarea?.estado, props.tarea?.crono_inicio, props.tarea?.duracion_usuario_seg, props.tarea?.duracion_cronometro_seg],
+  () => {
+    actualizar()
+    if (props.tarea?.estado === 'En Progreso' && props.tarea?.crono_inicio) start()
+    else stop()
+  }
+)
 </script>
 
 <style scoped>
@@ -48,7 +58,7 @@ watch(() => props.tarea.crono_acumulado_seg, () => actualizar())
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.crono-display.pausado { color: var(--accent); opacity: 0.7; }
+.crono-display.pausado { color: var(--accent); opacity: 0.8; }
 .crono-display-dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
