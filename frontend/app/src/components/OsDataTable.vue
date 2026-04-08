@@ -28,7 +28,7 @@
         <div class="toolbar-btn-wrap" ref="fieldsRef">
           <button class="toolbar-btn" @click.stop="showFields = !showFields">
             <SlidersHorizontalIcon :size="14" />
-            <span>Campos</span>
+            <span class="toolbar-btn-label">Campos</span>
           </button>
           <div v-if="showFields" class="popup fields-popup" @click.stop>
             <div class="pp-section-label">Propiedades visibles</div>
@@ -53,7 +53,7 @@
         <div class="toolbar-btn-wrap" ref="exportRef">
           <button class="toolbar-btn" @click.stop="showExport = !showExport">
             <DownloadIcon :size="14" />
-            <span>Exportar</span>
+            <span class="toolbar-btn-label">Exportar</span>
           </button>
           <div v-if="showExport" class="popup export-popup" @click.stop>
             <div class="pp-section-label">Exportar como</div>
@@ -175,41 +175,62 @@
           <!-- Filtro -->
           <div class="cp-section">
             <label class="cp-label">Filtrar</label>
-            <div class="cp-filter-row">
-              <select
-                class="cp-select"
-                :value="getFilterOp(colPopup)"
-                @change="setFilterOp(colPopup, $event.target.value)"
-              >
-                <option value="eq">Igual a</option>
-                <option value="contains">Contiene</option>
-                <option value="gt">Mayor que</option>
-                <option value="lt">Menor que</option>
-                <option value="gte">Mayor o igual</option>
-                <option value="lte">Menor o igual</option>
-                <option value="between">Entre</option>
-              </select>
-            </div>
-            <div class="cp-filter-inputs">
-              <input
-                ref="colFilterInput"
-                class="cp-input"
-                :placeholder="getFilterOp(colPopup) === 'between' ? 'Desde' : 'Valor'"
-                :value="getFilterVal(colPopup)"
-                @input="setFilterVal(colPopup, $event.target.value)"
-                @keyup.enter="colPopup = null"
-                @keyup.escape="colPopup = null"
-              />
-              <input
-                v-if="getFilterOp(colPopup) === 'between'"
-                class="cp-input"
-                placeholder="Hasta"
-                :value="getFilterVal2(colPopup)"
-                @input="setFilterVal2(colPopup, $event.target.value)"
-                @keyup.enter="colPopup = null"
-                @keyup.escape="colPopup = null"
-              />
-            </div>
+            <!-- Multi-select con checkboxes (si la columna tiene options) -->
+            <template v-if="getColumnOptions(colPopup).length">
+              <div class="cp-options">
+                <label
+                  v-for="opt in getColumnOptions(colPopup)"
+                  :key="opt.value"
+                  class="cp-option"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="isOptionSelected(colPopup, opt.value)"
+                    @change="toggleOption(colPopup, opt.value)"
+                  />
+                  <span v-if="opt.color" class="cp-option-dot" :style="{ background: opt.color }" />
+                  <span>{{ opt.label }}</span>
+                </label>
+              </div>
+            </template>
+            <!-- Filtro texto/operadores (si la columna NO tiene options) -->
+            <template v-else>
+              <div class="cp-filter-row">
+                <select
+                  class="cp-select"
+                  :value="getFilterOp(colPopup)"
+                  @change="setFilterOp(colPopup, $event.target.value)"
+                >
+                  <option value="eq">Igual a</option>
+                  <option value="contains">Contiene</option>
+                  <option value="gt">Mayor que</option>
+                  <option value="lt">Menor que</option>
+                  <option value="gte">Mayor o igual</option>
+                  <option value="lte">Menor o igual</option>
+                  <option value="between">Entre</option>
+                </select>
+              </div>
+              <div class="cp-filter-inputs">
+                <input
+                  ref="colFilterInput"
+                  class="cp-input"
+                  :placeholder="getFilterOp(colPopup) === 'between' ? 'Desde' : 'Valor'"
+                  :value="getFilterVal(colPopup)"
+                  @input="setFilterVal(colPopup, $event.target.value)"
+                  @keyup.enter="colPopup = null"
+                  @keyup.escape="colPopup = null"
+                />
+                <input
+                  v-if="getFilterOp(colPopup) === 'between'"
+                  class="cp-input"
+                  placeholder="Hasta"
+                  :value="getFilterVal2(colPopup)"
+                  @input="setFilterVal2(colPopup, $event.target.value)"
+                  @keyup.enter="colPopup = null"
+                  @keyup.escape="colPopup = null"
+                />
+              </div>
+            </template>
           </div>
 
           <!-- Ordenar -->
@@ -381,10 +402,29 @@ function setFilterVal2(key, val2) {
   columnFilters.value = { ...columnFilters.value, [key]: { ...curr, val2 } }
 }
 
+// Multi-select por opciones (Estado, Prioridad, Categoría, etc.)
+function getColumnOptions(key) {
+  const col = localColumns.value.find(c => c.key === key)
+  if (!col?.options) return []
+  return col.options.map(o => typeof o === 'string' ? { value: o, label: o } : o)
+}
+function isOptionSelected(key, value) {
+  return (columnFilters.value[key]?.selected || []).includes(value)
+}
+function toggleOption(key, value) {
+  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '', selected: [] }
+  const selected = [...(curr.selected || [])]
+  const idx = selected.indexOf(value)
+  if (idx === -1) selected.push(value)
+  else selected.splice(idx, 1)
+  columnFilters.value = { ...columnFilters.value, [key]: { ...curr, selected } }
+}
+
 function hasFilter(key) {
   const f = columnFilters.value[key]
   if (!f) return false
-  return f.val.trim() !== ''
+  if ((f.selected || []).length > 0) return true
+  return (f.val || '').trim() !== ''
 }
 
 const activeFilterCount = computed(() => {
@@ -403,7 +443,11 @@ const filteredRows = computed(() => {
   return data.filter(row => {
     return keys.every(key => {
       const f = columnFilters.value[key]
-      const fv = f.val.trim()
+      // Multi-select por opciones (checkboxes)
+      if ((f.selected || []).length > 0) {
+        return f.selected.includes(row[key])
+      }
+      const fv = (f.val || '').trim()
       if (!fv) return true
       const raw = row[key]
       const rawNum = parseFloat(String(raw).replace(',', '.'))
@@ -651,6 +695,16 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 }
 .toolbar-right { display: flex; align-items: center; gap: 4px; }
 
+/* Mobile: botones del toolbar solo con ícono */
+@media (max-width: 768px) {
+  .table-toolbar { padding: 0 10px; }
+  .toolbar-btn .toolbar-btn-label { display: none; }
+  .toolbar-btn {
+    padding: 0 8px !important;
+    min-width: 32px;
+  }
+}
+
 /* Badges de filtro/agg activos */
 .filter-badge, .agg-badge {
   display: inline-flex; align-items: center; gap: 3px;
@@ -873,6 +927,24 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   display: block; margin-bottom: 4px;
 }
 .cp-filter-row { margin-bottom: 6px; }
+.cp-options {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 220px; overflow-y: auto;
+  padding: 2px 0;
+}
+.cp-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 4px; border-radius: 4px;
+  font-size: 12px; color: var(--text-primary, #1a1a1a);
+  cursor: pointer; transition: background 60ms;
+}
+.cp-option:hover { background: var(--bg-card-hover, #f5f5f5); }
+.cp-option input[type="checkbox"] {
+  margin: 0; cursor: pointer; accent-color: var(--accent, #00C853);
+}
+.cp-option-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
 .cp-select {
   width: 100%; height: 28px;
   border-radius: 4px;

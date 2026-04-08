@@ -11,21 +11,9 @@
       @select-toggle="ms.toggle"
     >
       <template #toolbar>
-        <select v-model="filtroEstado" class="filtro-select">
-          <option value="">Estado</option>
-          <option v-for="e in CONFIG[tipo].estados" :key="e" :value="e">{{ e }}</option>
-        </select>
-        <select v-model="filtroPrioridad" class="filtro-select">
-          <option value="">Prioridad</option>
-          <option v-for="p in ['Baja','Media','Alta','Urgente']" :key="p" :value="p">{{ p }}</option>
-        </select>
-        <select v-model="filtroCategoria" class="filtro-select">
-          <option value="">Categoría</option>
-          <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-        </select>
         <button class="btn-crear" @click="abrirCrear">
           <span class="material-icons" style="font-size:14px">add</span>
-          Nuevo
+          <span class="btn-crear-label">Nuevo</span>
         </button>
       </template>
       <template #cell-nombre="{ row, value }">
@@ -106,31 +94,28 @@ const PRIORIDAD_COLORS = {
   Baja: '#78909C', Media: '#42A5F5', Alta: '#FFA726', Urgente: '#EF5350',
 }
 
-const columnas = [
-  { key: 'nombre',           label: 'Nombre',      sortable: true, visible: true, width: '280px' },
-  { key: 'estado',           label: 'Estado',       sortable: true, visible: true },
-  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true },
-  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true },
-  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true },
-  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true },
-  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, numeric: true },
-]
-
 const items      = ref([])
 const cargando   = ref(false)
 const categorias = ref([])
 const usuarios   = ref([])
 const etiquetas  = ref([])
 
-const filtroEstado    = ref('')
-const filtroPrioridad = ref('')
-const filtroCategoria = ref('')
+// Columnas con options multi-select en el header de cada columna
+const columnas = computed(() => [
+  { key: 'nombre',           label: 'Nombre',       sortable: true, visible: true, width: '280px' },
+  { key: 'estado',           label: 'Estado',       sortable: true, visible: true,
+    options: (CONFIG[props.tipo]?.estados || []).map(e => ({ value: e, label: e, color: ESTADO_COLORS[e] })) },
+  { key: 'prioridad',        label: 'Prioridad',    sortable: true, visible: true,
+    options: ['Baja','Media','Alta','Urgente'].map(p => ({ value: p, label: p, color: PRIORIDAD_COLORS[p] })) },
+  { key: 'categoria_nombre', label: 'Categoría',    sortable: true, visible: true,
+    options: categorias.value.map(c => ({ value: c.nombre, label: c.nombre, color: c.color })) },
+  { key: 'responsables_str', label: 'Responsable',  sortable: true, visible: true },
+  { key: 'fecha_estimada_fin', label: 'Fecha est.', sortable: true, visible: true },
+  { key: 'tareas_pendientes', label: 'Tareas',      sortable: true, visible: true, numeric: true },
+])
 
 const filasFiltradas = computed(() => {
-  let result = items.value
-  if (filtroEstado.value)    result = result.filter(i => i.estado === filtroEstado.value)
-  if (filtroPrioridad.value) result = result.filter(i => i.prioridad === filtroPrioridad.value)
-  if (filtroCategoria.value) result = result.filter(i => i.categoria_id === filtroCategoria.value)
+  const result = items.value
   return result
 })
 
@@ -231,9 +216,6 @@ function onEliminado(p) {
 
 // Recargar cuando cambia el tipo (Vue Router reutiliza el componente)
 watch(() => props.tipo, () => {
-  filtroEstado.value = ''
-  filtroPrioridad.value = ''
-  filtroCategoria.value = ''
   panelVisible.value = false
   cargar()
 })
@@ -253,14 +235,8 @@ onMounted(() => { cargar(); cargarDatos() })
   font-family: var(--font-sans);
 }
 .btn-crear:hover { background: #e8e8e8; }
-.filtro-select {
-  height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
-  border: 1px solid var(--border-default); background: var(--bg-card);
-  color: var(--text-primary); font-size: 12px; font-family: var(--font-sans);
-}
-.filtro-select:focus { outline: none; border-color: var(--accent); }
-@media (max-width: 600px) {
-  .filtro-select { font-size: 11px; padding: 0 4px; }
-  .btn-crear { padding: 0 8px; font-size: 11px; }
+@media (max-width: 768px) {
+  .btn-crear { padding: 0 10px; min-width: 32px; }
+  .btn-crear .btn-crear-label { display: none; }
 }
 </style>
