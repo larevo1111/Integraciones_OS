@@ -408,10 +408,10 @@ onUnmounted(() => {
 
 /* Subtarea: indentación + tipografía un poco más grande y mejor contraste */
 .is-subtarea { padding-left: 40px !important; }
-.is-subtarea .tarea-titulo { font-size: 14px; color: var(--text-primary); }
+.is-subtarea .tarea-titulo { font-size: 11px; color: var(--text-primary); }
 @media (max-width: 768px) {
   .is-subtarea { padding-left: 32px !important; }
-  .is-subtarea .tarea-titulo { font-size: 15px; }
+  .is-subtarea .tarea-titulo { font-size: 12px; }
 }
 
 /* Multi-selección */
