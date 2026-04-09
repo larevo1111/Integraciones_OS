@@ -270,23 +270,6 @@
       </template>
     </div>
 
-    <!-- Footer -->
-    <div class="tarea-panel-footer" style="flex-direction:column;gap:6px">
-      <!-- Popover de tiempo (solo si no tiene tiempo real) -->
-      <Transition name="popover">
-        <div v-if="popoverTiempo" class="popover-tiempo">
-          <span style="font-size:10px;color:var(--text-tertiary)">¿Cuánto te tomó?</span>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
-            <input ref="popoverHRef" type="number" class="input-field" style="width:48px;height:26px;font-size:11px" v-model.number="tiempoFinalH" min="0" placeholder="0" />
-            <span style="font-size:10px;color:var(--text-tertiary)">h</span>
-            <input type="number" class="input-field" style="width:42px;height:26px;font-size:11px" v-model.number="tiempoFinalM" min="0" max="59" placeholder="0" />
-            <span style="font-size:10px;color:var(--text-tertiary)">m</span>
-            <button class="btn btn-ghost btn-sm" style="padding:0 6px" @click="popoverTiempo=false">Cancelar</button>
-            <button class="btn btn-accent btn-sm" style="padding:0 8px" @click="confirmarCompletar">✓</button>
-          </div>
-        </div>
-      </Transition>
-    </div>
   </aside>
 
   <!-- Modal guardar cambios -->
@@ -345,7 +328,7 @@ const props = defineProps({
   proyectos:  { type: Array, default: () => [] },
   etiquetas:  { type: Array, default: () => [] }
 })
-const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre', 'abrir-subtarea', 'subtareas-cambiadas'])
+const emit = defineEmits(['cerrar', 'eliminar', 'actualizada', 'crear-item', 'abrir-padre', 'abrir-subtarea', 'subtareas-cambiadas', 'completar-tarea'])
 
 // ── Subtareas ──
 const subtareas    = ref([])
@@ -499,12 +482,6 @@ const duracionCronometroFmt = computed(() => {
 const duracionSistemaFmt    = computed(() => { _tickRef.value; return formatHHMMSS(calcDuracionSistema(props.tarea)) })
 
 
-// Popover completar
-const popoverTiempo   = ref(false)
-const popoverHRef     = ref(null)
-const tiempoFinalH    = ref(0)
-const tiempoFinalM    = ref(0)
-
 // Al setear fecha_estimada: sincroniza fecha_inicio_estimada si no tiene valor
 async function actualizarFechaEstimada(valor) {
   const body = { fecha_limite: valor || null }
@@ -637,25 +614,9 @@ function onCronometroUpdate(tareaActualizada) {
   if (tareaActualizada) emit('actualizada', tareaActualizada)
 }
 
-// completar() — siempre abre el popover para que el usuario confirme la duración
+// completar() — delega al padre (TareasPage) para abrir el modal único
 function completar() {
-  const totalSeg = calcDuracionVivo(props.tarea)
-  tiempoFinalH.value = Math.floor(totalSeg / 3600)
-  tiempoFinalM.value = Math.floor((totalSeg % 3600) / 60)
-  popoverTiempo.value = true
-  setTimeout(() => popoverHRef.value?.focus(), 50)
-}
-
-async function confirmarCompletar() {
-  const dusrSeg = (tiempoFinalH.value || 0) * 3600 + (tiempoFinalM.value || 0) * 60
-  popoverTiempo.value = false
-  try {
-    const data = await api(`/api/gestion/tareas/${props.tarea.id}/completar`, {
-      method: 'POST',
-      body: JSON.stringify({ duracion_usuario_seg: dusrSeg })
-    })
-    if (data?.tarea) emit('actualizada', data.tarea)
-  } catch(e) { console.error(e) }
+  emit('completar-tarea', props.tarea)
 }
 </script>
 
@@ -775,22 +736,6 @@ async function confirmarCompletar() {
 .t-input {
   width: 32px !important; height: 20px !important;
   font-size: 10px !important; text-align: center; padding: 0 2px !important;
-}
-
-/* Popover completar */
-.popover-tiempo {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  padding: 8px 10px;
-  width: 100%;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-.popover-enter-active, .popover-leave-active {
-  transition: opacity 120ms, transform 120ms;
-}
-.popover-enter-from, .popover-leave-to {
-  opacity: 0; transform: translateY(4px);
 }
 
 /* Confirm modal */

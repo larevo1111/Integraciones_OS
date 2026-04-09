@@ -323,6 +323,7 @@
         @abrir-padre="abrirPadre"
         @abrir-subtarea="abrirSubtarea"
         @subtareas-cambiadas="onSubtareasCambiadas"
+        @completar-tarea="abrirModalCompletar"
         class="d-desktop-only"
       />
     </Transition>
@@ -366,6 +367,7 @@
               @abrir-padre="abrirPadre"
               @abrir-subtarea="abrirSubtarea"
               @subtareas-cambiadas="onSubtareasCambiadas"
+              @completar-tarea="abrirModalCompletar"
             />
           </div>
         </div>
@@ -1482,17 +1484,24 @@ const tiempoModal     = ref(null)   // { tarea } cuando está abierto
 const tiempoInput     = ref('')     // minutos ingresados por el usuario
 const tiempoInputRef  = ref(null)   // ref para hacer focus
 
+// 5S — Una sola función para abrir el modal de completar.
+// La llaman: el check de la lista (vía cambiarEstado) y el chip Completada del panel (vía evento).
+function abrirModalCompletar(tarea) {
+  tiempoModal.value = { tarea }
+  // Pre-llenar con la duración del cronómetro actual (segundos → minutos).
+  // Si hay cualquier tiempo > 0 pero < 60s, mínimo 1 min (el input está en minutos).
+  const segActuales = calcDuracionVivo(tarea)
+  tiempoInput.value = segActuales > 0 ? Math.max(1, Math.round(segActuales / 60)) : ''
+  nextTick(() => { tiempoInputRef.value?.focus(); tiempoInputRef.value?.select() })
+}
+
 // 5S — Una sola función para el ciclo del check (Pendiente→EnProgreso→Completada→Pendiente)
 async function cambiarEstado(tarea) {
   const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente' }
   const nextEstado = CICLO[tarea.estado] || 'Pendiente'
   // Al completar: abrir modal para que el usuario confirme la duración
   if (nextEstado === 'Completada') {
-    tiempoModal.value = { tarea }
-    // Pre-llenar con la duración del cronómetro actual (en segundos → input en minutos)
-    const segActuales = calcDuracionVivo(tarea)
-    tiempoInput.value = Math.floor(segActuales / 60) || ''
-    nextTick(() => { tiempoInputRef.value?.focus(); tiempoInputRef.value?.select() })
+    abrirModalCompletar(tarea)
     return
   }
   // Otros estados: llamar al endpoint específico
