@@ -512,37 +512,61 @@
       </Transition>
     </Teleport>
 
-    <!-- Mini-modal: tiempo al completar tarea -->
+    <!-- Mini-modal: tiempo al completar tarea (HH:MM:SS) -->
     <Teleport to="body">
       <Transition name="tiempo-modal">
-        <div v-if="tiempoModal" class="tiempo-modal-overlay" @click.self="cancelarTiempoModal">
+        <form
+          v-if="tiempoModal"
+          class="tiempo-modal-overlay"
+          @click.self="cancelarTiempoModal"
+          @submit.prevent="confirmarTiempoModal"
+        >
           <div class="tiempo-modal-card">
             <p class="tiempo-modal-titulo">¿Cuánto tiempo tomó?</p>
             <p class="tiempo-modal-subtitulo">{{ tiempoModal.tarea.titulo }}</p>
             <div class="tiempo-modal-input-row">
               <input
                 ref="tiempoInputRef"
-                v-model="tiempoInput"
+                v-model.number="tiempoH"
                 type="number"
-                min="1"
-                max="9999"
-                placeholder="min"
-                class="tiempo-modal-input"
-                @keyup.enter="confirmarTiempoModal"
+                min="0"
+                max="999"
+                placeholder="00"
+                class="tiempo-modal-input tiempo-modal-input-seg"
                 @keyup.escape="cancelarTiempoModal"
               />
-              <span class="tiempo-modal-unidad">minutos</span>
+              <span class="tiempo-modal-sep">:</span>
+              <input
+                v-model.number="tiempoM"
+                type="number"
+                min="0"
+                max="59"
+                placeholder="00"
+                class="tiempo-modal-input tiempo-modal-input-seg"
+                @keyup.escape="cancelarTiempoModal"
+              />
+              <span class="tiempo-modal-sep">:</span>
+              <input
+                v-model.number="tiempoS"
+                type="number"
+                min="0"
+                max="59"
+                placeholder="00"
+                class="tiempo-modal-input tiempo-modal-input-seg"
+                @keyup.escape="cancelarTiempoModal"
+              />
             </div>
+            <p class="tiempo-modal-unidades">h : m : s</p>
             <div class="tiempo-modal-acciones">
-              <button class="tiempo-modal-btn-omitir" @click="cancelarTiempoModal">Cancelar</button>
+              <button type="button" class="tiempo-modal-btn-omitir" @click="cancelarTiempoModal">Cancelar</button>
               <button
+                type="submit"
                 class="tiempo-modal-btn-ok"
-                :disabled="tiempoInput === ''"
-                @click="confirmarTiempoModal"
+                :disabled="tiempoTotalSeg === 0"
               >Confirmar</button>
             </div>
           </div>
-        </div>
+        </form>
       </Transition>
     </Teleport>
   </div>
@@ -1479,19 +1503,25 @@ function onDocumentClick(e) {
   }
 }
 
-// ─── MINI-MODAL TIEMPO AL COMPLETAR ───────────────────────────
+// ─── MINI-MODAL TIEMPO AL COMPLETAR (HH:MM:SS) ────────────────
 const tiempoModal     = ref(null)   // { tarea } cuando está abierto
-const tiempoInput     = ref('')     // minutos ingresados por el usuario
-const tiempoInputRef  = ref(null)   // ref para hacer focus
+const tiempoH         = ref(0)
+const tiempoM         = ref(0)
+const tiempoS         = ref(0)
+const tiempoInputRef  = ref(null)   // ref al primer input (horas) para focus
+const tiempoTotalSeg  = computed(() =>
+  (tiempoH.value || 0) * 3600 + (tiempoM.value || 0) * 60 + (tiempoS.value || 0)
+)
 
 // 5S — Una sola función para abrir el modal de completar.
 // La llaman: el check de la lista (vía cambiarEstado) y el chip Completada del panel (vía evento).
 function abrirModalCompletar(tarea) {
   tiempoModal.value = { tarea }
-  // Pre-llenar con la duración del cronómetro actual (segundos → minutos).
-  // Si hay cualquier tiempo > 0 pero < 60s, mínimo 1 min (el input está en minutos).
-  const segActuales = calcDuracionVivo(tarea)
-  tiempoInput.value = segActuales > 0 ? Math.max(1, Math.round(segActuales / 60)) : ''
+  // Pre-llenar con el valor exacto del cronómetro en HH:MM:SS
+  const seg = calcDuracionVivo(tarea)
+  tiempoH.value = Math.floor(seg / 3600)
+  tiempoM.value = Math.floor((seg % 3600) / 60)
+  tiempoS.value = seg % 60
   nextTick(() => { tiempoInputRef.value?.focus(); tiempoInputRef.value?.select() })
 }
 
@@ -1524,13 +1554,14 @@ async function _llamarEndpointEstado(tarea, nuevoEstado) {
 }
 
 async function confirmarTiempoModal() {
+  if (tiempoTotalSeg.value === 0) return   // guardia: no permitir confirmar en 0
   const { tarea } = tiempoModal.value
-  const min = parseInt(tiempoInput.value) || 0
+  const dusrSeg = tiempoTotalSeg.value
   tiempoModal.value = null
   try {
     const data = await api(`/api/gestion/tareas/${tarea.id}/completar`, {
       method: 'POST',
-      body: JSON.stringify({ duracion_usuario_seg: min * 60 })
+      body: JSON.stringify({ duracion_usuario_seg: dusrSeg })
     })
     if (data?.tarea) onTareaActualizada(data.tarea)
   } catch (e) { console.error(e) }

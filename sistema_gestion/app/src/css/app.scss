@@ -1094,7 +1094,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tiempo-modal-input-row {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
 }
 .tiempo-modal-input {
   width: 80px; padding: 6px 10px;
@@ -1110,8 +1110,20 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   -moz-appearance: textfield;
   &::-webkit-outer-spin-button, &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 }
-.tiempo-modal-unidad {
-  font-size: 12px; color: var(--text-secondary);
+.tiempo-modal-input-seg {
+  width: 56px; font-size: 18px; padding: 8px 4px;
+  font-variant-numeric: tabular-nums;
+}
+.tiempo-modal-sep {
+  font-size: 18px; font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+.tiempo-modal-unidades {
+  font-size: 10px; color: var(--text-tertiary);
+  text-align: center; margin: 0;
+  letter-spacing: 2px;
+  text-transform: uppercase;
 }
 .tiempo-modal-acciones {
   display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;
