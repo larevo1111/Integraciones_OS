@@ -18,16 +18,15 @@ from ia_service.config import get_local_conn
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/sa_opencode'
 OC_BIN = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
 TIMEOUT_OC = 1200  # segundos (20 minutos)
-MODEL_VISION = 'opencode/mimo-v2-omni-free'
+MODEL_DEFAULT = 'opencode/qwen3.6-plus-free'
+MODEL_VISION  = 'opencode/qwen3.6-plus-free'  # mimo-v2 ya no existe
 
 
 # ── Ejecutar OpenCode ────────────────────────────────────────────────────────
 
 def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = False) -> dict:
     """Ejecuta opencode run --format json y retorna {ok, result, session_id}."""
-    cmd = [OC_BIN, 'run', '--format', 'json']
-    if con_imagen:
-        cmd += ['-m', MODEL_VISION]
+    cmd = [OC_BIN, 'run', '--format', 'json', '-m', MODEL_VISION if con_imagen else MODEL_DEFAULT]
     cmd.append(prompt)
     if session_id:
         cmd += ['--session', session_id]

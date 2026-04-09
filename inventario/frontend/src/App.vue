@@ -377,7 +377,18 @@
 
       <!-- ═══ VISTA GESTIÓN ═══ -->
       <template v-if="vistaActiva === 'gestion'">
-      <div class="ges-scroll-container">
+      <!-- Sub-pestañas de Gestión -->
+      <div class="ges-subtabs">
+        <button class="ges-subtab" :class="{ active: gesSubtab === 'dashboard' }" @click="gesSubtab = 'dashboard'">
+          <span class="material-icons" style="font-size:14px">dashboard</span> Dashboard
+        </button>
+        <button class="ges-subtab" :class="{ active: gesSubtab === 'auditoria' }" @click="gesSubtab = 'auditoria'; cargarOpsRevisar()">
+          <span class="material-icons" style="font-size:14px">fact_check</span> Auditoría OPs
+          <span v-if="opsResumen.sospechosas > 0" class="ges-subtab-badge">{{ opsResumen.sospechosas }}</span>
+        </button>
+      </div>
+
+      <div class="ges-scroll-container" v-if="gesSubtab === 'dashboard'">
 
         <!-- DASHBOARD KPIs -->
         <div class="ges-dashboard" v-if="gesDash">
@@ -527,6 +538,112 @@
         </div>
 
       </div><!-- /ges-scroll-container -->
+
+      <!-- ═══ SUB-PESTAÑA: AUDITORÍA OPs ═══ -->
+      <div class="ges-scroll-container" v-if="gesSubtab === 'auditoria'">
+        <div class="ges-dashboard">
+          <!-- Header con resumen -->
+          <div class="ops-header">
+            <div class="ops-resumen-cards">
+              <div class="ops-card">
+                <div class="ops-card-num">{{ opsResumen.total || 0 }}</div>
+                <div class="ops-card-label">Total OPs</div>
+              </div>
+              <div class="ops-card ops-card-incluidas">
+                <div class="ops-card-num">{{ opsResumen.incluidas || 0 }}</div>
+                <div class="ops-card-label">Incluidas (Generadas)</div>
+              </div>
+              <div class="ops-card ops-card-excluidas">
+                <div class="ops-card-num">{{ opsResumen.excluidas || 0 }}</div>
+                <div class="ops-card-label">Excluidas (Procesadas)</div>
+              </div>
+              <div class="ops-card ops-card-sospechosas">
+                <div class="ops-card-num">{{ opsResumen.sospechosas || 0 }}</div>
+                <div class="ops-card-label">Sospechosas (±6h)</div>
+              </div>
+              <div class="ops-card ops-card-revisadas">
+                <div class="ops-card-num">{{ opsResumen.revisadas || 0 }}</div>
+                <div class="ops-card-label">Revisadas</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filtros -->
+          <div class="inv-filters-row" style="padding:8px 0 12px 0">
+            <span class="inv-bodegas-label">Inclusión</span>
+            <button class="inv-pill" :class="{ active: !opsFiltroInc }" @click="opsFiltroInc = null; cargarOpsRevisar()">Todas</button>
+            <button class="inv-pill" :class="{ active: opsFiltroInc === 'incluidas' }" @click="opsFiltroInc = opsFiltroInc === 'incluidas' ? null : 'incluidas'; cargarOpsRevisar()">Incluidas</button>
+            <button class="inv-pill" :class="{ active: opsFiltroInc === 'excluidas' }" @click="opsFiltroInc = opsFiltroInc === 'excluidas' ? null : 'excluidas'; cargarOpsRevisar()">Excluidas</button>
+
+            <span class="inv-separator"></span>
+
+            <span class="inv-bodegas-label">Sospecha</span>
+            <button class="inv-pill" :class="{ active: !opsFiltroSos }" @click="opsFiltroSos = null; cargarOpsRevisar()">Todas</button>
+            <button class="inv-pill ges-pill-critica" :class="{ active: opsFiltroSos === 'sospechosas' }" @click="opsFiltroSos = opsFiltroSos === 'sospechosas' ? null : 'sospechosas'; cargarOpsRevisar()">Sospechosas</button>
+            <button class="inv-pill" :class="{ active: opsFiltroSos === 'normales' }" @click="opsFiltroSos = opsFiltroSos === 'normales' ? null : 'normales'; cargarOpsRevisar()">Normales</button>
+
+            <span class="inv-separator"></span>
+
+            <span class="inv-bodegas-label">Revisión</span>
+            <button class="inv-pill" :class="{ active: !opsFiltroRev }" @click="opsFiltroRev = null; cargarOpsRevisar()">Todas</button>
+            <button class="inv-pill" :class="{ active: opsFiltroRev === 'pendientes' }" @click="opsFiltroRev = opsFiltroRev === 'pendientes' ? null : 'pendientes'; cargarOpsRevisar()">Pendientes</button>
+            <button class="inv-pill" :class="{ active: opsFiltroRev === 'revisadas' }" @click="opsFiltroRev = opsFiltroRev === 'revisadas' ? null : 'revisadas'; cargarOpsRevisar()">Revisadas</button>
+          </div>
+
+          <!-- Tabla de OPs -->
+          <div class="ops-table-wrap">
+            <table class="inv-table ops-table">
+              <thead>
+                <tr>
+                  <th class="th" style="width:30px"></th>
+                  <th class="th" style="width:60px">ID</th>
+                  <th class="th">Descripción</th>
+                  <th class="th" style="width:90px">Estado corte</th>
+                  <th class="th text-center" style="width:70px">Incluida</th>
+                  <th class="th" style="width:130px">Evento</th>
+                  <th class="th text-right" style="width:90px">Δ corte</th>
+                  <th class="th text-center" style="width:70px">Mat/Prod</th>
+                  <th class="th text-center" style="width:90px">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="op in opsRevisar" :key="op.id" class="ops-row" :class="{ 'ops-row-sospechosa': op.sospechosa, 'ops-row-revisada': op.revisada }" @click="abrirDetalleOp(op)">
+                  <td class="td td-center">
+                    <span v-if="op.sospechosa" class="ops-dot ops-dot-sospechosa" title="Sospechosa: cambio dentro de ±6h del corte"></span>
+                    <span v-else class="ops-dot ops-dot-normal" title="Normal"></span>
+                  </td>
+                  <td class="td">{{ op.id_orden }}</td>
+                  <td class="td">{{ op.descripcion }}</td>
+                  <td class="td">
+                    <span class="ops-estado-chip" :class="op.estado_al_corte === 'Generada' ? 'est-generada' : 'est-procesada'">{{ op.estado_al_corte }}</span>
+                  </td>
+                  <td class="td td-center">
+                    <span v-if="op.incluida_en_calculo" class="material-icons" style="font-size:14px;color:#4ade80">check</span>
+                    <span v-else class="material-icons" style="font-size:14px;color:#6b7280">close</span>
+                  </td>
+                  <td class="td" style="font-size:11px">
+                    <div v-if="op.fecha_cambio_procesada">P: {{ formatFechaCorta2(op.fecha_cambio_procesada) }}</div>
+                    <div v-else>C: {{ formatFechaCorta2(op.fecha_creacion) }}</div>
+                  </td>
+                  <td class="td text-right" :class="op.sospechosa ? 'text-red' : ''">{{ formatDelta(op.minutos_del_corte) }}</td>
+                  <td class="td text-center">{{ op.materiales_count }} / {{ op.productos_count }}</td>
+                  <td class="td td-center">
+                    <span v-if="op.revisada" class="ops-rev-chip ops-rev-yes">Revisada</span>
+                    <span v-else class="ops-rev-chip ops-rev-no">Pendiente</span>
+                  </td>
+                </tr>
+                <tr v-if="!opsRevisar.length">
+                  <td colspan="9" class="td td-empty">
+                    <span class="material-icons" style="font-size:24px;opacity:0.3">inbox</span>
+                    <span>No hay OPs con los filtros seleccionados</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       </template><!-- /VISTA GESTIÓN -->
 
     </div><!-- /inv-content -->
@@ -685,6 +802,93 @@
         </div>
         <div class="inv-modal-body" style="padding:0">
           <img :src="API + '/api/inventario/fotos/' + articuloFoto?.foto" class="inv-foto-preview">
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DETALLE OP REVISAR -->
+    <div v-if="opDetalleVisible && opDetalleData" class="inv-overlay" @click.self="opDetalleVisible = false">
+      <div class="inv-modal ges-modal-detalle" style="width:680px;max-width:90vw">
+        <div class="inv-modal-header" :class="{ 'inv-modal-header-warn': opDetalleData.op.sospechosa }">
+          <span>OP {{ opDetalleData.op.id_orden }} — {{ opDetalleData.op.descripcion }}</span>
+          <button class="action-btn" @click="opDetalleVisible = false"><span class="material-icons">close</span></button>
+        </div>
+        <div class="inv-modal-body ges-detalle-body">
+          <!-- Resumen -->
+          <div class="ges-detalle-info">
+            <span class="ops-estado-chip" :class="opDetalleData.op.estado_al_corte === 'Generada' ? 'est-generada' : 'est-procesada'">{{ opDetalleData.op.estado_al_corte }} al corte</span>
+            <span v-if="opDetalleData.op.incluida_en_calculo" style="font-size:11px;color:#4ade80">✓ Incluida en cálculo</span>
+            <span v-else style="font-size:11px;color:#9ca3af">✗ No incluida</span>
+            <span v-if="opDetalleData.op.sospechosa" class="cierre-badge cierre-badge-conteo" style="margin-left:auto">⚠ Sospechosa</span>
+          </div>
+
+          <!-- Fechas -->
+          <div class="ges-detalle-section">
+            <div class="ges-detalle-label">Fechas</div>
+            <div class="ops-fechas">
+              <div><strong>Creada:</strong> {{ opDetalleData.op.fecha_creacion || '—' }}</div>
+              <div><strong>Procesada:</strong> {{ opDetalleData.op.fecha_cambio_procesada || '—' }} <span style="font-size:10px;color:var(--text-tertiary)">(en COT, ya con offset aplicado)</span></div>
+              <div v-if="opDetalleData.op.fecha_anulacion"><strong>Anulada:</strong> {{ opDetalleData.op.fecha_anulacion }}</div>
+              <div><strong>Δ del corte:</strong> {{ formatDelta(opDetalleData.op.minutos_del_corte) }}</div>
+            </div>
+          </div>
+
+          <!-- Cambios de estado -->
+          <div class="ges-detalle-section" v-if="opDetalleData.cambios_estado.length">
+            <div class="ges-detalle-label">Cambios de estado ({{ opDetalleData.cambios_estado.length }}) <span style="font-size:10px;color:var(--text-tertiary)">— UTC</span></div>
+            <table class="ges-table-mini">
+              <tbody>
+                <tr v-for="(c, i) in opDetalleData.cambios_estado" :key="i">
+                  <td>{{ c.f_cambio_de_estado }}</td>
+                  <td><strong>{{ c.nuevo_estado }}</strong></td>
+                  <td style="font-size:10px;color:var(--text-tertiary)">{{ c.responsable_cambio_de_estado }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Materiales -->
+          <div class="ges-detalle-section" v-if="opDetalleData.materiales.length">
+            <div class="ges-detalle-label">Materiales ({{ opDetalleData.materiales.length }})</div>
+            <table class="ges-table-mini">
+              <thead><tr><th>Cód</th><th>Material</th><th class="text-right">Cant</th></tr></thead>
+              <tbody>
+                <tr v-for="(m, i) in opDetalleData.materiales" :key="i">
+                  <td>{{ m.cod_material }}</td>
+                  <td>{{ m.descripcion_material }}</td>
+                  <td class="text-right">{{ m.cantidad }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Productos -->
+          <div class="ges-detalle-section" v-if="opDetalleData.productos.length">
+            <div class="ges-detalle-label">Productos ({{ opDetalleData.productos.length }})</div>
+            <table class="ges-table-mini">
+              <thead><tr><th>Cód</th><th>Producto</th><th class="text-right">Cant</th></tr></thead>
+              <tbody>
+                <tr v-for="(p, i) in opDetalleData.productos" :key="i">
+                  <td>{{ p.cod_articulo }}</td>
+                  <td>{{ p.descripcion_articulo_producido }}</td>
+                  <td class="text-right">{{ p.cantidad }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Revisión -->
+          <div class="ges-detalle-section">
+            <div class="ges-detalle-label">Revisión</div>
+            <textarea v-model="opNotaRevision" class="ges-textarea" rows="2" placeholder="Nota de revisión (opcional)..."></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button v-if="!opDetalleData.op.revisada" class="inv-btn-primary" :disabled="opGuardando" @click="marcarOpRevisada(true)">{{ opGuardando ? 'Guardando...' : 'Marcar como revisada' }}</button>
+              <button v-else class="inv-btn-secondary" :disabled="opGuardando" @click="marcarOpRevisada(false)">Desmarcar revisada</button>
+            </div>
+            <div v-if="opDetalleData.op.revisada" style="margin-top:6px;font-size:10px;color:var(--text-tertiary)">
+              Revisada por {{ opDetalleData.op.revisada_por }} el {{ opDetalleData.op.fecha_revision }}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -931,6 +1135,18 @@ const resultadosAsignar = ref([])
 const effiSeleccionado = ref(null)
 // Vista activa
 const vistaActiva = ref('conteo')
+// Sub-pestaña de Gestión
+const gesSubtab = ref('dashboard')
+// Auditoría OPs
+const opsRevisar = ref([])
+const opsResumen = ref({})
+const opsFiltroInc = ref(null)
+const opsFiltroSos = ref(null)
+const opsFiltroRev = ref(null)
+const opDetalleVisible = ref(false)
+const opDetalleData = ref(null)
+const opNotaRevision = ref('')
+const opGuardando = ref(false)
 // Estado de cierres
 const estadoCierre = ref({ conteo_cerrado: false, inventario_cerrado: false })
 const conteoBloqueado = computed(() => estadoCierre.value.conteo_cerrado || estadoCierre.value.inventario_cerrado)
@@ -1470,6 +1686,67 @@ async function guardarResolucion() {
     console.error('Error guardando resolución:', e)
   }
   gesGuardando.value = false
+}
+
+// ── Auditoría OPs ──
+async function cargarOpsRevisar() {
+  let url = `/api/inventario/ops-revisar?fecha=${FECHA.value}`
+  if (opsFiltroInc.value) url += `&filtro_inclusion=${opsFiltroInc.value}`
+  if (opsFiltroSos.value) url += `&filtro_sospecha=${opsFiltroSos.value}`
+  if (opsFiltroRev.value) url += `&filtro_revision=${opsFiltroRev.value}`
+  const data = await fetchApi(url)
+  opsRevisar.value = data.ops || []
+  opsResumen.value = data.resumen || {}
+}
+
+async function abrirDetalleOp(op) {
+  opDetalleData.value = await fetchApi(`/api/inventario/ops-revisar/${op.id}/detalle`)
+  opNotaRevision.value = opDetalleData.value.op.nota_revision || ''
+  opDetalleVisible.value = true
+}
+
+async function marcarOpRevisada(revisada) {
+  if (!opDetalleData.value) return
+  opGuardando.value = true
+  try {
+    await fetch(API + `/api/inventario/ops-revisar/${opDetalleData.value.op.id}`, {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        revisada: revisada,
+        nota: opNotaRevision.value || null,
+        usuario: usuario.value
+      })
+    })
+    opDetalleVisible.value = false
+    await cargarOpsRevisar()
+  } catch (e) {
+    console.error('Error guardando revisión OP:', e)
+  }
+  opGuardando.value = false
+}
+
+function formatDelta(minutos) {
+  if (minutos === null || minutos === undefined) return '—'
+  const abs = Math.abs(minutos)
+  const signo = minutos < 0 ? '-' : '+'
+  if (abs < 60) return `${signo}${abs}m`
+  if (abs < 1440) {
+    const h = Math.floor(abs / 60)
+    const m = abs % 60
+    return `${signo}${h}h ${m}m`
+  }
+  const d = Math.floor(abs / 1440)
+  const h = Math.floor((abs % 1440) / 60)
+  return `${signo}${d}d ${h}h`
+}
+
+function formatFechaCorta2(f) {
+  if (!f) return '—'
+  // f viene como '2026-03-31 19:48:00'
+  const [fecha, hora] = f.split(' ')
+  const [y, m, d] = fecha.split('-')
+  return `${d}/${m} ${hora ? hora.substring(0, 5) : ''}`
 }
 
 // ── Excluidos ──
@@ -2061,6 +2338,51 @@ onUnmounted(() => clearInterval(clockInterval))
 .stepper-bloqueado .count-input { cursor: not-allowed; background: rgba(0,0,0,0.2); }
 .inv-panel-action-warn { color: #fbbf24 !important; }
 .inv-panel-action-warn:hover { background: rgba(245,158,11,0.15) !important; }
+
+/* ═══ SUB-PESTAÑAS DE GESTIÓN ═══ */
+.ges-subtabs { display: flex; gap: 4px; padding: 6px 16px 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.ges-subtab { display: flex; align-items: center; gap: 5px; padding: 7px 14px; font-size: 12px; font-weight: 500; color: var(--text-tertiary); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; position: relative; }
+.ges-subtab:hover { color: var(--text-secondary); }
+.ges-subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.ges-subtab-badge { background: rgba(239,68,68,0.2); color: #f87171; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 3px; }
+
+/* ═══ AUDITORÍA OPs ═══ */
+.ops-header { padding-bottom: 8px; }
+.ops-resumen-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+.ops-card { flex: 1; min-width: 90px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 12px; }
+.ops-card-num { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.ops-card-label { font-size: 9px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.ops-card-incluidas .ops-card-num { color: #4ade80; }
+.ops-card-excluidas .ops-card-num { color: #9ca3af; }
+.ops-card-sospechosas { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); }
+.ops-card-sospechosas .ops-card-num { color: #f87171; }
+.ops-card-revisadas .ops-card-num { color: #60a5fa; }
+
+.ops-table-wrap { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; overflow-x: auto; }
+.ops-table { width: 100%; table-layout: fixed; }
+.ops-table .td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-row { cursor: pointer; }
+.ops-row:hover td { background: rgba(255,255,255,0.03); }
+.ops-row-sospechosa td { background: rgba(239,68,68,0.04); }
+.ops-row-sospechosa:hover td { background: rgba(239,68,68,0.08); }
+.ops-row-revisada { opacity: 0.55; }
+
+.ops-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.ops-dot-sospechosa { background: #f87171; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+.ops-dot-normal { background: #4ade80; }
+
+.ops-estado-chip { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+.est-generada { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.est-procesada { background: rgba(107,114,128,0.15); color: #9ca3af; }
+
+.ops-rev-chip { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+.ops-rev-yes { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.ops-rev-no { background: rgba(107,114,128,0.15); color: #9ca3af; }
+
+.ops-fechas { font-size: 11px; line-height: 1.7; color: var(--text-secondary); }
+.ops-fechas strong { color: var(--text-primary); display: inline-block; min-width: 90px; }
+
+.td-center { text-align: center; }
 
 /* ═══ ACORDEONES GESTIÓN ═══ */
 .ges-scroll-container { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }

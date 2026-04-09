@@ -1067,6 +1067,156 @@ def estado_analisis():
     return analisis_status
 
 
+# ── Auditoría de OPs (inv_ops_revisar) ──
+
+@app.get("/api/inventario/ops-revisar")
+def listar_ops_revisar(fecha: str, filtro_inclusion: Optional[str] = None,
+                       filtro_sospecha: Optional[str] = None,
+                       filtro_revision: Optional[str] = None):
+    """Lista OPs en auditoría con filtros opcionales.
+
+    filtro_inclusion: 'incluidas' | 'excluidas' | None (todas)
+    filtro_sospecha: 'sospechosas' | 'normales' | None
+    filtro_revision: 'revisadas' | 'pendientes' | None
+    """
+    sql = "SELECT * FROM inv_ops_revisar WHERE fecha_corte = %s"
+    params = [fecha]
+
+    if filtro_inclusion == 'incluidas':
+        sql += " AND incluida_en_calculo = 1"
+    elif filtro_inclusion == 'excluidas':
+        sql += " AND incluida_en_calculo = 0"
+
+    if filtro_sospecha == 'sospechosas':
+        sql += " AND sospechosa = 1"
+    elif filtro_sospecha == 'normales':
+        sql += " AND sospechosa = 0"
+
+    if filtro_revision == 'revisadas':
+        sql += " AND revisada = 1"
+    elif filtro_revision == 'pendientes':
+        sql += " AND revisada = 0"
+
+    sql += " ORDER BY sospechosa DESC, ABS(minutos_del_corte) ASC"
+    rows = db_query(DB_INV, sql, params)
+
+    for r in rows:
+        for campo in ['fecha_creacion', 'fecha_anulacion', 'fecha_cambio_procesada',
+                       'calculado_en', 'fecha_revision']:
+            r[campo] = str(r[campo]) if r[campo] else None
+
+    # Resumen para el header
+    resumen_rows = db_query(DB_INV, """
+        SELECT
+          COUNT(*) AS total,
+          SUM(incluida_en_calculo) AS incluidas,
+          SUM(CASE WHEN incluida_en_calculo = 0 THEN 1 ELSE 0 END) AS excluidas,
+          SUM(sospechosa) AS sospechosas,
+          SUM(revisada) AS revisadas
+        FROM inv_ops_revisar
+        WHERE fecha_corte = %s
+    """, (fecha,))
+
+    return {
+        "ops": rows,
+        "resumen": resumen_rows[0] if resumen_rows else {}
+    }
+
+
+@app.get("/api/inventario/ops-revisar/{op_id}/detalle")
+def detalle_op_revisar(op_id: int):
+    """Detalle completo de una OP: cambios de estado + materiales + productos + trazabilidad."""
+    rows = db_query(DB_INV, "SELECT * FROM inv_ops_revisar WHERE id = %s", (op_id,))
+    if not rows:
+        raise HTTPException(404, "OP no encontrada")
+    op = rows[0]
+    id_orden = op['id_orden']
+
+    # Cambios de estado
+    cambios = db_query(DB_EFFI, """
+        SELECT nuevo_estado, f_cambio_de_estado, responsable_cambio_de_estado
+        FROM zeffi_cambios_estado
+        WHERE id_orden = %s
+        ORDER BY f_cambio_de_estado
+    """, (id_orden,))
+
+    # Materiales
+    materiales = db_query(DB_EFFI, """
+        SELECT cod_material, descripcion_material, cantidad, vigencia
+        FROM zeffi_materiales
+        WHERE id_orden = %s
+    """, (id_orden,))
+
+    # Productos
+    productos = db_query(DB_EFFI, """
+        SELECT cod_articulo, descripcion_articulo_producido, cantidad, vigencia
+        FROM zeffi_articulos_producidos
+        WHERE id_orden = %s
+    """, (id_orden,))
+
+    # Trazabilidad relacionada con esta OP
+    trazabilidad = db_query(DB_EFFI, """
+        SELECT articulo, cantidad, fecha, tipo_de_movimiento
+        FROM zeffi_trazabilidad
+        WHERE transaccion LIKE %s OR transaccion LIKE %s
+        ORDER BY fecha DESC
+        LIMIT 50
+    """, (f"%: {id_orden}", f"%: {id_orden} %"))
+
+    # Convertir fechas a string
+    for r in cambios:
+        r['f_cambio_de_estado'] = str(r['f_cambio_de_estado']) if r['f_cambio_de_estado'] else None
+    for r in trazabilidad:
+        r['fecha'] = str(r['fecha']) if r['fecha'] else None
+    for campo in ['fecha_creacion', 'fecha_anulacion', 'fecha_cambio_procesada',
+                   'calculado_en', 'fecha_revision']:
+        op[campo] = str(op[campo]) if op[campo] else None
+
+    return {
+        "op": op,
+        "cambios_estado": cambios,
+        "materiales": materiales,
+        "productos": productos,
+        "trazabilidad": trazabilidad
+    }
+
+
+class OpRevisarUpdate(BaseModel):
+    revisada: bool
+    nota: Optional[str] = None
+    usuario: str
+
+
+@app.put("/api/inventario/ops-revisar/{op_id}")
+def actualizar_op_revisar(op_id: int, data: OpRevisarUpdate):
+    """Marca una OP como revisada (o desmarca) con nota."""
+    rows = db_query(DB_INV, "SELECT id_orden, fecha_corte FROM inv_ops_revisar WHERE id = %s", (op_id,))
+    if not rows:
+        raise HTTPException(404, "OP no encontrada")
+
+    if data.revisada:
+        db_execute(DB_INV, """
+            UPDATE inv_ops_revisar
+            SET revisada = 1, nota_revision = %s,
+                revisada_por = %s, fecha_revision = NOW()
+            WHERE id = %s
+        """, (data.nota, data.usuario, op_id))
+        accion = 'op_revisada'
+    else:
+        db_execute(DB_INV, """
+            UPDATE inv_ops_revisar
+            SET revisada = 0, nota_revision = NULL,
+                revisada_por = NULL, fecha_revision = NULL
+            WHERE id = %s
+        """, (op_id,))
+        accion = 'op_desmarcada'
+
+    registrar_auditoria(0, accion, data.usuario,
+                        f"OP {rows[0]['id_orden']}", str(data.revisada),
+                        data.nota or '')
+    return {"ok": True}
+
+
 # ── Sync Effi ──
 
 EXPORT_SCRIPT = os.path.join(BASE_DIR, 'scripts', 'export_inventario.js')
