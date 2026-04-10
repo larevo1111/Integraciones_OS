@@ -164,37 +164,50 @@ const jornadaSel = ref(null)
 
 const esAdmin = computed(() => (auth.usuario?.nivel || 1) >= 7)
 
-const columnas = [
-  { key: '_nombre',             label: 'Usuario',        visible: true,  filterType: 'select' },
-  { key: 'fecha',              label: 'Fecha',          visible: false },
-  { key: 'hora_inicio',        label: 'Inicio (usr)',    visible: true,  width: '120px' },
-  { key: 'hora_fin',           label: 'Fin (usr)',       visible: true,  width: '120px' },
-  { key: 'hora_inicio_registro', label: 'Inicio (sys)', visible: false, width: '120px' },
-  { key: 'hora_fin_registro',    label: 'Fin (sys)',     visible: false, width: '120px' },
-  { key: 'tiempo_total_usr',    label: 'T. Total (usr)',    visible: true  },
-  { key: 'tiempo_pausa_usr',   label: 'T. Pausas (usr)',   visible: true  },
-  { key: 'tiempo_laborado_usr',label: 'T. Laborado (usr)', visible: true  },
-  { key: 'tiempo_total_sys',    label: 'T. Total (sys)',    visible: false },
-  { key: 'tiempo_pausa_sys',   label: 'T. Pausas (sys)',   visible: false },
-  { key: 'tiempo_laborado_sys',label: 'T. Laborado (sys)', visible: false },
-  { key: 'estado',             label: 'Estado',          visible: true,  filterType: 'select' },
-  { key: 'tareas_count',       label: 'Tareas',          visible: true  },
-  { key: 'dur_tareas_real',    label: 'Dur. sistema',     visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de cada tarea (calculado automáticamente)' },
-  { key: 'dur_tareas_crono',   label: 'Dur. cronómetro',  visible: false, hint: 'Duración Cronómetro: tiempo acumulado del cronómetro que cada persona activó manualmente' },
-  { key: 'dur_tareas_usuario', label: 'Dur. usuario',     visible: false, hint: 'Duración Usuario: tiempo que la persona reportó manualmente al completar la tarea' },
-  { key: 'num_pausas',         label: 'Pausas',          visible: false },
-]
+// Options dinámicas extraídas de los datos cargados (sin requests extra)
+const usuarioOptions = computed(() => {
+  const seen = new Set()
+  return jornadasFiltradas.value
+    .filter(j => j._nombre && !seen.has(j._nombre) && seen.add(j._nombre))
+    .map(j => ({ value: j._nombre, label: j._nombre }))
+})
+const estadoJornadaOptions = computed(() => {
+  const seen = new Set()
+  const COLORES = { Activa: '#00C853', Finalizada: '#2979FF', 'Sin jornada': '#9E9E9E' }
+  return jornadasFiltradas.value
+    .filter(j => j.estado && !seen.has(j.estado) && seen.add(j.estado))
+    .map(j => ({ value: j.estado, label: j.estado, color: COLORES[j.estado] || '#9E9E9E' }))
+})
 
-// Cuando el rango es > 1 día, mostrar columna fecha
 const columnasComputed = computed(() => {
   const multi = desde.value !== hasta.value
-  return columnas.map(c => c.key === 'fecha' ? { ...c, visible: multi } : c)
+  return [
+    { key: '_nombre',             label: 'Usuario',          visible: true,  options: usuarioOptions.value },
+    { key: 'fecha',              label: 'Fecha',            visible: multi },
+    { key: 'hora_inicio',        label: 'Inicio (usr)',      visible: true,  width: '120px' },
+    { key: 'hora_fin',           label: 'Fin (usr)',          visible: true,  width: '120px' },
+    { key: 'hora_inicio_registro', label: 'Inicio (sys)',    visible: false, width: '120px' },
+    { key: 'hora_fin_registro',    label: 'Fin (sys)',       visible: false, width: '120px' },
+    { key: 'tiempo_total_usr',    label: 'T. Total (usr)',    visible: true  },
+    { key: 'tiempo_pausa_usr',   label: 'T. Pausas (usr)',   visible: true  },
+    { key: 'tiempo_laborado_usr',label: 'T. Laborado (usr)', visible: true  },
+    { key: 'tiempo_total_sys',    label: 'T. Total (sys)',    visible: false },
+    { key: 'tiempo_pausa_sys',   label: 'T. Pausas (sys)',   visible: false },
+    { key: 'tiempo_laborado_sys',label: 'T. Laborado (sys)', visible: false },
+    { key: 'estado',             label: 'Estado',            visible: true,  options: estadoJornadaOptions.value },
+    { key: 'tareas_count',       label: 'Tareas',            visible: true  },
+    { key: 'dur_tareas_real',    label: 'Dur. sistema',       visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de cada tarea (calculado automáticamente)' },
+    { key: 'dur_tareas_crono',   label: 'Dur. cronómetro',    visible: false, hint: 'Duración Cronómetro: tiempo acumulado del cronómetro que cada persona activó manualmente' },
+    { key: 'dur_tareas_usuario', label: 'Dur. usuario',       visible: false, hint: 'Duración Usuario: tiempo que la persona reportó manualmente al completar la tarea' },
+    { key: 'num_pausas',         label: 'Pausas',            visible: false },
+  ]
 })
 
 const jornadasFiltradas = computed(() => {
   return jornadas.value.map(j => ({
     ...j,
     _nombre: j.Nombre_Usuario ? primerNombre(j.Nombre_Usuario) : j.usuario,
+    estado: estadoLabel(j),
   }))
 })
 

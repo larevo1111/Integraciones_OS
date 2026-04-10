@@ -1,5 +1,5 @@
 <template>
-  <div class="os-table-wrapper">
+  <div ref="wrapperRef" class="os-table-wrapper">
 
     <!-- ── TOOLBAR ── -->
     <div class="table-toolbar">
@@ -346,10 +346,11 @@ function onRowTouchEnd() {
 }
 
 // ── Columnas locales (copia para mutar visible) ──────
+const wrapperRef = ref(null)
 const localColumns = ref([])
 watch(() => props.columns, (cols) => {
   localColumns.value = cols.map(c => ({ ...c }))
-}, { immediate: true })
+}, { immediate: true, deep: true })
 
 const visibleColumns  = computed(() => localColumns.value.filter(c => c.visible))
 
@@ -366,8 +367,9 @@ function openColPopup(key) {
     colPopup.value = null
     return
   }
-  // Calcular posición del th clickeado
-  const thEls = document.querySelectorAll('.os-table .th')
+  // Calcular posición del th clickeado — buscar SOLO dentro de esta instancia
+  const root = wrapperRef.value
+  const thEls = root ? root.querySelectorAll('.os-table .th') : []
   const colIdx = visibleColumns.value.findIndex(c => c.key === key)
   const thEl = thEls[colIdx]
   if (thEl) {

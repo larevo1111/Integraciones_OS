@@ -280,10 +280,26 @@ const pausas = computed(() => props.jornada.pausas || [])
 const tareasCompletadas = ref([])
 const cargandoTareas = ref(false)
 
-const tareasColumnas = reactive([
+// Options dinámicas extraídas de las tareas cargadas (sin request extra)
+const catOptions = computed(() => {
+  const seen = new Map()
+  tareasCompletadas.value.forEach(t => {
+    if (t.categoria_nombre && !seen.has(t.categoria_nombre))
+      seen.set(t.categoria_nombre, t.categoria_color || '#795548')
+  })
+  return [...seen.entries()].map(([nombre, color]) => ({ value: nombre, label: nombre, color }))
+})
+const estadoOptions = computed(() => {
+  const seen = new Set()
+  tareasCompletadas.value.forEach(t => { if (t.estado) seen.add(t.estado) })
+  const COLORES = { Pendiente: '#9E9E9E', 'En Progreso': '#2979FF', Completada: '#00C853', Cancelada: '#FF5252' }
+  return [...seen].map(e => ({ value: e, label: e, color: COLORES[e] || '#9E9E9E' }))
+})
+
+const tareasColumnas = computed(() => [
   { key: 'titulo',                  label: 'Tarea',              visible: true,  width: '160px' },
-  { key: 'categoria_nombre',        label: 'Categoría',          visible: true, filterType: 'select' },
-  { key: 'estado',                  label: 'Estado',             visible: false, filterType: 'select' },
+  { key: 'categoria_nombre',        label: 'Categoría',          visible: true,  options: catOptions.value },
+  { key: 'estado',                  label: 'Estado',             visible: false, options: estadoOptions.value },
   { key: 'fecha_inicio_real',       label: 'Inicio real',        visible: true },
   { key: 'fecha_fin_real',          label: 'Fin real',           visible: true },
   { key: 'duracion_usuario_seg',    label: 'Dur. usuario',       visible: true,  hint: 'Duración confirmada por el usuario en el modal' },
