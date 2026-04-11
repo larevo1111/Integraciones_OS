@@ -82,11 +82,32 @@ Host vps-os
 | `cloudflared.service` | — | Cloudflare Tunnel `vps-os` |
 | `mariadb.service` | 3306 | Base de datos |
 | `docker.service` | — | Docker daemon |
-| `nginx.service` | 80 | Reverse proxy (pendiente configurar) |
+| `nginx.service` | 80 | Sirviendo WordPress (`/var/www/wordpress`) |
+| `php8.3-fpm.service` | socket | PHP-FPM para WordPress |
 
-**Arrancar/parar servicios:**
+**Docker (EspoCRM):**
+```
+espocrm: Up — puerto 8083 — BD: osadmin@host.docker.internal/espocrm
+Volumes: /opt/espocrm/html (178MB), /opt/espocrm/data (4.4MB)
+docker-compose: /opt/espocrm/docker-compose.yml
+```
+
+**WordPress:**
+```
+Archivos: /var/www/wordpress
+Config:   wp-config.php → BD wordpress / osadmin / localhost
+Nginx:    /etc/nginx/sites-enabled/wordpress → puerto 80
+Estado:   Wizard de instalación pendiente (completar en wp.oscomunidad.com)
+```
+
+**Acceso al VPS (SSH puerto 22 bloqueado):**
+⚠️ El puerto 22 está bloqueado por el firewall de Contabo (panel cloud, no el OS).
+- UFW: inactivo. iptables: sin reglas. fail2ban: sin IPs baneadas.
+- **Administrar via code-server**: `http://94.72.115.156:9400`
+- **Para habilitar SSH**: customer.contabo.com → VPS → Networking → Firewall → agregar TCP 22
+
+**Arrancar/parar servicios (desde code-server terminal):**
 ```bash
-ssh root@94.72.115.156
 systemctl status os-gestion
 systemctl restart os-gestion
 journalctl -u os-gestion -f
@@ -119,11 +140,12 @@ journalctl -u os-gestion -f
 | Config | `/etc/cloudflared/config.yml` |
 | Estado | Activo — pero **DNS siguen apuntando al servidor local** |
 
-**Dominios configurados en el tunnel** (pendientes de corte):
+**Dominios configurados en el tunnel:**
 ```
-gestion.oscomunidad.com  → 9300
-menu.oscomunidad.com     → 9100
-inv.oscomunidad.com      → 9401
+wp.oscomunidad.com       → 80    (WordPress — DNS apunta al VPS ✅)
+gestion.oscomunidad.com  → 9300  (DNS aún en servidor local — pendiente corte)
+menu.oscomunidad.com     → 9100  (DNS aún en servidor local — pendiente corte)
+inv.oscomunidad.com      → 9401  (DNS aún en servidor local — pendiente corte)
 ```
 
 **Para cortar dominios al VPS** (cuando Santi confirme que todo funciona):
@@ -157,19 +179,36 @@ Verificar: `ssh -i ~/.ssh/sos_erp -p 65002 u768061575@109.106.250.195 echo OK`
 
 ---
 
-## Estado de migración (2026-04-10)
+## Estado de migración (2026-04-11)
 
-| App | VPS listo | DNS cortados | Notas |
+| App | VPS listo | DNS en VPS | Notas |
 |---|---|---|---|
-| Sistema Gestión (`gestion.oscomunidad.com`) | ✅ | ❌ pendiente | Funcionando en 9300 |
-| ERP Frontend (`menu.oscomunidad.com`) | ✅ | ❌ pendiente | Funcionando en 9100 |
-| Inventario (`inv.oscomunidad.com`) | ✅ | ❌ pendiente | Funcionando en 9401 |
-| IA Service | ❌ no aplica | — | Se queda local (usa GPU) |
+| Sistema Gestión (`gestion.oscomunidad.com`) | ✅ | ❌ pendiente corte | Funcionando en 9300 |
+| ERP Frontend (`menu.oscomunidad.com`) | ✅ | ❌ pendiente corte | Funcionando en 9100 |
+| Inventario (`inv.oscomunidad.com`) | ✅ | ❌ pendiente corte | Funcionando en 9401 |
+| EspoCRM (`crm.oscomunidad.com`) | ✅ Docker | ❌ pendiente corte | Docker puerto 8083 |
+| WordPress (`wp.oscomunidad.com`) | ✅ | ✅ DNS en VPS | **Pendiente: completar wizard instalación** |
+| IA Service | ❌ no aplica | — | Se queda local (usa GPU/Ollama) |
 | Bot Telegram | ❌ no aplica | — | Se queda local |
 | Pipeline Effi | ❌ no aplica | — | Se queda local |
 | WA Bridge | ❌ no aplica | — | Se queda local |
 
-**Probar el VPS** (sin afectar producción):
+**Recursos VPS (2026-04-11):**
+- Disco: 7.8G usado / 96G total (9% — mucho espacio libre)
+- RAM: 1.3G usada / 11G total
+
+**Probar VPS directamente (sin DNS):**
 - `http://94.72.115.156:9300` → Gestión
 - `http://94.72.115.156:9100` → ERP
 - `http://94.72.115.156:9401` → Inventario
+- `http://94.72.115.156:8083` → EspoCRM
+- `http://94.72.115.156/` → WordPress
+
+## Pendientes
+
+| Tarea | Quién | Notas |
+|---|---|---|
+| Abrir puerto 22 SSH | Santi (panel Contabo) | customer.contabo.com → Networking → Firewall |
+| Completar instalación WordPress | Santi | Entrar a wp.oscomunidad.com y llenar el wizard |
+| Cortar DNS gestion/menu/inv al VPS | Santi (cuando confirme) | `cloudflared tunnel route dns --overwrite-dns vps-os <dominio>` desde local |
+| Cortar DNS crm al VPS | Santi (cuando confirme) | Igual que los anteriores |
