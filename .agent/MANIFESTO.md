@@ -7,17 +7,28 @@
 
 ## Índice de secciones
 
-- [Reglas críticas de frontend](#frontend)
-- [1. Protocolo de identidad y gobernanza](#1-identidad)
-- [2. Arquitectura general](#2-arquitectura)
-- [3. Convenciones de código y BD](#3-convenciones)
-- [4. Reglas de timezone](#4-timezone)
-- [5. Reglas del pipeline](#5-pipeline)
-- [6. Gotchas técnicos — Effi](#6-gotchas-effi)
-- [7. Gotchas técnicos — EspoCRM](#7-gotchas-espocrm)
-- [8. Reglas del super agente](#8-super-agente)
-- [9. Reglas modo autónomo](#9-modo-autonomo)
-- [10. Reglas de documentación](#10-documentacion)
+- [Reglas críticas de frontend](#reglas-críticas-de-frontend)
+- [1. Protocolo de identidad y gobernanza](#1-protocolo-de-identidad-y-gobernanza-digital-5s)
+- [2. Filosofía del sistema IA](#2-filosofía-del-sistema-ia--principio-fundamental)
+- [3. Archivos de contexto y configuración](#3-archivos-de-contexto-y-configuración)
+- [4. Tono y comunicación](#4-tono-y-comunicación)
+- [5. Autonomía de ejecución](#5-autonomía-de-ejecución--dos-fases)
+- [5B. Filosofía 5S japonesa](#5b-filosofía-5s-japonesa--simplicidad-al-máximo)
+- [6. Filosofía de memoria externa](#6-filosofía-de-memoria-externa-y-protocolo-de-registro)
+- [7. Flujo de trabajo obligatorio](#7-flujo-de-trabajo-obligatorio)
+- [8. Regla transversal de entornos](#8-regla-transversal-de-entornos)
+- [9. Contexto del proyecto](#9-contexto-del-proyecto-integraciones_os)
+- [10. Reglas técnicas aprendidas](#10-reglas-técnicas-aprendidas)
+- [11. Estructura de memoria](#11-estructura-de-memoria)
+- [12. Manual de estilos frontend](#12-manual-de-estilos--frontend-erp)
+- [13. Estándar de navegación drill-down](#13-estándar-de-navegación-drill-down--erp)
+- [14. Diccionario de negocio](#14-diccionario-de-negocio)
+- [15. Gestión de screenshots](#15-gestión-de-screenshots-temporales-y-ui)
+- [16. Delegación — política de equipo](#16-delegación--política-de-equipo-y-ahorro-de-tokens)
+- [17. Protocolo de QA y testing](#17-protocolo-de-qa-y-testing)
+- [18. Estructura multi-contexto](#18-estructura-multi-contexto--agent)
+- [19. Super Agente Claude Code](#19-super-agente-claude-code--modo-paralelo-en-el-bot-de-telegram)
+- [20. Reglas de documentación](#20-reglas-de-documentación)
 
 ---
 
@@ -262,11 +273,38 @@ Una vez que Santi dio la orden, no interrumpir para pedir permiso en cada comand
 
 ---
 
+## 5B. FILOSOFÍA 5S JAPONESA — SIMPLICIDAD AL MÁXIMO
+
+**Regla cardinal del proyecto. Aplica a TODO: frontend, backend, endpoints, modales, componentes, variables.**
+
+### Principio
+Una operación = una función. Un modal = un modal. Una variable = una variable. Si hay dos caminos para hacer lo mismo, es un bug esperando a nacer. **Antes de crear algo, verificar que no exista.**
+
+### Checklist obligatorio antes de crear CUALQUIER cosa
+
+1. **¿Ya existe una función que haga esto?** → Úsala. Si le falta algo, extiéndela.
+2. **¿Ya existe un modal/componente para esta interacción?** → Emite un evento al padre para que abra el que ya existe. NUNCA crear un segundo modal.
+3. **¿Estoy creando una nueva variable de estado para algo que ya se controla en otro lugar?** → Elimínala. Usa la misma ref.
+4. **¿Hay dos endpoints que hacen variaciones de lo mismo?** → Unifica en uno con parámetros.
+5. **¿Tengo que arreglar algo en dos sitios?** → STOP. Primero refactoriza para que exista en un solo sitio, luego arregla.
+
+### Caso real (lección aprendida v2.3.0→v2.3.3)
+
+Existían dos modales para "completar tarea":
+- TareasPage: input de minutos, sus propias variables `tiempoInput`, función `confirmarTiempoModal`
+- TareaPanel: popover h+m, sus propias variables `tiempoFinalH/M`, función `confirmarCompletar`
+
+Al encontrar un bug de pre-fill, hubo que arreglarlo en **los dos lugares**. Al cambiar la precisión a HH:MM:SS, habría que cambiarlo en **los dos**.
+
+**Solución 5S**: TareaPanel emite `completar-tarea`, TareasPage abre SU modal. Un solo modal, un solo pre-fill, un solo confirm. El cambio a HH:MM:SS se hizo en un solo sitio y cubrió automáticamente los dos caminos. Resultado: −46 líneas de código, 0 duplicación, 0 bugs de divergencia.
+
+---
+
 ## 6. FILOSOFÍA DE MEMORIA EXTERNA Y PROTOCOLO DE REGISTRO
 
 **Principio:** No confiar en la memoria del chat. La verdad reside en los archivos del repositorio. Resolver sin documentar es resolver a medias.
 
-### 5.1 Jerarquía de dónde registrar
+### 6.1 Jerarquía de dónde registrar
 
 | Dónde | Qué va ahí |
 |---|---|
@@ -276,7 +314,7 @@ Una vez que Santi dio la orden, no interrumpir para pedir permiso en cada comand
 | **CONTEXTO_ACTIVO.md** | Estado actual del sistema, qué funciona, próximos pasos |
 | **CATALOGO_SCRIPTS.md** | Scripts ejecutables con comando exacto y parámetros |
 
-### 5.2 Protocolo de registro — OBLIGATORIO al terminar cualquier tarea
+### 6.2 Protocolo de registro — OBLIGATORIO al terminar cualquier tarea
 
 Antes de dar una tarea por terminada, responder estas preguntas:
 
@@ -290,7 +328,7 @@ Antes de dar una tarea por terminada, responder estas preguntas:
 
 **Regla absoluta: ningún problema resuelto queda sin registrar. Si se descubrió en esta sesión, se documenta en esta sesión.**
 
-### 5.3 El catálogo es el índice de TODO el conocimiento
+### 6.3 El catálogo es el índice de TODO el conocimiento
 
 `.agent/catalogo-skills.md` lista **todas** las skills Y manuales disponibles.
 Toda skill o manual nuevo → entrada en el catálogo antes de terminar.
@@ -511,14 +549,14 @@ Al crear o modificar cualquier script de resumen, ejecutar los checks de integri
 ### Cloudflare Tunnel
 - Configuración en `/etc/cloudflared/config.yml`. Agregar hostname + reiniciar servicio + CNAME en Cloudflare DNS.
 
-### 9.1 PREMISA CRÍTICA DE IA (Cero Alucinaciones)
+### 10.1 PREMISA CRÍTICA DE IA (Cero Alucinaciones)
 **Regla absoluta para cualquier Bot o Agente IA que consuma datos del ERP:**
 Para que la IA no invente respuestas o datos financieros, el flujo técnico obligado y el System Prompt de TODO agente debe seguir siempre estos 3 pasos (nunca intentar saltárselos):
 1. **Generar código:** El Agente lee la pregunta + esquema y devuelve SÓLO una consulta SQL válida (o script equivalente).
 2. **Ejecutar código:** El sistema/orquestador ejecuta el query ciegamente contra la BD MariaDB real y captura las filas retornadas.
 3. **Responder usando ese resultado:** El sistema entrega los datos crudos de vuelta al Agente IA, quien redacta la respuesta usando única y exclusivamente la información del paso 2.
 
-### 9.2 FLUJO CON IMÁGENES (Visión Multimodal)
+### 10.2 FLUJO CON IMÁGENES (Visión Multimodal)
 Cuando el usuario envía una foto (desde Telegram u otro canal), el flujo tiene un paso previo:
 ```
 Foto + texto (opcional)
@@ -534,14 +572,14 @@ Texto extraído se inyecta como contexto en la pregunta
 - Si la imagen está en blanco o sin contenido, responde directo sin pasar por el enrutador
 - Funciona con: capturas de pantalla, remisiones en papel, facturas físicas, etiquetas, conteos escritos
 
-### 9.3 CAPACIDADES POR AGENTE
+### 10.3 CAPACIDADES POR AGENTE
 Cada agente declara sus capacidades en `ia_agentes.capacidades` (JSON). Capacidades definidas:
 `vision` | `sql` | `codigo` | `razonamiento` | `documentos` | `contexto_largo` | `enrutamiento` | `imagen_generacion`
 El servicio consulta esto para elegir el agente correcto por capacidad, sin hardcoding.
 
 ---
 
-### 9.4 BOT TELEGRAM — PRESENTACIÓN DE DATOS
+### 10.4 BOT TELEGRAM — PRESENTACIÓN DE DATOS
 
 **Regla absoluta (2026-03-22):** Si una consulta devuelve **más de 2 registros**, el bot SIEMPRE debe mostrar el botón "Ver tabla completa" con la mini app visual. Sin excepción, sin importar número de columnas.
 
@@ -550,7 +588,7 @@ El servicio consulta esto para elegir el agente correcto por capacidad, sin hard
 - `_limpiar_tablas_texto()` elimina pipes del texto del LLM como red de seguridad.
 - Gotcha del depurador viejo: el depurador de `ia_logica_negocio` hacía `SET activo=0 WHERE empresa=%s` (mataba TODAS las reglas incluyendo las recién aprendidas). Corregido: ahora solo comprime las consolidaciones (`creado_por='depurador-auto'`), nunca toca reglas individuales.
 
-### 9.5 ESTRUCTURA DEL REPO — REGLA DE MÓDULOS
+### 10.5 ESTRUCTURA DEL REPO — REGLA DE MÓDULOS
 
 Cada módulo o herramienta independiente **debe tener su propio directorio en la raíz del repo**.
 
@@ -938,7 +976,7 @@ El prompt le indica al Super Agente 3 formatos:
 
 ---
 
-## 10. REGLAS DE DOCUMENTACIÓN
+## 20. REGLAS DE DOCUMENTACIÓN
 
 > Detalle completo en `.agent/MANUAL_DOCUMENTACION.md` — este es el resumen ejecutivo.
 
