@@ -1,5 +1,5 @@
 # Contexto: Sistema Gestión OS
-**Actualizado**: 2026-03-26
+**Actualizado**: 2026-04-09
 
 ## Propósito
 
@@ -14,10 +14,17 @@ Web activa en gestion.oscomunidad.com + Android futuro (Capacitor).
 | Puerto API | 9300 |
 | Systemd | `os-gestion.service` |
 | Directorio | `sistema_gestion/` |
-| Build prod | `cd sistema_gestion/app && npx quasar build` |
+| Build prod | `cd sistema_gestion/app && npx quasar build && rsync -a --delete dist/spa/ ../api/public/` |
 | Dev frontend | `cd sistema_gestion/app && npx quasar dev` (puerto 9301) |
 | Manual diseño | `sistema_gestion/MANUAL_DISENO_HIBRIDO.md` |
-| Cloudflare | Tunnel activo |
+| Cloudflare | Tunnel **vps-os** (VPS 94.72.115.156) — migrado 2026-04-10 |
+
+### Migrado al VPS (2026-04-10)
+- Corre en Contabo VPS: 94.72.115.156 (6vCPU, 12GB RAM, Ubuntu 24.04)
+- Repo clonado en `/home/osserver/Proyectos_Antigravity/Integraciones_OS/`
+- Tunnel cloudflared: `vps-os` (ID: fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a)
+- SSH key Hostinger: `/home/osserver/.ssh/sos_erp` ✅
+- Servidor local sigue corriendo en paralelo (puerto 9300 local, sin acceso externo)
 
 ## Credenciales BD (3 pools en server.js)
 
@@ -34,8 +41,8 @@ Hostinger NO permite compartir usuario MySQL entre BDs — cada BD tiene su prop
 | Tabla | Descripción |
 |---|---|
 | `g_categorias` | 13 seeds con color e icono. Campo `es_empaque` para categoría Empaque |
-| `g_tareas` | Tareas con id_remision, id_pedido, cronómetro |
-| `g_tarea_tiempo` | Sesiones de cronómetro |
+| `g_tareas` | Tareas con duraciones 5S: `duracion_usuario_seg`, `duracion_cronometro_seg`, `duracion_sistema_seg` (INT, segundos), `crono_inicio` (DATETIME, NULL=pausado) |
+| `g_tarea_tiempo` | Legacy — ya no se consulta. Las duraciones viven en `g_tareas` directamente |
 | `g_usuarios_config` | Configuración por usuario |
 | `g_perfiles` | Perfiles de usuario |
 | `g_categorias_perfiles` | Relación categorías-perfiles |

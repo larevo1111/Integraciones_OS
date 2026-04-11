@@ -26,3 +26,4 @@ Thumbs.db
 dist/
 build/
 .agent/contexto_persistente/ # Si decidimos no sync esto
+.agent/.servers.env
