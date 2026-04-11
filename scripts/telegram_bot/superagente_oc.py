@@ -18,8 +18,8 @@ from ia_service.config import get_local_conn
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/sa_opencode'
 OC_BIN = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
 TIMEOUT_OC = 1200  # segundos (20 minutos)
-MODEL_DEFAULT = 'opencode/nemotron-3-super-free'
-MODEL_VISION  = 'opencode/nemotron-3-super-free'  # qwen3.6-plus-free ya no existe
+MODEL_DEFAULT = 'opencode/minimax-m2.5-free'
+MODEL_VISION  = 'opencode/minimax-m2.5-free'  # nemotron como fallback
 
 
 # ── Ejecutar OpenCode ────────────────────────────────────────────────────────
