@@ -248,6 +248,51 @@ def check_apps_web():
     return resultados, fallos
 
 
+def check_opencode():
+    """Verifica que OpenCode responda con el modelo activo en BD."""
+    import pymysql
+    import pymysql.cursors
+    oc_bin = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
+    modelo = 'opencode/minimax-m2.5-free'  # default si BD no responde
+    try:
+        conn = pymysql.connect(
+            host='localhost', user='osadmin', password='Epist2487.',
+            database='ia_service_os', charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor, connect_timeout=3,
+        )
+        with conn.cursor() as cur:
+            cur.execute("SELECT valor FROM ia_config WHERE clave='sa_opencode_modelo'")
+            row = cur.fetchone()
+        conn.close()
+        if row and row.get('valor'):
+            modelo = row['valor']
+    except Exception:
+        pass
+
+    nombre = modelo.split('/')[-1]
+    rc, out, err = _run([oc_bin, 'run', '--format', 'json', '-m', modelo, 'responde OK'], timeout=35)
+    if rc == 0 and 'text' in out:
+        return [_ok(f'OpenCode ({nombre})')], 0
+    else:
+        return [_fail(f'OpenCode ({nombre})', (err or out)[:80])], 1
+
+
+def check_claude_code():
+    """Verifica que Claude Code responda."""
+    claude_bin = '/home/osserver/.local/bin/claude'
+    env = os.environ.copy()
+    env.pop('CLAUDECODE', None)
+    env.pop('ANTHROPIC_API_KEY', None)
+    rc, out, err = _run([claude_bin, '-p', 'responde solo OK', '--output-format', 'json'], timeout=60)
+    if rc == 0 and out:
+        return [_ok('Claude Code')], 0
+    else:
+        detail = err[:80] if err else 'sin respuesta'
+        if 'credit' in detail.lower():
+            return [_warn('Claude Code — límite de crédito')], 0
+        return [_fail('Claude Code', detail)], 1
+
+
 def check_pipeline():
     """Verifica último pipeline ejecutado."""
     log_path = os.path.join(REPO_DIR, 'logs', 'pipeline.log')
@@ -355,15 +400,17 @@ def main():
     _log(f'=== Diagnóstico diario {HOY} ===')
 
     checks = [
-        ('SERVICIOS',   check_servicios),
-        ('BD LOCALES',  check_bds_locales),
-        ('HOSTINGER',   check_hostinger),
-        ('WARP',        check_warp),
+        ('SERVICIOS',    check_servicios),
+        ('BD LOCALES',   check_bds_locales),
+        ('HOSTINGER',    check_hostinger),
+        ('WARP',         check_warp),
         ('GPU / OLLAMA', check_gpu_ollama),
-        ('APPS WEB',    check_apps_web),
-        ('PIPELINE',    check_pipeline),
-        ('BOT',         check_bot_errores),
-        ('DISCO',       check_disco),
+        ('APPS WEB',     check_apps_web),
+        ('OPENCODE',     check_opencode),
+        ('CLAUDE CODE',  check_claude_code),
+        ('PIPELINE',     check_pipeline),
+        ('BOT',          check_bot_errores),
+        ('DISCO',        check_disco),
     ]
 
     todas_lineas = []
@@ -405,6 +452,15 @@ def main():
     reporte_path = os.path.join(REPO_DIR, 'logs', 'ultimo_diagnostico.txt')
     with open(reporte_path, 'w') as f:
         f.write(reporte)
+
+    # Si hay fallos y se pidió --con-claude, llamar a Claude Code para corregir
+    if args.con_claude and total_fallos > 0 and fallos_detalle:
+        _log(f'Invocando Claude Code para {total_fallos} fallo(s)...')
+        fallos_texto = '\n'.join(fallos_detalle)
+        respuesta_claude = llamar_claude(fallos_texto)
+        if respuesta_claude:
+            _log(f'Claude respondió: {respuesta_claude[:200]}')
+            _enviar_telegram(f'🤖 <b>Claude Code corrigió fallos:</b>\n{respuesta_claude[:600]}')
 
     return total_fallos
 

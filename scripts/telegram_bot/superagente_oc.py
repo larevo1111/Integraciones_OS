@@ -19,15 +19,30 @@ from ia_service.config import get_local_conn
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/sa_opencode'
 OC_BIN = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
 TIMEOUT_OC = 1200  # segundos (20 minutos)
-MODEL_DEFAULT = 'opencode/minimax-m2.5-free'
-MODEL_VISION  = 'opencode/minimax-m2.5-free'  # nemotron como fallback
+MODEL_DEFAULT = 'opencode/minimax-m2.5-free'  # fallback hardcodeado si BD no responde
+
+
+def _get_modelo_oc() -> str:
+    """Lee modelo OpenCode activo desde ia_config BD. Fallback al hardcodeado."""
+    try:
+        conn = get_local_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT valor FROM ia_config WHERE clave='sa_opencode_modelo'")
+            row = cur.fetchone()
+        conn.close()
+        if row and row.get('valor'):
+            return row['valor']
+    except Exception:
+        pass
+    return MODEL_DEFAULT
 
 
 # ── Ejecutar OpenCode ────────────────────────────────────────────────────────
 
 def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = False) -> dict:
     """Ejecuta opencode run --format json y retorna {ok, result, session_id}."""
-    cmd = [OC_BIN, 'run', '--format', 'json', '-m', MODEL_VISION if con_imagen else MODEL_DEFAULT]
+    modelo = _get_modelo_oc()
+    cmd = [OC_BIN, 'run', '--format', 'json', '-m', modelo]
     cmd.append(prompt)
     if session_id:
         cmd += ['--session', session_id]
