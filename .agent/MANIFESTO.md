@@ -8,25 +8,21 @@
 ## Índice de secciones
 
 - [Reglas críticas de frontend](#reglas-críticas-de-frontend)
-- [1. Protocolo de identidad y gobernanza](#1-protocolo-de-identidad-y-gobernanza-digital-5s)
+- [1. Roles, delegación y equipo](#1-roles-delegación-y-equipo)
 - [2. Filosofía del sistema IA](#2-filosofía-del-sistema-ia--principio-fundamental)
-- [3. Archivos de contexto y configuración](#3-archivos-de-contexto-y-configuración)
+- [3. Memoria externa, documentación y contextos](#3-memoria-externa-documentación-y-contextos)
 - [4. Tono y comunicación](#4-tono-y-comunicación)
 - [5. Autonomía de ejecución](#5-autonomía-de-ejecución--dos-fases)
 - [5B. Filosofía 5S japonesa](#5b-filosofía-5s-japonesa--simplicidad-al-máximo)
-- [6. Filosofía de memoria externa](#6-filosofía-de-memoria-externa-y-protocolo-de-registro)
 - [7. Flujo de trabajo obligatorio](#7-flujo-de-trabajo-obligatorio)
 - [8. Regla transversal de entornos](#8-regla-transversal-de-entornos)
-- [9. Contexto del proyecto](#9-contexto-del-proyecto-integraciones_os)
+- [9. Contexto y estructura del proyecto](#9-contexto-y-estructura-del-proyecto)
 - [10. Reglas técnicas aprendidas](#10-reglas-técnicas-aprendidas)
-- [11. Estructura de memoria](#11-estructura-de-memoria)
 - [12. Manual de estilos frontend](#12-manual-de-estilos--frontend-erp)
 - [13. Estándar de navegación drill-down](#13-estándar-de-navegación-drill-down--erp)
 - [14. Diccionario de negocio](#14-diccionario-de-negocio)
 - [15. Gestión de screenshots](#15-gestión-de-screenshots-temporales-y-ui)
-- [16. Delegación — política de equipo](#16-delegación--política-de-equipo-y-ahorro-de-tokens)
 - [17. Protocolo de QA y testing](#17-protocolo-de-qa-y-testing)
-- [18. Estructura multi-contexto](#18-estructura-multi-contexto--agent)
 - [19. Super Agente Claude Code](#19-super-agente-claude-code--modo-paralelo-en-el-bot-de-telegram)
 - [20. Reglas de documentación](#20-reglas-de-documentación)
 
@@ -134,9 +130,9 @@ npx quasar build
 
 ---
 
-## 1. PROTOCOLO DE IDENTIDAD Y GOBERNANZA DIGITAL [5S]
+## 1. ROLES, DELEGACIÓN Y EQUIPO
 
-### 1.1 Jerarquía de Autoridad y Roles
+### 1.1 Jerarquía de roles
 
 **Santi (Santiago)** — Director Estratégico y Dueño.
 Su visión es el norte y su aprobación es la ÚNICA llave para ejecutar cambios en producción o estructura. Santi NO codea — dirige, decide y orquesta agentes.
@@ -150,7 +146,9 @@ Plataforma agentic de Google Labs (lanzada Nov 2025). IDE agent-first basado en 
 **Subagentes Claude** — Ejecutores Paralelos de Claude Code.
 Instancias de Claude lanzadas por Claude Code con la herramienta `Agent`. Mismas capacidades que Claude Code (Bash, Playwright, Read, Write, DB) pero corren en paralelo sin consumir tokens del contexto principal. Recibe el **máximo posible de trabajo secundario**: construcción de módulos, QA, exploración de codebase, diagnósticos de BD, documentación. **Regla: si una tarea no requiere razonamiento arquitectónico profundo → va al subagente.** NO confundir con Antigravity Google Labs — son conceptos distintos.
 
-### 1.2 Asignación de tareas según tipo
+> ⚠️ **REGLA ANTI-CONFUSIÓN**: Cuando este documento (o cualquier conversación) mencione "Antigravity" sin calificador, se refiere a **Antigravity de Google Labs** (el agente externo). Los subagentes de Claude se llaman "subagentes Claude" o "subagente".
+
+### 1.2 Asignación de tareas
 
 | Tipo de tarea | Asignar a | Motivo |
 |---|---|---|
@@ -164,6 +162,43 @@ Instancias de Claude lanzadas por Claude Code con la herramienta `Agent`. Mismas
 | Construcción secundaria (módulos, CRUD) | Subagente Claude | Paralelo, sin consumir contexto principal |
 | Tareas paralelas simultáneas | Subagente Claude | Multi-agente sin bloquear la conversación |
 | QA funcional (endpoints, BD, logs) | Subagente Claude | Ejecución autónoma de checks |
+
+### 1.3 Qué retiene Claude Code (nunca delegar)
+
+- Diseño arquitectural y decisiones técnicas críticas
+- Features con lógica de negocio compleja
+- Coordinación entre múltiples partes del sistema
+- Decisiones que necesitan aprobación de Santi
+- Tareas que requieren contexto acumulado de la conversación
+
+### 1.4 Qué puede hacer Antigravity (ocasional, por demanda)
+
+Solo cuando el contexto supera lo que Claude Code puede procesar con subagentes (>200K tokens):
+- Segunda opinión arquitectural con el codebase completo
+- Análisis masivo de logs o datos históricos que no caben en contexto normal
+
+Todo lo demás (QA, exploración, construcción secundaria) → **Subagentes Claude**.
+
+### 1.5 Protocolo de delegación
+
+Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente:
+1. **¿Puedo delegarlo?** → Si toma >3 lecturas de archivo o >3 comandos bash → **delegarlo**.
+2. **Lanzar con prompt detallado** — incluir todo el contexto: rutas, schemas, objetivo, formato de resultado esperado.
+3. **En segundo plano si es posible** → `run_in_background: true` para no bloquear la conversación.
+4. **Informar a Santi** qué se delegó y en qué directorio quedará el resultado.
+
+### 1.6 Regla de los planes y delegación
+
+Cada plan puede incluir una sección opcional de tareas delegables:
+- **"Tareas para Subagentes Claude"** — trabajo secundario/paralelo que Claude Code puede delegar a instancias `Agent`
+- **"Tareas para Antigravity"** — solo si el contexto del análisis supera lo que Claude Code puede procesar con subagentes (>200K tokens); no es obligatorio
+
+### 1.7 Archivos de resultados de subagentes
+
+- **QA/Testing:** `.agent/QA_REGISTRO.md` — registro vivo de bugs y checklists
+- **Screenshots temporales:** `screenshots_temporales/<modulo>_<desc>_<timestamp>.png`
+- **Diagnósticos:** `.agent/docs/DIAG_<tema>_<fecha>.md`
+- **Reportes del entrenador IA:** `/tmp/reporte_mejoras_<fecha>.md`
 
 ---
 
@@ -215,16 +250,19 @@ Cuando la IA falla en una consulta:
 
 ---
 
-## 3. ARCHIVOS DE CONTEXTO Y CONFIGURACIÓN
+## 3. MEMORIA EXTERNA, DOCUMENTACIÓN Y CONTEXTOS
 
-**Leer SIEMPRE al iniciar sesión, en este orden:**
-1. `.agent/MANIFESTO.md` — Estado actual, decisiones tomadas, arquitectura vigente. Fuente de verdad #1.
+**Principio:** No confiar en la memoria del chat. La verdad reside en los archivos del repositorio. Resolver sin documentar es resolver a medias.
+
+### 3.1 Qué leer al iniciar sesión
+
+**Leer SIEMPRE en este orden:**
+1. `.agent/MANIFESTO.md` — Reglas globales, arquitectura vigente. Fuente de verdad #1.
 2. `.agent/CONTEXTO_ACTIVO.md` — Estado actual del sistema y próximos pasos.
 3. `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts. Verificar si ya existe algo antes de crear.
 4. `.agent/skills/` — Skills individuales: documentan CÓMO hacer algo que ya se aprendió.
 
-**Para tareas frontend además:**
-- `frontend/design-system/MANUAL_ESTILOS.md`
+**Para tareas frontend además:** `frontend/design-system/MANUAL_ESTILOS.md`
 
 **Para CUALQUIER tarea que involucre código Python:**
 - **OBLIGATORIO leer primero:** `.agent/skills/desarrollo_python.md` — límites de líneas, reglas de modularidad, checklist pre-commit. **Este manual existe porque `servicio.py` llegó a 1,756 líneas y requirió refactor mayor. No repetir.**
@@ -239,12 +277,112 @@ Cuando la IA falla en una consulta:
 **Regla de conexiones a BD:**
 Las instrucciones de conexión están documentadas como skills. Si no existe la skill, Claude Code puede explorar — pero tiene la **obligación de documentar lo aprendido como skill nueva** antes de dar la tarea por terminada. El conocimiento no queda en el chat: se institucionaliza.
 
-**Convención de backups de BD:**
+### 3.2 Estructura de directorios .agent/
+
+```
+.agent/
+├── MANIFESTO.md              ← Reglas globales, arquitectura, gotchas técnicos (este archivo)
+├── CONTEXTO_ACTIVO.md        ← Índice de 1 página: módulos activos y qué se está haciendo
+├── contextos/                ← Un archivo por módulo con su estado detallado
+│   ├── ia_service.md         ← Servicio IA, bot Telegram, aprendizaje, agentes
+│   ├── pipeline_effi.md      ← Pipeline Effi→MariaDB→Hostinger, 18 pasos
+│   ├── erp_frontend.md       ← ERP Vue/Quasar, módulo Ventas, design system
+│   ├── sistema_gestion.md    ← Módulo Tareas, auth, gestion.oscomunidad.com
+│   └── espocrm.md            ← Integración bidireccional, campos custom
+├── planes/
+│   ├── actuales/             ← Planes en ejecución (PLAN_NOMBRE_YYYY-MM-DD.md)
+│   └── completados/          ← Planes terminados (no se borran)
+├── skills/                   ← Cómo hacer cosas específicas (por dominio)
+├── manuales/                 ← Guías detalladas de referencia
+└── docs/                     ← Informes, perfiles, documentación externa
+```
+
+**Por qué múltiples contextos:** El proyecto tiene varios módulos activos en paralelo con ciclos independientes. Al trabajar en un módulo no es necesario leer el estado de los demás.
+
+### 3.3 Catálogo de archivos .agent/
+
+- `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
+- `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
+- `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts ejecutables (Python/JS). **Actualizar obligatoriamente al crear o modificar cualquier script.**
+- `.agent/CATALOGO_AGENTES.md` — Catálogo de todos los agentes IA del ecosistema OS (cloud + locales Ollama). Incluye: modelo, proveedor, costo, capacidades, credenciales, notas. **Actualizar al agregar, modificar o desactivar cualquier agente.**
+- `.agent/CATALOGO_APIS.md` — Catálogo de todas las APIs HTTP internas del ecosistema OS. Incluye: base URL, proceso systemd, BD, endpoints, ejemplos de llamada desde Python/JS. **Actualizar al crear o modificar cualquier endpoint de cualquier servicio.**
+- `.agent/catalogo-skills.md` — Catálogo de conocimientos fundacionales. Índice de cómo se hacen las cosas.
+- `.agent/CATALOGO_REFERENCIAS.md` — Fuentes externas e internas que informan decisiones técnicas y de IA. Incluye: guías de Anthropic/Google, papers de text-to-SQL, referencias de Antigravity, patrones de prompting, pendientes de investigar. **Actualizar al adoptar cualquier técnica externa o al encontrar una referencia relevante.**
+- `.agent/skills/` — Skills individuales con conocimiento especializado.
+- `.agent/planes/` — Especificaciones de construcción técnica para las features.
+- `.agent/docs/` — Informes y documentación externa.
+- `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — Manual completo de producción e inventarios en Effi. Tablas, campos, estados de OPs, trazabilidad, lógica de signos, relaciones entre tablas, reconstrucción de stock a fecha, ajuste por OPs generadas.
+- `.agent/contextos/inventario_fisico.md` — Contexto del subproyecto de inventario físico vs teórico.
+- `inventario/POLITICAS_ACCESO.md` — Políticas de acceso y seguridad del módulo de inventario.
+- `inventario/politicas.json` — Config de permisos por acción y nivel de usuario.
+
+#### Sistema de Inventario Físico (actualizado 2026-04-06)
+App independiente para conteo de inventario. Separada de sistema_gestion.
+- **Manual completo**: `.agent/manuales/inventario_fisico_manual.md` — **21 secciones, v2.0**
+- **App**: `inv.oscomunidad.com` — Vue 3 + Vite frontend, FastAPI backend (puerto 9401)
+- **BD**: `os_inventario` — 4 tablas: `inv_conteos`, `inv_rangos`, `inv_auditorias`, `inv_teorico`
+- **Catálogo**: `inv_catalogo_articulos` (effi_data local + Hostinger) — artículos con unidad y grupo precalculados, sync cada 2h + botón Sync Effi
+- **Scripts inventario**: `depurar_inventario.py`, `calcular_rangos.py`, `calcular_inventario_teorico.py`, `api.py`
+- **Scripts sync/ajuste**: `sync_inventario_catalogo.py` (paso 6e pipeline), `import_ajuste_inventario.js` (Playwright, crea ajustes en Effi)
+- **Auth**: Google OAuth, JWT compartido con sistema_gestion
+- **Grupos**: MP, PP, PT, INS, DS, DES, NM — detectados automáticamente
+- **Funcionalidades clave**: conteo físico, asignación artículos NM→Effi, sync catálogo, ajustes inventario Effi, validación unidades, auditoría completa
+- **Systemd**: `os-inventario-api.service`, cloudflared `inv.oscomunidad.com`
+
+### 3.4 Jerarquía de dónde registrar
+
+| Dónde | Qué va ahí |
+|---|---|
+| **MANIFESTO.md** | Reglas generales, gotchas críticos de BD, decisiones arquitecturales permanentes |
+| **Skills** (`.agent/skills/` o `.claude/commands/`) | Patrones técnicos específicos reutilizables, procedimientos por dominio |
+| **Manuales** (`MANUAL_*.md`, `INSTRUCCIONES_*.md`) | Guías de referencia detalladas para humanos y agentes |
+| **CONTEXTO_ACTIVO.md** | Estado actual del sistema, qué funciona, próximos pasos |
+| **CATALOGO_SCRIPTS.md** | Scripts ejecutables con comando exacto y parámetros |
+
+### 3.5 Protocolo de registro — OBLIGATORIO al terminar cualquier tarea
+
+Antes de dar una tarea por terminada, responder estas preguntas:
+
+1. ¿Corregí un bug o encontré un comportamiento inesperado de la BD/Effi/API? → **MANIFESTO §10 + skill del dominio**
+2. ¿Cambié arquitectura o estructura de datos? → **CONTEXTO_ACTIVO**
+3. ¿Creé o modifiqué un script? → **CATALOGO_SCRIPTS**
+4. ¿Aprendí algo sobre Effi, la BD o el frontend que no estaba documentado? → **Skill del dominio correspondiente**
+5. ¿Definí un patrón nuevo reutilizable? → **Crear/actualizar skill + entrada en catálogo**
+6. ¿Adopté una técnica de una fuente externa (paper, guía, librería)? → **CATALOGO_REFERENCIAS** con URL, relevancia y dónde se aplicó
+7. ¿Algún archivo Python supera 400 líneas o alguna función supera 80 líneas? → **Refactorizar ANTES de hacer commit** (ver `.agent/skills/desarrollo_python.md`)
+
+**Regla absoluta: ningún problema resuelto queda sin registrar. Si se descubrió en esta sesión, se documenta en esta sesión.**
+
+`.agent/catalogo-skills.md` lista **todas** las skills Y manuales disponibles. Toda skill o manual nuevo → entrada en el catálogo antes de terminar.
+
+### 3.6 Protocolo de trabajo por módulo
+
+**Al empezar a trabajar en un módulo:**
+1. Leer `CONTEXTO_ACTIVO.md` para ver qué está activo
+2. Leer el contexto del módulo: `.agent/contextos/<modulo>.md`
+3. Verificar si hay plan activo en `.agent/planes/actuales/`
+
+**Al terminar una tarea significativa:**
+1. Actualizar `.agent/contextos/<modulo>.md` con el nuevo estado
+2. Actualizar `CONTEXTO_ACTIVO.md` si cambió la prioridad o estado del módulo
+3. La memoria de Claude (`MEMORY.md`) siempre refleja el contexto activo más reciente
+
+### 3.7 Convención de backups de BD
+
 Todos los backups SQL del servidor se guardan en `/home/osserver/Proyectos_Antigravity/backups/{nombre_bd}/{YYYY-MM-DD_HHMMSS}.sql`.
 - Esta carpeta vive **fuera de cualquier repo git** del proyecto — sirve a todas las BDs del servidor (effi_data, os_inventario, ia_service_os, os_whatsapp, espocrm, etc.)
 - Comando estándar: `mysqldump -u osadmin -pEpist2487. --single-transaction --routines --triggers {bd} > {backup_dir}/$(date +%Y-%m-%d_%H%M%S).sql`
 - **Cuándo crear backup**: antes de cambios destructivos (DROP, TRUNCATE), antes de migraciones de schema, cuando Santi lo pida, antes de cerrar definitivamente un inventario.
 - Detalle completo: `feedback_backups_bd.md` en la memoria de Claude.
+
+### 3.8 Protocolo de documentación de scripts
+
+Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
+- Propósito (1 línea)
+- Comando de ejecución manual exacto
+- Archivos que genera / tablas que modifica
+- Dependencias (otros scripts, credenciales, servicios)
+- Comportamientos especiales o errores conocidos
 
 ---
 
@@ -297,41 +435,6 @@ Existían dos modales para "completar tarea":
 Al encontrar un bug de pre-fill, hubo que arreglarlo en **los dos lugares**. Al cambiar la precisión a HH:MM:SS, habría que cambiarlo en **los dos**.
 
 **Solución 5S**: TareaPanel emite `completar-tarea`, TareasPage abre SU modal. Un solo modal, un solo pre-fill, un solo confirm. El cambio a HH:MM:SS se hizo en un solo sitio y cubrió automáticamente los dos caminos. Resultado: −46 líneas de código, 0 duplicación, 0 bugs de divergencia.
-
----
-
-## 6. FILOSOFÍA DE MEMORIA EXTERNA Y PROTOCOLO DE REGISTRO
-
-**Principio:** No confiar en la memoria del chat. La verdad reside en los archivos del repositorio. Resolver sin documentar es resolver a medias.
-
-### 6.1 Jerarquía de dónde registrar
-
-| Dónde | Qué va ahí |
-|---|---|
-| **MANIFESTO.md** | Reglas generales, gotchas críticos de BD, decisiones arquitecturales permanentes |
-| **Skills** (`.agent/skills/` o `.claude/commands/`) | Patrones técnicos específicos reutilizables, procedimientos por dominio |
-| **Manuales** (`MANUAL_*.md`, `INSTRUCCIONES_*.md`) | Guías de referencia detalladas para humanos y agentes |
-| **CONTEXTO_ACTIVO.md** | Estado actual del sistema, qué funciona, próximos pasos |
-| **CATALOGO_SCRIPTS.md** | Scripts ejecutables con comando exacto y parámetros |
-
-### 6.2 Protocolo de registro — OBLIGATORIO al terminar cualquier tarea
-
-Antes de dar una tarea por terminada, responder estas preguntas:
-
-1. ¿Corregí un bug o encontré un comportamiento inesperado de la BD/Effi/API? → **MANIFESTO sección 9 + skill del dominio**
-2. ¿Cambié arquitectura o estructura de datos? → **CONTEXTO_ACTIVO**
-3. ¿Creé o modifiqué un script? → **CATALOGO_SCRIPTS**
-4. ¿Aprendí algo sobre Effi, la BD o el frontend que no estaba documentado? → **Skill del dominio correspondiente**
-5. ¿Definí un patrón nuevo reutilizable? → **Crear/actualizar skill + entrada en catálogo**
-6. ¿Adopté una técnica de una fuente externa (paper, guía, librería)? → **CATALOGO_REFERENCIAS** con URL, relevancia y dónde se aplicó
-7. ¿Algún archivo Python supera 400 líneas o alguna función supera 80 líneas? → **Refactorizar ANTES de hacer commit** (ver `.agent/skills/desarrollo_python.md`)
-
-**Regla absoluta: ningún problema resuelto queda sin registrar. Si se descubrió en esta sesión, se documenta en esta sesión.**
-
-### 6.3 El catálogo es el índice de TODO el conocimiento
-
-`.agent/catalogo-skills.md` lista **todas** las skills Y manuales disponibles.
-Toda skill o manual nuevo → entrada en el catálogo antes de terminar.
 
 ---
 
@@ -412,7 +515,7 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 
 ---
 
-## 9. CONTEXTO DEL PROYECTO: Integraciones_OS
+## 9. CONTEXTO Y ESTRUCTURA DEL PROYECTO
 
 - **Propósito**: Centralizar y automatizar datos de Effi, EspoCRM y otras fuentes en MariaDB para análisis y gestión operativa.
 - **Persistencia**: MariaDB local — BD `effi_data` (Effi), `espocrm` (CRM), `nocodb_meta` (NocoDB).
@@ -428,6 +531,30 @@ El pipeline las calcula en local (staging temporal), las copia a Hostinger, y lu
 - **Systemd**: `systemd/effi-pipeline.service` + `.timer`
   - Test manual: `python3 scripts/orquestador.py --forzar`
   - Log: `journalctl -u effi-pipeline -f` o `logs/pipeline.log`
+
+### 9.1 Estructura del repo
+
+Cada módulo o herramienta independiente **debe tener su propio directorio en la raíz del repo**.
+
+```
+Integraciones_OS/
+├── scripts/          ← pipeline Effi (exports, imports, sync, orquestador, ia_service, telegram_bot)
+├── frontend/         ← ERP web (menu.oscomunidad.com) — Quasar + Node API
+├── ia-admin/         ← Panel admin del servicio IA (ia.oscomunidad.com) — Quasar + Node API
+├── wa_bridge/        ← WhatsApp HTTP Bridge (Baileys) — puerto 3100, BD os_whatsapp
+├── espocrm-custom/   ← Customizaciones EspoCRM (PHP + JS)
+├── docs/             ← Documentos de negocio (PDFs, DOCX, PPTX, XLSXs)
+├── logs/             ← Logs de todos los servicios
+├── systemd/          ← Unit files de systemd
+└── .agent/           ← Contexto y documentación interna para Claude
+```
+
+**Regla para módulos nuevos:**
+- Cualquier módulo nuevo → **directorio propio en raíz**, NO dentro de `scripts/`
+- `scripts/` es exclusivo del pipeline Effi y sus servicios asociados (ia_service, telegram_bot)
+- Cada módulo debe tener su propio `README.md` o entrada en `.agent/`
+
+**Nota:** `ia_service/` y `telegram_bot/` viven dentro de `scripts/` por razones históricas. En el futuro, si crecen mucho, se pueden migrar a raíz — no es urgente.
 
 ---
 
@@ -588,31 +715,6 @@ El servicio consulta esto para elegir el agente correcto por capacidad, sin hard
 - `_limpiar_tablas_texto()` elimina pipes del texto del LLM como red de seguridad.
 - Gotcha del depurador viejo: el depurador de `ia_logica_negocio` hacía `SET activo=0 WHERE empresa=%s` (mataba TODAS las reglas incluyendo las recién aprendidas). Corregido: ahora solo comprime las consolidaciones (`creado_por='depurador-auto'`), nunca toca reglas individuales.
 
-### 10.5 ESTRUCTURA DEL REPO — REGLA DE MÓDULOS
-
-Cada módulo o herramienta independiente **debe tener su propio directorio en la raíz del repo**.
-
-**Estructura actual (referencia):**
-```
-Integraciones_OS/
-├── scripts/          ← pipeline Effi (exports, imports, sync, orquestador, ia_service, telegram_bot)
-├── frontend/         ← ERP web (menu.oscomunidad.com) — Quasar + Node API
-├── ia-admin/         ← Panel admin del servicio IA (ia.oscomunidad.com) — Quasar + Node API
-├── wa_bridge/        ← WhatsApp HTTP Bridge (Baileys) — puerto 3100, BD os_whatsapp
-├── espocrm-custom/   ← Customizaciones EspoCRM (PHP + JS)
-├── docs/             ← Documentos de negocio (PDFs, DOCX, PPTX, XLSXs)
-├── logs/             ← Logs de todos los servicios
-├── systemd/          ← Unit files de systemd
-└── .agent/           ← Contexto y documentación interna para Claude
-```
-
-**Regla para módulos nuevos:**
-- Cualquier módulo nuevo (gestión de tareas, CRM propio, reportes, etc.) → **directorio propio en raíz**, NO dentro de `scripts/`
-- `scripts/` es exclusivo del pipeline Effi y sus servicios asociados (ia_service, telegram_bot)
-- Cada módulo debe tener su propio `README.md` o entrada en `.agent/`
-
-**Nota:** `ia_service/` y `telegram_bot/` viven dentro de `scripts/` por razones históricas. En el futuro, si crecen mucho, se pueden migrar a raíz — no es urgente.
-
 ### ⚠️ REGLA: ALMACENAMIENTO DE ARCHIVOS SUBIDOS — DIRECTORIO UNIFICADO
 
 **Ruta raíz:** `/home/osserver/subidos/`
@@ -655,46 +757,6 @@ Todo archivo subido por usuarios (imágenes, documentos, audio, etc.) va aquí. 
 5. **Formatos permitidos:** jpg, jpeg, png, webp, gif, pdf. Validar MIME type, no solo extensión.
 6. **Crear directorio del item** al subir el primer archivo (`mkdir -p` en el endpoint)
 7. **Futuro:** cuando el ERP nuevo entre en producción, migrar a Cloudflare R2 siguiendo la skill `OS_ERP_INTEGRADO/.agent/skills/multimedia_r2.md`. La ruta relativa en BD no cambia — solo cambia dónde se almacena físicamente.
-
----
-
-## 11. ESTRUCTURA DE MEMORIA
-
-- `.agent/MANIFESTO.md` — Visión, roles, reglas y aprendizajes técnicos. (este archivo)
-- `.agent/CONTEXTO_ACTIVO.md` — Estado actual y próximos pasos.
-- `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts ejecutables (Python/JS). **Actualizar obligatoriamente al crear o modificar cualquier script.**
-- `.agent/CATALOGO_AGENTES.md` — **Catálogo de todos los agentes IA del ecosistema OS** (cloud + locales Ollama). Incluye: modelo, proveedor, costo, capacidades, credenciales, notas. **Actualizar al agregar, modificar o desactivar cualquier agente.**
-- `.agent/CATALOGO_APIS.md` — **Catálogo de todas las APIs HTTP internas del ecosistema OS.** Incluye: base URL, proceso systemd, BD, endpoints, ejemplos de llamada desde Python/JS. **Actualizar al crear o modificar cualquier endpoint de cualquier servicio.**
-- `.agent/catalogo-skills.md` — Catálogo de conocimientos fundacionales. Índice de cómo se hacen las cosas.
-- `.agent/CATALOGO_REFERENCIAS.md` — **Fuentes externas e internas que informan decisiones técnicas y de IA.** Incluye: guías de Anthropic/Google, papers de text-to-SQL, referencias de Antigravity, patrones de prompting, pendientes de investigar. **Actualizar al adoptar cualquier técnica externa o al encontrar una referencia relevante.**
-- `.agent/skills/` — Skills individuales con conocimiento especializado (Ej. `.agent/skills/manejo_ia.md`).
-- `.agent/planes/` — Especificaciones de construcción técnica para las features (Ej. `.agent/planes/bot_telegram.md`).
-- `.agent/docs/` — Informes y documentación externa.
-- `.agent/docs/MANUAL_EFFI_PRODUCCION_INVENTARIOS.md` — **Manual completo de producción e inventarios en Effi.** Tablas, campos, estados de OPs, trazabilidad, lógica de signos, relaciones entre tablas, reconstrucción de stock a fecha, ajuste por OPs generadas.
-- `.agent/contextos/inventario_fisico.md` — Contexto del subproyecto de inventario físico vs teórico.
-- `inventario/POLITICAS_ACCESO.md` — Políticas de acceso y seguridad del módulo de inventario.
-- `inventario/politicas.json` — Config de permisos por acción y nivel de usuario.
-
-### Sistema de Inventario Físico (actualizado 2026-04-06)
-App independiente para conteo de inventario. Separada de sistema_gestion.
-- **Manual completo**: `.agent/manuales/inventario_fisico_manual.md` — **21 secciones, v2.0**
-- **App**: `inv.oscomunidad.com` — Vue 3 + Vite frontend, FastAPI backend (puerto 9401)
-- **BD**: `os_inventario` — 4 tablas: `inv_conteos`, `inv_rangos`, `inv_auditorias`, `inv_teorico`
-- **Catálogo**: `inv_catalogo_articulos` (effi_data local + Hostinger) — artículos con unidad y grupo precalculados, sync cada 2h + botón Sync Effi
-- **Scripts inventario**: `depurar_inventario.py`, `calcular_rangos.py`, `calcular_inventario_teorico.py`, `api.py`
-- **Scripts sync/ajuste**: `sync_inventario_catalogo.py` (paso 6e pipeline), `import_ajuste_inventario.js` (Playwright, crea ajustes en Effi)
-- **Auth**: Google OAuth, JWT compartido con sistema_gestion
-- **Grupos**: MP, PP, PT, INS, DS, DES, NM — detectados automáticamente
-- **Funcionalidades clave**: conteo físico, asignación artículos NM→Effi, sync catálogo, ajustes inventario Effi, validación unidades, auditoría completa
-- **Systemd**: `os-inventario-api.service`, cloudflared `inv.oscomunidad.com`
-
-### Protocolo de documentación de scripts
-Al crear un script nuevo, agregar entrada en `CATALOGO_SCRIPTS.md` con:
-- Propósito (1 línea)
-- Comando de ejecución manual exacto
-- Archivos que genera / tablas que modifica
-- Dependencias (otros scripts, credenciales, servicios)
-- Comportamientos especiales o errores conocidos
 
 ---
 
@@ -771,68 +833,6 @@ Claude Code (o un subagente) documenta bugs de UI almacenando capturas en `scree
 
 ---
 
-## 16. DELEGACIÓN — POLÍTICA DE EQUIPO Y AHORRO DE TOKENS
-
-**Principio:** Claude Code es el arquitecto y constructor principal. Para trabajo secundario y paralelo existen DOS recursos distintos — aprender a distinguirlos es crítico.
-
-### 16.1 Los dos tipos de agentes colaboradores
-
-#### Subagentes Claude (vía herramienta `Agent`)
-Claude Code puede lanzar subinstancias de sí mismo con la herramienta `Agent`. Son instancias independientes de Claude con acceso a todas las herramientas (Bash, Read, Write, Edit, Playwright, etc.). Corren en paralelo o en segundo plano **sin consumir tokens del contexto principal**. Úselos para construcción secundaria, QA funcional, exploración, documentación.
-
-#### Antigravity de Google Labs (agente externo)
-Plataforma agentic independiente de Google Labs. **NO es un subagente de Claude** — es una herramienta separada que Santi usa directamente. Tiene ventana de contexto de 1 millón de tokens, navegación browser nativa y verificación visual autónoma. Ver perfil completo en `.agent/docs/ANTIGRAVITY_GOOGLE_LABS.md`.
-
-> ⚠️ **REGLA ANTI-CONFUSIÓN**: Cuando este documento (o cualquier conversación) mencione "Antigravity" sin calificador, se refiere a **Antigravity de Google Labs** (el agente externo). Los subagentes de Claude se llaman "subagentes Claude" o "subagente".
-
-### 16.2 Roles en el equipo
-
-| Rol | Quién | Responsabilidad |
-|---|---|---|
-| **Director** | Santi | Visión, decisiones de negocio, aprobación de planes |
-| **Arquitecto + Constructor principal** | Claude Code | Diseño técnico, decisiones arquitecturales, coordinación, features críticas, BD, web |
-| **Ejecutores paralelos** | Subagentes Claude | Construcción secundaria, QA funcional, tareas paralelas sin bloquear la conversación |
-| **Consultor Ocasional** | Antigravity Google Labs | Solo cuando el contexto supera >200K tokens; por demanda explícita de Santi |
-
-### 16.3 Regla de los planes
-
-Cada plan puede incluir una sección opcional de tareas delegables:
-- **"Tareas para Subagentes Claude"** — trabajo secundario/paralelo que Claude Code puede delegar a instancias `Agent`
-- **"Tareas para Antigravity"** — solo si el contexto del análisis supera lo que Claude Code puede procesar con subagentes (>200K tokens); no es obligatorio
-
-### 16.4 Qué puede hacer Antigravity (ocasional, por demanda)
-
-Solo cuando el contexto supera lo que Claude Code puede procesar con subagentes (>200K tokens):
-- Segunda opinión arquitectural con el codebase completo
-- Análisis masivo de logs o datos históricos que no caben en contexto normal
-
-Todo lo demás (QA, exploración, construcción secundaria) → **Subagentes Claude**.
-
-### 16.5 Qué retiene Claude Code (nunca delegar)
-
-- Diseño arquitectural y decisiones técnicas críticas
-- Features con lógica de negocio compleja
-- Coordinación entre múltiples partes del sistema
-- Decisiones que necesitan aprobación de Santi
-- Tareas que requieren contexto acumulado de la conversación
-
-### 16.6 Protocolo de ejecución
-
-Antes de hacer cualquier exploración, búsqueda o tarea secundaria directamente:
-1. **¿Puedo delegarlo?** → Si toma >3 lecturas de archivo o >3 comandos bash → **delegarlo**.
-2. **Lanzar con prompt detallado** — incluir todo el contexto: rutas, schemas, objetivo, formato de resultado esperado.
-3. **En segundo plano si es posible** → `run_in_background: true` para no bloquear la conversación.
-4. **Informar a Santi** qué se delegó y en qué directorio quedará el resultado.
-
-### 16.7 Archivos de resultados
-
-- **QA/Testing:** `.agent/QA_REGISTRO.md` — registro vivo de bugs y checklists
-- **Screenshots temporales:** `screenshots_temporales/<modulo>_<desc>_<timestamp>.png`
-- **Diagnósticos:** `.agent/docs/DIAG_<tema>_<fecha>.md`
-- **Reportes del entrenador IA:** `/tmp/reporte_mejoras_<fecha>.md`
-
----
-
 ## 17. PROTOCOLO DE QA Y TESTING
 
 ### Archivos clave
@@ -857,53 +857,6 @@ Claude Code implementa + build + restart
   → Re-verificar → cerrar bugs
   → Screenshots de bugs resueltos → borrar
 ```
-
----
-
-## 18. ESTRUCTURA MULTI-CONTEXTO — .agent/
-
-### Por qué múltiples contextos
-
-El proyecto tiene varios módulos activos en paralelo con ciclos de trabajo independientes:
-- Servicio IA + Bot Telegram
-- Pipeline Effi
-- ERP Frontend
-- Sistema Gestión OS (gestion.oscomunidad.com)
-- EspoCRM
-
-Un solo archivo de contexto de 700+ líneas mezcla todo. Cuando Claude empieza una sesión de trabajo en el Módulo de Tareas, no necesita leer el estado del pipeline Effi — y viceversa.
-
-### Estructura de directorios
-
-```
-.agent/
-├── MANIFESTO.md              ← Reglas globales, arquitectura, gotchas técnicos (este archivo)
-├── CONTEXTO_ACTIVO.md        ← Índice de 1 página: módulos activos y qué se está haciendo
-├── contextos/                ← Un archivo por módulo con su estado detallado
-│   ├── ia_service.md         ← Servicio IA, bot Telegram, aprendizaje, agentes
-│   ├── pipeline_effi.md      ← Pipeline Effi→MariaDB→Hostinger, 18 pasos
-│   ├── erp_frontend.md       ← ERP Vue/Quasar, módulo Ventas, design system
-│   ├── sistema_gestion.md    ← Módulo Tareas, auth, gestion.oscomunidad.com
-│   └── espocrm.md            ← Integración bidireccional, campos custom
-├── planes/
-│   ├── actuales/             ← Planes en ejecución (PLAN_NOMBRE_YYYY-MM-DD.md)
-│   └── completados/          ← Planes terminados (no se borran)
-├── skills/                   ← Cómo hacer cosas específicas (por dominio)
-├── manuales/                 ← Guías detalladas de referencia
-└── docs/                     ← Informes, perfiles, documentación externa
-```
-
-### Protocolo de trabajo por módulo
-
-**Al empezar a trabajar en un módulo:**
-1. Leer `CONTEXTO_ACTIVO.md` para ver qué está activo
-2. Leer el contexto del módulo: `.agent/contextos/<modulo>.md`
-3. Verificar si hay plan activo en `.agent/planes/actuales/`
-
-**Al terminar una tarea significativa:**
-1. Actualizar `.agent/contextos/<modulo>.md` con el nuevo estado
-2. Actualizar `CONTEXTO_ACTIVO.md` si cambió la prioridad o estado del módulo
-3. La memoria de Claude (`MEMORY.md`) siempre refleja el contexto activo más reciente
 
 ---
 
