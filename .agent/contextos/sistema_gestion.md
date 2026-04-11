@@ -17,14 +17,13 @@ Web activa en gestion.oscomunidad.com + Android futuro (Capacitor).
 | Build prod | `cd sistema_gestion/app && npx quasar build && rsync -a --delete dist/spa/ ../api/public/` |
 | Dev frontend | `cd sistema_gestion/app && npx quasar dev` (puerto 9301) |
 | Manual diseño | `sistema_gestion/MANUAL_DISENO_HIBRIDO.md` |
-| Cloudflare | Tunnel **vps-os** (VPS 94.72.115.156) — migrado 2026-04-10 |
+| Cloudflare | Tunnel local activo — DNS apunta al servidor local |
 
-### Migrado al VPS (2026-04-10)
-- Corre en Contabo VPS: 94.72.115.156 (6vCPU, 12GB RAM, Ubuntu 24.04)
-- Repo clonado en `/home/osserver/Proyectos_Antigravity/Integraciones_OS/`
-- Tunnel cloudflared: `vps-os` (ID: fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a)
-- SSH key Hostinger: `/home/osserver/.ssh/sos_erp` ✅
-- Servidor local sigue corriendo en paralelo (puerto 9300 local, sin acceso externo)
+### VPS listo (pendiente corte — 2026-04-10)
+- VPS Contabo: 94.72.115.156 — repo clonado, servicios corriendo, BDs migradas
+- Tunnel cloudflared VPS: `vps-os` (ID: fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a)
+- **DNS siguen apuntando al servidor local** hasta que Santi confirme que el VPS funciona bien
+- Probar VPS directo: `http://94.72.115.156:9300`
 
 ## Credenciales BD (3 pools en server.js)
 
