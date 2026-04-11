@@ -424,7 +424,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
         if uid in SA_FORZAR_NUEVA:
             SA_FORZAR_NUEVA.discard(uid)
             await update.effective_chat.send_action(ChatAction.TYPING)
-            resultado = sa_mod.nueva_conversacion(
+            resultado = await sa_mod.nueva_conversacion(
                 pregunta=texto, usuario_id=uid,
                 nombre_usuario=nombre, nivel=nivel,
                 empresa=empresa_sa
@@ -476,7 +476,7 @@ async def handle_mensaje(update: Update, ctx: ContextTypes.DEFAULT_TYPE, texto_o
         if uid in SAOC_FORZAR_NUEVA:
             SAOC_FORZAR_NUEVA.discard(uid)
             await update.effective_chat.send_action(ChatAction.TYPING)
-            resultado = saoc_mod.nueva_conversacion(
+            resultado = await saoc_mod.nueva_conversacion(
                 pregunta=texto, usuario_id=uid,
                 nombre_usuario=nombre, nivel=nivel,
                 empresa=empresa_sa
@@ -812,7 +812,7 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         await query.edit_message_reply_markup(reply_markup=None)
         await update.effective_chat.send_action(ChatAction.TYPING)
-        resp = sa_mod._ejecutar_claude(prompt_rd)
+        resp = await asyncio.to_thread(sa_mod._ejecutar_claude, prompt_rd)
         if resp.get('ok') and resp.get('session_id'):
             sa_mod.crear_sesion(uid, empresa, resp['session_id'],
                                 nombre=f'RD - {fecha_rd}')

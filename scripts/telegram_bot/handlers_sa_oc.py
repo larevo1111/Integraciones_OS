@@ -55,7 +55,7 @@ async def manejar_superagente_oc(update: Update, saoc_mod, tabla_mod,
     else:
         # Consulta normal al Super Agente OpenCode
         await update.effective_chat.send_action(ChatAction.TYPING)
-        resultado = saoc_mod.consultar(
+        resultado = await saoc_mod.consultar(
             pregunta=pregunta, usuario_id=uid,
             nombre_usuario=nombre, nivel=nivel, empresa=empresa,
             con_imagen=con_imagen,

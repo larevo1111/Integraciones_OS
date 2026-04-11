@@ -4,6 +4,7 @@ Simplemente envía prompts a Claude Code CLI (claude -p) y devuelve la respuesta
 Maneja sesiones persistentes con --resume y nombres de conversaciones.
 No usa API keys, no loguea — es hablar con Claude por terminal.
 """
+import asyncio
 import json
 import os
 import subprocess
@@ -268,8 +269,8 @@ def obtener_telegram_ids_nivel7(empresa: str) -> list[str]:
 
 # ── Consulta principal ───────────────────────────────────────────────────────
 
-def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
-              nivel: int, empresa: str) -> dict:
+async def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
+                    nivel: int, empresa: str) -> dict:
     """
     Consulta al Super Agente. Usa --resume si hay sesión activa.
     Si no hay sesión, crea una nueva enviando primero el prompt sistema.
@@ -277,24 +278,24 @@ def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
     sesion = obtener_sesion_activa(usuario_id, empresa)
 
     if sesion:
-        resp = _ejecutar_claude(pregunta, session_id=sesion['claude_session_id'])
+        resp = await asyncio.to_thread(_ejecutar_claude, pregunta, sesion['claude_session_id'])
         if not resp.get('ok'):
             return resp
         return _procesar_respuesta(resp['result'])
     else:
         # Sin sesión → crear nueva con prompt sistema (ya retorna procesado)
-        return _iniciar_sesion(pregunta, usuario_id, nombre_usuario, nivel, empresa)
+        return await _iniciar_sesion(pregunta, usuario_id, nombre_usuario, nivel, empresa)
 
 
-def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
-                       nivel: int, empresa: str) -> dict:
+async def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
+                              nivel: int, empresa: str) -> dict:
     """Fuerza creación de una conversación nueva."""
-    return _iniciar_sesion(pregunta, usuario_id, nombre_usuario, nivel, empresa,
-                           procesar=True)
+    return await _iniciar_sesion(pregunta, usuario_id, nombre_usuario, nivel, empresa,
+                                 procesar=True)
 
 
-def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
-                    nivel: int, empresa: str, procesar: bool = True) -> dict:
+async def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
+                           nivel: int, empresa: str, procesar: bool = True) -> dict:
     """Crea sesión nueva: envía prompt sistema, luego la pregunta con --resume."""
     prompt_tpl = obtener_prompt_sistema(empresa)
     if not prompt_tpl or prompt_tpl == 'PROMPT_PENDIENTE':
@@ -310,7 +311,7 @@ def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
                       .replace('{empresa}', empresa))
 
     prompt_con_nombre = f'{nombre}\n\n{prompt_sistema}'
-    resp1 = _ejecutar_claude(prompt_con_nombre)
+    resp1 = await asyncio.to_thread(_ejecutar_claude, prompt_con_nombre)
     if not resp1.get('ok'):
         return resp1
 
@@ -321,7 +322,7 @@ def _iniciar_sesion(pregunta: str, usuario_id: str, nombre_usuario: str,
     # Guardar en BD con el mismo nombre
     crear_sesion(usuario_id, empresa, session_id, nombre=nombre)
 
-    resp2 = _ejecutar_claude(pregunta, session_id=session_id)
+    resp2 = await asyncio.to_thread(_ejecutar_claude, pregunta, session_id)
     if not resp2.get('ok'):
         return resp2
 

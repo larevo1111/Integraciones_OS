@@ -54,7 +54,7 @@ async def manejar_superagente(update: Update, sa_mod, tabla_mod,
     else:
         # Consulta normal al Super Agente
         await update.effective_chat.send_action(ChatAction.TYPING)
-        resultado = sa_mod.consultar(
+        resultado = await sa_mod.consultar(
             pregunta=pregunta, usuario_id=uid,
             nombre_usuario=nombre, nivel=nivel, empresa=empresa,
         )

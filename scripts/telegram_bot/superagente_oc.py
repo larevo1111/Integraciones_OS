@@ -4,6 +4,7 @@ Envía prompts a OpenCode CLI (opencode run) y devuelve la respuesta.
 Maneja sesiones persistentes con --session/--continue y nombres de conversaciones.
 No usa API keys — modelos gratuitos de OpenCode.
 """
+import asyncio
 import json
 import logging
 import os
@@ -246,35 +247,35 @@ def obtener_historial(oc_session_id: str, max_intercambios: int = 5) -> str:
 
 # ── Consulta principal ───────────────────────────────────────────────────────
 
-def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
-              nivel: int, empresa: str, con_imagen: bool = False) -> dict:
+async def consultar(pregunta: str, usuario_id: str, nombre_usuario: str,
+                    nivel: int, empresa: str, con_imagen: bool = False) -> dict:
     """
     Consulta al Super Agente OpenCode.
     Si hay sesión activa, usa --session para continuar la conversación.
     Si no hay sesión, crea una nueva.
-    con_imagen=True usa mimo-v2-omni-free para esa llamada (visión).
+    con_imagen=True usa el modelo visión para esa llamada.
     """
     sesion = obtener_sesion_activa(usuario_id, empresa)
 
     if sesion and sesion.get('oc_session_id'):
-        resp = _ejecutar_opencode(pregunta, session_id=sesion['oc_session_id'], con_imagen=con_imagen)
+        resp = await asyncio.to_thread(_ejecutar_opencode, pregunta, sesion['oc_session_id'], con_imagen)
         if not resp.get('ok'):
             # Si la sesión está rota (stdout vacío sin stderr), crear una nueva
             if resp.get('sesion_rota'):
                 log.warning(f'SAOC sesión rota {sesion["oc_session_id"]}, creando nueva')
-                return nueva_conversacion(pregunta, usuario_id, nombre_usuario, nivel, empresa, con_imagen=con_imagen)
+                return await nueva_conversacion(pregunta, usuario_id, nombre_usuario, nivel, empresa, con_imagen=con_imagen)
             return resp
         return _procesar_respuesta(resp['result'])
     else:
-        return nueva_conversacion(pregunta, usuario_id, nombre_usuario, nivel, empresa, con_imagen=con_imagen)
+        return await nueva_conversacion(pregunta, usuario_id, nombre_usuario, nivel, empresa, con_imagen=con_imagen)
 
 
-def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
-                       nivel: int, empresa: str, con_imagen: bool = False) -> dict:
+async def nueva_conversacion(pregunta: str, usuario_id: str, nombre_usuario: str,
+                              nivel: int, empresa: str, con_imagen: bool = False) -> dict:
     """Fuerza creación de una conversación nueva (sin --session)."""
     nombre = _generar_nombre(pregunta)
 
-    resp = _ejecutar_opencode(pregunta, con_imagen=con_imagen)
+    resp = await asyncio.to_thread(_ejecutar_opencode, pregunta, None, con_imagen)
     if not resp.get('ok'):
         return resp
 
