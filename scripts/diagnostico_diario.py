@@ -318,14 +318,30 @@ def llamar_claude(fallos_texto):
     else:
         _log(f'Iniciando nueva sesión RD...')
 
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True,
+    def _run_claude(cmd_args):
+        return subprocess.run(
+            cmd_args, capture_output=True, text=True,
             cwd=REPO_DIR, timeout=600, env=env,
         )
+
+    def _es_error_contexto(proc):
+        txt = (proc.stdout + proc.stderr).lower()
+        return ('too long' in txt or 'context' in txt or
+                'session' in txt or not proc.stdout.strip())
+
+    try:
+        proc = _run_claude(cmd)
+
+        # Si --resume falla (sesión inválida o contexto lleno) → reintentar sin ella
+        if session_id and _es_error_contexto(proc):
+            _log('Sesión RD expirada o contexto lleno — iniciando sesión nueva...')
+            if os.path.exists(RD_SESSION_FILE):
+                os.remove(RD_SESSION_FILE)
+            cmd_nuevo = [c for c in cmd if c not in ['--resume', session_id]]
+            proc = _run_claude(cmd_nuevo)
+
         if proc.stdout.strip():
             data = json.loads(proc.stdout.strip().split('\n')[-1])
-            # Guardar session_id para el próximo run
             new_sid = data.get('session_id')
             if new_sid:
                 open(RD_SESSION_FILE, 'w').write(new_sid)
