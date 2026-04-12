@@ -2,7 +2,7 @@
 """
 Diagnóstico diario del sistema OS.
 Revisa servicios, BDs, apps, GPU, conectividad y pipeline.
-Envía reporte por Telegram. Si hay fallos, intenta corregir y opcionalmente llama a Claude Code.
+Envía reporte por Telegram. Si hay fallos, opcionalmente llama a Claude Code.
 
 Uso:
   python3 diagnostico_diario.py              # Diagnóstico completo + reporte
@@ -23,35 +23,37 @@ sys.path.insert(0, BASE_DIR)
 from dotenv import load_dotenv
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-BOT_TOKEN   = os.getenv('TELEGRAM_BOT_TOKEN')          # Bot principal (interactivo)
-NOTIF_TOKEN = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN')    # Bot notificaciones (fallback)
-SANTI_CHAT  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')      # Chat de Santi
+from checks_sistema import (
+    _ok, _fail, _warn, _run,
+    check_servicios, check_opencode, check_bot_errores,
+)
+
+BOT_TOKEN   = os.getenv('TELEGRAM_BOT_TOKEN')
+NOTIF_TOKEN = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN')
+SANTI_CHAT  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')
 CLAUDE_BIN  = '/home/osserver/.local/bin/claude'
 REPO_DIR    = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
 LOG_FILE    = os.path.join(REPO_DIR, 'logs', 'diagnostico.log')
+BOT_LOG     = os.path.join(REPO_DIR, 'logs', 'telegram_bot.log')
 HOY         = date.today().isoformat()
 
-# Servicios que DEBEN estar activos
 SERVICIOS_REQUERIDOS = [
     'ia-service', 'ollama', 'os-telegram-bot', 'wa-bridge',
     'os-erp-frontend', 'os-ia-admin', 'os-gestion',
     'os-inventario-api', 'os-ialocal', 'effi-webhook',
 ]
 
-# Apps web con su URL de health check
 APPS_WEB = [
-    ('ERP Frontend',    'http://localhost:9100'),
-    ('IA Admin',        'http://localhost:9200'),
-    ('Gestión',         'http://localhost:9300'),
-    ('Inventario',      'http://localhost:9401'),
-    ('IA Service',      'http://localhost:5100/ia/health'),
-    ('IA Local',        'http://localhost:9500'),
+    ('ERP Frontend', 'http://localhost:9100'),
+    ('IA Admin',     'http://localhost:9200'),
+    ('Gestión',      'http://localhost:9300'),
+    ('Inventario',   'http://localhost:9401'),
+    ('IA Service',   'http://localhost:5100/ia/health'),
+    ('IA Local',     'http://localhost:9500'),
 ]
 
-# BDs locales
 BDS_LOCALES = ['ia_service_os', 'effi_data', 'os_inventario', 'os_whatsapp', 'espocrm']
 
-# Hostinger
 HOSTINGER_CFG = dict(
     host='109.106.250.195', port=3306,
     user='u768061575_osserver', password='Epist2487.',
@@ -60,26 +62,7 @@ HOSTINGER_CFG = dict(
 )
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-def _ok(nombre):
-    return f'✅ {nombre}'
-
-def _fail(nombre, detalle=''):
-    return f'❌ {nombre}' + (f' — {detalle}' if detalle else '')
-
-def _warn(nombre, detalle=''):
-    return f'⚠️ {nombre}' + (f' — {detalle}' if detalle else '')
-
-def _run(cmd, timeout=15):
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-        return r.returncode, r.stdout.strip(), r.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return -1, '', 'timeout'
-    except Exception as e:
-        return -1, '', str(e)
-
+# ── Helpers locales ───────────────────────────────────────────────────────────
 
 def _enviar_telegram(mensaje, con_boton_claude=False):
     """Envía reporte por el bot principal (para que Santi pueda responder)."""
@@ -89,7 +72,6 @@ def _enviar_telegram(mensaje, con_boton_claude=False):
     if not token or not chat:
         print('⚠️  Sin tokens Telegram configurados')
         return
-
     payload = {'chat_id': chat, 'text': mensaje, 'parse_mode': 'HTML'}
     if con_boton_claude:
         payload['reply_markup'] = json.dumps({
@@ -99,7 +81,7 @@ def _enviar_telegram(mensaje, con_boton_claude=False):
         })
     try:
         requests.post(f'https://api.telegram.org/bot{token}/sendMessage',
-                       json=payload, timeout=10)
+                      json=payload, timeout=10)
     except Exception as e:
         print(f'Error enviando Telegram: {e}')
 
@@ -112,35 +94,12 @@ def _log(msg):
         f.write(line + '\n')
 
 
-# ── Checks ───────────────────────────────────────────────────────────────────
-
-def check_servicios():
-    """Verifica servicios systemd requeridos. Reinicia los caídos."""
-    resultados = []
-    fallos = 0
-    for svc in SERVICIOS_REQUERIDOS:
-        rc, out, _ = _run(['systemctl', 'is-active', f'{svc}.service'])
-        if out == 'active':
-            resultados.append(_ok(svc))
-        else:
-            # Intentar reiniciar
-            _log(f'Reiniciando {svc}...')
-            _run(['sudo', 'systemctl', 'restart', f'{svc}.service'], timeout=20)
-            time.sleep(3)
-            rc2, out2, _ = _run(['systemctl', 'is-active', f'{svc}.service'])
-            if out2 == 'active':
-                resultados.append(_warn(svc, 'estaba caído → reiniciado'))
-            else:
-                resultados.append(_fail(svc, 'no arrancó'))
-                fallos += 1
-    return resultados, fallos
-
+# ── Checks exclusivos del diagnóstico diario ──────────────────────────────────
 
 def check_bds_locales():
-    """Verifica conexión a BDs locales."""
+    """Verifica conexión a BDs locales. (lineas, fallos, acciones)"""
     import pymysql
-    resultados = []
-    fallos = 0
+    resultados, fallos = [], 0
     for bd in BDS_LOCALES:
         try:
             conn = pymysql.connect(
@@ -150,13 +109,13 @@ def check_bds_locales():
             conn.close()
             resultados.append(_ok(bd))
         except Exception as e:
-            resultados.append(_fail(bd, str(e)[:60]))
+            resultados.append(_fail(f'{bd} — {str(e)[:60]}'))
             fallos += 1
-    return resultados, fallos
+    return resultados, fallos, []
 
 
 def check_hostinger():
-    """Verifica conexión a Hostinger."""
+    """Verifica conexión a Hostinger. (lineas, fallos, acciones)"""
     import pymysql
     try:
         conn = pymysql.connect(**HOSTINGER_CFG)
@@ -164,47 +123,43 @@ def check_hostinger():
         cur.execute('SELECT COUNT(*) FROM zeffi_facturas_venta_encabezados')
         n = cur.fetchone()[0]
         conn.close()
-        return [_ok(f'Hostinger ({n} facturas)')], 0
+        return [_ok(f'Hostinger ({n} facturas)')], 0, []
     except Exception as e:
         err = str(e)[:80]
-        # Verificar/activar WARP
         rc, warp_st, _ = _run(['warp-cli', '--accept-tos', 'status'])
         if 'Disconnected' in warp_st:
             _log('Hostinger inalcanzable — activando WARP...')
             _run(['warp-cli', '--accept-tos', 'connect'], timeout=10)
             time.sleep(5)
-            # Reintentar
             try:
                 conn = pymysql.connect(**HOSTINGER_CFG)
                 cur = conn.cursor()
                 cur.execute('SELECT COUNT(*) FROM zeffi_facturas_venta_encabezados')
                 n = cur.fetchone()[0]
                 conn.close()
-                return [_warn(f'Hostinger ({n} fact) — WARP activado')], 0
+                return [_warn(f'Hostinger ({n} fact) — WARP activado')], 0, []
             except Exception:
                 pass
-        return [_fail('Hostinger', err)], 1
+        return [_fail(f'Hostinger — {err}')], 1, []
 
 
 def check_warp():
-    """Estado de Cloudflare WARP."""
+    """Estado de Cloudflare WARP. (lineas, fallos, acciones)"""
     rc, out, _ = _run(['warp-cli', '--accept-tos', 'status'])
     if 'Connected' in out:
-        return [_ok('WARP conectado')], 0
+        return [_ok('WARP conectado')], 0, []
     elif 'Disconnected' in out:
-        return [_ok('WARP desconectado (no necesario)')], 0
-    else:
-        return [_warn('WARP', out[:60])], 0
+        return [_ok('WARP desconectado (no necesario)')], 0, []
+    return [_warn(f'WARP — {out[:60]}')], 0, []
 
 
 def check_gpu_ollama():
-    """Verifica GPU y modelo Ollama."""
+    """Verifica GPU VRAM y modelo Ollama cargado. (lineas, fallos, acciones)"""
     import requests
-    resultados = []
-    fallos = 0
+    resultados, fallos = [], 0
 
-    # GPU
-    rc, out, _ = _run(['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader,nounits'])
+    rc, out, _ = _run(['nvidia-smi', '--query-gpu=memory.used,memory.total',
+                        '--format=csv,noheader,nounits'])
     if rc == 0 and out:
         parts = out.split(',')
         usado, total = parts[0].strip(), parts[1].strip()
@@ -213,7 +168,6 @@ def check_gpu_ollama():
         resultados.append(_fail('GPU no disponible'))
         fallos += 1
 
-    # Ollama
     try:
         r = requests.get('http://localhost:11434/api/ps', timeout=5)
         modelos = r.json().get('models', [])
@@ -226,80 +180,48 @@ def check_gpu_ollama():
         resultados.append(_fail('Ollama no responde'))
         fallos += 1
 
-    return resultados, fallos
+    return resultados, fallos, []
 
 
 def check_apps_web():
-    """Verifica que las apps web respondan."""
+    """Verifica que las apps web respondan. (lineas, fallos, acciones)"""
     import requests
-    resultados = []
-    fallos = 0
+    resultados, fallos = [], 0
     for nombre, url in APPS_WEB:
         try:
             r = requests.get(url, timeout=5)
             if r.status_code < 500:
                 resultados.append(_ok(nombre))
             else:
-                resultados.append(_fail(nombre, f'HTTP {r.status_code}'))
+                resultados.append(_fail(f'{nombre} — HTTP {r.status_code}'))
                 fallos += 1
         except Exception:
-            resultados.append(_fail(nombre, 'no responde'))
+            resultados.append(_fail(f'{nombre} — no responde'))
             fallos += 1
-    return resultados, fallos
-
-
-def check_opencode():
-    """Verifica que OpenCode responda con el modelo activo en BD."""
-    import pymysql
-    import pymysql.cursors
-    oc_bin = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
-    modelo = 'opencode/minimax-m2.5-free'  # default si BD no responde
-    try:
-        conn = pymysql.connect(
-            host='localhost', user='osadmin', password='Epist2487.',
-            database='ia_service_os', charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor, connect_timeout=3,
-        )
-        with conn.cursor() as cur:
-            cur.execute("SELECT valor FROM ia_config WHERE clave='sa_opencode_modelo'")
-            row = cur.fetchone()
-        conn.close()
-        if row and row.get('valor'):
-            modelo = row['valor']
-    except Exception:
-        pass
-
-    nombre = modelo.split('/')[-1]
-    rc, out, err = _run([oc_bin, 'run', '--format', 'json', '-m', modelo, 'responde OK'], timeout=35)
-    if rc == 0 and 'text' in out:
-        return [_ok(f'OpenCode ({nombre})')], 0
-    else:
-        return [_fail(f'OpenCode ({nombre})', (err or out)[:80])], 1
+    return resultados, fallos, []
 
 
 def check_claude_code():
-    """Verifica que Claude Code responda."""
-    claude_bin = '/home/osserver/.local/bin/claude'
+    """Verifica que Claude Code responda. (lineas, fallos, acciones)"""
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)
     env.pop('ANTHROPIC_API_KEY', None)
-    rc, out, err = _run([claude_bin, '-p', 'responde solo OK', '--output-format', 'json'], timeout=60)
+    rc, out, err = _run([CLAUDE_BIN, '-p', 'responde solo OK', '--output-format', 'json'],
+                         timeout=60)
     if rc == 0 and out:
-        return [_ok('Claude Code')], 0
-    else:
-        detail = err[:80] if err else 'sin respuesta'
-        if 'credit' in detail.lower():
-            return [_warn('Claude Code — límite de crédito')], 0
-        return [_fail('Claude Code', detail)], 1
+        return [_ok('Claude Code')], 0, []
+    detail = err[:80] if err else 'sin respuesta'
+    if 'credit' in detail.lower():
+        return [_warn('Claude Code — límite de crédito')], 0, []
+    return [_fail(f'Claude Code — {detail}')], 1, []
 
 
 def check_pipeline():
-    """Verifica último pipeline ejecutado."""
+    """Verifica último pipeline ejecutado. (lineas, fallos, acciones)"""
     log_path = os.path.join(REPO_DIR, 'logs', 'pipeline.log')
     if not os.path.exists(log_path):
-        return [_fail('Pipeline', 'sin log')], 1
+        return [_fail('Pipeline — sin log')], 1, []
 
-    # Buscar última línea FIN
     ultima_fin = ''
     with open(log_path, 'r') as f:
         for line in f:
@@ -307,38 +229,14 @@ def check_pipeline():
                 ultima_fin = line.strip()
 
     if not ultima_fin:
-        return [_warn('Pipeline', 'sin ejecución registrada')], 0
-
+        return [_warn('Pipeline — sin ejecución registrada')], 0, []
     if '❌' in ultima_fin:
-        return [_warn(f'Pipeline: último con errores')], 0
-    else:
-        return [_ok('Pipeline: última ejecución OK')], 0
-
-
-def check_bot_errores():
-    """Verifica errores recientes del bot."""
-    log_path = os.path.join(REPO_DIR, 'logs', 'telegram_bot.log')
-    if not os.path.exists(log_path):
-        return [_warn('Bot', 'sin log')], 0
-
-    # Contar conflictos en última hora
-    ahora = datetime.now()
-    conflictos = 0
-    try:
-        with open(log_path, 'r') as f:
-            for line in f:
-                if 'Conflict' in line and HOY in line:
-                    conflictos += 1
-    except Exception:
-        pass
-
-    if conflictos > 5:
-        return [_warn(f'Bot: {conflictos} conflictos hoy')], 0
-    return [_ok('Bot sin errores graves')], 0
+        return [_warn('Pipeline — último con errores')], 0, []
+    return [_ok('Pipeline: última ejecución OK')], 0, []
 
 
 def check_disco():
-    """Verifica espacio en disco."""
+    """Verifica espacio en disco. (lineas, fallos, acciones)"""
     rc, out, _ = _run(['df', '-h', '/'])
     if rc == 0:
         lines = out.split('\n')
@@ -347,12 +245,12 @@ def check_disco():
             uso = parts[4] if len(parts) > 4 else '?'
             uso_num = int(uso.replace('%', '')) if '%' in uso else 0
             if uso_num >= 90:
-                return [_fail(f'Disco: {uso} usado')], 1
+                return [_fail(f'Disco: {uso} usado')], 1, []
             elif uso_num >= 80:
-                return [_warn(f'Disco: {uso} usado')], 0
+                return [_warn(f'Disco: {uso} usado')], 0, []
             else:
-                return [_ok(f'Disco: {uso} usado')], 0
-    return [_warn('Disco: no se pudo verificar')], 0
+                return [_ok(f'Disco: {uso} usado')], 0, []
+    return [_warn('Disco: no se pudo verificar')], 0, []
 
 
 # ── Claude Code ──────────────────────────────────────────────────────────────
@@ -367,11 +265,9 @@ def llamar_claude(fallos_texto):
         f'Al terminar, envía un resumen breve de lo que hiciste por Telegram '
         f'usando la función notificar() de scripts/ia_service/alertas.py.'
     )
-
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)
     env.pop('ANTHROPIC_API_KEY', None)
-
     _log(f'Llamando a Claude Code para corregir {fallos_texto[:100]}...')
     try:
         proc = subprocess.run(
@@ -400,28 +296,26 @@ def main():
     _log(f'=== Diagnóstico diario {HOY} ===')
 
     checks = [
-        ('SERVICIOS',    check_servicios),
+        ('SERVICIOS',    lambda: check_servicios(SERVICIOS_REQUERIDOS, _log)),
         ('BD LOCALES',   check_bds_locales),
         ('HOSTINGER',    check_hostinger),
         ('WARP',         check_warp),
         ('GPU / OLLAMA', check_gpu_ollama),
         ('APPS WEB',     check_apps_web),
-        ('OPENCODE',     check_opencode),
+        ('OPENCODE',     lambda: check_opencode(_log)),
         ('CLAUDE CODE',  check_claude_code),
         ('PIPELINE',     check_pipeline),
-        ('BOT',          check_bot_errores),
+        ('BOT',          lambda: check_bot_errores(BOT_LOG, _log)),
         ('DISCO',        check_disco),
     ]
 
-    todas_lineas = []
-    total_fallos = 0
-    fallos_detalle = []
+    todas_lineas, total_fallos, fallos_detalle = [], 0, []
 
     for titulo, fn in checks:
         try:
-            lineas, fallos = fn()
+            lineas, fallos, _ = fn()
         except Exception as e:
-            lineas = [_fail(titulo, str(e)[:80])]
+            lineas = [_fail(f'{titulo} — {str(e)[:80]}')]
             fallos = 1
         todas_lineas.append(f'\n<b>{titulo}</b>')
         todas_lineas.extend(lineas)
@@ -429,35 +323,28 @@ def main():
         if fallos > 0:
             fallos_detalle.extend([l for l in lineas if l.startswith('❌')])
 
-    # Construir reporte
-    if total_fallos == 0:
-        encabezado = f'🟢 <b>RD — {HOY}</b>\nTodo operativo'
-    else:
-        encabezado = f'🔴 <b>RD — {HOY}</b>\n{total_fallos} fallo(s) detectado(s)'
-
+    encabezado = (
+        f'🟢 <b>RD — {HOY}</b>\nTodo operativo' if not total_fallos
+        else f'🔴 <b>RD — {HOY}</b>\n{total_fallos} fallo(s) detectado(s)'
+    )
     reporte = encabezado + '\n' + '\n'.join(todas_lineas)
 
-    # Log
     for l in todas_lineas:
         _log(l)
     _log(f'Total fallos: {total_fallos}')
 
-    # Enviar por Telegram (bot principal para que Santi pueda responder)
     if not args.silencioso or total_fallos > 0:
         if len(reporte) > 4000:
             reporte = reporte[:3990] + '\n...(truncado)'
         _enviar_telegram(reporte, con_boton_claude=(total_fallos > 0))
 
-    # Guardar reporte en archivo para que Claude Code lo lea si se invoca
     reporte_path = os.path.join(REPO_DIR, 'logs', 'ultimo_diagnostico.txt')
     with open(reporte_path, 'w') as f:
         f.write(reporte)
 
-    # Si hay fallos y se pidió --con-claude, llamar a Claude Code para corregir
     if args.con_claude and total_fallos > 0 and fallos_detalle:
         _log(f'Invocando Claude Code para {total_fallos} fallo(s)...')
-        fallos_texto = '\n'.join(fallos_detalle)
-        respuesta_claude = llamar_claude(fallos_texto)
+        respuesta_claude = llamar_claude('\n'.join(fallos_detalle))
         if respuesta_claude:
             _log(f'Claude respondió: {respuesta_claude[:200]}')
             _enviar_telegram(f'🤖 <b>Claude Code corrigió fallos:</b>\n{respuesta_claude[:600]}')
