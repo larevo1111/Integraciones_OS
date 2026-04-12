@@ -14,13 +14,17 @@ MAX_FILAS_INLINE = 2   # >2 filas → SIEMPRE botón "Ver tabla completa"
 def _formatear_valor(v) -> str:
     if v is None:
         return '—'
-    if isinstance(v, float):
-        if v >= 1_000_000:
-            return f'${v/1_000_000:.1f}M'
-        if v >= 1_000:
-            return f'${v:,.0f}'
-        return f'{v:.2f}'
-    return str(v)
+    # Los valores de BD llegan como str, Decimal o float — convertir todo a float
+    if not isinstance(v, (int, float)):
+        try:
+            v = float(str(v).replace(',', ''))
+        except (ValueError, TypeError):
+            return str(v)
+    if v >= 1_000_000:
+        return f'${v/1_000_000:.1f}M'
+    if v >= 1_000:
+        return f'${v:,.0f}'
+    return f'{v:.2f}'
 
 
 def _fila_valor(fila, idx: int, col: str):

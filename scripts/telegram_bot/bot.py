@@ -11,24 +11,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
-import httpx
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters
 )
 from telegram.constants import ParseMode, ChatAction
-from telegram.request import HTTPXRequest
-
-
-class _NoKeepAliveRequest(HTTPXRequest):
-    """Sin keepalive en getUpdates — evita 409 Conflict por reutilización de conexiones."""
-    async def initialize(self) -> None:
-        await super().initialize()
-        try:
-            self._client._transport._pool._max_keepalive_connections = 0
-        except AttributeError:
-            pass  # degrada silenciosamente si httpx cambia su API interna
 
 import api_ia, db, tabla as tabla_mod, whisper as whisper_mod, superagente as sa_mod
 import superagente_oc as saoc_mod
@@ -851,12 +839,7 @@ def main():
     log.info('Iniciando OS IA Bot...')
     db.limpiar_tablas_viejas()
 
-    app = (
-        Application.builder()
-        .token(TOKEN)
-        .get_updates_request(_NoKeepAliveRequest(connection_pool_size=1))
-        .build()
-    )
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler('start',      cmd_start))
     app.add_handler(CommandHandler('ayuda',      cmd_ayuda))
