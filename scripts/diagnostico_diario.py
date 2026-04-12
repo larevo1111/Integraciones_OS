@@ -64,6 +64,33 @@ HOSTINGER_CFG = dict(
 
 # ── Helpers locales ───────────────────────────────────────────────────────────
 
+def _enviar_gmail(asunto, cuerpo_texto):
+    """Envía email por Gmail. Se usa cuando todo está OK (sin fallos)."""
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    usuario  = os.getenv('GMAIL_USER', '')
+    password = os.getenv('GMAIL_APP_PASSWORD', '')
+    destino  = os.getenv('EMAIL_DESTINO', 'larevo1111@gmail.com')
+    if not usuario or not password:
+        _log('⚠️  Gmail no configurado en .env — omitiendo email.')
+        return
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = asunto
+        msg['From']    = f'OS Sistema <{usuario}>'
+        msg['To']      = destino
+        msg.attach(MIMEText(cuerpo_texto, 'plain', 'utf-8'))
+        with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(usuario, password)
+            smtp.sendmail(usuario, destino, msg.as_string())
+        _log(f'📧 Email enviado → {destino}')
+    except Exception as e:
+        _log(f'Error enviando email: {e}')
+
+
 def _enviar_telegram(mensaje, con_boton_claude=False):
     """Envía reporte por el bot principal (para que Santi pueda responder)."""
     import requests
@@ -261,9 +288,18 @@ def llamar_claude(fallos_texto):
         f'RD - {HOY}\n\n'
         f'Diagnóstico diario automático detectó estos fallos:\n\n'
         f'{fallos_texto}\n\n'
-        f'Revisa cada fallo, diagnostica la causa raíz y corrige lo que puedas. '
-        f'Al terminar, envía un resumen breve de lo que hiciste por Telegram '
-        f'usando la función notificar() de scripts/ia_service/alertas.py.'
+        f'REGLAS OBLIGATORIAS — léelas antes de tocar cualquier cosa:\n'
+        f'1. Lee primero: .agent/CONTEXTO_ACTIVO.md y .agent/MANIFESTO.md para entender el sistema.\n'
+        f'2. Lee SIEMPRE el archivo completo antes de modificarlo. Nunca editar sin leer.\n'
+        f'3. Filosofía 5S: una función = una operación. No duplicar lógica. No parches superficiales.\n'
+        f'4. Diagnostica la causa raíz — no el síntoma. Si no hay causa clara, solo documenta.\n'
+        f'5. MODO AUTÓNOMO: SOLO puedes modificar datos en BD (ia_config, ia_ejemplos_sql, ia_tipos_consulta). '
+        f'NUNCA modificar archivos .py, .js o de configuración sin sesión interactiva con Santi.\n'
+        f'6. No meter try/except vacíos, no hardcodear valores, no workarounds.\n'
+        f'7. Verifica con systemctl/curl que el servicio responde tras cualquier cambio.\n\n'
+        f'Al terminar, notifica a Santi por Telegram usando:\n'
+        f'  python3 {REPO_DIR}/scripts/ia_service/alertas.py\n'
+        f'o bien con curl directo al bot con el resumen de lo que hiciste (máx 3 líneas).\n'
     )
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)
@@ -333,10 +369,16 @@ def main():
         _log(l)
     _log(f'Total fallos: {total_fallos}')
 
-    if not args.silencioso or total_fallos > 0:
+    if total_fallos == 0:
+        # Sin fallos → email silencioso a Gmail
+        if not args.silencioso:
+            cuerpo = reporte.replace('<b>', '').replace('</b>', '')
+            _enviar_gmail(f'✅ RD {HOY} — Todo operativo', cuerpo)
+    else:
+        # Con fallos → Telegram para acción inmediata
         if len(reporte) > 4000:
             reporte = reporte[:3990] + '\n...(truncado)'
-        _enviar_telegram(reporte, con_boton_claude=(total_fallos > 0))
+        _enviar_telegram(reporte, con_boton_claude=True)
 
     reporte_path = os.path.join(REPO_DIR, 'logs', 'ultimo_diagnostico.txt')
     with open(reporte_path, 'w') as f:
