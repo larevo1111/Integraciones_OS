@@ -415,7 +415,21 @@ Una vez que Santi dio la orden, no interrumpir para pedir permiso en cada comand
 
 **Regla cardinal del proyecto. Aplica a TODO: frontend, backend, endpoints, modales, componentes, variables.**
 
-### Principio
+### Principio de Código Mínimo Suficiente
+
+> **El código correcto es el mínimo que resuelve el problema real — ni más, ni menos.**
+
+Antes de escribir cualquier línea, preguntarse: *¿es necesaria para que esto funcione hoy?*
+Si la respuesta no es un "sí" claro → no va.
+
+No agregar: abstracciones para un solo uso, error handling para escenarios imposibles, parámetros opcionales que nadie usa, validaciones en código interno ya garantizado por el flujo, logs de debug que quedan en producción.
+
+Sí agregar cuando realmente se necesita: lógica de negocio real, validación en bordes del sistema (entrada de usuario, APIs externas), manejo de errores que sí pueden ocurrir.
+
+*Tres líneas similares son mejores que una abstracción prematura.*
+*Un bug arreglado en el lugar correcto es mejor que un parche encima.*
+
+### Principio anti-duplicación (5S)
 Una operación = una función. Un modal = un modal. Una variable = una variable. Si hay dos caminos para hacer lo mismo, es un bug esperando a nacer. **Antes de crear algo, verificar que no exista.**
 
 ### Checklist obligatorio antes de crear CUALQUIER cosa
