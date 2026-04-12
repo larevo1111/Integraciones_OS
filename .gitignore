@@ -27,3 +27,4 @@ dist/
 build/
 .agent/contexto_persistente/ # Si decidimos no sync esto
 .agent/.servers.env
+scripts/.rd_session_id

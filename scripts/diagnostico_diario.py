@@ -31,8 +31,9 @@ from checks_sistema import (
 BOT_TOKEN   = os.getenv('TELEGRAM_BOT_TOKEN')
 NOTIF_TOKEN = os.getenv('TELEGRAM_NOTIF_BOT_TOKEN')
 SANTI_CHAT  = os.getenv('TELEGRAM_NOTIF_CHAT_ID')
-CLAUDE_BIN  = '/home/osserver/.local/bin/claude'
-REPO_DIR    = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
+CLAUDE_BIN       = '/home/osserver/.local/bin/claude'
+REPO_DIR         = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
+RD_SESSION_FILE  = os.path.join(BASE_DIR, '.rd_session_id')  # persiste el ID de sesión RD
 LOG_FILE    = os.path.join(REPO_DIR, 'logs', 'diagnostico.log')
 BOT_LOG     = os.path.join(REPO_DIR, 'logs', 'telegram_bot.log')
 HOY         = date.today().isoformat()
@@ -304,15 +305,30 @@ def llamar_claude(fallos_texto):
     env = os.environ.copy()
     env.pop('CLAUDECODE', None)
     env.pop('ANTHROPIC_API_KEY', None)
-    _log(f'Llamando a Claude Code para corregir {fallos_texto[:100]}...')
+
+    # Reusar siempre la misma sesión RD para no proliferar conversaciones
+    session_id = None
+    if os.path.exists(RD_SESSION_FILE):
+        session_id = open(RD_SESSION_FILE).read().strip() or None
+
+    cmd = [CLAUDE_BIN, '-p', prompt, '--output-format', 'json', '--model', 'sonnet']
+    if session_id:
+        cmd.extend(['--resume', session_id])
+        _log(f'Retomando sesión RD {session_id[:8]}...')
+    else:
+        _log(f'Iniciando nueva sesión RD...')
+
     try:
         proc = subprocess.run(
-            [CLAUDE_BIN, '-p', prompt, '--output-format', 'json'],
-            capture_output=True, text=True,
+            cmd, capture_output=True, text=True,
             cwd=REPO_DIR, timeout=600, env=env,
         )
         if proc.stdout.strip():
             data = json.loads(proc.stdout.strip().split('\n')[-1])
+            # Guardar session_id para el próximo run
+            new_sid = data.get('session_id')
+            if new_sid:
+                open(RD_SESSION_FILE, 'w').write(new_sid)
             return data.get('result', '')[:500]
     except Exception as e:
         _log(f'Error llamando Claude: {e}')
