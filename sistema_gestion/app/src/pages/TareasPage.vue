@@ -274,27 +274,36 @@
           </div>
         </template>
 
-        <!-- Completadas al fondo (colapsables) -->
+        <!-- Completadas al fondo (colapsables, con misma agrupación/orden) -->
         <template v-if="completadasFiltradas.length">
           <div class="completadas-header" @click="mostrarCompletadas = !mostrarCompletadas">
             <span class="material-icons" style="font-size:16px">{{ mostrarCompletadas ? 'expand_more' : 'chevron_right' }}</span>
             Completadas ({{ completadasFiltradas.length }})
           </div>
           <template v-if="mostrarCompletadas">
-            <TareaItem
-              v-for="t in completadasFiltradas"
-              :key="t.id"
-              :tarea="t"
-              :seleccionada="tareaSeleccionada?.id === t.id"
-              :seleccionada-multi="seleccionMultiIds.includes(t.id)"
-              :usuario-actual="auth.usuario?.email"
-              :mostrar-responsable="!props.soloMias"
-              :compacto="isMobile"
-              @click="seleccionar"
-              @cambiar-estado="cambiarEstado"
-              @editar-titulo="editarTituloInline"
-              @seleccionar-multi="onSeleccionarMulti"
-            />
+            <template v-for="grupo in gruposCompletadas" :key="grupo.key">
+              <div v-if="!grupo.sinHeader" class="grupo-header">
+                <div class="grupo-color-bar" :style="{ background: grupo.color }" />
+                <span class="grupo-nombre">{{ grupo.nombre }}</span>
+                <span class="grupo-count">{{ grupo.tareas.length }}</span>
+              </div>
+              <div class="grupo-tareas-list">
+                <TareaItem
+                  v-for="t in grupo.tareas"
+                  :key="t.id"
+                  :tarea="t"
+                  :seleccionada="tareaSeleccionada?.id === t.id"
+                  :seleccionada-multi="seleccionMultiIds.includes(t.id)"
+                  :usuario-actual="auth.usuario?.email"
+                  :mostrar-responsable="!props.soloMias"
+                  :compacto="isMobile"
+                  @click="seleccionar"
+                  @cambiar-estado="cambiarEstado"
+                  @editar-titulo="editarTituloInline"
+                  @seleccionar-multi="onSeleccionarMulti"
+                />
+              </div>
+            </template>
           </template>
         </template>
       </div>
@@ -744,7 +753,7 @@ const defaultsFromFilters = computed(() => {
     if (fp.prioridades?.length === 1)   d.prioridad = fp.prioridades[0]
     if (fp.proyecto_id && !d.proyecto_id) d.proyecto_id = fp.proyecto_id
     if (fp.etiquetas?.length)           d.etiquetas = [...(d.etiquetas || []), ...fp.etiquetas]
-    if (fp.responsables?.length === 1)  d.responsable = fp.responsables[0]
+    // NO heredar responsable del filtro — siempre usa el usuario activo (backend default)
     if (fp.id_op)                       d.id_op = fp.id_op
     if (fp.id_pedido)                   d.id_pedido = fp.id_pedido
     if (fp.id_remision)                 d.id_remision = fp.id_remision
@@ -1266,6 +1275,7 @@ function buildGrupos(lista) {
 
 const gruposAtrasadas = computed(() => buildGrupos(tareasAtrasadas.value))
 const grupos = computed(() => buildGrupos(tareasNormales.value))
+const gruposCompletadas = computed(() => buildGrupos(completadasFiltradas.value))
 
 function formatGrupoFecha(iso) {
   if (iso === 'Sin fecha') return 'Sin fecha'

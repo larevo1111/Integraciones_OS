@@ -764,9 +764,21 @@ app.post('/api/gestion/tareas', async (req, res) => {
   if (!titulo || !categoria_id) return res.status(400).json({ error: 'Faltan titulo y categoria_id' })
 
   // Determinar responsable principal (legacy) y lista de responsables
+  // El creador SIEMPRE se incluye como responsable por defecto
   const listaResps = Array.isArray(responsables) && responsables.length > 0
     ? responsables
     : (responsable ? [responsable] : [req.usuario.email])
+
+  // Validar nivel: no se puede asignar a usuarios de nivel superior
+  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+  if (miNivel < 9) {
+    for (const email of listaResps) {
+      const nivelResp = nivelCache[email] || 1
+      if (nivelResp > miNivel) {
+        return res.status(403).json({ error: `No puedes asignar tareas a usuarios de nivel superior (${email})` })
+      }
+    }
+  }
   const respPrincipal = listaResps[0]
 
   try {
@@ -877,6 +889,16 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
 
     // Actualizar responsables (si se pasó el array — reemplaza todos)
     if (responsables !== undefined && Array.isArray(responsables)) {
+      // Validar nivel: no asignar a usuarios de nivel superior
+      const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+      if (miNivel < 9) {
+        for (const email of responsables) {
+          const nivelResp = nivelCache[email] || 1
+          if (nivelResp > miNivel) {
+            return res.status(403).json({ error: `No puedes asignar tareas a usuarios de nivel superior (${email})` })
+          }
+        }
+      }
       await db.gestion.query('DELETE FROM g_tareas_responsables WHERE tarea_id = ?', [req.params.id])
       if (responsables.length > 0) {
         const vals = responsables.map(e => [req.params.id, e])

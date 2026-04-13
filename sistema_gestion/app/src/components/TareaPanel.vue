@@ -267,6 +267,19 @@
           <span class="field-label">Fin real</span>
           <span style="font-size:12px;color:var(--text-secondary)">{{ fmtDT(tarea.fecha_fin_real) }}</span>
         </div>
+        <div class="divider" style="margin:8px 0"></div>
+        <div v-if="tarea.fecha_creacion" class="field-row">
+          <span class="field-label">Fecha creación</span>
+          <span style="font-size:12px;color:var(--text-tertiary)">{{ fmtDT(tarea.fecha_creacion) }}</span>
+        </div>
+        <div v-if="tarea.fecha_ult_modificacion" class="field-row">
+          <span class="field-label">Última modificación</span>
+          <span style="font-size:12px;color:var(--text-tertiary)">{{ fmtDT(tarea.fecha_ult_modificacion) }}</span>
+        </div>
+        <div v-if="tarea.usuario_creador" class="field-row">
+          <span class="field-label">Creada por</span>
+          <span style="font-size:12px;color:var(--text-tertiary)">{{ tarea.usuario_creador }}</span>
+        </div>
       </template>
     </div>
 
