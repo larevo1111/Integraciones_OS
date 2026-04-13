@@ -16,7 +16,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, jsonify
-from ia_service import consultar
+from ia_service import consultar, llamada_simple
 from ia_service.config import get_local_conn
 
 app = Flask(__name__)
@@ -404,6 +404,40 @@ def endpoint_logica_negocio_crear():
     threading.Thread(target=depurar_logica_negocio, args=(empresa,), daemon=True).start()
 
     return jsonify({'ok': True, 'id': nuevo_id, 'palabras': palabras})
+
+
+@app.route('/ia/simple', methods=['POST'])
+def endpoint_simple():
+    """
+    Llamada simple a un modelo sin pipeline completo.
+    Body JSON:
+    {
+        "prompt":          "Despachar pedido a Muebles La 33",  -- REQUERIDO
+        "contexto":        "Clasificá esta tarea...",            -- system prompt (opcional)
+        "modelo":          "groq-llama",                        -- slug agente (default: groq-llama)
+        "tipo_respuesta":  "enum",                              -- texto|numero|json|enum|booleano
+        "opciones":        ["Ventas", "Logistica", ...],        -- solo para enum
+        "temperatura":     0.2,                                 -- default: 0.2
+        "max_tokens":      500,                                 -- default: 500
+        "fallback":        "cerebras-llama"                     -- agente fallback (default: cerebras-llama)
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    prompt = (data.get('prompt') or '').strip()
+    if not prompt:
+        return jsonify({'ok': False, 'error': 'prompt requerido'}), 400
+
+    resultado = llamada_simple(
+        prompt         = prompt,
+        contexto       = data.get('contexto', ''),
+        modelo         = data.get('modelo', 'groq-llama'),
+        tipo_respuesta = data.get('tipo_respuesta', 'texto'),
+        opciones       = data.get('opciones'),
+        temperatura    = float(data.get('temperatura', 0.2)),
+        max_tokens     = int(data.get('max_tokens', 500)),
+        fallback       = data.get('fallback', 'cerebras-llama'),
+    )
+    return jsonify(resultado)
 
 
 if __name__ == '__main__':

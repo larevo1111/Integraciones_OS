@@ -1331,3 +1331,117 @@ def _guardar_log(**kwargs) -> int | None:
         return None
     finally:
         conn.close()
+
+
+# ─── LLAMADA SIMPLE ─────────────────────────────────────────────────────────
+
+def llamada_simple(
+    prompt: str,
+    contexto: str = '',
+    modelo: str = 'groq-llama',
+    tipo_respuesta: str = 'texto',
+    opciones: list = None,
+    temperatura: float = 0.2,
+    max_tokens: int = 500,
+    fallback: str = 'cerebras-llama',
+) -> dict:
+    """
+    Llamada directa a un modelo sin toda la orquestación del pipeline.
+    Para tareas simples: clasificar, extraer datos, sí/no, etc.
+
+    tipo_respuesta: 'texto' | 'numero' | 'json' | 'enum' | 'booleano'
+    opciones: lista de valores válidos (solo para tipo 'enum')
+    """
+    if not prompt:
+        return {'ok': False, 'error': 'prompt requerido'}
+
+    # Para enum, inyectar instrucción de opciones
+    prompt_final = prompt
+    if tipo_respuesta == 'enum' and opciones:
+        lista_ops = ', '.join(opciones)
+        prompt_final = (
+            f"{prompt}\n\n"
+            f"Responde ÚNICAMENTE con una de estas opciones exactas: {lista_ops}\n"
+            f"Sin explicación, sin puntuación extra. Solo la opción."
+        )
+    elif tipo_respuesta == 'numero':
+        prompt_final = f"{prompt}\n\nResponde ÚNICAMENTE con el número. Sin texto, sin unidades."
+    elif tipo_respuesta == 'booleano':
+        prompt_final = f"{prompt}\n\nResponde ÚNICAMENTE con 'true' o 'false'. Sin explicación."
+    elif tipo_respuesta == 'json':
+        prompt_final = f"{prompt}\n\nResponde ÚNICAMENTE con JSON válido. Sin explicación, sin bloques de código."
+
+    mensajes = []
+    if contexto:
+        mensajes.append({'role': 'system', 'content': contexto})
+    mensajes.append({'role': 'user', 'content': prompt_final})
+
+    # Intentar modelo principal
+    agente_cfg = _cargar_agente(modelo)
+    modelo_usado = modelo
+    if not agente_cfg:
+        # Directo al fallback
+        agente_cfg = _cargar_agente(fallback)
+        modelo_usado = fallback
+        if not agente_cfg:
+            return {'ok': False, 'error': f'Ni {modelo} ni {fallback} están disponibles'}
+
+    res = _llamar_agente(agente_cfg, mensajes, temperatura, max_tokens)
+
+    # Si falla, intentar fallback
+    if not res.get('ok') and fallback and modelo_usado != fallback:
+        agente_fb = _cargar_agente(fallback)
+        if agente_fb:
+            res = _llamar_agente(agente_fb, mensajes, temperatura, max_tokens)
+            modelo_usado = fallback
+
+    if not res.get('ok'):
+        return {'ok': False, 'error': res.get('error', 'Error desconocido'), 'modelo_usado': modelo_usado}
+
+    raw = (res.get('texto') or '').strip()
+
+    # Parsear según tipo_respuesta
+    resultado = raw
+    try:
+        if tipo_respuesta == 'numero':
+            nums = _re.findall(r'-?\d+\.?\d*', raw)
+            resultado = float(nums[0]) if nums else None
+            if resultado is not None and resultado == int(resultado):
+                resultado = int(resultado)
+        elif tipo_respuesta == 'booleano':
+            low = raw.lower().strip().rstrip('.')
+            resultado = low in ('true', 'sí', 'si', 'yes', 'verdadero', '1')
+        elif tipo_respuesta == 'json':
+            # Intentar directo, si falla extraer de bloque ```json
+            try:
+                resultado = json.loads(raw)
+            except json.JSONDecodeError:
+                match = _re.search(r'```(?:json)?\s*([\s\S]*?)```', raw)
+                resultado = json.loads(match.group(1)) if match else raw
+        elif tipo_respuesta == 'enum' and opciones:
+            # Buscar match exacto o parcial
+            if raw in opciones:
+                resultado = raw
+            else:
+                low = raw.lower().strip().rstrip('.')
+                for op in opciones:
+                    if op.lower() == low:
+                        resultado = op
+                        break
+                else:
+                    # Buscar si la respuesta contiene alguna opción
+                    for op in opciones:
+                        if op.lower() in low:
+                            resultado = op
+                            break
+    except Exception:
+        pass  # Devolver raw si el parseo falla
+
+    return {
+        'ok': True,
+        'resultado': resultado,
+        'raw': raw,
+        'modelo_usado': modelo_usado,
+        'latencia_ms': res.get('latencia_ms', 0),
+        'tokens': {'in': res.get('tokens_in', 0), 'out': res.get('tokens_out', 0)},
+    }
