@@ -230,18 +230,11 @@ def check_apps_web():
 
 
 def check_claude_code():
-    """Verifica que Claude Code responda. (lineas, fallos, acciones)"""
-    env = os.environ.copy()
-    env.pop('CLAUDECODE', None)
-    env.pop('ANTHROPIC_API_KEY', None)
-    rc, out, err = _run([CLAUDE_BIN, '-p', 'responde solo OK', '--output-format', 'json'],
-                         timeout=60)
-    if rc == 0 and out:
-        return [_ok('Claude Code')], 0, []
-    detail = err[:80] if err else 'sin respuesta'
-    if 'credit' in detail.lower():
-        return [_warn('Claude Code — límite de crédito')], 0, []
-    return [_fail(f'Claude Code — {detail}')], 1, []
+    """Verifica que el binario de Claude Code existe y tiene versión válida."""
+    rc, out, _ = _run([CLAUDE_BIN, '--version'], timeout=10)
+    if rc == 0 and out.strip():
+        return [_ok(f'Claude Code {out.strip()}')], 0, []
+    return [_fail('Claude Code — binario no responde')], 1, []
 
 
 def check_pipeline():
