@@ -440,7 +440,14 @@ app.get('/api/gestion/tareas', async (req, res) => {
   // Filtros adicionales (simples)
   if (responsable)  { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(responsable) }
   if (solo_mias === '1') { where.push('EXISTS (SELECT 1 FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id AND tr.email = ?)'); params.push(req.usuario.email) }
-  if (estado)       { where.push('t.estado = ?');        params.push(estado) }
+  if (estado) {
+    if (estado === 'En Progreso') {
+      // Incluir tareas con ese estado O padres que tengan al menos una subtarea en progreso
+      where.push(`(t.estado = 'En Progreso' OR EXISTS (SELECT 1 FROM g_tareas s WHERE s.parent_id = t.id AND s.estado = 'En Progreso'))`)
+    } else {
+      where.push('t.estado = ?'); params.push(estado)
+    }
+  }
 
   // responsables: multi (comma-separated emails)
   const responsablesRaw = req.query.responsables
@@ -1878,12 +1885,24 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
     const ahora = new Date()
     const hoy = localDateCO(ahora)
 
-    // Verificar que no exista jornada ACTIVA hoy (sin hora_fin)
+    // Verificar que no exista NINGUNA jornada abierta (sin importar fecha)
     const [[activa]] = await db.gestion.query(
-      'SELECT id FROM g_jornadas WHERE empresa = ? AND usuario = ? AND fecha = ? AND hora_fin IS NULL',
-      [req.empresa, req.usuario.email, hoy]
+      'SELECT id, fecha, hora_inicio FROM g_jornadas WHERE empresa = ? AND usuario = ? AND hora_fin IS NULL ORDER BY id DESC LIMIT 1',
+      [req.empresa, req.usuario.email]
     )
-    if (activa) return res.status(409).json({ error: 'Ya tienes una jornada activa hoy' })
+    if (activa) {
+      const horasAbiertas = (ahora - new Date(activa.hora_inicio)) / 3600000
+      if (horasAbiertas > 13) {
+        // Auto-cerrar jornada abandonada (>13h) con hora_fin = hora_inicio + 13h
+        const cierreAuto = new Date(new Date(activa.hora_inicio).getTime() + 13 * 3600000)
+        await db.gestion.query(
+          'UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = NOW(), usuario_ult_modificacion = ? WHERE id = ?',
+          [cierreAuto, 'sistema', activa.id]
+        )
+      } else {
+        return res.status(409).json({ error: `Tienes una jornada abierta del ${activa.fecha}. Ciérrala antes de iniciar una nueva.` })
+      }
+    }
 
     // Si ya hay una jornada cerrada hoy, exigir gap de 6 horas desde que se cerró
     const [[cerrada]] = await db.gestion.query(
