@@ -709,6 +709,50 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
   }
 })
 
+// GET /api/gestion/sugerir-categoria?titulo=...
+app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
+  const titulo = (req.query.titulo || '').trim()
+  if (!titulo) return res.json({ ok: false, categoria_id: null })
+
+  try {
+    const [cats] = await db.gestion.query(
+      'SELECT id, nombre FROM g_categorias WHERE activa = 1 ORDER BY orden'
+    )
+    const nombres = cats.map(c => c.nombre)
+    const variosId = (cats.find(c => c.nombre === 'Varios') || {}).id || null
+
+    const https = require('http')
+    const body = JSON.stringify({
+      prompt: titulo,
+      contexto: 'Sos un clasificador de tareas laborales de una empresa de producción y venta de muebles de madera. Dada una tarea, elegí la categoría más apropiada. Si no encaja claramente en ninguna, elegí Varios.',
+      modelo: 'groq-llama',
+      tipo_respuesta: 'enum',
+      opciones: nombres,
+      fallback: 'cerebras-llama'
+    })
+
+    const iaReq = https.request({ hostname: '127.0.0.1', port: 5100, path: '/ia/simple', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, timeout: 5000 }, iaRes => {
+      let data = ''
+      iaRes.on('data', d => data += d)
+      iaRes.on('end', () => {
+        try {
+          const r = JSON.parse(data)
+          if (r.ok && r.resultado) {
+            const cat = cats.find(c => c.nombre === r.resultado)
+            res.json({ ok: true, categoria_id: cat ? cat.id : variosId, categoria_nombre: cat ? cat.nombre : 'Varios' })
+          } else {
+            res.json({ ok: true, categoria_id: variosId, categoria_nombre: 'Varios' })
+          }
+        } catch { res.json({ ok: true, categoria_id: variosId, categoria_nombre: 'Varios' }) }
+      })
+    })
+    iaReq.on('error', () => res.json({ ok: true, categoria_id: variosId, categoria_nombre: 'Varios' }))
+    iaReq.on('timeout', () => { iaReq.destroy(); res.json({ ok: true, categoria_id: variosId, categoria_nombre: 'Varios' }) })
+    iaReq.write(body)
+    iaReq.end()
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // POST /api/gestion/tareas
 app.post('/api/gestion/tareas', async (req, res) => {
   const {

@@ -60,6 +60,26 @@ resultado = consultar(
 **⚠️ cerebras-llama tiene 8,192 tokens máx de entrada** — NO sirve para `analisis_datos` (DDL = 28K-37K tokens). Solo para tareas con prompt pequeño.
 **⚠️ Ollama: solo 1 modelo 14B en VRAM a la vez (~9GB RTX 3060 12GB)**. Warmup automático desde servicio.py.
 
+## Función utilitaria: llamada_simple() (2026-04-12)
+
+Endpoint `POST /ia/simple` — llamada directa a un modelo sin pasar por el pipeline de 10 pasos.
+Para tareas simples: clasificar, extraer datos, sí/no, etc.
+
+```python
+# Parámetros (solo prompt es obligatorio)
+{
+  "prompt": "Despachar pedido a Muebles La 33",
+  "contexto": "Clasificá esta tarea en una categoría.",   # system prompt
+  "modelo": "groq-llama",                                 # default
+  "tipo_respuesta": "enum",                                # texto|numero|json|enum|booleano
+  "opciones": ["Ventas", "Logistica", ...],                # solo para enum
+  "fallback": "cerebras-llama"                             # suplente automático
+}
+# Respuesta: {"ok": true, "resultado": "Logistica", "latencia_ms": 600}
+```
+
+**Primer uso**: clasificación automática de categoría al crear tarea en Sistema Gestión.
+
 ## Tipos de consulta — configuración DEFINITIVA (2026-03-22)
 
 | Tipo | agente_preferido | agente_fallback | agente_sql | Razón |

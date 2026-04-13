@@ -1626,6 +1626,29 @@ WHERE DATE(created_at) = CURDATE()
 GROUP BY tipo_consulta, agente_slug ORDER BY costo_usd DESC;
 ```
 
+### Llamada simple (utilitaria)
+
+`POST /ia/simple` — llamada directa a un modelo sin pipeline completo. Para clasificación, extracción, sí/no, etc.
+
+```bash
+# Ejemplo: clasificar tarea en categoría
+curl -s -X POST http://localhost:5100/ia/simple \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Despachar pedido a Muebles La 33",
+    "contexto": "Clasificá esta tarea en una categoría.",
+    "modelo": "groq-llama",
+    "tipo_respuesta": "enum",
+    "opciones": ["Ventas","Cartera","Pagos","Logistica"],
+    "fallback": "cerebras-llama"
+  }'
+# → {"ok": true, "resultado": "Logistica", "latencia_ms": 600}
+```
+
+**Parámetros**: `prompt` (obligatorio), `contexto`, `modelo` (default: groq-llama), `tipo_respuesta` (texto|numero|json|enum|booleano), `opciones` (solo enum), `temperatura` (default: 0.2), `max_tokens` (default: 500), `fallback` (default: cerebras-llama).
+
+**Código**: `servicio.py → llamada_simple()` usa `_cargar_agente()` + `_llamar_agente()`. Fallback automático si el principal falla.
+
 ### Endpoints del servicio
 
 ```bash
