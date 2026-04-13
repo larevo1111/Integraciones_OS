@@ -102,6 +102,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
+import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
 import OpSelector        from 'src/components/OpSelector.vue'
 import ProyectoSelector  from 'src/components/ProyectoSelector.vue'
@@ -164,16 +165,23 @@ watch(() => props.modelValue, async (val) => {
 })
 
 async function guardar() {
-  if (!form.value.titulo || !form.value.categoria_id || guardando.value) return
+  if (!form.value.titulo || guardando.value) return
   guardando.value = true
   try {
-    let data
+    let tarea
     if (editar.value) {
-      data = await api(`/api/gestion/tareas/${props.tareaEditar.id}`, { method: 'PUT', body: JSON.stringify(form.value) })
+      const data = await api(`/api/gestion/tareas/${props.tareaEditar.id}`, { method: 'PUT', body: JSON.stringify(form.value) })
+      tarea = data.tarea
     } else {
-      data = await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(form.value) })
+      // Sugerencia IA si no eligió categoría
+      if (!form.value.categoria_id) {
+        const sug = await sugerirCategoria(form.value.titulo)
+        if (sug) form.value.categoria_id = sug.categoria_id
+      }
+      if (!form.value.categoria_id) return // categoría requerida
+      tarea = await crearTarea(form.value)
     }
-    emit('guardada', data.tarea)
+    emit('guardada', tarea)
     emit('update:modelValue', false)
   } catch (e) { console.error(e) } finally { guardando.value = false }
 }

@@ -576,6 +576,7 @@
 import { ref, computed, inject, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from 'src/services/api'
+import { crearTarea, crearSubtarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
 
 const props = defineProps({
@@ -804,17 +805,9 @@ async function guardarSubtarea(padre) {
   if (!titulo) return
   qaSubTitulo.value = ''
   try {
-    const data = await api('/api/gestion/tareas', {
-      method: 'POST',
-      body: JSON.stringify({
-        titulo,
-        categoria_id: padre.categoria_id,
-        proyecto_id:  padre.proyecto_id || null,
-        parent_id:    padre.id
-      })
-    })
+    const tarea = await crearSubtarea(padre, titulo)
     const subs = subtareasData.value[padre.id] || []
-    subtareasData.value = { ...subtareasData.value, [padre.id]: [...subs, data.tarea] }
+    subtareasData.value = { ...subtareasData.value, [padre.id]: [...subs, tarea] }
     const idx = tareas.value.findIndex(t => t.id === padre.id)
     if (idx !== -1) {
       tareas.value[idx] = { ...tareas.value[idx], subtareas_total: (tareas.value[idx].subtareas_total || 0) + 1 }
@@ -859,9 +852,15 @@ async function qaAgregar() {
   qaGuardando.value = true
   try {
     const defs = defaultsFromFilters.value
+    let catId = qaCatId.value || defs.categoria_id
+    // Sugerencia IA si no eligió categoría manualmente
+    if (!catId) {
+      const sug = await sugerirCategoria(qaTitulo.value)
+      catId = sug?.categoria_id || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id
+    }
     const body = {
       titulo:       qaTitulo.value,
-      categoria_id: qaCatId.value || defs.categoria_id || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id,
+      categoria_id: catId,
       proyecto_id:  qaProyectoId.value ?? defs.proyecto_id ?? null,
       prioridad:    defs.prioridad || undefined,
       responsable:  defs.responsable || undefined,
@@ -871,8 +870,8 @@ async function qaAgregar() {
       etiquetas:    qaEtiquetas.value.length ? qaEtiquetas.value : (defs.etiquetas || []),
       fecha_limite: defs.fecha_limite || null
     }
-    const data = await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(body) })
-    onTareaGuardada(data.tarea)
+    const tarea = await crearTarea(body)
+    onTareaGuardada(tarea)
     qaTitulo.value     = ''
     qaOp.value         = ''
     qaRemision.value   = ''

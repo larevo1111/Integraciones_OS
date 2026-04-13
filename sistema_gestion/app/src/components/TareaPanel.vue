@@ -295,6 +295,7 @@
 <script setup>
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
+import { crearSubtarea as crearSubtareaFn } from 'src/composables/useTareas'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
 import CronoDisplay         from './CronoDisplay.vue'
@@ -346,15 +347,10 @@ async function crearSubtarea() {
   const titulo = nuevaSubtitulo.value.trim()
   if (!titulo || !props.tarea?.id) return
   try {
-    const body = {
-      titulo,
-      parent_id: props.tarea.id,
-      categoria_id: props.tarea.categoria_id,
-      proyecto_id: props.tarea.proyecto_id,
+    await crearSubtareaFn(props.tarea, titulo, {
       responsable: props.tarea.responsable,
       responsables: props.tarea.responsables || (props.tarea.responsable ? [props.tarea.responsable] : [])
-    }
-    await api('/api/gestion/tareas', { method: 'POST', body: JSON.stringify(body) })
+    })
     nuevaSubtitulo.value = ''
     await cargarSubtareas()
     emit('subtareas-cambiadas')

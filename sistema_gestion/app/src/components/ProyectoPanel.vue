@@ -262,6 +262,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch, inject } from 'vue'
 import { api } from 'src/services/api'
+import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import CategoriaSelector from './CategoriaSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import EtiquetasSelector from './EtiquetasSelector.vue'
@@ -390,17 +391,21 @@ const nuevaTareaFecha     = ref('')
 async function crearTareaEnProyecto() {
   const titulo = nuevaTareaTitulo.value.trim()
   if (!titulo) return
+  let catId = nuevaTareaCatId.value || form.value.categoria_id
+  // Sugerencia IA si no eligió categoría
+  if (!catId) {
+    const sug = await sugerirCategoria(titulo)
+    catId = sug?.categoria_id || 1
+  }
   const body = {
     titulo,
     proyecto_id: props.item.id,
-    categoria_id: nuevaTareaCatId.value || form.value.categoria_id || 1,
+    categoria_id: catId,
     etiquetas: nuevaTareaEtiquetas.value,
     fecha_limite: nuevaTareaFecha.value || null
   }
   try {
-    await api('/api/gestion/tareas', {
-      method: 'POST', body: JSON.stringify(body)
-    })
+    await crearTarea(body)
     nuevaTareaTitulo.value = ''
     nuevaTareaEtiquetas.value = []
     nuevaTareaFecha.value = ''
