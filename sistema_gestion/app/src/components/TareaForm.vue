@@ -33,14 +33,17 @@
             />
 
             <!-- Categorías como chips -->
-            <div class="form-section-label">Categoría</div>
+            <div class="form-section-label">
+              Categoría
+              <span v-if="iaLoading" class="material-icons" style="font-size:12px;color:var(--accent);animation:spin 1s linear infinite;margin-left:4px">autorenew</span>
+            </div>
             <div class="cats-grid">
               <button
                 v-for="c in categorias"
                 :key="c.id"
                 class="cat-chip"
                 :class="{ selected: form.categoria_id === c.id }"
-                @click="form.categoria_id = c.id"
+                @click="form.categoria_id = c.id; catManual = true"
               >
                 <span class="cat-dot" :style="{ background: c.color }"></span>
                 {{ c.nombre.replace(/_/g, ' ') }}
@@ -137,6 +140,22 @@ const form = ref({
   fecha_limite: '', id_op: '', etiquetas: []
 })
 
+const catManual   = ref(false)
+const iaLoading   = ref(false)
+
+// Debounce: sugerir categoría IA 1.5s después de parar de escribir (solo tareas nuevas)
+let tfDebounce = null
+watch(() => form.value.titulo, (val) => {
+  if (tfDebounce) clearTimeout(tfDebounce)
+  if (!val || val.length < 4 || catManual.value || editar.value) return
+  tfDebounce = setTimeout(async () => {
+    iaLoading.value = true
+    const sug = await sugerirCategoria(val)
+    iaLoading.value = false
+    if (sug?.categoria_id && !catManual.value) form.value.categoria_id = sug.categoria_id
+  }, 1500)
+})
+
 const editar = computed(() => !!props.tareaEditar)
 const categoriaSeleccionada = computed(() => props.categorias.find(c => c.id === form.value.categoria_id))
 
@@ -195,6 +214,7 @@ async function guardar() {
 </script>
 
 <style scoped>
+@keyframes spin { to { transform: rotate(360deg); } }
 /* Overlay */
 .form-overlay {
   position: fixed; inset: 0;

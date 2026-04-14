@@ -209,13 +209,16 @@
             </form>
             <template v-if="mostrarFormTarea">
               <div class="quickadd-cats">
+                <span v-if="nuevaTareaIALoading" style="display:inline-flex;align-items:center;margin-right:4px">
+                  <span class="material-icons" style="font-size:12px;color:var(--accent);animation:spin 1s linear infinite">autorenew</span>
+                </span>
                 <button
                   v-for="c in categorias"
                   :key="c.id"
                   type="button"
                   class="cat-chip"
                   :class="{ selected: nuevaTareaCatId === c.id }"
-                  @click="nuevaTareaCatId = c.id"
+                  @click="nuevaTareaCatId = c.id; nuevaTareaCatManual = true"
                 >
                   <span class="cat-dot" :style="{ background: c.color }"></span>
                   {{ c.nombre.replace(/_/g, ' ') }}
@@ -385,8 +388,23 @@ async function cargarProyectos() {
 const mostrarFormTarea    = ref(false)
 const nuevaTareaTitulo    = ref('')
 const nuevaTareaCatId     = ref(null)
+const nuevaTareaCatManual = ref(false)
+const nuevaTareaIALoading = ref(false)
 const nuevaTareaEtiquetas = ref([])
 const nuevaTareaFecha     = ref('')
+
+// Debounce: sugerir categoría IA 1.5s después de parar de escribir
+let ntDebounce = null
+watch(nuevaTareaTitulo, (val) => {
+  if (ntDebounce) clearTimeout(ntDebounce)
+  if (!val || val.length < 4 || nuevaTareaCatManual.value) return
+  ntDebounce = setTimeout(async () => {
+    nuevaTareaIALoading.value = true
+    const sug = await sugerirCategoria(val)
+    nuevaTareaIALoading.value = false
+    if (sug?.categoria_id && !nuevaTareaCatManual.value) nuevaTareaCatId.value = sug.categoria_id
+  }, 1500)
+})
 
 async function crearTareaEnProyecto() {
   const titulo = nuevaTareaTitulo.value.trim()
@@ -407,6 +425,8 @@ async function crearTareaEnProyecto() {
   try {
     await crearTarea(body)
     nuevaTareaTitulo.value = ''
+    nuevaTareaCatId.value = null
+    nuevaTareaCatManual.value = false
     nuevaTareaEtiquetas.value = []
     nuevaTareaFecha.value = ''
     mostrarFormTarea.value = false
