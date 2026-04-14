@@ -768,9 +768,10 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 }
 .toolbar-right { display: flex; align-items: center; gap: 4px; }
 
-/* Mobile: botones del toolbar solo con ícono */
+/* Mobile: toolbar flexible y botones solo ícono */
 @media (max-width: 768px) {
-  .table-toolbar { padding: 0 10px; }
+  .table-toolbar { padding: 6px 10px; height: auto; min-height: 36px; flex-wrap: wrap; gap: 4px; }
+  .toolbar-right { flex-wrap: wrap; }
   .toolbar-btn .toolbar-btn-label { display: none; }
   .toolbar-btn {
     padding: 0 8px !important;

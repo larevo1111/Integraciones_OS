@@ -75,22 +75,20 @@ function filtrarPorNivel(items, reqUsuario, campoResponsables = 'responsables') 
   })
 }
 
-// Última actividad de tareas de un usuario en una fecha (para indicador de confianza de jornadas)
+// Última actividad PROPIA de tareas de un usuario en una fecha
+// Solo usa fecha_fin_real (completar tarea) — fecha_ult_modificacion es ruidosa (cualquier persona la cambia)
 async function ultimaActividadTareas(email, fecha) {
   const [[row]] = await db.gestion.query(`
-    SELECT GREATEST(
-      COALESCE(MAX(t.fecha_fin_real), '2000-01-01'),
-      COALESCE(MAX(t.fecha_ult_modificacion), '2000-01-01')
-    ) AS ultima
+    SELECT MAX(t.fecha_fin_real) AS ultima
     FROM g_tareas t
     JOIN g_tareas_responsables tr ON tr.tarea_id = t.id
-    WHERE tr.email = ? AND DATE(t.fecha_ult_modificacion) = ?
+    WHERE tr.email = ? AND DATE(t.fecha_fin_real) = ?
   `, [email, fecha])
-  return row?.ultima && row.ultima > '2000-01-02' ? new Date(row.ultima) : null
+  return row?.ultima ? new Date(row.ultima) : null
 }
 
 // Indicador de confianza de una jornada cerrada
-// 🔴 rojo: cierre automático  🟡 amarillo: gap >30min o actividad post-cierre  🟢 verde: alineada  ⚪ gris: sin actividad
+// 🔴 rojo: cierre automático  🟡 amarillo: gap >1h entre última tarea y cierre  🟢 verde: alineada  ⚪ gris: sin tareas completadas
 function indicadorConfianza(jornada) {
   if (!jornada.hora_fin) return null // abierta, no aplica
   if (jornada.cierre_automatico) return 'rojo'
@@ -98,8 +96,8 @@ function indicadorConfianza(jornada) {
   const fin = new Date(jornada.hora_fin)
   const ult = new Date(jornada.ultima_actividad_tareas)
   const diffMin = (fin - ult) / 60000
-  // Amarillo: última actividad >30min antes del cierre O actividad >30min después del cierre
-  if (diffMin > 30 || diffMin < -30) return 'amarillo'
+  // Amarillo: última tarea completada >45min antes del cierre O completó tareas >45min después del cierre
+  if (diffMin > 45 || diffMin < -45) return 'amarillo'
   return 'verde'
 }
 
