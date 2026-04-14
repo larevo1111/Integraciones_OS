@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_cliente_mes (
     fin_pct_descuento        DECIMAL(8,4)  COMMENT 'descuentos / ventas_brutas (decimal 0-1)',
     fin_ventas_netas_sin_iva DECIMAL(15,2) COMMENT 'precio_bruto_total - descuento_total',
     fin_impuestos            DECIMAL(15,2) COMMENT 'SUM impuesto_total',
+    fin_ventas_netas         DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva + impuestos (incluye IVA)',
+    fin_devoluciones         DECIMAL(15,2) COMMENT 'SUM subtotal NCs del cliente-mes (sin IVA)',
+    fin_ingresos_netos       DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva - devoluciones',
 
     -- Costo y utilidad
     cto_costo_total          DECIMAL(15,2) COMMENT 'SUM costo_manual_total',
@@ -128,6 +131,10 @@ def main():
         "DROP COLUMN IF EXISTS ant_var_ventas_pct",
         "DROP COLUMN IF EXISTS ant_consignacion_pp",
         "DROP COLUMN IF EXISTS ant_var_consignacion_pct",
+        # fin_ventas_netas, fin_devoluciones, fin_ingresos_netos
+        "ADD COLUMN IF NOT EXISTS fin_ventas_netas DECIMAL(15,2) AFTER fin_impuestos",
+        "ADD COLUMN IF NOT EXISTS fin_devoluciones DECIMAL(15,2) AFTER fin_ventas_netas",
+        "ADD COLUMN IF NOT EXISTS fin_ingresos_netos DECIMAL(15,2) AFTER fin_devoluciones",
         # year_ant_*
         "ADD COLUMN IF NOT EXISTS year_ant_ventas_netas DECIMAL(15,2)",
         "ADD COLUMN IF NOT EXISTS year_ant_var_ventas_pct DECIMAL(8,4)",
@@ -269,6 +276,22 @@ def main():
             resumen[key]['con_consignacion_pp'] = fval(row['con_pp'])
         # Si el cliente no tiene facturas ese mes, no crear entrada solo por OV
 
+    # ── 4b. Devoluciones (NCs) por cliente ──────────────────────────────────────
+    cursor.execute(f"""
+        SELECT
+            DATE_FORMAT(fecha_de_creacion, '%Y-%m') AS mes,
+            id_cliente,
+            SUM({cn('subtotal')})                    AS devolucion
+        FROM zeffi_notas_credito_venta_encabezados
+        WHERE (fecha_de_anulacion IS NULL OR TRIM(fecha_de_anulacion) = '')
+        GROUP BY mes, id_cliente
+    """)
+
+    for row in cursor.fetchall():
+        key = (row['mes'], row['id_cliente'])
+        if key in resumen:
+            resumen[key]['fin_devoluciones'] = fval(row['devolucion'])
+
     # ── 5. Derivados calculados en Python ─────────────────────────────────────
     today         = datetime.date.today()
     current_month = today.strftime('%Y-%m')
@@ -335,6 +358,11 @@ def main():
         brutas = d.get('fin_ventas_brutas', 0)
         costo  = d.get('cto_costo_total', 0)
 
+        devol  = d.get('fin_devoluciones', 0.0)
+        impues = d.get('fin_impuestos', 0)
+        d['fin_ventas_netas']        = netas + impues
+        d['fin_devoluciones']        = devol
+        d['fin_ingresos_netos']      = netas - devol
         d['fin_pct_descuento']       = d.get('fin_descuentos', 0) / brutas if brutas else None
         d['cto_utilidad_bruta']      = netas - costo
         d['cto_margen_utilidad_pct'] = (netas - costo) / netas if netas else None
@@ -361,6 +389,7 @@ def main():
         'cliente', 'ciudad', 'departamento', 'canal', 'vendedor',
         'fin_ventas_brutas', 'fin_descuentos', 'fin_pct_descuento',
         'fin_ventas_netas_sin_iva', 'fin_impuestos',
+        'fin_ventas_netas', 'fin_devoluciones', 'fin_ingresos_netos',
         'cto_costo_total', 'cto_utilidad_bruta', 'cto_margen_utilidad_pct',
         'vol_unidades_vendidas', 'vol_num_facturas', 'vol_ticket_promedio',
         'cat_num_referencias',

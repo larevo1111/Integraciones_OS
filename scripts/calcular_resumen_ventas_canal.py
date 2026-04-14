@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_canal_mes (
     fin_pct_descuento        DECIMAL(8,4)  COMMENT 'descuentos / ventas_brutas (decimal 0-1)',
     fin_ventas_netas_sin_iva DECIMAL(15,2) COMMENT 'SUM precio_neto_total (sin IVA, neto de descuentos)',
     fin_impuestos            DECIMAL(15,2) COMMENT 'SUM impuesto_total',
+    fin_ventas_netas         DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva + impuestos (incluye IVA)',
+    fin_devoluciones         DECIMAL(15,2) COMMENT 'SUM subtotal NCs del canal-mes (sin IVA)',
+    fin_ingresos_netos       DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva - devoluciones',
     fin_pct_del_mes          DECIMAL(8,4)  COMMENT 'participacion canal en total mes (decimal 0-1)',
 
     -- Costo y utilidad
@@ -136,6 +139,9 @@ def main():
         "DROP COLUMN IF EXISTS ant_var_consignacion_pct",
         # Asegurar columnas base que se agregaron después del DDL original
         "ADD COLUMN IF NOT EXISTS _key VARCHAR(100) NOT NULL DEFAULT '' AFTER mes",
+        "ADD COLUMN IF NOT EXISTS fin_ventas_netas DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva + impuestos' AFTER fin_impuestos",
+        "ADD COLUMN IF NOT EXISTS fin_devoluciones DECIMAL(15,2) COMMENT 'SUM subtotal NCs del canal-mes' AFTER fin_ventas_netas",
+        "ADD COLUMN IF NOT EXISTS fin_ingresos_netos DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva - devoluciones' AFTER fin_devoluciones",
         "ADD COLUMN IF NOT EXISTS con_consignacion_pp DECIMAL(15,2) COMMENT 'SUM total_neto OVs atribuidas al canal via id_cliente' AFTER fin_pct_del_mes",
         # year_ant_*
         "ADD COLUMN IF NOT EXISTS year_ant_ventas_netas DECIMAL(15,2)",
@@ -336,6 +342,30 @@ def main():
             resumen[(mes_ov, canal_ov)] = {}
         resumen[(mes_ov, canal_ov)]['con_consignacion_pp'] = con_val
 
+    # ── 6b. Devoluciones (NCs) por canal ────────────────────────────────────────
+    cursor.execute(f"""
+        SELECT
+            DATE_FORMAT(fecha_de_creacion, '%Y-%m') AS mes,
+            id_cliente,
+            SUM({cn('subtotal')})                    AS devolucion
+        FROM zeffi_notas_credito_venta_encabezados
+        WHERE (fecha_de_anulacion IS NULL OR TRIM(fecha_de_anulacion) = '')
+        GROUP BY mes, id_cliente
+    """)
+
+    dev_por_canal = {}  # (mes, canal) → suma devoluciones
+    for row in cursor.fetchall():
+        mes_nc = row['mes']
+        if not mes_nc:
+            continue
+        canal_nc = canal_por_cliente.get(row['id_cliente'], 'Sin canal')
+        key = (mes_nc, canal_nc)
+        dev_por_canal[key] = dev_por_canal.get(key, 0.0) + fval(row['devolucion'])
+
+    for key, dev_val in dev_por_canal.items():
+        if key in resumen:
+            resumen[key]['fin_devoluciones'] = dev_val
+
     # ── 7. Derivados calculados en Python ─────────────────────────────────────
     today         = datetime.date.today()
     current_month = today.strftime('%Y-%m')
@@ -411,6 +441,11 @@ def main():
         brutas = d.get('fin_ventas_brutas', 0)
         costo  = d.get('cto_costo_total', 0)
 
+        devol  = d.get('fin_devoluciones', 0.0)
+        impues = d.get('fin_impuestos', 0)
+        d['fin_ventas_netas']        = netas + impues
+        d['fin_devoluciones']        = devol
+        d['fin_ingresos_netos']      = netas - devol
         d['fin_pct_descuento']       = d.get('fin_descuentos', 0) / brutas if brutas else None
         d['fin_pct_del_mes']         = netas / totales_mes[mes] if totales_mes.get(mes) else None
         d['cto_utilidad_bruta']      = netas - costo
@@ -439,7 +474,8 @@ def main():
     COLS_BASE = [
         '_key', 'mes', 'canal', 'fecha_actualizacion',
         'fin_ventas_brutas', 'fin_descuentos', 'fin_pct_descuento',
-        'fin_ventas_netas_sin_iva', 'fin_impuestos', 'fin_pct_del_mes',
+        'fin_ventas_netas_sin_iva', 'fin_impuestos', 'fin_ventas_netas',
+        'fin_devoluciones', 'fin_ingresos_netos', 'fin_pct_del_mes',
         'cto_costo_total', 'cto_utilidad_bruta', 'cto_margen_utilidad_pct',
         'vol_unidades_vendidas', 'vol_num_facturas', 'vol_ticket_promedio',
         'cli_clientes_activos', 'cli_clientes_nuevos', 'cli_vtas_por_cliente',

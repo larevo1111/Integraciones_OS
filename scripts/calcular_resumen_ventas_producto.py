@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS resumen_ventas_facturas_producto_mes (
     fin_pct_descuento        DECIMAL(8,4)  COMMENT 'descuentos / ventas_brutas (decimal 0-1)',
     fin_ventas_netas_sin_iva DECIMAL(15,2) COMMENT 'precio_bruto_total - descuento_total',
     fin_impuestos            DECIMAL(15,2) COMMENT 'SUM impuesto_total',
+    fin_ventas_netas         DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva + impuestos (incluye IVA)',
+    fin_devoluciones         DECIMAL(15,2) COMMENT 'SUM subtotal NCs del producto-mes (sin IVA)',
+    fin_ingresos_netos       DECIMAL(15,2) COMMENT 'ventas_netas_sin_iva - devoluciones',
     fin_pct_del_mes          DECIMAL(8,4)  COMMENT 'participacion producto en total ventas mes (decimal 0-1)',
 
     -- Costo y utilidad
@@ -120,6 +123,9 @@ def main():
         "DROP COLUMN IF EXISTS ant_unidades",
         "DROP COLUMN IF EXISTS ant_var_unidades_pct",
         # year_ant_*
+        "ADD COLUMN IF NOT EXISTS fin_ventas_netas DECIMAL(15,2) AFTER fin_impuestos",
+        "ADD COLUMN IF NOT EXISTS fin_devoluciones DECIMAL(15,2) AFTER fin_ventas_netas",
+        "ADD COLUMN IF NOT EXISTS fin_ingresos_netos DECIMAL(15,2) AFTER fin_devoluciones",
         "ADD COLUMN IF NOT EXISTS year_ant_ventas_netas DECIMAL(15,2)",
         "ADD COLUMN IF NOT EXISTS year_ant_var_ventas_pct DECIMAL(8,4)",
         "ADD COLUMN IF NOT EXISTS year_ant_unidades DECIMAL(15,2)",
@@ -233,6 +239,22 @@ def main():
             resumen[key]['top_canal']        = row['canal']
             resumen[key]['top_canal_ventas'] = fval(row['ventas'])
 
+    # ── 3b. Devoluciones (NCs) por producto ─────────────────────────────────────
+    cursor.execute(f"""
+        SELECT
+            DATE_FORMAT(fecha_factura, '%Y-%m') AS mes,
+            cod_articulo,
+            SUM({cn('precio_bruto_total')} - {cn('descuento_total')}) AS devolucion
+        FROM zeffi_notas_credito_venta_detalle
+        WHERE (TRIM(COALESCE(vigencia, '')) = '' OR vigencia != 'Anulada')
+        GROUP BY mes, cod_articulo
+    """)
+
+    for row in cursor.fetchall():
+        key = (row['mes'], row['cod_articulo'])
+        if key in resumen:
+            resumen[key]['fin_devoluciones'] = fval(row['devolucion'])
+
     # ── 4. Derivados calculados en Python ─────────────────────────────────────
     today         = datetime.date.today()
     current_month = today.strftime('%Y-%m')
@@ -304,6 +326,11 @@ def main():
         costo     = d.get('cto_costo_total', 0)
         unidades  = d.get('vol_unidades_vendidas', 0)
 
+        devol  = d.get('fin_devoluciones', 0.0)
+        impues = d.get('fin_impuestos', 0)
+        d['fin_ventas_netas']        = netas + impues
+        d['fin_devoluciones']        = devol
+        d['fin_ingresos_netos']      = netas - devol
         d['fin_pct_descuento']       = d.get('fin_descuentos', 0) / brutas if brutas else None
         d['fin_pct_del_mes']         = netas / totales_mes[mes] if totales_mes.get(mes) else None
         d['cto_utilidad_bruta']      = netas - costo
@@ -328,7 +355,9 @@ def main():
         '_key', 'mes', 'cod_articulo', 'fecha_actualizacion',
         'nombre', 'categoria', 'marca',
         'fin_ventas_brutas', 'fin_descuentos', 'fin_pct_descuento',
-        'fin_ventas_netas_sin_iva', 'fin_impuestos', 'fin_pct_del_mes',
+        'fin_ventas_netas_sin_iva', 'fin_impuestos',
+        'fin_ventas_netas', 'fin_devoluciones', 'fin_ingresos_netos',
+        'fin_pct_del_mes',
         'cto_costo_total', 'cto_utilidad_bruta', 'cto_margen_utilidad_pct',
         'vol_unidades_vendidas', 'vol_num_facturas', 'vol_precio_unitario_prom',
         'cli_clientes_activos',
