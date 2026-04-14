@@ -585,13 +585,47 @@ function clearColumn(key) {
 function showAll() { localColumns.value.forEach(c => c.visible = true) }
 function hideAll() { localColumns.value.forEach(c => c.visible = false) }
 
-// ── Exportar ─────────────────────────────────────────
+// ── Exportar (client-side) ───────────────────────────
 function doExport(format) {
   showExport.value = false
-  const visibleKeys = visibleColumns.value.map(c => c.key)
+  const cols = visibleColumns.value
+  const data = sortedRows.value
+
+  if (format === 'csv') {
+    const header = cols.map(c => `"${c.label}"`).join(',')
+    const body = data.map(r => cols.map(c => `"${r[c.key] ?? ''}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + header + '\n' + body], { type: 'text/csv;charset=utf-8' })
+    downloadBlob(blob, `${props.title || props.recurso || 'export'}.csv`)
+    return
+  }
+
+  if (format === 'xlsx') {
+    import('xlsx').then(XLSX => {
+      const ws = XLSX.utils.aoa_to_sheet([
+        cols.map(c => c.label),
+        ...data.map(r => cols.map(c => r[c.key] ?? ''))
+      ])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Datos')
+      XLSX.writeFile(wb, `${props.title || props.recurso || 'export'}.xlsx`)
+    })
+    return
+  }
+
+  // PDF fallback → backend
+  const visibleKeys = cols.map(c => c.key)
   const params = new URLSearchParams({ format, fields: JSON.stringify(visibleKeys) })
   if (props.mes) params.set('mes', props.mes)
   window.open(`/api/export/${props.recurso}?${params}`, '_blank')
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // ── Formato numérico estándar ────────────────────────

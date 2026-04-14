@@ -8,6 +8,11 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+// ── HELPER: fecha Colombia YYYY-MM-DD ────────────────
+function localDateCO() {
+  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' })
+}
+
 // ── HELPER: aplicar filtros WHERE ─────────────────────
 function buildWhere(filters) {
   if (!filters || filters.length === 0) return { sql: '', params: [] }
@@ -558,6 +563,7 @@ app.get('/api/ventas/cartera', async (req, res) => {
 // Resumen cartera por cliente (con tramos de antigüedad y plazo del cliente)
 app.get('/api/ventas/cartera-cliente', async (req, res) => {
   try {
+    const hoy = localDateCO()
     const rows = await query(`
       SELECT
         sub.id_cliente,
@@ -576,7 +582,7 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
       FROM (
         SELECT *,
                CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
-               DATEDIFF(CURDATE(), fecha_de_creacion)                               AS ant
+               DATEDIFF(?, fecha_de_creacion)                                       AS ant
         FROM zeffi_facturas_venta_encabezados
         WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
       ) sub
@@ -587,7 +593,7 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
       ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
       GROUP BY sub.id_cliente
       ORDER BY total_pendiente DESC
-      LIMIT 1000`)
+      LIMIT 1000`, [hoy])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -596,18 +602,19 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
 app.get('/api/ventas/cartera-cliente/:id_cliente', async (req, res) => {
   try {
     const id_cliente = decodeURIComponent(req.params.id_cliente)
+    const hoy = localDateCO()
     const rows = await query(`
       SELECT
         id_interno, id_numeracion, fecha_de_creacion,
         cliente, id_cliente, ciudad, vendedor, formas_de_pago, estado_cxc,
         CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))    AS fin_total_neto,
         CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS fin_pendiente,
-        DATEDIFF(CURDATE(), fecha_de_creacion)                               AS dias_antiguedad
+        DATEDIFF(?, fecha_de_creacion)                                       AS dias_antiguedad
       FROM zeffi_facturas_venta_encabezados
       WHERE id_cliente = ?
         AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
       ORDER BY fecha_de_creacion ASC`,
-      [id_cliente])
+      [hoy, id_cliente])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -883,19 +890,30 @@ app.get('/api/export/:recurso', async (req, res) => {
       'cotizaciones':     { tabla: 'zeffi_cotizaciones_ventas_encabezados',     order: 'fecha_de_creacion DESC' },
       'remisiones':       { tabla: 'zeffi_remisiones_venta_encabezados',        order: 'fecha_de_creacion DESC' },
       'cartera':          { tabla: 'zeffi_facturas_venta_encabezados',          order: 'fecha_de_creacion DESC' },
+      'cartera-cliente':  { queryFn: () => {
+        const hoy = localDateCO()
+        return query(`SELECT sub.id_cliente, MAX(sub.cliente) AS cliente, MAX(sub.ciudad) AS ciudad, MAX(sub.vendedor) AS vendedor, MAX(c.forma_de_pago) AS plazo, COUNT(*) AS num_facturas_pendientes, SUM(sub.pdte_num) AS total_pendiente, SUM(CASE WHEN sub.ant BETWEEN 1 AND 30 THEN sub.pdte_num ELSE 0 END) AS saldo_1_30, SUM(CASE WHEN sub.ant BETWEEN 31 AND 60 THEN sub.pdte_num ELSE 0 END) AS saldo_31_60, SUM(CASE WHEN sub.ant BETWEEN 61 AND 90 THEN sub.pdte_num ELSE 0 END) AS saldo_61_90, SUM(CASE WHEN sub.ant > 90 THEN sub.pdte_num ELSE 0 END) AS saldo_mas_90, ROUND(AVG(sub.ant),0) AS promedio_antiguedad, MAX(sub.ant) AS antiguedad_max FROM (SELECT *, CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num, DATEDIFF(?, fecha_de_creacion) AS ant FROM zeffi_facturas_venta_encabezados WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0) sub LEFT JOIN (SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago FROM zeffi_clientes GROUP BY numero_de_identificacion) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente,' ',-1) GROUP BY sub.id_cliente ORDER BY total_pendiente DESC LIMIT 1000`, [hoy])
+      }},
+      'consignacion':     { queryFn: () => query(`SELECT id_cliente, MAX(nombre_cliente) AS nombre_cliente, MAX(ciudad) AS ciudad, MAX(vendedor) AS vendedor, COUNT(*) AS num_ordenes, ROUND(SUM(CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))),2) AS fin_total_consignacion, MIN(fecha_de_creacion) AS fecha_primera_orden, MAX(fecha_de_creacion) AS fecha_ultima_orden FROM zeffi_ordenes_venta_encabezados WHERE vigencia = 'Vigente' GROUP BY id_cliente ORDER BY fin_total_consignacion DESC`) },
     }
     if (!MAP[recurso]) return res.status(404).json({ error: 'recurso no encontrado' })
 
-    const { tabla, order } = MAP[recurso]
-    if (mes) {
-      if (recurso === 'facturas') {
-        filters.push({ field: 'fecha_de_creacion', op: 'mes', value: mes })
-      } else {
-        filters.push({ field: 'mes', op: 'eq', value: mes })
+    const entry = MAP[recurso]
+    let rows
+    if (entry.queryFn) {
+      rows = await entry.queryFn()
+    } else {
+      const { tabla, order } = entry
+      if (mes) {
+        if (recurso === 'facturas') {
+          filters.push({ field: 'fecha_de_creacion', op: 'mes', value: mes })
+        } else {
+          filters.push({ field: 'mes', op: 'eq', value: mes })
+        }
       }
+      const { sql, params } = buildWhere(filters)
+      rows = await query(`SELECT * FROM ${tabla}${sql} ORDER BY ${order} LIMIT 5000`, params)
     }
-    const { sql, params } = buildWhere(filters)
-    const rows = await query(`SELECT * FROM ${tabla}${sql} ORDER BY ${order} LIMIT 5000`, params)
 
     await exportData(res, rows, fields, format, recurso)
   } catch (e) { res.status(500).json({ error: e.message }) }
