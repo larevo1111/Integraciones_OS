@@ -824,14 +824,13 @@ app.post('/api/gestion/tareas', async (req, res) => {
     ? responsables
     : (responsable ? [responsable] : [req.usuario.email])
 
-  // Validar nivel: no se puede asignar a usuarios de nivel superior
+  // Validar nivel: no se puede poner como ÚNICO responsable a alguien de nivel superior
+  // Sí se puede como co-responsable (junto con el creador u otros)
   const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
-  if (miNivel < 9) {
-    for (const email of listaResps) {
-      const nivelResp = nivelCache[email] || 1
-      if (nivelResp > miNivel) {
-        return res.status(403).json({ error: `No puedes asignar tareas a usuarios de nivel superior (${email})` })
-      }
+  if (miNivel < 9 && listaResps.length === 1) {
+    const nivelResp = nivelCache[listaResps[0]] || 1
+    if (nivelResp > miNivel && listaResps[0] !== req.usuario.email) {
+      return res.status(403).json({ error: `No puedes asignar como único responsable a un usuario de nivel superior` })
     }
   }
   const respPrincipal = listaResps[0]
@@ -944,14 +943,12 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
 
     // Actualizar responsables (si se pasó el array — reemplaza todos)
     if (responsables !== undefined && Array.isArray(responsables)) {
-      // Validar nivel: no asignar a usuarios de nivel superior
+      // Validar nivel: no se puede poner como ÚNICO responsable a alguien de nivel superior
       const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
-      if (miNivel < 9) {
-        for (const email of responsables) {
-          const nivelResp = nivelCache[email] || 1
-          if (nivelResp > miNivel) {
-            return res.status(403).json({ error: `No puedes asignar tareas a usuarios de nivel superior (${email})` })
-          }
+      if (miNivel < 9 && responsables.length === 1) {
+        const nivelResp = nivelCache[responsables[0]] || 1
+        if (nivelResp > miNivel && responsables[0] !== req.usuario.email) {
+          return res.status(403).json({ error: `No puedes asignar como único responsable a un usuario de nivel superior` })
         }
       }
       await db.gestion.query('DELETE FROM g_tareas_responsables WHERE tarea_id = ?', [req.params.id])
