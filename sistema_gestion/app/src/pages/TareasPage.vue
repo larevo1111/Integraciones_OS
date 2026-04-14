@@ -129,12 +129,15 @@
 
         <!-- Categorías chips + OP -->
         <div v-if="qaActivo" class="quickadd-cats">
+          <span v-if="qaIALoading" class="ia-loading" title="IA sugiriendo categoría...">
+            <span class="material-icons spin" style="font-size:12px;color:var(--accent)">autorenew</span>
+          </span>
           <button
             v-for="c in categorias"
             :key="c.id"
             class="cat-chip"
             :class="{ selected: qaCatId === c.id }"
-            @click="qaCatId = c.id"
+            @click="qaCatId = c.id; qaCatManual = true"
           >
             <span class="cat-dot" :style="{ background: c.color }"></span>
             {{ c.nombre.replace(/_/g, ' ') }}
@@ -839,6 +842,22 @@ const qaGuardando   = ref(false)
 const qaInputRef    = ref(null)
 const qaEtiquetas   = ref([])
 
+const qaCatManual   = ref(false)  // true si el usuario eligió chip manualmente
+const qaIALoading   = ref(false)  // indicador visual de sugerencia en curso
+
+// Debounce: sugerir categoría IA 1.5s después de parar de escribir (solo tareas nuevas)
+let qaDebounceTimer = null
+watch(qaTitulo, (val) => {
+  if (qaDebounceTimer) clearTimeout(qaDebounceTimer)
+  if (!val || val.length < 4 || qaCatManual.value) return
+  qaDebounceTimer = setTimeout(async () => {
+    qaIALoading.value = true
+    const sug = await sugerirCategoria(val)
+    qaIALoading.value = false
+    if (sug?.categoria_id && !qaCatManual.value) qaCatId.value = sug.categoria_id
+  }, 1500)
+})
+
 const qaCatEsProduccion = computed(() =>
   categorias.value.find(c => c.id === qaCatId.value)?.es_produccion
 )
@@ -849,6 +868,8 @@ const qaCatEsEmpaque = computed(() =>
 function qaCancelar() {
   qaActivo.value    = false
   qaTitulo.value    = ''
+  qaCatId.value     = null
+  qaCatManual.value = false
   qaOp.value        = ''
   qaRemision.value  = ''
   qaPedido.value    = ''
@@ -882,6 +903,8 @@ async function qaAgregar() {
     const tarea = await crearTarea(body)
     onTareaGuardada(tarea)
     qaTitulo.value     = ''
+    qaCatId.value      = null
+    qaCatManual.value  = false
     qaOp.value         = ''
     qaRemision.value   = ''
     qaPedido.value     = ''
@@ -1671,6 +1694,11 @@ onUnmounted(() => {
 <style scoped>
 /* Espacio para el badge de subtareas que flota debajo del círculo de estado */
 .sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
+
+/* Spinner IA sugerencia */
+.ia-loading { display: inline-flex; align-items: center; margin-right: 4px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .d-desktop-only { }
 .d-mobile-only  { display: none; }

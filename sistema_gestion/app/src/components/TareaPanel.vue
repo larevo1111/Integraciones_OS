@@ -221,6 +221,7 @@
         :value="camposPendientes.descripcion !== undefined ? camposPendientes.descripcion : tarea.descripcion"
         placeholder="Agrega detalles, pasos a seguir..."
         @input="camposPendientes.descripcion = $event.target.value"
+        @blur="guardarCampoPendiente('descripcion', $event.target.value)"
       />
 
       <!-- Notas -->
@@ -231,6 +232,7 @@
         :value="camposPendientes.notas !== undefined ? camposPendientes.notas : tarea.notas"
         placeholder="Notas rápidas..."
         @input="camposPendientes.notas = $event.target.value"
+        @blur="guardarCampoPendiente('notas', $event.target.value)"
       />
 
       <!-- Acordeón: más campos (al final) -->
@@ -540,10 +542,8 @@ async function guardarPendientes() {
 const mostrarConfirmGuardar = ref(false)
 
 function intentarCerrar() {
-  if (hayCambiosPendientes.value) {
-    mostrarConfirmGuardar.value = true
-    return
-  }
+  // Auto-guardar cambios pendientes al cerrar (sin pedir confirmación)
+  if (hayCambiosPendientes.value) guardarPendientes()
   emit('cerrar')
 }
 
