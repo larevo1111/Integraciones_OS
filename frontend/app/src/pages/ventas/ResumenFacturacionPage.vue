@@ -170,7 +170,7 @@ const TRIMESTRES = {
 }
 
 // ── Column labels ──────────────────────────────────────
-const VISIBLE_PRODUCTO = ['cod_articulo','grupo_producto','cantidad_total','fin_ventas_netas','fin_costo_total','fin_utilidad_bruta','margen_pct','fin_notas_credito','num_facturas','num_clientes']
+const VISIBLE_PRODUCTO = ['cod_articulo','descripcion','grupo_producto','cantidad_total','fin_ventas_netas','fin_costo_total','fin_utilidad_bruta','margen_pct','fin_notas_credito','num_facturas','num_clientes']
 const LABELS_PRODUCTO  = {
   cod_articulo:       'Cód.',
   grupo_producto:     'Grupo producto',
