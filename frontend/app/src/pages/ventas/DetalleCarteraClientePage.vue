@@ -67,15 +67,16 @@ const cols    = ref([])
 const loading = ref(true)
 
 const VISIBLE = [
-  'id_numeracion', 'fecha_de_creacion', 'vendedor',
+  'tipo_doc', 'id_numeracion', 'fecha_de_creacion', 'vendedor',
   'fin_total_neto', 'fin_pendiente', 'dias_antiguedad', 'estado_cxc'
 ]
 
 const LABELS = {
-  id_numeracion:    'No Fac',
+  tipo_doc:         'Tipo',
+  id_numeracion:    'Documento',
   fecha_de_creacion:'Fecha',
   vendedor:         'Vendedor',
-  fin_total_neto:   'Total factura',
+  fin_total_neto:   'Total',
   fin_pendiente:    'Pendiente',
   dias_antiguedad:  'Días antigüedad',
   estado_cxc:       'Estado CxC',

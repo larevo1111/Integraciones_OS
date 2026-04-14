@@ -560,7 +560,7 @@ app.get('/api/ventas/cartera', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Resumen cartera por cliente (con tramos de antigüedad y plazo del cliente)
+// Resumen cartera por cliente (facturas + remisiones pendientes de cobro)
 app.get('/api/ventas/cartera-cliente', async (req, res) => {
   try {
     const hoy = localDateCO()
@@ -571,7 +571,7 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
         MAX(sub.ciudad)                                                           AS ciudad,
         MAX(sub.vendedor)                                                         AS vendedor,
         MAX(c.forma_de_pago)                                                      AS plazo,
-        COUNT(*)                                                                  AS num_facturas_pendientes,
+        COUNT(*)                                                                  AS num_docs_pendientes,
         SUM(sub.pdte_num)                                                         AS total_pendiente,
         SUM(CASE WHEN sub.ant BETWEEN  1 AND  30 THEN sub.pdte_num ELSE 0 END)   AS saldo_1_30,
         SUM(CASE WHEN sub.ant BETWEEN 31 AND  60 THEN sub.pdte_num ELSE 0 END)   AS saldo_31_60,
@@ -580,10 +580,16 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
         ROUND(AVG(sub.ant), 0)                                                    AS promedio_antiguedad,
         MAX(sub.ant)                                                              AS antiguedad_max
       FROM (
-        SELECT *,
+        SELECT cliente, id_cliente, ciudad, vendedor, pdte_de_cobro, fecha_de_creacion, 'Factura' AS tipo_doc,
                CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
-               DATEDIFF(?, fecha_de_creacion)                                       AS ant
+               DATEDIFF(?, fecha_de_creacion) AS ant
         FROM zeffi_facturas_venta_encabezados
+        WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
+        UNION ALL
+        SELECT cliente, id_cliente, ciudad, vendedor, pdte_de_cobro, fecha_de_creacion, 'Remisión' AS tipo_doc,
+               CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
+               DATEDIFF(?, fecha_de_creacion) AS ant
+        FROM zeffi_remisiones_venta_encabezados
         WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
       ) sub
       LEFT JOIN (
@@ -593,33 +599,43 @@ app.get('/api/ventas/cartera-cliente', async (req, res) => {
       ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
       GROUP BY sub.id_cliente
       ORDER BY total_pendiente DESC
-      LIMIT 1000`, [hoy])
+      LIMIT 1000`, [hoy, hoy])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ── CARTERA DETALLE: facturas pendientes de un cliente ────
+// ── CARTERA DETALLE: documentos pendientes de un cliente (facturas + remisiones) ────
 app.get('/api/ventas/cartera-cliente/:id_cliente', async (req, res) => {
   try {
     const id_cliente = decodeURIComponent(req.params.id_cliente)
     const hoy = localDateCO()
     const rows = await query(`
-      SELECT
-        id_interno, id_numeracion, fecha_de_creacion,
-        cliente, id_cliente, ciudad, vendedor, formas_de_pago, estado_cxc,
-        CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))    AS fin_total_neto,
-        CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS fin_pendiente,
-        DATEDIFF(?, fecha_de_creacion)                                       AS dias_antiguedad
+      SELECT id_interno, id_numeracion, fecha_de_creacion,
+             cliente, id_cliente, ciudad, vendedor, formas_de_pago, estado_cxc,
+             'Factura' AS tipo_doc,
+             CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))    AS fin_total_neto,
+             CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS fin_pendiente,
+             DATEDIFF(?, fecha_de_creacion)                                       AS dias_antiguedad
       FROM zeffi_facturas_venta_encabezados
       WHERE id_cliente = ?
         AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
+      UNION ALL
+      SELECT CAST(id_remision AS CHAR) AS id_interno, CONCAT('REM-', id_remision) AS id_numeracion, fecha_de_creacion,
+             cliente, id_cliente, ciudad, vendedor, '' AS formas_de_pago, estado_cxc,
+             'Remisión' AS tipo_doc,
+             CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))    AS fin_total_neto,
+             CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS fin_pendiente,
+             DATEDIFF(?, fecha_de_creacion)                                       AS dias_antiguedad
+      FROM zeffi_remisiones_venta_encabezados
+      WHERE id_cliente = ?
+        AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
       ORDER BY fecha_de_creacion ASC`,
-      [hoy, id_cliente])
+      [hoy, id_cliente, hoy, id_cliente])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// ── CARTERA A FECHA: facturas con saldo pendiente a una fecha de corte ────
+// ── CARTERA A FECHA: documentos con saldo pendiente a una fecha de corte ────
 app.get('/api/ventas/cartera-cliente-fecha', async (req, res) => {
   try {
     const fecha = req.query.fecha
@@ -631,7 +647,7 @@ app.get('/api/ventas/cartera-cliente-fecha', async (req, res) => {
         MAX(sub.ciudad)                                                           AS ciudad,
         MAX(sub.vendedor)                                                         AS vendedor,
         MAX(c.forma_de_pago)                                                      AS plazo,
-        COUNT(*)                                                                  AS num_facturas_pendientes,
+        COUNT(*)                                                                  AS num_docs_pendientes,
         SUM(sub.pdte_num)                                                         AS total_pendiente,
         SUM(CASE WHEN sub.ant BETWEEN  1 AND  30 THEN sub.pdte_num ELSE 0 END)   AS saldo_1_30,
         SUM(CASE WHEN sub.ant BETWEEN 31 AND  60 THEN sub.pdte_num ELSE 0 END)   AS saldo_31_60,
@@ -640,10 +656,17 @@ app.get('/api/ventas/cartera-cliente-fecha', async (req, res) => {
         ROUND(AVG(sub.ant), 0)                                                    AS promedio_antiguedad,
         MAX(sub.ant)                                                              AS antiguedad_max
       FROM (
-        SELECT *,
+        SELECT cliente, id_cliente, ciudad, vendedor, pdte_de_cobro, fecha_de_creacion,
                CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
-               DATEDIFF(?, fecha_de_creacion)                                       AS ant
+               DATEDIFF(?, fecha_de_creacion) AS ant
         FROM zeffi_facturas_venta_encabezados
+        WHERE fecha_de_creacion <= ?
+          AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
+        UNION ALL
+        SELECT cliente, id_cliente, ciudad, vendedor, pdte_de_cobro, fecha_de_creacion,
+               CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
+               DATEDIFF(?, fecha_de_creacion) AS ant
+        FROM zeffi_remisiones_venta_encabezados
         WHERE fecha_de_creacion <= ?
           AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
       ) sub
@@ -654,7 +677,7 @@ app.get('/api/ventas/cartera-cliente-fecha', async (req, res) => {
       ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
       GROUP BY sub.id_cliente
       ORDER BY total_pendiente DESC
-      LIMIT 1000`, [fecha, fecha])
+      LIMIT 1000`, [fecha, fecha, fecha, fecha])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -979,7 +1002,7 @@ app.get('/api/export/:recurso', async (req, res) => {
       'cartera':          { tabla: 'zeffi_facturas_venta_encabezados',          order: 'fecha_de_creacion DESC' },
       'cartera-cliente':  { queryFn: () => {
         const hoy = localDateCO()
-        return query(`SELECT sub.id_cliente, MAX(sub.cliente) AS cliente, MAX(sub.ciudad) AS ciudad, MAX(sub.vendedor) AS vendedor, MAX(c.forma_de_pago) AS plazo, COUNT(*) AS num_facturas_pendientes, SUM(sub.pdte_num) AS total_pendiente, SUM(CASE WHEN sub.ant BETWEEN 1 AND 30 THEN sub.pdte_num ELSE 0 END) AS saldo_1_30, SUM(CASE WHEN sub.ant BETWEEN 31 AND 60 THEN sub.pdte_num ELSE 0 END) AS saldo_31_60, SUM(CASE WHEN sub.ant BETWEEN 61 AND 90 THEN sub.pdte_num ELSE 0 END) AS saldo_61_90, SUM(CASE WHEN sub.ant > 90 THEN sub.pdte_num ELSE 0 END) AS saldo_mas_90, ROUND(AVG(sub.ant),0) AS promedio_antiguedad, MAX(sub.ant) AS antiguedad_max FROM (SELECT *, CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num, DATEDIFF(?, fecha_de_creacion) AS ant FROM zeffi_facturas_venta_encabezados WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0) sub LEFT JOIN (SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago FROM zeffi_clientes GROUP BY numero_de_identificacion) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente,' ',-1) GROUP BY sub.id_cliente ORDER BY total_pendiente DESC LIMIT 1000`, [hoy])
+        return query(`SELECT sub.id_cliente, MAX(sub.cliente) AS cliente, MAX(sub.ciudad) AS ciudad, MAX(sub.vendedor) AS vendedor, MAX(c.forma_de_pago) AS plazo, COUNT(*) AS num_docs_pendientes, SUM(sub.pdte_num) AS total_pendiente, SUM(CASE WHEN sub.ant BETWEEN 1 AND 30 THEN sub.pdte_num ELSE 0 END) AS saldo_1_30, SUM(CASE WHEN sub.ant BETWEEN 31 AND 60 THEN sub.pdte_num ELSE 0 END) AS saldo_31_60, SUM(CASE WHEN sub.ant BETWEEN 61 AND 90 THEN sub.pdte_num ELSE 0 END) AS saldo_61_90, SUM(CASE WHEN sub.ant > 90 THEN sub.pdte_num ELSE 0 END) AS saldo_mas_90, ROUND(AVG(sub.ant),0) AS promedio_antiguedad, MAX(sub.ant) AS antiguedad_max FROM (SELECT cliente, id_cliente, ciudad, vendedor, pdte_de_cobro, fecha_de_creacion, CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num, DATEDIFF(?, fecha_de_creacion) AS ant FROM zeffi_facturas_venta_encabezados WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0 UNION ALL SELECT cliente, id_cliente, ciudad, vendedor, pdte_de_cobro, fecha_de_creacion, CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num, DATEDIFF(?, fecha_de_creacion) AS ant FROM zeffi_remisiones_venta_encabezados WHERE CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0) sub LEFT JOIN (SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago FROM zeffi_clientes GROUP BY numero_de_identificacion) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente,' ',-1) GROUP BY sub.id_cliente ORDER BY total_pendiente DESC LIMIT 1000`, [hoy, hoy])
       }},
       'consignacion':     { queryFn: () => query(`SELECT id_cliente, MAX(nombre_cliente) AS nombre_cliente, MAX(ciudad) AS ciudad, MAX(vendedor) AS vendedor, COUNT(*) AS num_ordenes, ROUND(SUM(CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))),2) AS fin_total_consignacion, MIN(fecha_de_creacion) AS fecha_primera_orden, MAX(fecha_de_creacion) AS fecha_ultima_orden FROM zeffi_ordenes_venta_encabezados WHERE vigencia = 'Vigente' GROUP BY id_cliente ORDER BY fin_total_consignacion DESC`) },
     }

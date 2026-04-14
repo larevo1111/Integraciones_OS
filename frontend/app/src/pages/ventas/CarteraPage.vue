@@ -43,8 +43,8 @@
           <span class="kpi-value">{{ kpis.numClientes }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Facturas pendientes</span>
-          <span class="kpi-value">{{ kpis.numFacturas }}</span>
+          <span class="kpi-label">Documentos pendientes</span>
+          <span class="kpi-value">{{ kpis.numDocs }}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Saldo en mora (+30 días)</span>
@@ -96,7 +96,7 @@ const loadingActivo = computed(() => tab.value === 'hoy' ? loadingHoy.value : lo
 
 const VISIBLE = [
   'cliente', 'ciudad', 'vendedor', 'plazo',
-  'num_facturas_pendientes', 'total_pendiente',
+  'num_docs_pendientes', 'total_pendiente',
   'saldo_1_30', 'saldo_31_60', 'saldo_61_90', 'saldo_mas_90',
   'promedio_antiguedad', 'antiguedad_max'
 ]
@@ -106,7 +106,7 @@ const LABELS = {
   ciudad:                  'Ciudad',
   vendedor:                'Vendedor',
   plazo:                   'Plazo',
-  num_facturas_pendientes: 'Facturas pend.',
+  num_docs_pendientes: 'Docs. pend.',
   total_pendiente:         'Total pendiente',
   saldo_1_30:              '1–30 días',
   saldo_31_60:             '31–60 días',
@@ -132,7 +132,7 @@ const kpis = computed(() => {
   return {
     totalPendiente: rows.reduce((s, r) => s + (parseFloat(r.total_pendiente) || 0), 0),
     numClientes:    rows.length,
-    numFacturas:    rows.reduce((s, r) => s + (parseInt(r.num_facturas_pendientes) || 0), 0),
+    numDocs:        rows.reduce((s, r) => s + (parseInt(r.num_docs_pendientes) || 0), 0),
     totalMora:      rows.reduce((s, r) => s + (parseFloat(r.saldo_31_60) || 0)
                                            + (parseFloat(r.saldo_61_90) || 0)
                                            + (parseFloat(r.saldo_mas_90) || 0), 0),
