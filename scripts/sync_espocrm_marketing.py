@@ -59,20 +59,22 @@ TIPOS_IDENTIFICACION = [
     'Número de Identificación Tributaria CO', 'Pasaporte'
 ]
 TIPOS_PERSONA  = ['', 'Física (natural)', 'Jurídica (moral)']
-TIPOS_CLIENTE  = ['', 'Común', 'Fiel', 'Desertor', 'Mayorista', 'Importador', 'Industrial']
+TIPOS_CLIENTE  = ['', 'Negocio amigo', 'Red de amigos', 'Cliente directo', 'Interno', 'Otro']
 
 LAYOUT_JSON = [
     {
         "label": "",
         "rows": [
-            [{"name": "firstName"},              {"name": "lastName"}],
+            [{"name": "firstName", "fullWidth": True}],
             [{"name": "emailAddress"},           {"name": "phoneNumber"}],
             [{"name": "tipoDeMarketing"},        {"name": "tipoCliente"}],
+            [{"name": "calificacionNegocioAmigo"}, False],
             [{"name": "numeroIdentificacion"},   {"name": "tipoIdentificacion"}],
             [{"name": "tipoPersona"},            {"name": "vendedorEffi"}],
             [{"name": "tarifaPrecios"},          {"name": "formaPago"}],
             [{"name": "ciudadNombre"},             False],
             [{"name": "direccion"},              {"name": "direccionLinea2"}],
+            [{"name": "cUbicacionMaps", "fullWidth": True}],
             [{"name": "fuente"},                 {"name": "enviadoAEffi"}],
             [{"name": "description", "fullWidth": True}]
         ]
@@ -216,6 +218,25 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, municipios):
             'direccionLinea2': {
                 'type': 'varchar',
                 'maxLength': 255
+            },
+            'lastName': {
+                'required': False,
+                'options': []
+            },
+            'firstName': {
+                'options': []
+            },
+            'cUbicacionMaps': {
+                'type': 'text',
+                'isCustom': True,
+                'maxLength': 5000,
+                'seeMoreDisabled': True,
+                'rows': 3
+            },
+            'calificacionNegocioAmigo': {
+                'type': 'enum',
+                'options': ['', 'A', 'B', 'C'],
+                'default': ''
             }
         }
     }
@@ -234,6 +255,8 @@ def generar_json(tipos_marketing, tarifas_precios, vendedores, municipios):
             'ciudadNombre':         'Municipio',
             'direccion':            'Dirección',
             'direccionLinea2':      'Referencia / Línea 2',
+            'calificacionNegocioAmigo': 'Clasificación Cliente',
+            'cUbicacionMaps':       'Ubicación Maps',
         }
     }
     with open(TMP_ENTITY, 'w', encoding='utf-8') as f:
