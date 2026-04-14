@@ -423,7 +423,9 @@ app.get('/api/gestion/tareas', async (req, res) => {
   }
 
   if (filtro === 'hoy') {
-    where.push('t.fecha_limite = ?'); params.push(hoyRef)
+    // Hoy = fecha límite hoy + tareas en progreso (o con subtarea en progreso) sin importar fecha
+    where.push(`(t.fecha_limite = ? OR t.estado = 'En Progreso' OR EXISTS (SELECT 1 FROM g_tareas s WHERE s.parent_id = t.id AND s.estado = 'En Progreso'))`)
+    params.push(hoyRef)
   } else if (filtro === 'manana') {
     where.push('t.fecha_limite = ?'); params.push(fechaRefOffset(1))
   } else if (filtro === 'ayer') {

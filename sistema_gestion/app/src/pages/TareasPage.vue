@@ -189,7 +189,7 @@
                 <span class="grupo-count">{{ grupo.tareas.length }}</span>
               </div>
               <div class="grupo-tareas-list" :data-grupo="'atr-'+grupo.key">
-                <div v-for="t in grupo.tareas" :key="t.id" :data-id="t.id" class="sortable-tarea-wrap">
+                <div v-for="t in grupo.tareas" :key="t.id" :data-id="t.id" class="sortable-tarea-wrap" :class="{ 'has-subs': t.subtareas_total > 0 }">
                   <TareaItem
                     :tarea="t"
                     :seleccionada="tareaSeleccionada?.id === t.id"
@@ -219,7 +219,7 @@
             <span class="grupo-count">{{ grupo.tareas.length }}</span>
           </div>
           <div class="grupo-tareas-list" :data-grupo="grupo.key">
-            <div v-for="t in grupo.tareas" :key="t.id" :data-id="t.id" class="sortable-tarea-wrap">
+            <div v-for="t in grupo.tareas" :key="t.id" :data-id="t.id" class="sortable-tarea-wrap" :class="{ 'has-subs': t.subtareas_total > 0 }">
               <TareaItem
                 :tarea="t"
                 :seleccionada="tareaSeleccionada?.id === t.id"
@@ -1659,6 +1659,9 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Espacio para el badge de subtareas que flota debajo del círculo de estado */
+.sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
+
 .d-desktop-only { }
 .d-mobile-only  { display: none; }
 @media (max-width: 768px) {
