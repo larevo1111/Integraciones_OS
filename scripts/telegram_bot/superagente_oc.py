@@ -19,31 +19,32 @@ from ia_service.config import get_local_conn
 REPO_DIR = '/home/osserver/Proyectos_Antigravity/sa_opencode'
 OC_BIN = '/home/osserver/.nvm/versions/node/v22.17.0/bin/opencode'
 TIMEOUT_OC = 1200  # segundos (20 minutos)
-MODEL_DEFAULT = 'opencode/minimax-m2.5-free'  # fallback hardcodeado si BD no responde
+MODEL_DEFAULT = 'opencode/big-pickle'
 
 
-def _get_modelo_oc() -> str:
-    """Lee modelo OpenCode activo desde ia_config BD. Fallback al hardcodeado."""
+def _get_modelos_oc() -> list[str]:
+    """Retorna [modelo_activo, fallback1, fallback2, ...] desde BD."""
     try:
         conn = get_local_conn()
         with conn.cursor() as cur:
-            cur.execute("SELECT valor FROM ia_config WHERE clave='sa_opencode_modelo'")
-            row = cur.fetchone()
+            cur.execute("SELECT clave, valor FROM ia_config WHERE clave IN "
+                        "('sa_opencode_modelo', 'sa_opencode_fallbacks')")
+            rows = {r['clave']: r['valor'] for r in cur.fetchall()}
         conn.close()
-        if row and row.get('valor'):
-            return row['valor']
+        principal = rows.get('sa_opencode_modelo', MODEL_DEFAULT)
+        fallbacks = [f.strip() for f in rows.get('sa_opencode_fallbacks', '').split(',') if f.strip()]
+        # Principal primero, luego fallbacks (sin duplicados)
+        orden = [principal] + [m for m in fallbacks if m != principal]
+        return orden if orden else [MODEL_DEFAULT]
     except Exception:
-        pass
-    return MODEL_DEFAULT
+        return [MODEL_DEFAULT]
 
 
 # ── Ejecutar OpenCode ────────────────────────────────────────────────────────
 
-def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = False) -> dict:
-    """Ejecuta opencode run --format json y retorna {ok, result, session_id}."""
-    modelo = _get_modelo_oc()
-    cmd = [OC_BIN, 'run', '--format', 'json', '-m', modelo]
-    cmd.append(prompt)
+def _run_oc(prompt: str, modelo: str, session_id: str = None) -> dict:
+    """Ejecuta opencode run con un modelo específico. Retorna {ok, result, session_id}."""
+    cmd = [OC_BIN, 'run', '--format', 'json', '-m', modelo, prompt]
     if session_id:
         cmd += ['--session', session_id]
 
@@ -53,7 +54,7 @@ def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = F
             cwd=REPO_DIR, timeout=TIMEOUT_OC,
         )
     except subprocess.TimeoutExpired:
-        return {'ok': False, 'error': 'El Super Agente OpenCode tardó demasiado. Intenta de nuevo.'}
+        return {'ok': False, 'error': 'Tardó demasiado.'}
     except FileNotFoundError:
         return {'ok': False, 'error': 'opencode no está instalado.'}
     except Exception as e:
@@ -63,10 +64,9 @@ def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = F
     stderr = (proc.stderr or '').strip()
 
     if not stdout:
-        log.error(f'SAOC stdout vacío: rc={proc.returncode}, session={session_id}, stderr={stderr[:200]}')
         return {
             'ok': False,
-            'error': stderr[:200] if stderr else 'El Super Agente OpenCode no respondió.',
+            'error': stderr[:200] if stderr else 'Sin respuesta.',
             'sesion_rota': bool(session_id and not stderr),
         }
 
@@ -90,14 +90,38 @@ def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = F
 
     result_text = ''.join(text_parts).strip()
     if not result_text:
-        log.warning(f'SAOC sin texto. stdout={stdout[:500]}')
-        return {'ok': False, 'error': 'El Super Agente OpenCode no respondió.'}
+        return {'ok': False, 'error': 'Sin texto en la respuesta.'}
 
-    return {
-        'ok': True,
-        'result': result_text,
-        'session_id': sid,
-    }
+    return {'ok': True, 'result': result_text, 'session_id': sid}
+
+
+def _ejecutar_opencode(prompt: str, session_id: str = None, con_imagen: bool = False) -> dict:
+    """Ejecuta OpenCode con fallback automático entre modelos."""
+    modelos = _get_modelos_oc()
+
+    for i, modelo in enumerate(modelos):
+        nombre = modelo.split('/')[-1]
+        resp = _run_oc(prompt, modelo, session_id)
+        if resp.get('ok'):
+            # Si usó un fallback, actualizar BD para que sea el nuevo principal
+            if i > 0:
+                try:
+                    conn = get_local_conn()
+                    with conn.cursor() as cur:
+                        cur.execute("UPDATE ia_config SET valor=%s WHERE clave='sa_opencode_modelo'",
+                                    (modelo,))
+                    conn.commit()
+                    conn.close()
+                    log.info(f'SAOC fallback: {modelos[0]} → {modelo}')
+                except Exception:
+                    pass
+            return resp
+        # Si falla, loguear y probar el siguiente
+        log.warning(f'SAOC {nombre} falló: {resp.get("error", "")[:100]}')
+        # No pasar session_id a los fallbacks (sesión es del modelo original)
+        session_id = None
+
+    return {'ok': False, 'error': 'Todos los modelos están caídos. Intenta en unos minutos.'}
 
 
 # ── Sesiones BD ──────────────────────────────────────────────────────────────

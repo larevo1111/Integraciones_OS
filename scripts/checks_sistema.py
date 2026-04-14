@@ -91,29 +91,51 @@ def check_servicios(lista, log_fn=print):
     return lineas, fallos, acciones
 
 
+def _oc_responde(modelo, timeout=45):
+    """Prueba un modelo OpenCode con pregunta SQL real. Retorna True si da texto útil."""
+    rc, out, _ = _run(
+        [OC_BIN, 'run', '--format', 'json', '-m', modelo,
+         'cuantas filas tiene zeffi_facturas_venta_encabezados? responde solo el número'],
+        timeout=timeout,
+    )
+    if rc != 0 or '"type":"text"' not in out:
+        return False
+    # Verificar que el texto contiene un número (respuesta real, no solo "Terminado")
+    import re
+    for line in out.split('\n'):
+        try:
+            import json as _json
+            ev = _json.loads(line)
+            if ev.get('type') == 'text':
+                txt = ev.get('part', {}).get('text', '')
+                if re.search(r'\d{2,}', txt):
+                    return True
+        except Exception:
+            continue
+    return False
+
+
 def check_opencode(log_fn=print):
     """
     Verifica OpenCode con el modelo activo en ia_config BD.
     Si falla, prueba los fallbacks en orden y actualiza la BD.
     (lineas, fallos, acciones)
     """
-    modelo = get_ia_config('sa_opencode_modelo') or 'opencode/minimax-m2.5-free'
+    modelo = get_ia_config('sa_opencode_modelo') or 'opencode/big-pickle'
     fallbacks_str = get_ia_config('sa_opencode_fallbacks') or ''
     fallbacks = [f.strip() for f in fallbacks_str.split(',') if f.strip()]
     nombre = modelo.split('/')[-1]
 
-    rc, out, err = _run([OC_BIN, 'run', '--format', 'json', '-m', modelo, 'responde OK'], timeout=35)
-    if rc == 0 and 'text' in out:
+    if _oc_responde(modelo):
         return [_ok(f'OpenCode ({nombre})')], 0, []
 
-    log_fn(f'OpenCode {modelo} falló: {(err or out)[:100]}')
+    log_fn(f'OpenCode {nombre} no respondió SQL correctamente')
 
     for fallback in [m for m in fallbacks if m != modelo]:
-        rc2, out2, _ = _run([OC_BIN, 'run', '--format', 'json', '-m', fallback, 'responde OK'], timeout=35)
-        if rc2 == 0 and 'text' in out2:
+        if _oc_responde(fallback):
             set_ia_config('sa_opencode_modelo', fallback)
             fb = fallback.split('/')[-1]
-            log_fn(f'OpenCode: {modelo} → {fallback}')
+            log_fn(f'OpenCode: {nombre} → {fb}')
             return (
                 [_warn(f'OpenCode: {nombre} → {fb} (auto)')],
                 0,
