@@ -231,6 +231,10 @@ const jornadasFiltradas = computed(() => {
     ...j,
     _nombre: j.Nombre_Usuario ? primerNombre(j.Nombre_Usuario) : j.usuario,
     estado: estadoLabel(j),
+    // Mapear nombres de campos del backend (seg) a los que espera el frontend (min)
+    dur_tareas_real:    Math.round((j.dur_tareas_sistema_seg || 0) / 60),
+    dur_tareas_crono:   Math.round((j.dur_tareas_crono_seg || 0) / 60),
+    dur_tareas_usuario: Math.round((j.dur_tareas_usuario_seg || 0) / 60),
   }))
 })
 
