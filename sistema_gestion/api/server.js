@@ -101,6 +101,26 @@ function indicadorConfianza(jornada) {
   return 'verde'
 }
 
+// Verificar si el usuario puede cambiar el estado de una tarea
+// Retorna { ok, esPropietario, advertencia } o lanza respuesta 403
+async function verificarPermisoEstado(req, res, tareaId) {
+  const miEmail = req.usuario.email
+  const miNivel = req.usuario.nivel || nivelCache[miEmail] || 1
+  const [[tarea]] = await db.gestion.query(
+    'SELECT id, empresa FROM g_tareas WHERE id = ? AND empresa = ?', [tareaId, req.empresa]
+  )
+  if (!tarea) { res.status(404).json({ error: 'Tarea no encontrada' }); return null }
+  const [resps] = await db.gestion.query(
+    'SELECT email FROM g_tareas_responsables WHERE tarea_id = ?', [tareaId]
+  )
+  const emails = resps.map(r => r.email)
+  const esPropietario = emails.includes(miEmail)
+  if (esPropietario) return { ok: true, esPropietario: true }
+  if (miNivel >= 7) return { ok: true, esPropietario: false, advertencia: 'admin_tarea_ajena' }
+  res.status(403).json({ error: 'Solo el responsable de la tarea o un administrador puede cambiar su estado' })
+  return null
+}
+
 // Inicializar caché después de que DB esté lista (ver al final del archivo)
 
 const app = express()
@@ -1043,6 +1063,8 @@ async function _getTareaCompleta(tareaId) {
 app.post('/api/gestion/tareas/:id/iniciar', async (req, res) => {
   const tareaId = req.params.id
   try {
+    const permiso = await verificarPermisoEstado(req, res, tareaId)
+    if (!permiso) return
     await db.gestion.query(
       `UPDATE g_tareas SET
         estado = 'En Progreso',
@@ -1064,6 +1086,8 @@ app.post('/api/gestion/tareas/:id/iniciar', async (req, res) => {
 app.post('/api/gestion/tareas/:id/pausar', async (req, res) => {
   const tareaId = req.params.id
   try {
+    const permiso = await verificarPermisoEstado(req, res, tareaId)
+    if (!permiso) return
     // 1. Volcar el delta al cronómetro (en una sola variable para evitar suma doble)
     await db.gestion.query(
       `UPDATE g_tareas SET
@@ -1090,6 +1114,8 @@ app.post('/api/gestion/tareas/:id/pausar', async (req, res) => {
 app.post('/api/gestion/tareas/:id/cancelar', async (req, res) => {
   const tareaId = req.params.id
   try {
+    const permiso = await verificarPermisoEstado(req, res, tareaId)
+    if (!permiso) return
     // 1. Volcar crono y cambiar estado
     await db.gestion.query(
       `UPDATE g_tareas SET
@@ -1123,6 +1149,8 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
   const tareaId = req.params.id
   const dusrBody = req.body?.duracion_usuario_seg
   try {
+    const permiso = await verificarPermisoEstado(req, res, tareaId)
+    if (!permiso) return
     // 1. Volcar crono y cambiar estado
     await db.gestion.query(
       `UPDATE g_tareas SET
@@ -1163,6 +1191,8 @@ app.post('/api/gestion/tareas/:id/completar', async (req, res) => {
 app.post('/api/gestion/tareas/:id/revertir', async (req, res) => {
   const tareaId = req.params.id
   try {
+    const permiso = await verificarPermisoEstado(req, res, tareaId)
+    if (!permiso) return
     await db.gestion.query(
       `UPDATE g_tareas SET
         estado = 'Pendiente',

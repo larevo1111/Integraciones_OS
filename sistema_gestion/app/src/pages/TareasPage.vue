@@ -1538,6 +1538,13 @@ function abrirModalCompletar(tarea) {
 async function cambiarEstado(tarea) {
   const CICLO = { 'Pendiente': 'En Progreso', 'En Progreso': 'Completada', 'Completada': 'Pendiente' }
   const nextEstado = CICLO[tarea.estado] || 'Pendiente'
+  // Advertencia si admin toca tarea ajena
+  const miEmail = auth.usuario?.email
+  const esResponsable = (tarea.responsables || []).includes(miEmail)
+  if (!esResponsable && auth.nivel >= 7) {
+    const responsable = tarea.responsable_nombre || tarea.responsables?.[0] || 'otro usuario'
+    if (!confirm(`Esta tarea es de ${responsable}. ¿Seguro que quieres cambiar su estado?`)) return
+  }
   // Al completar: abrir modal para que el usuario confirme la duración
   if (nextEstado === 'Completada') {
     abrirModalCompletar(tarea)
@@ -1559,7 +1566,10 @@ async function _llamarEndpointEstado(tarea, nuevoEstado) {
   try {
     const data = await api(`/api/gestion/tareas/${tarea.id}/${endpoint}`, { method: 'POST' })
     if (data?.tarea) onTareaActualizada(data.tarea)
-  } catch (e) { console.error(e) }
+  } catch (e) {
+    const msg = e?.data?.error || e?.message || 'Error al cambiar estado'
+    alert(msg)
+  }
 }
 
 async function confirmarTiempoModal() {
