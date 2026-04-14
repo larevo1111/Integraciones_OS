@@ -779,7 +779,7 @@ app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
     const https = require('http')
     const body = JSON.stringify({
       prompt: titulo,
-      contexto: 'Sos un clasificador de tareas laborales de una empresa de producción y venta de muebles de madera. Dada una tarea, elegí la categoría más apropiada. Si no encaja claramente en ninguna, elegí Varios.',
+      contexto: 'Clasificador de tareas de Origen Silvestre — empresa de producción y venta de chocolate artesanal, miel, propóleo y productos orgánicos. Pistas: Produccion (fabricar, procesar, empacar), Ventas (clientes, pedidos, despachos, precios, cotizar), Reuniones (reunión, informe semanal/mensual), Compras (comprar, insumos, proveedores), Pagos (pagar, descargar pagos, factura proveedor, transferencia), Cartera (cobrar, cartera, saldo cliente), Administrativo (trámites, documentos, INVIMA). Elegí la categoría más apropiada. Si no encaja claramente, elegí Varios.',
       modelo: 'groq-llama',
       tipo_respuesta: 'enum',
       opciones: nombres,

@@ -861,11 +861,11 @@ async function qaAgregar() {
   qaGuardando.value = true
   try {
     const defs = defaultsFromFilters.value
-    let catId = qaCatId.value || defs.categoria_id
-    // Sugerencia IA si no eligió categoría manualmente
+    let catId = qaCatId.value  // Solo si el usuario eligió chip de categoría explícitamente
+    // Sugerencia IA si no eligió categoría manualmente (no heredar del filtro — la IA clasifica mejor)
     if (!catId) {
       const sug = await sugerirCategoria(qaTitulo.value)
-      catId = sug?.categoria_id || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id
+      catId = sug?.categoria_id || defs.categoria_id || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id
     }
     const body = {
       titulo:       qaTitulo.value,
