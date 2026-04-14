@@ -23,14 +23,13 @@
           </div>
 
           <!-- Body -->
-          <div class="form-body">
+          <form class="form-body" @submit.prevent="guardar">
             <!-- Título -->
             <input
               ref="tituloRef"
               class="input-field titulo-input"
               v-model="form.titulo"
               placeholder="¿Qué hay que hacer?"
-              @keydown.enter.prevent="guardar"
             />
 
             <!-- Categorías como chips -->
@@ -91,6 +90,14 @@
               <label class="input-label">Descripción (opcional)</label>
               <textarea class="input-field" v-model="form.descripcion" rows="3" placeholder="Contexto, pasos, notas..." />
             </div>
+          </form>
+
+          <!-- Footer con botones -->
+          <div class="form-footer">
+            <button class="form-btn-cancel" @click="$emit('update:modelValue', false)">Cancelar</button>
+            <button class="form-btn-crear" :disabled="!form.titulo || !form.categoria_id || guardando" @click="guardar">
+              {{ guardando ? 'Guardando...' : (editar ? 'Guardar tarea' : 'Crear tarea') }}
+            </button>
           </div>
 
         </div>
@@ -220,8 +227,8 @@ async function guardar() {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   border-radius: 16px 16px 0 0;
-  max-height: 92vh;
-  padding-bottom: env(safe-area-inset-bottom, 16px);
+  max-height: 92dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Handle bar (mobile) */
@@ -309,6 +316,28 @@ async function guardar() {
   .form-row-2 { grid-template-columns: 1fr; }
   .form-row-3 { grid-template-columns: 1fr 1fr; }
 }
+
+/* Footer */
+.form-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 16px; border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.form-btn-cancel {
+  height: 32px; padding: 0 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-default); background: transparent;
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  cursor: pointer; font-family: var(--font-sans);
+}
+.form-btn-cancel:hover { background: var(--bg-card-hover); }
+.form-btn-crear {
+  height: 32px; padding: 0 16px; border-radius: var(--radius-md);
+  border: none; background: #fff; color: #111;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-sans);
+}
+.form-btn-crear:disabled { opacity: 0.4; cursor: default; }
+.form-btn-crear:hover:not(:disabled) { background: #e8e8e8; }
 
 /* Transiciones */
 .modal-enter-active, .modal-leave-active { transition: opacity 150ms; }

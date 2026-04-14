@@ -722,7 +722,7 @@ function fmtFecha(iso) {
 @media (max-width: 768px) {
   .pp-overlay { align-items: flex-end; }
   .pp-panel {
-    width: 100%; height: 88vh; max-height: 88vh;
+    width: 100%; height: 88dvh; max-height: 88dvh;
     border-left: none; border-top: 1px solid var(--border-default);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     animation: pp-slide-up 180ms ease-out;
@@ -731,6 +731,7 @@ function fmtFecha(iso) {
   }
   .pp-panel.pp-panel-full {
     height: 100dvh; max-height: 100dvh; border-radius: 0;
+    transition: height 320ms cubic-bezier(0.32,0.72,0,1), border-radius 320ms ease;
   }
   @keyframes pp-slide-up {
     from { transform: translateY(100%); }
