@@ -74,6 +74,12 @@
         <template #cell-tiempo_laborado_sys="{ row }">
           <span class="td-mono td-laborado">{{ formatMins(row.tiempo_laborado_sys) }}</span>
         </template>
+        <template #cell-indicador_confianza="{ row }">
+          <span v-if="row.indicador_confianza" class="confianza-dot" :class="'conf-' + row.indicador_confianza"
+            :title="confTitulo[row.indicador_confianza]">
+            {{ confIcono[row.indicador_confianza] }}
+          </span>
+        </template>
         <template #cell-estado="{ row }">
           <span class="badge" :class="badgeClass(row)">{{ estadoLabel(row) }}</span>
         </template>
@@ -114,6 +120,15 @@ import JornadaDetallePopup from 'src/components/JornadaDetallePopup.vue'
 
 const auth         = useAuthStore()
 const jornadaStore = useJornadaStore()
+
+// Indicadores de confianza de jornada
+const confIcono  = { rojo: '●', amarillo: '●', verde: '●', gris: '●' }
+const confTitulo = {
+  rojo:     'Cierre automático — revisar manualmente',
+  amarillo: 'Gap sospechoso entre actividad y cierre',
+  verde:    'Actividad alineada con cierre',
+  gris:     'Sin actividad de tareas registrada'
+}
 
 // ── Filtros de tiempo ────────────────────────────────────
 const hoy = hoyLocal()
@@ -194,6 +209,7 @@ const columnasComputed = computed(() => {
     { key: 'tiempo_total_sys',    label: 'T. Total (sys)',    visible: false },
     { key: 'tiempo_pausa_sys',   label: 'T. Pausas (sys)',   visible: false },
     { key: 'tiempo_laborado_sys',label: 'T. Laborado (sys)', visible: false },
+    { key: 'indicador_confianza', label: 'Confianza',         visible: true,  width: '90px' },
     { key: 'estado',             label: 'Estado',            visible: true,  options: estadoJornadaOptions.value },
     { key: 'tareas_count',       label: 'Tareas',            visible: true  },
     { key: 'dur_tareas_real',    label: 'Dur. sistema',       visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de cada tarea (calculado automáticamente)' },
@@ -298,6 +314,13 @@ function badgeClass(j) {
 .badge-green { background: rgba(0,200,83,0.12); color: var(--accent); }
 .badge-blue  { background: rgba(99,179,237,0.12); color: #63B3ED; }
 .badge-gray  { background: rgba(160,160,160,0.08); color: var(--text-tertiary); }
+
+/* Indicador de confianza */
+.confianza-dot { font-size: 12px; cursor: default; }
+.conf-rojo     { color: #F56565; }
+.conf-amarillo { color: #ECC94B; }
+.conf-verde    { color: #48BB78; }
+.conf-gris     { color: #A0AEC0; }
 
 @media (max-width: 768px) {
   .u-email { display: none; }

@@ -75,6 +75,34 @@ function filtrarPorNivel(items, reqUsuario, campoResponsables = 'responsables') 
   })
 }
 
+// Última actividad de tareas de un usuario en una fecha (para indicador de confianza de jornadas)
+async function ultimaActividadTareas(email, fecha) {
+  const [[row]] = await db.gestion.query(`
+    SELECT GREATEST(
+      COALESCE(MAX(t.fecha_fin_real), '2000-01-01'),
+      COALESCE(MAX(t.fecha_ult_modificacion), '2000-01-01')
+    ) AS ultima
+    FROM g_tareas t
+    JOIN g_tareas_responsables tr ON tr.tarea_id = t.id
+    WHERE tr.email = ? AND DATE(t.fecha_ult_modificacion) = ?
+  `, [email, fecha])
+  return row?.ultima && row.ultima > '2000-01-02' ? new Date(row.ultima) : null
+}
+
+// Indicador de confianza de una jornada cerrada
+// 🔴 rojo: cierre automático  🟡 amarillo: gap >30min o actividad post-cierre  🟢 verde: alineada  ⚪ gris: sin actividad
+function indicadorConfianza(jornada) {
+  if (!jornada.hora_fin) return null // abierta, no aplica
+  if (jornada.cierre_automatico) return 'rojo'
+  if (!jornada.ultima_actividad_tareas) return 'gris'
+  const fin = new Date(jornada.hora_fin)
+  const ult = new Date(jornada.ultima_actividad_tareas)
+  const diffMin = (fin - ult) / 60000
+  // Amarillo: última actividad >30min antes del cierre O actividad >30min después del cierre
+  if (diffMin > 30 || diffMin < -30) return 'amarillo'
+  return 'verde'
+}
+
 // Inicializar caché después de que DB esté lista (ver al final del archivo)
 
 const app = express()
@@ -1876,6 +1904,7 @@ app.get('/api/gestion/jornadas/hoy', requireAuth, async (req, res) => {
     `, [jornada.id])
 
     jornada.pausas = pausas
+    jornada.indicador_confianza = indicadorConfianza(jornada)
     res.json({ ok: true, jornada })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
@@ -1895,11 +1924,15 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
     if (activa) {
       const horasAbiertas = (ahora - new Date(activa.hora_inicio)) / 3600000
       if (horasAbiertas > 13) {
-        // Auto-cerrar jornada abandonada (>13h) con hora_fin = hora_inicio + 13h
-        const cierreAuto = new Date(new Date(activa.hora_inicio).getTime() + 13 * 3600000)
+        // Auto-cerrar jornada abandonada (>13h)
+        const ultimaAct = await ultimaActividadTareas(req.usuario.email, activa.fecha)
+        // Cierre = última actividad + 30min, o hora_inicio + 13h si no hay actividad
+        const cierreAuto = ultimaAct
+          ? new Date(ultimaAct.getTime() + 30 * 60000)
+          : new Date(new Date(activa.hora_inicio).getTime() + 13 * 3600000)
         await db.gestion.query(
-          'UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = NOW(), usuario_ult_modificacion = ? WHERE id = ?',
-          [cierreAuto, 'sistema', activa.id]
+          'UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = NOW(), cierre_automatico = 1, ultima_actividad_tareas = ?, usuario_ult_modificacion = ? WHERE id = ?',
+          [cierreAuto, ultimaAct, 'sistema', activa.id]
         )
       } else {
         return res.status(409).json({ error: `Tienes una jornada abierta del ${activa.fecha}. Ciérrala antes de iniciar una nueva.` })
@@ -1956,10 +1989,14 @@ app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => 
     const ahora = new Date()
     // hora_fin = valor del usuario (editable), hora_fin_registro = momento real del click (inmutable)
     const horaFin = req.body.hora_fin ? new Date(req.body.hora_fin) : ahora
+
+    // Calcular última actividad de tareas para indicador de confianza
+    const ultimaAct = await ultimaActividadTareas(req.usuario.email, jornada.fecha)
+
     await db.gestion.query(`
-      UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ?
+      UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = ?, ultima_actividad_tareas = ?, usuario_ult_modificacion = ?
       WHERE id = ?
-    `, [horaFin, ahora, req.usuario.email, jornada.id])
+    `, [horaFin, ahora, ultimaAct, req.usuario.email, jornada.id])
 
     const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [jornada.id])
     res.json({ ok: true, jornada: updated })
@@ -2057,7 +2094,13 @@ app.get('/api/gestion/jornadas/historial', requireAuth, async (req, res) => {
       LIMIT 100
     `, params)
 
-    res.json({ ok: true, jornadas })
+    // Agregar indicador de confianza a cada jornada cerrada
+    const jornadasConIndicador = jornadas.map(j => ({
+      ...j,
+      indicador_confianza: indicadorConfianza(j)
+    }))
+
+    res.json({ ok: true, jornadas: jornadasConIndicador })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
@@ -2349,6 +2392,8 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
     const jornadasFiltradas = jornadas.filter(j =>
       j.usuario === req.usuario.email || (nivelCache[j.usuario] || 1) < miNivel
     )
+    // Agregar indicador de confianza
+    jornadasFiltradas.forEach(j => { j.indicador_confianza = indicadorConfianza(j) })
     res.json({ ok: true, desde, hasta, jornadas: jornadasFiltradas })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
