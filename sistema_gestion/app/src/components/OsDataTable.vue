@@ -131,7 +131,7 @@
               v-for="(row, idx) in sortedRows"
               :key="row._pk || row.mes || row._key || idx"
               class="data-row"
-              :class="{ 'multi-sel': isSelected(row) }"
+              :class="[{ 'multi-sel': isSelected(row) }, props.rowClass?.(row)]"
               @click="onRowClick(row, $event)"
               @touchstart.passive="onRowTouchStart(row)"
               @touchend="onRowTouchEnd"
@@ -301,6 +301,7 @@ const props = defineProps({
   mes:      { type: String,  default: '' },
   tooltips: { type: Object,  default: () => ({}) },
   selectedIds: { type: Array, default: () => [] },
+  rowClass:     { type: Function, default: null },
 })
 
 const emit = defineEmits(['row-click', 'select-toggle'])

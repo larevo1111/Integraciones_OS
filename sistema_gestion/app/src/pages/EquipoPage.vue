@@ -21,6 +21,7 @@
         :rows="jornadasFiltradas"
         :columns="columnasComputed"
         :loading="cargando"
+        :row-class="jornadaRowClass"
         @row-click="abrirDetalle"
       >
         <template #toolbar>
@@ -129,6 +130,12 @@ const confTitulo = {
   verde:    'Actividad alineada con cierre',
   gris:     'Sin actividad de tareas registrada'
 }
+function jornadaRowClass(row) {
+  const c = row.indicador_confianza
+  if (c === 'rojo') return 'row-conf-rojo'
+  if (c === 'amarillo') return 'row-conf-amarillo'
+  return ''
+}
 
 // ── Filtros de tiempo ────────────────────────────────────
 const hoy = hoyLocal()
@@ -197,6 +204,7 @@ const estadoJornadaOptions = computed(() => {
 const columnasComputed = computed(() => {
   const multi = desde.value !== hasta.value
   return [
+    { key: 'indicador_confianza', label: '⬤',              visible: true,  width: '40px' },
     { key: '_nombre',             label: 'Usuario',          visible: true,  options: usuarioOptions.value },
     { key: 'fecha',              label: 'Fecha',            visible: multi },
     { key: 'hora_inicio',        label: 'Inicio (usr)',      visible: true,  width: '120px' },
@@ -209,7 +217,6 @@ const columnasComputed = computed(() => {
     { key: 'tiempo_total_sys',    label: 'T. Total (sys)',    visible: false },
     { key: 'tiempo_pausa_sys',   label: 'T. Pausas (sys)',   visible: false },
     { key: 'tiempo_laborado_sys',label: 'T. Laborado (sys)', visible: false },
-    { key: 'indicador_confianza', label: 'Confianza',         visible: true,  width: '90px' },
     { key: 'estado',             label: 'Estado',            visible: true,  options: estadoJornadaOptions.value },
     { key: 'tareas_count',       label: 'Tareas',            visible: true  },
     { key: 'dur_tareas_real',    label: 'Dur. sistema',       visible: true,  hint: 'Duración Sistema: tiempo entre inicio y fin real de cada tarea (calculado automáticamente)' },
@@ -321,6 +328,10 @@ function badgeClass(j) {
 .conf-amarillo { color: #ECC94B; }
 .conf-verde    { color: #48BB78; }
 .conf-gris     { color: #A0AEC0; }
+
+/* Resalte sutil de filas con confianza baja */
+:deep(.row-conf-rojo)     { background: rgba(245, 101, 101, 0.08) !important; }
+:deep(.row-conf-amarillo) { background: rgba(236, 201, 75, 0.06) !important; }
 
 @media (max-width: 768px) {
   .u-email { display: none; }
