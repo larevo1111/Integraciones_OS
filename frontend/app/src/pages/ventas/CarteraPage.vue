@@ -18,8 +18,22 @@
     <!-- ── CONTENT ── -->
     <div class="page-content">
 
+      <!-- Pill Tabs -->
+      <div class="pill-tabs">
+        <button class="pill-tab" :class="{ active: tab === 'hoy' }" @click="tab = 'hoy'">Hoy</button>
+        <button class="pill-tab" :class="{ active: tab === 'fecha' }" @click="onTabFecha">A fecha de corte</button>
+      </div>
+
+      <!-- Selector de fecha (solo tab fecha) -->
+      <div v-if="tab === 'fecha'" class="filter-bar">
+        <div class="filter-row">
+          <span class="filter-range-label">Fecha de corte</span>
+          <input v-model="fechaCorte" type="date" class="filter-date-input" @change="cargarFecha" />
+        </div>
+      </div>
+
       <!-- KPIs -->
-      <div v-if="!loading && resCliente.length > 0" class="kpi-section">
+      <div v-if="!loadingActivo && datosActivos.length > 0" class="kpi-section">
         <div class="kpi-card">
           <span class="kpi-label">Total pendiente</span>
           <span class="kpi-value">{{ fmtMoney(kpis.totalPendiente) }}</span>
@@ -42,13 +56,13 @@
         </div>
       </div>
 
-      <!-- Tabla cartera por cliente -->
+      <!-- Tabla cartera -->
       <OsDataTable
-        title="Cartera por cliente"
+        :title="tab === 'hoy' ? 'Cartera por cliente' : `Cartera al ${fechaCorte}`"
         recurso="cartera-cliente"
-        :rows="resCliente"
-        :columns="colsCliente"
-        :loading="loading"
+        :rows="datosActivos"
+        :columns="colsActivos"
+        :loading="loadingActivo"
         @row-click="onRowClick"
       />
     </div>
@@ -62,11 +76,23 @@ import axios from 'axios'
 import { ChevronRightIcon } from 'lucide-vue-next'
 import OsDataTable from 'src/components/OsDataTable.vue'
 
-const router     = useRouter()
+const router = useRouter()
 const API = '/api'
-const resCliente = ref([])
-const loading    = ref(true)
-const colsCliente = ref([])
+
+const tab = ref('hoy')
+const fechaCorte = ref('')
+
+// Datos por pestaña
+const resHoy = ref([])
+const resFecha = ref([])
+const colsHoy = ref([])
+const colsFecha = ref([])
+const loadingHoy = ref(true)
+const loadingFecha = ref(false)
+
+const datosActivos = computed(() => tab.value === 'hoy' ? resHoy.value : resFecha.value)
+const colsActivos = computed(() => tab.value === 'hoy' ? colsHoy.value : colsFecha.value)
+const loadingActivo = computed(() => tab.value === 'hoy' ? loadingHoy.value : loadingFecha.value)
 
 const VISIBLE = [
   'cliente', 'ciudad', 'vendedor', 'plazo',
@@ -94,8 +120,15 @@ function labelFromKey(key) {
   return LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
+function buildColumns(data) {
+  if (!data.length) return []
+  return Object.keys(data[0]).map(key => ({
+    key, label: labelFromKey(key), visible: VISIBLE.includes(key)
+  }))
+}
+
 const kpis = computed(() => {
-  const rows = resCliente.value
+  const rows = datosActivos.value
   return {
     totalPendiente: rows.reduce((s, r) => s + (parseFloat(r.total_pendiente) || 0), 0),
     numClientes:    rows.length,
@@ -115,14 +148,26 @@ function fmtMoney(n) {
 onMounted(async () => {
   try {
     const { data } = await axios.get(`${API}/ventas/cartera-cliente`)
-    resCliente.value = data
-    if (data.length > 0) {
-      colsCliente.value = Object.keys(data[0]).map(key => ({
-        key, label: labelFromKey(key), visible: VISIBLE.includes(key)
-      }))
-    }
-  } finally { loading.value = false }
+    resHoy.value = data
+    colsHoy.value = buildColumns(data)
+  } finally { loadingHoy.value = false }
 })
+
+function onTabFecha() {
+  tab.value = 'fecha'
+}
+
+async function cargarFecha() {
+  if (!fechaCorte.value) return
+  loadingFecha.value = true
+  try {
+    const { data } = await axios.get(`${API}/ventas/cartera-cliente-fecha`, {
+      params: { fecha: fechaCorte.value }
+    })
+    resFecha.value = data
+    colsFecha.value = buildColumns(data)
+  } finally { loadingFecha.value = false }
+}
 
 function onRowClick(row) {
   router.push(`/ventas/cartera/${encodeURIComponent(row.id_cliente)}`)
@@ -148,6 +193,29 @@ function onRowClick(row) {
 .page-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
 
 .page-content { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.pill-tabs { display: flex; gap: 4px; }
+.pill-tab {
+  padding: 5px 14px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.12s;
+}
+.pill-tab:hover { background: var(--bg-card-hover); }
+.pill-tab.active {
+  background: var(--accent); color: #fff;
+  border-color: var(--accent);
+}
+
+.filter-bar { display: flex; flex-direction: column; gap: 8px; }
+.filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filter-range-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.filter-date-input {
+  padding: 4px 8px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-default); background: var(--bg-input);
+  font-size: 13px; color: var(--text-primary);
+}
 
 .kpi-section { display: flex; gap: 12px; flex-wrap: wrap; }
 .kpi-card {

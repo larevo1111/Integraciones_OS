@@ -619,6 +619,46 @@ app.get('/api/ventas/cartera-cliente/:id_cliente', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ── CARTERA A FECHA: facturas con saldo pendiente a una fecha de corte ────
+app.get('/api/ventas/cartera-cliente-fecha', async (req, res) => {
+  try {
+    const fecha = req.query.fecha
+    if (!fecha) return res.status(400).json({ error: 'Parámetro fecha requerido' })
+    const rows = await query(`
+      SELECT
+        sub.id_cliente,
+        MAX(sub.cliente)                                                          AS cliente,
+        MAX(sub.ciudad)                                                           AS ciudad,
+        MAX(sub.vendedor)                                                         AS vendedor,
+        MAX(c.forma_de_pago)                                                      AS plazo,
+        COUNT(*)                                                                  AS num_facturas_pendientes,
+        SUM(sub.pdte_num)                                                         AS total_pendiente,
+        SUM(CASE WHEN sub.ant BETWEEN  1 AND  30 THEN sub.pdte_num ELSE 0 END)   AS saldo_1_30,
+        SUM(CASE WHEN sub.ant BETWEEN 31 AND  60 THEN sub.pdte_num ELSE 0 END)   AS saldo_31_60,
+        SUM(CASE WHEN sub.ant BETWEEN 61 AND  90 THEN sub.pdte_num ELSE 0 END)   AS saldo_61_90,
+        SUM(CASE WHEN sub.ant > 90               THEN sub.pdte_num ELSE 0 END)   AS saldo_mas_90,
+        ROUND(AVG(sub.ant), 0)                                                    AS promedio_antiguedad,
+        MAX(sub.ant)                                                              AS antiguedad_max
+      FROM (
+        SELECT *,
+               CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) AS pdte_num,
+               DATEDIFF(?, fecha_de_creacion)                                       AS ant
+        FROM zeffi_facturas_venta_encabezados
+        WHERE fecha_de_creacion <= ?
+          AND CAST(REPLACE(COALESCE(pdte_de_cobro,'0'),',','.') AS DECIMAL(15,2)) > 0
+      ) sub
+      LEFT JOIN (
+        SELECT numero_de_identificacion, MAX(forma_de_pago) AS forma_de_pago
+        FROM zeffi_clientes
+        GROUP BY numero_de_identificacion
+      ) c ON c.numero_de_identificacion = SUBSTRING_INDEX(sub.id_cliente, ' ', -1)
+      GROUP BY sub.id_cliente
+      ORDER BY total_pendiente DESC
+      LIMIT 1000`, [fecha, fecha])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ── CONSIGNACIÓN: resumen agrupado por cliente (Nivel 1) ─
 app.get('/api/ventas/consignacion', async (req, res) => {
   try {
@@ -636,6 +676,53 @@ app.get('/api/ventas/consignacion', async (req, res) => {
       WHERE vigencia = 'Vigente'
       GROUP BY id_cliente
       ORDER BY fin_total_consignacion DESC`)
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── CONSIGNACIÓN A FECHA: OVs vigentes a una fecha de corte ─
+app.get('/api/ventas/consignacion-fecha', async (req, res) => {
+  try {
+    const fecha = req.query.fecha
+    if (!fecha) return res.status(400).json({ error: 'Parámetro fecha requerido' })
+    const rows = await query(`
+      SELECT
+        id_cliente,
+        MAX(nombre_cliente)  AS nombre_cliente,
+        MAX(ciudad)          AS ciudad,
+        MAX(vendedor)        AS vendedor,
+        COUNT(*)             AS num_ordenes,
+        ROUND(SUM(CAST(REPLACE(COALESCE(total_neto,'0'),',','.') AS DECIMAL(15,2))),2) AS fin_total_consignacion,
+        MIN(fecha_de_creacion) AS fecha_primera_orden,
+        MAX(fecha_de_creacion) AS fecha_ultima_orden
+      FROM zeffi_ordenes_venta_encabezados
+      WHERE fecha_de_creacion <= ?
+        AND (vigencia = 'Vigente' OR (vigencia = 'Anulada' AND fecha_de_anulacion > ?))
+      GROUP BY id_cliente
+      ORDER BY fin_total_consignacion DESC`, [fecha, fecha])
+    res.json(rows)
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ── CONSIGNACIÓN POR PRODUCTO A FECHA ─
+app.get('/api/ventas/consignacion-por-producto-fecha', async (req, res) => {
+  try {
+    const fecha = req.query.fecha
+    if (!fecha) return res.status(400).json({ error: 'Parámetro fecha requerido' })
+    const rows = await query(`
+      SELECT
+        d.cod_articulo,
+        MIN(COALESCE(NULLIF(TRIM(d.descripcion_en_factura),''), d.descripcion_original)) AS descripcion_articulo,
+        COUNT(DISTINCT d.id_orden)                                                        AS num_ordenes,
+        COUNT(DISTINCT e.id_cliente)                                                      AS num_clientes,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.cantidad,'0'),',','.') AS DECIMAL(15,4))))     AS cantidad_total,
+        ROUND(SUM(CAST(REPLACE(COALESCE(d.total_neto,'0'),',','.') AS DECIMAL(15,2))))   AS fin_total
+      FROM zeffi_ordenes_venta_encabezados e
+      JOIN zeffi_ordenes_venta_detalle d ON d.id_orden = e.id_orden
+      WHERE e.fecha_de_creacion <= ?
+        AND (e.vigencia = 'Vigente' OR (e.vigencia = 'Anulada' AND e.fecha_de_anulacion > ?))
+      GROUP BY d.cod_articulo
+      ORDER BY fin_total DESC`, [fecha, fecha])
     res.json(rows)
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
