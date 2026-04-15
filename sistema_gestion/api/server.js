@@ -1981,7 +1981,11 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
     }
 
     // hora_inicio = valor del usuario (editable), hora_inicio_registro = momento real del click (inmutable)
-    const horaInicio = req.body.hora_inicio ? new Date(req.body.hora_inicio) : ahora
+    let horaInicio = req.body.hora_inicio ? new Date(req.body.hora_inicio) : ahora
+    // Validar que hora_inicio sea del mismo día (no permitir fechas de otro día)
+    if (localDateCO(horaInicio) !== hoy) {
+      return res.status(400).json({ error: 'La hora de inicio debe ser de hoy' })
+    }
 
     const [result] = await db.gestion.query(`
       INSERT INTO g_jornadas (empresa, usuario, fecha, hora_inicio, hora_inicio_registro, usuario_creador, usuario_ult_modificacion)
