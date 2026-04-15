@@ -1980,11 +1980,20 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
       }
     }
 
-    // hora_inicio = valor del usuario (editable), hora_inicio_registro = momento real del click (inmutable)
-    let horaInicio = req.body.hora_inicio ? new Date(req.body.hora_inicio) : ahora
-    // Validar que hora_inicio sea del mismo día (no permitir fechas de otro día)
-    if (localDateCO(horaInicio) !== hoy) {
-      return res.status(400).json({ error: 'La hora de inicio debe ser de hoy' })
+    // hora_inicio: el frontend envía solo HH:MM — el backend construye el datetime con fecha de hoy
+    let horaInicio = ahora
+    if (req.body.hora_inicio) {
+      const hi = String(req.body.hora_inicio)
+      if (hi.match(/^\d{2}:\d{2}$/)) {
+        // Solo hora (HH:MM) — construir datetime con fecha de hoy del servidor
+        horaInicio = new Date(`${hoy}T${hi}:00`)
+      } else {
+        // Datetime completo (compatibilidad) — validar que sea de hoy
+        horaInicio = new Date(hi)
+        if (localDateCO(horaInicio) !== hoy) {
+          return res.status(400).json({ error: 'La hora de inicio debe ser de hoy' })
+        }
+      }
     }
 
     const [result] = await db.gestion.query(`
@@ -2016,8 +2025,14 @@ app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => 
     if (pausaAbierta) return res.status(409).json({ error: 'Hay una pausa activa. Reanuda antes de finalizar.' })
 
     const ahora = new Date()
-    // hora_fin = valor del usuario (editable), hora_fin_registro = momento real del click (inmutable)
-    const horaFin = req.body.hora_fin ? new Date(req.body.hora_fin) : ahora
+    // hora_fin: el frontend envía solo HH:MM — construir datetime con fecha de la jornada
+    let horaFin = ahora
+    if (req.body.hora_fin) {
+      const hf = String(req.body.hora_fin)
+      horaFin = hf.match(/^\d{2}:\d{2}$/)
+        ? new Date(`${jornada.fecha}T${hf}:00`)
+        : new Date(hf)
+    }
 
     // Calcular última actividad de tareas para indicador de confianza
     const ultimaAct = await ultimaActividadTareas(req.usuario.email, jornada.fecha)
@@ -2163,8 +2178,14 @@ app.post('/api/gestion/jornadas/:id/pausas/iniciar', requireAuth, async (req, re
     const ahora = new Date()
     // Pausa retroactiva: hora_inicio y hora_fin del body → pausa completa inmediata
     // Pausa normal: hora_inicio = ahora, hora_fin = NULL (se cierra después con /reanudar)
-    const horaInicioPausa = hiBody ? new Date(hiBody) : ahora
-    const horaFinPausa    = hfBody ? new Date(hfBody) : null
+    // Frontend envía HH:MM — construir datetime con fecha de la jornada
+    function parseHora(val) {
+      if (!val) return null
+      const s = String(val)
+      return s.match(/^\d{2}:\d{2}$/) ? new Date(`${jornada.fecha}T${s}:00`) : new Date(s)
+    }
+    const horaInicioPausa = hiBody ? parseHora(hiBody) : ahora
+    const horaFinPausa    = hfBody ? parseHora(hfBody) : null
 
     const [result] = await db.gestion.query(`
       INSERT INTO g_jornada_pausas (empresa, jornada_id, hora_inicio, hora_inicio_registro, hora_fin, hora_fin_registro, observaciones, usuario_creador, usuario_ult_modificacion)
@@ -2246,8 +2267,15 @@ app.put('/api/gestion/jornadas/:id/pausas/:pausaId/reanudar', requireAuth, async
     if (pausa.hora_fin) return res.status(409).json({ error: 'La pausa ya fue cerrada' })
 
     const ahora = new Date()
-    // hora_fin = valor del usuario (editable), hora_fin_registro = momento real del click (inmutable)
-    const horaFinPausa = req.body.hora_fin ? new Date(req.body.hora_fin) : ahora
+    // hora_fin: frontend envía solo HH:MM
+    const [[jornadaPausa]] = await db.gestion.query('SELECT fecha FROM g_jornadas WHERE id = ?', [req.params.id])
+    let horaFinPausa = ahora
+    if (req.body.hora_fin) {
+      const hf = String(req.body.hora_fin)
+      horaFinPausa = hf.match(/^\d{2}:\d{2}$/)
+        ? new Date(`${jornadaPausa.fecha}T${hf}:00`)
+        : new Date(hf)
+    }
     await db.gestion.query(
       'UPDATE g_jornada_pausas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ? WHERE id = ?',
       [horaFinPausa, ahora, req.usuario.email, pausa.id]

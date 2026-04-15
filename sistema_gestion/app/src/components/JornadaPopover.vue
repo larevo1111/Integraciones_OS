@@ -48,10 +48,9 @@ onMounted(() => {
 })
 
 function confirmar() {
-  // Construir datetime completo combinando fecha del día + hora editada por el usuario
-  const fecha = props.fecha || hoyLocal()
-  const datetime = `${fecha}T${horaEditable.value}:00`
-  emit('confirmar', new Date(datetime).toISOString())
+  // Enviar solo la hora (HH:MM) — el backend construye el datetime con su propia fecha
+  // No confiar en la fecha del browser (puede estar desactualizada si la pestaña quedó abierta)
+  emit('confirmar', horaEditable.value)
 }
 
 const posStyle = computed(() => {
