@@ -196,6 +196,7 @@
                 class="quickadd-input"
                 placeholder="Agregar una tarea..."
                 @focus="mostrarFormTarea = true; if (!nuevaTareaCatId) nuevaTareaCatId = form.categoria_id"
+                @blur="ntSugerirSiNecesario"
                 @keydown.escape="mostrarFormTarea = false; nuevaTareaTitulo = ''"
               />
               <template v-if="mostrarFormTarea">
@@ -393,17 +394,23 @@ const nuevaTareaIALoading = ref(false)
 const nuevaTareaEtiquetas = ref([])
 const nuevaTareaFecha     = ref('')
 
-// Debounce: sugerir categoría IA 1.5s después de parar de escribir
+// Función central: sugerir categoría IA si el usuario no eligió manualmente
+async function ntSugerirSiNecesario() {
+  if (nuevaTareaCatManual.value || !nuevaTareaTitulo.value || nuevaTareaTitulo.value.length < 4) return
+  if (nuevaTareaCatId.value && !nuevaTareaCatManual.value) return
+  nuevaTareaIALoading.value = true
+  const sug = await sugerirCategoria(nuevaTareaTitulo.value)
+  nuevaTareaIALoading.value = false
+  if (sug?.categoria_id && !nuevaTareaCatManual.value) nuevaTareaCatId.value = sug.categoria_id
+}
+
+// Debounce 1.5s
 let ntDebounce = null
 watch(nuevaTareaTitulo, (val) => {
   if (ntDebounce) clearTimeout(ntDebounce)
   if (!val || val.length < 4 || nuevaTareaCatManual.value) return
-  ntDebounce = setTimeout(async () => {
-    nuevaTareaIALoading.value = true
-    const sug = await sugerirCategoria(val)
-    nuevaTareaIALoading.value = false
-    if (sug?.categoria_id && !nuevaTareaCatManual.value) nuevaTareaCatId.value = sug.categoria_id
-  }, 1500)
+  if (!nuevaTareaCatManual.value) nuevaTareaCatId.value = null
+  ntDebounce = setTimeout(ntSugerirSiNecesario, 1500)
 })
 
 async function crearTareaEnProyecto() {

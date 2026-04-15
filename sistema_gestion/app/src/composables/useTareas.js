@@ -44,8 +44,10 @@ export async function sugerirCategoria(titulo) {
   try {
     const data = await api(`/api/gestion/sugerir-categoria?titulo=${encodeURIComponent(titulo)}`)
     if (data.ok && data.categoria_id) return data
+    console.warn('[IA] sugerencia sin resultado:', data)
     return null
-  } catch {
+  } catch (e) {
+    console.error('[IA] sugerencia falló:', e.message)
     return null
   }
 }

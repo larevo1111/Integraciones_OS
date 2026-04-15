@@ -115,6 +115,7 @@
             v-model="qaTitulo"
             placeholder="Agregar una tarea..."
             @focus="qaActivo = true"
+            @blur="qaSugerirSiNecesario"
             @keydown.escape="qaCancelar"
           />
           <template v-if="qaActivo">
@@ -845,17 +846,25 @@ const qaEtiquetas   = ref([])
 const qaCatManual   = ref(false)  // true si el usuario eligió chip manualmente
 const qaIALoading   = ref(false)  // indicador visual de sugerencia en curso
 
-// Debounce: sugerir categoría IA 1.5s después de parar de escribir (solo tareas nuevas)
+// Función central: sugerir categoría IA si el usuario no eligió manualmente
+// Se llama desde: (1) debounce 1.5s, (2) blur del input, (3) submit si aún no hay categoría
+async function qaSugerirSiNecesario() {
+  if (qaCatManual.value || !qaTitulo.value || qaTitulo.value.length < 4) return
+  if (qaCatId.value && !qaCatManual.value) return  // ya sugerida por IA, no repetir
+  qaIALoading.value = true
+  const sug = await sugerirCategoria(qaTitulo.value)
+  qaIALoading.value = false
+  if (sug?.categoria_id && !qaCatManual.value) qaCatId.value = sug.categoria_id
+}
+
+// Debounce: dispara sugerencia 1.5s después de parar de escribir
 let qaDebounceTimer = null
 watch(qaTitulo, (val) => {
   if (qaDebounceTimer) clearTimeout(qaDebounceTimer)
   if (!val || val.length < 4 || qaCatManual.value) return
-  qaDebounceTimer = setTimeout(async () => {
-    qaIALoading.value = true
-    const sug = await sugerirCategoria(val)
-    qaIALoading.value = false
-    if (sug?.categoria_id && !qaCatManual.value) qaCatId.value = sug.categoria_id
-  }, 1500)
+  // Reset categoría IA previa al cambiar el título
+  if (!qaCatManual.value) qaCatId.value = null
+  qaDebounceTimer = setTimeout(qaSugerirSiNecesario, 1500)
 })
 
 const qaCatEsProduccion = computed(() =>
@@ -882,12 +891,9 @@ async function qaAgregar() {
   qaGuardando.value = true
   try {
     const defs = defaultsFromFilters.value
-    let catId = qaCatId.value  // Solo si el usuario eligió chip de categoría explícitamente
-    // Sugerencia IA si no eligió categoría manualmente (no heredar del filtro — la IA clasifica mejor)
-    if (!catId) {
-      const sug = await sugerirCategoria(qaTitulo.value)
-      catId = sug?.categoria_id || defs.categoria_id || categorias.value.find(c => c.nombre === 'Varios')?.id || categorias.value[0]?.id
-    }
+    // Si no hay categoría (ni manual ni IA), llamar IA ahora
+    if (!qaCatId.value) await qaSugerirSiNecesario()
+    const catId = qaCatId.value || categorias.value.find(c => c.nombre === 'Varios')?.id
     const body = {
       titulo:       qaTitulo.value,
       categoria_id: catId,

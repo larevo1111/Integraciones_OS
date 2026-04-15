@@ -30,6 +30,7 @@
               class="input-field titulo-input"
               v-model="form.titulo"
               placeholder="¿Qué hay que hacer?"
+              @blur="tfSugerirSiNecesario"
             />
 
             <!-- Categorías como chips -->
@@ -143,17 +144,21 @@ const form = ref({
 const catManual   = ref(false)
 const iaLoading   = ref(false)
 
-// Debounce: sugerir categoría IA 1.5s después de parar de escribir (solo tareas nuevas)
+// Función central: sugerir categoría IA si el usuario no eligió manualmente
+async function tfSugerirSiNecesario() {
+  if (catManual.value || editar.value || !form.value.titulo || form.value.titulo.length < 4) return
+  iaLoading.value = true
+  const sug = await sugerirCategoria(form.value.titulo)
+  iaLoading.value = false
+  if (sug?.categoria_id && !catManual.value) form.value.categoria_id = sug.categoria_id
+}
+
+// Debounce 1.5s (solo tareas nuevas)
 let tfDebounce = null
 watch(() => form.value.titulo, (val) => {
   if (tfDebounce) clearTimeout(tfDebounce)
   if (!val || val.length < 4 || catManual.value || editar.value) return
-  tfDebounce = setTimeout(async () => {
-    iaLoading.value = true
-    const sug = await sugerirCategoria(val)
-    iaLoading.value = false
-    if (sug?.categoria_id && !catManual.value) form.value.categoria_id = sug.categoria_id
-  }, 1500)
+  tfDebounce = setTimeout(tfSugerirSiNecesario, 1500)
 })
 
 const editar = computed(() => !!props.tareaEditar)
@@ -200,10 +205,7 @@ async function guardar() {
       tarea = data.tarea
     } else {
       // Sugerencia IA si no eligió categoría
-      if (!form.value.categoria_id) {
-        const sug = await sugerirCategoria(form.value.titulo)
-        if (sug) form.value.categoria_id = sug.categoria_id
-      }
+      if (!form.value.categoria_id || !catManual.value) await tfSugerirSiNecesario()
       if (!form.value.categoria_id) return // categoría requerida
       tarea = await crearTarea(form.value)
     }
