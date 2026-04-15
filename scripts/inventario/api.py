@@ -154,7 +154,7 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
     sql = """
         SELECT c.id, c.id_effi, c.cod_barras, c.nombre, c.categoria, c.bodega,
                c.inventario_teorico, c.inventario_fisico, c.diferencia,
-               c.costo_promedio, c.estado, c.contado_por, c.fecha_conteo, c.notas, c.foto,
+               c.costo_manual, c.estado, c.contado_por, c.fecha_conteo, c.notas, c.foto,
                r.grupo, r.unidad, r.rango_min, r.rango_max, r.factor_error
         FROM inv_conteos c
         LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
@@ -186,7 +186,7 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         r['inventario_teorico'] = float(r['inventario_teorico']) if r['inventario_teorico'] is not None else None
         r['inventario_fisico'] = float(r['inventario_fisico']) if r['inventario_fisico'] is not None else None
         r['diferencia'] = float(r['diferencia']) if r['diferencia'] is not None else None
-        r['costo_promedio'] = float(r['costo_promedio']) if r['costo_promedio'] is not None else 0
+        r['costo_manual'] = float(r['costo_manual']) if r['costo_manual'] is not None else 0
         r['fecha_conteo'] = str(r['fecha_conteo']) if r['fecha_conteo'] else None
         r['rango_min'] = float(r['rango_min']) if r['rango_min'] is not None else None
         r['rango_max'] = float(r['rango_max']) if r['rango_max'] is not None else None
@@ -331,7 +331,7 @@ def agregar_articulo(data: ArticuloAgregar):
     # Buscar datos del artículo en effi_data
     rows = db_query(DB_EFFI, """
         SELECT id, cod_barras, nombre, categoria,
-               CAST(REPLACE(COALESCE(costo_promedio,'0'), ',', '.') AS DECIMAL(12,2)) AS costo_promedio
+               CAST(REPLACE(COALESCE(costo_manual,'0'), ',', '.') AS DECIMAL(12,2)) AS costo_manual
         FROM zeffi_inventario
         WHERE id = %s AND vigencia = 'Vigente'
     """, (data.id_effi,))
@@ -353,10 +353,10 @@ def agregar_articulo(data: ArticuloAgregar):
     db_execute(DB_INV, """
         INSERT INTO inv_conteos
             (fecha_inventario, bodega, id_effi, cod_barras, nombre, categoria,
-             excluido, inventario_teorico, costo_promedio, estado)
+             excluido, inventario_teorico, costo_manual, estado)
         VALUES (%s, %s, %s, %s, %s, %s, 0, 0, %s, 'pendiente')
     """, (data.fecha_inventario, data.bodega, data.id_effi,
-          art['cod_barras'], art['nombre'], art['categoria'], art['costo_promedio']))
+          art['cod_barras'], art['nombre'], art['categoria'], art['costo_manual']))
 
     return {"ok": True, "nombre": art['nombre']}
 
@@ -417,7 +417,7 @@ async def agregar_no_matriculado(
             INSERT INTO inv_conteos
                 (fecha_inventario, bodega, id_effi, nombre, categoria,
                  excluido, inventario_teorico, inventario_fisico, diferencia,
-                 costo_promedio, estado, contado_por, fecha_conteo, notas, foto)
+                 costo_manual, estado, contado_por, fecha_conteo, notas, foto)
             VALUES (%s, %s, %s, %s, %s, 0, 0, %s, %s, %s, 'contado', %s, NOW(), %s, %s)
         """, (fecha_inventario, bodega, f'NM-{uuid.uuid4().hex[:6]}', nombre,
               f'NO MATRICULADO ({unidad})', cantidad, cantidad, costo,
@@ -755,10 +755,10 @@ def calcular_gestion(data: GestionCalcular):
         SELECT c.id_effi,
                c.nombre,
                GROUP_CONCAT(DISTINCT c.bodega ORDER BY c.bodega) AS bodegas,
-               SUM(COALESCE(c.inventario_teorico, 0)) AS total_teorico,
+               MAX(COALESCE(c.inventario_teorico, 0)) AS total_teorico,
                SUM(COALESCE(c.inventario_fisico, 0)) AS total_fisico,
-               SUM(COALESCE(c.diferencia, 0)) AS total_diferencia,
-               MAX(COALESCE(c.costo_promedio, 0)) AS costo_promedio,
+               SUM(COALESCE(c.inventario_fisico, 0)) - MAX(COALESCE(c.inventario_teorico, 0)) AS total_diferencia,
+               MAX(COALESCE(c.costo_manual, 0)) AS costo_manual,
                r.grupo, r.unidad
         FROM inv_conteos c
         LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
@@ -770,7 +770,7 @@ def calcular_gestion(data: GestionCalcular):
         return {"ok": False, "mensaje": "No hay conteos para esa fecha"}
 
     # 2. Calcular valor total del inventario (para umbrales de severidad)
-    valor_total = sum(abs(float(r['total_teorico'] or 0) * float(r['costo_promedio'] or 0)) for r in rows)
+    valor_total = sum(abs(float(r['total_teorico'] or 0) * float(r['costo_manual'] or 0)) for r in rows)
     if valor_total == 0:
         valor_total = 1  # evitar division por cero
 
@@ -781,7 +781,7 @@ def calcular_gestion(data: GestionCalcular):
         cur.execute("DELETE FROM inv_gestion WHERE fecha_inventario = %s", (data.fecha_inventario,))
         for r in rows:
             dif = float(r['total_diferencia'] or 0)
-            costo = float(r['costo_promedio'] or 0)
+            costo = float(r['costo_manual'] or 0)
             impacto = dif * costo
             pct = abs(impacto) / valor_total * 100 if valor_total > 0 else 0
 
@@ -820,7 +820,7 @@ def calcular_gestion(data: GestionCalcular):
             cur.execute("""
                 INSERT INTO inv_gestion
                     (fecha_inventario, id_effi, nombre, grupo, unidad, bodegas,
-                     total_teorico, total_fisico, total_diferencia, costo_promedio,
+                     total_teorico, total_fisico, total_diferencia, costo_manual,
                      impacto_economico, severidad)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (data.fecha_inventario, r['id_effi'], r['nombre'], grupo, unidad, bodegas_json,
@@ -843,8 +843,8 @@ def gestion_dashboard(fecha: str):
     if not rows:
         return {"vacio": True}
 
-    valor_teorico = sum(float(r['total_teorico'] or 0) * float(r['costo_promedio'] or 0) for r in rows)
-    valor_fisico = sum(float(r['total_fisico'] or 0) * float(r['costo_promedio'] or 0) for r in rows)
+    valor_teorico = sum(float(r['total_teorico'] or 0) * float(r['costo_manual'] or 0) for r in rows)
+    valor_fisico = sum(float(r['total_fisico'] or 0) * float(r['costo_manual'] or 0) for r in rows)
     impacto_total = sum(float(r['impacto_economico'] or 0) for r in rows)
 
     con_dif = [r for r in rows if float(r['total_diferencia'] or 0) != 0]
@@ -870,8 +870,8 @@ def gestion_dashboard(fecha: str):
         grupos[g]['total'] += 1
         if float(r['total_diferencia'] or 0) == 0:
             grupos[g]['exactos'] += 1
-        grupos[g]['valor_teorico'] += float(r['total_teorico'] or 0) * float(r['costo_promedio'] or 0)
-        grupos[g]['valor_fisico'] += float(r['total_fisico'] or 0) * float(r['costo_promedio'] or 0)
+        grupos[g]['valor_teorico'] += float(r['total_teorico'] or 0) * float(r['costo_manual'] or 0)
+        grupos[g]['valor_fisico'] += float(r['total_fisico'] or 0) * float(r['costo_manual'] or 0)
         grupos[g]['impacto'] += float(r['impacto_economico'] or 0)
 
     for g in grupos.values():
@@ -904,6 +904,48 @@ def gestion_dashboard(fecha: str):
     }
 
 
+@app.get("/api/inventario/costos")
+def listar_costos(fecha: str):
+    """Datos de valorización para la pestaña Costos — usa costo_manual."""
+    rows = db_query(DB_INV, """
+        SELECT c.id_effi, c.nombre, c.categoria, c.bodega,
+               COALESCE(r.grupo, '') AS grupo,
+               COALESCE(r.unidad, '') AS unidad,
+               COALESCE(c.inventario_teorico, 0) AS teorico,
+               COALESCE(c.inventario_fisico, 0) AS fisico,
+               COALESCE(c.diferencia, 0) AS diferencia,
+               COALESCE(c.costo_manual, 0) AS costo_manual
+        FROM inv_conteos c
+        LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+        WHERE c.fecha_inventario = %s AND c.excluido = 0
+        ORDER BY c.categoria, c.nombre
+    """, (fecha,))
+
+    result = []
+    for r in rows:
+        teorico = float(r['teorico'] or 0)
+        fisico = float(r['fisico']) if r['fisico'] is not None else None
+        dif = float(r['diferencia'] or 0)
+        costo = float(r['costo_manual'] or 0)
+        result.append({
+            'id_effi': r['id_effi'],
+            'nombre': r['nombre'],
+            'categoria': r['categoria'] or '',
+            'grupo': r['grupo'],
+            'unidad': r['unidad'],
+            'bodega': r['bodega'],
+            'costo_manual': round(costo, 2),
+            'teorico': round(teorico, 2),
+            'fisico': round(fisico, 2) if fisico is not None else None,
+            'diferencia': round(dif, 2),
+            'valor_teorico': round(teorico * costo, 2),
+            'valor_fisico': round(fisico * costo, 2) if fisico is not None else None,
+            'impacto': round(dif * costo, 2),
+        })
+
+    return result
+
+
 @app.get("/api/inventario/gestion")
 def listar_gestion(fecha: str, severidad: Optional[str] = None, estado: Optional[str] = None,
                    grupo: Optional[str] = None, bodega: Optional[str] = None, solo_diferencias: bool = True):
@@ -930,7 +972,7 @@ def listar_gestion(fecha: str, severidad: Optional[str] = None, estado: Optional
     rows = db_query(DB_INV, sql, params)
 
     for r in rows:
-        for campo in ['total_teorico', 'total_fisico', 'total_diferencia', 'costo_promedio', 'impacto_economico']:
+        for campo in ['total_teorico', 'total_fisico', 'total_diferencia', 'costo_manual', 'impacto_economico']:
             r[campo] = float(r[campo]) if r[campo] is not None else 0
         r['fecha_revision'] = str(r['fecha_revision']) if r['fecha_revision'] else None
         r['analizado_en'] = str(r['analizado_en']) if r['analizado_en'] else None
@@ -959,7 +1001,7 @@ def detalle_gestion(gestion_id: int):
             c[campo] = float(c[campo]) if c[campo] is not None else None
         c['fecha_conteo'] = str(c['fecha_conteo']) if c['fecha_conteo'] else None
 
-    for campo in ['total_teorico', 'total_fisico', 'total_diferencia', 'costo_promedio', 'impacto_economico']:
+    for campo in ['total_teorico', 'total_fisico', 'total_diferencia', 'costo_manual', 'impacto_economico']:
         g[campo] = float(g[campo]) if g[campo] is not None else 0
     g['fecha_revision'] = str(g['fecha_revision']) if g['fecha_revision'] else None
     g['analizado_en'] = str(g['analizado_en']) if g['analizado_en'] else None

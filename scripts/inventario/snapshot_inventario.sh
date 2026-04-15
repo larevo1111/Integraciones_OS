@@ -22,7 +22,7 @@ ARCHIVO="$SNAP_DIR/inventario_${FECHA}_${HORA}.csv"
 mysql -u osadmin -pEpist2487. effi_data -e "
   SELECT id, nombre, categoria, vigencia,
          REPLACE(stock_total_empresa, ',', '.') AS stock_total,
-         REPLACE(costo_promedio, ',', '.') AS costo_promedio,
+         REPLACE(costo_manual, ',', '.') AS costo_manual,
          REPLACE(stock_bodega_principal_sucursal_principal, ',', '.') AS stock_principal,
          REPLACE(stock_bodega_jenifer_sucursal_principal, ',', '.') AS stock_jenifer,
          REPLACE(stock_bodega_santiago_sucursal_principal, ',', '.') AS stock_santiago,

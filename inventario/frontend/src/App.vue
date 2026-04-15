@@ -234,6 +234,9 @@
         <button class="inv-tab" :class="{ active: vistaActiva === 'gestion' }" @click="vistaActiva = 'gestion'; cargarGestion()">
           <span class="material-icons" style="font-size:15px">analytics</span> Gestión
         </button>
+        <button class="inv-tab" :class="{ active: vistaActiva === 'costos' }" @click="vistaActiva = 'costos'; cargarCostos()">
+          <span class="material-icons" style="font-size:15px">attach_money</span> Costos
+        </button>
       </div>
 
       <!-- ═══ VISTA CONTEO ═══ -->
@@ -646,6 +649,18 @@
 
       </template><!-- /VISTA GESTIÓN -->
 
+      <!-- ═══ VISTA COSTOS ═══ -->
+      <template v-if="vistaActiva === 'costos'">
+        <div class="costos-container">
+          <OsDataTable
+            :rows="costosRows"
+            :columns="costosColumns"
+            :loading="costosLoading"
+            title="Valorización de Inventario"
+          />
+        </div>
+      </template><!-- /VISTA COSTOS -->
+
     </div><!-- /inv-content -->
 
     <!-- FAB -->
@@ -905,7 +920,7 @@
           <div class="ges-detalle-info">
             <span class="grupo-tag" :class="'grupo-' + (gesDetalleData.gestion.grupo || 'mp').toLowerCase()">{{ gesDetalleData.gestion.grupo }}</span>
             <span class="unidad-tag">{{ gesDetalleData.gestion.unidad }}</span>
-            <span class="ges-detalle-costo">Costo: ${{ Number(gesDetalleData.gestion.costo_promedio).toLocaleString() }}</span>
+            <span class="ges-detalle-costo">Costo: ${{ Number(gesDetalleData.gestion.costo_manual).toLocaleString() }}</span>
             <span class="ges-sev-dot" :class="'sev-' + gesDetalleData.gestion.severidad" style="margin-left:auto"></span>
             <span style="font-size:11px;color:var(--text-tertiary)">{{ gesDetalleData.gestion.severidad }}</span>
           </div>
@@ -1077,6 +1092,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import OsDataTable from './components/OsDataTable.vue'
 
 const API = window.location.origin
 const AUTH_API = 'https://gestion.oscomunidad.com'
@@ -1135,6 +1151,34 @@ const resultadosAsignar = ref([])
 const effiSeleccionado = ref(null)
 // Vista activa
 const vistaActiva = ref('conteo')
+// Costos
+const costosRows = ref([])
+const costosLoading = ref(false)
+const costosColumns = ref([
+  { key: 'id_effi', label: 'Cód', visible: true, nowrap: true },
+  { key: 'nombre', label: 'Artículo', visible: true },
+  { key: 'categoria', label: 'Categoría', visible: true,
+    options: [] },
+  { key: 'grupo', label: 'Tipo', visible: true,
+    options: [
+      { value: 'MP', label: 'Materia Prima' },
+      { value: 'INS', label: 'Insumos' },
+      { value: 'PP', label: 'Producto en Proceso' },
+      { value: 'PT', label: 'Producto Terminado' },
+      { value: 'DS', label: 'Desechable' },
+      { value: 'DES', label: 'Desperdicio' },
+      { value: 'NM', label: 'No Matriculado' },
+    ] },
+  { key: 'bodega', label: 'Bodega', visible: false,
+    options: [] },
+  { key: 'costo_manual', label: 'Costo Unit.', visible: true, nowrap: true },
+  { key: 'teorico', label: 'Cant. Teórica', visible: true, nowrap: true },
+  { key: 'fisico', label: 'Cant. Física', visible: true, nowrap: true },
+  { key: 'diferencia', label: 'Diferencia', visible: true, nowrap: true },
+  { key: 'valor_teorico', label: 'Val. Teórico', visible: true, nowrap: true },
+  { key: 'valor_fisico', label: 'Val. Físico', visible: true, nowrap: true },
+  { key: 'impacto', label: 'Impacto $', visible: true, nowrap: true },
+])
 // Sub-pestaña de Gestión
 const gesSubtab = ref('dashboard')
 // Auditoría OPs
@@ -1567,6 +1611,27 @@ async function pollSync() {
       }
     }
   } catch { clearInterval(_syncPoll) }
+}
+
+// ── Costos ──
+async function cargarCostos() {
+  costosLoading.value = true
+  try {
+    const data = await fetchApi(`/api/inventario/costos?fecha=${FECHA.value}`)
+    costosRows.value = data
+
+    // Generar opciones dinámicas para filtro categoría y bodega
+    const cats = [...new Set(data.map(r => r.categoria).filter(Boolean))].sort()
+    const bods = [...new Set(data.map(r => r.bodega).filter(Boolean))].sort()
+    const catCol = costosColumns.value.find(c => c.key === 'categoria')
+    const bodCol = costosColumns.value.find(c => c.key === 'bodega')
+    if (catCol) catCol.options = cats.map(c => ({ value: c, label: c }))
+    if (bodCol) bodCol.options = bods.map(b => ({ value: b, label: b }))
+  } catch (e) {
+    console.error('Error cargando costos:', e)
+  } finally {
+    costosLoading.value = false
+  }
 }
 
 // ── Gestión ──
@@ -2606,4 +2671,12 @@ onUnmounted(() => clearInterval(clockInterval))
 .cp-footer { border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
 .cp-clear-btn { width: 100%; height: 26px; border-radius: 4px; border: none; background: transparent; font-size: 12px; color: #f87171; cursor: pointer; font-family: inherit; }
 .cp-clear-btn:hover { background: rgba(248,113,113,0.08); }
+
+/* ── COSTOS ── */
+.costos-container {
+  padding: 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
 </style>

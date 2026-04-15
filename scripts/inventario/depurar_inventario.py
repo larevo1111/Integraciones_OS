@@ -48,7 +48,7 @@ def obtener_articulos():
     )
     sql = f"""
         SELECT id, cod_barras, nombre, categoria, gestion_de_stock,
-               CAST(REPLACE(COALESCE(costo_promedio,'0'), ',', '.') AS DECIMAL(12,2)) AS costo_promedio,
+               CAST(REPLACE(COALESCE(costo_manual,'0'), ',', '.') AS DECIMAL(12,2)) AS costo_manual,
                {cols_bodega}
         FROM zeffi_inventario
         WHERE vigencia = 'Vigente'
@@ -91,7 +91,7 @@ def guardar(fecha_inv, filas):
         sql = """
             INSERT INTO inv_conteos
                 (fecha_inventario, bodega, id_effi, cod_barras, nombre, categoria,
-                 excluido, razon_exclusion, inventario_teorico, costo_promedio, estado)
+                 excluido, razon_exclusion, inventario_teorico, costo_manual, estado)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pendiente')
         """
         cur.executemany(sql, filas)
@@ -120,7 +120,7 @@ def main():
             # Excluidos: una sola fila sin bodega específica
             filas.append((
                 fecha_inv, '—', a['id'], a['cod_barras'], a['nombre'],
-                a['categoria'], 1, razon, None, a['costo_promedio']
+                a['categoria'], 1, razon, None, a['costo_manual']
             ))
             stats['excluidos'] += 1
             stats['razones'][razon] = stats['razones'].get(razon, 0) + 1
@@ -134,7 +134,7 @@ def main():
                     filas.append((
                         fecha_inv, nombre_bodega, a['id'], a['cod_barras'],
                         a['nombre'], a['categoria'], 0, None,
-                        stock, a['costo_promedio']
+                        stock, a['costo_manual']
                     ))
                     stats['filas_bodega'] += 1
                     tiene_stock = True
@@ -144,7 +144,7 @@ def main():
                 filas.append((
                     fecha_inv, 'Principal', a['id'], a['cod_barras'],
                     a['nombre'], a['categoria'], 0, None,
-                    0, a['costo_promedio']
+                    0, a['costo_manual']
                 ))
                 stats['filas_bodega'] += 1
 
