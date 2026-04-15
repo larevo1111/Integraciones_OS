@@ -701,6 +701,8 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
   border-radius: var(--radius-lg);
   overflow: visible;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── TOOLBAR ── */
@@ -846,7 +848,7 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 .export-desc  { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
 
 /* ── TABLA ── */
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow: auto; flex: 1; min-height: 0; }
 .os-table     { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 .th {

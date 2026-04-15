@@ -2675,7 +2675,12 @@ onUnmounted(() => clearInterval(clockInterval))
 /* ── COSTOS ── */
 .costos-container {
   padding: 12px;
-  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.costos-container .os-table-wrapper {
   flex: 1;
   min-height: 0;
 }
