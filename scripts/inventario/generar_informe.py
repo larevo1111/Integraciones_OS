@@ -344,29 +344,60 @@ Se contaron <strong>{r['contados']}</strong> de {r['total']} artículos registra
     {filas_top}
 </table>
 
-<!-- ═══ PÁGINA 4: HALLAZGOS Y RECOMENDACIONES ═══ -->
+<!-- ═══ PÁGINA 4: CORRECCIONES, HALLAZGOS Y RECOMENDACIONES ═══ -->
 <div class="page-break"></div>
-<h2>4. Hallazgos y Análisis</h2>
+<h2>4. Errores Detectados y Correcciones Aplicadas</h2>
+
+<h3>4.1 Error de registro en conteo físico</h3>
 <div class="hallazgos">
-    <strong>Principales hallazgos:</strong>
+    <p>Durante la revisión se detectó que el conteo de <strong>25,30 kg de Nibs de Cacao</strong> fue registrado en el artículo equivocado:</p>
+    <table style="margin:8px 0">
+        <tr><th>Cód</th><th>Artículo</th><th>Antes</th><th>Después</th></tr>
+        <tr><td>358</td><td>NIBS DE CACAO SF X KG</td><td>Físico: 25,30</td><td class="neg">Físico: 0 (error de registro)</td></tr>
+        <tr><td>178</td><td>NIBS DE CACAO X KG LT</td><td>Físico: 0</td><td class="pos">Físico: 25,30 (valor correcto)</td></tr>
+    </table>
+    <p>Impacto: la diferencia del cód 178 pasó de -44,45 a -19,15 (-$459.600 menos de faltante).</p>
+</div>
+
+<h3>4.2 Costos manuales corregidos en Effi</h3>
+<div class="hallazgos">
+    <p>Se detectaron <strong>11 artículos</strong> con costo manual incorrecto ($0 o $1) que distorsionaban la valorización. Se corrigieron en Effi:</p>
+    <table style="margin:8px 0">
+        <tr><th>Cód</th><th>Artículo</th><th>Costo anterior</th><th>Costo corregido</th></tr>
+        <tr><td>275</td><td>CHOCOBEETAL X KG</td><td class="neg">$0</td><td>$26.964</td></tr>
+        <tr><td>509</td><td>ALMENDRA x 100 GRS</td><td class="neg">$1</td><td>$11.603</td></tr>
+        <tr><td>512</td><td>Macadamia Tostada x 100 GRS</td><td class="neg">$1</td><td>$8.803</td></tr>
+        <tr><td>485</td><td>MANTECA DE CACAO TEMPLADA X KG</td><td class="neg">$45</td><td>$50.000</td></tr>
+        <tr><td>195</td><td>MARAÑON x KILO MARZO 2024</td><td class="neg">$0</td><td>$62.000</td></tr>
+        <tr><td>513</td><td>Marañon x 100 GRS</td><td class="neg">$1</td><td>$8.503</td></tr>
+        <tr><td>173</td><td>Muestra Chocolate de mesa 2 porciones</td><td class="neg">$0</td><td>$2.000</td></tr>
+        <tr><td>142</td><td>RECIPACK 2.0 160X240</td><td class="neg">$0</td><td>$279</td></tr>
+        <tr><td>140</td><td>RECIPACK 2.0 100X180</td><td class="neg">$0</td><td>$236</td></tr>
+        <tr><td>141</td><td>RECIPACK 2.0 133X210</td><td class="neg">$0</td><td>$216</td></tr>
+        <tr><td>NM-*</td><td>Miel os 275 / Miel panal 150 (No Matriculados)</td><td class="neg">$0</td><td>$7.362 / $4.589</td></tr>
+    </table>
+    <p>Impacto: la valorización del inventario subió <strong>$354.754</strong> tras las correcciones de costos.</p>
+</div>
+
+<h2>5. Hallazgos Generales</h2>
+<div class="hallazgos">
     <ul>
         <li><strong>Materias Primas</strong> concentran el mayor faltante: almendra de cacao, polen, vainilla y maní representan el grueso de la diferencia.</li>
         <li><strong>Cajas de chocolate</strong> (cód 412, 580) muestran sobrante significativo — posiblemente stock recibido no registrado en Effi.</li>
         <li><strong>Productos en Proceso</strong> (nibs, coberturas) presentan faltantes importantes — posible consumo en producción no registrado.</li>
         <li><strong>Etiquetas</strong> (cód 90) con -852 unidades de diferencia — probable consumo acumulado sin registro.</li>
         <li><strong>Bodega Desarrollo</strong>: stock en 0. No requiere traslado.</li>
-        <li><strong>{d['sin_costo']}</strong> artículos no tienen costo manual asignado en Effi — su valorización es $0.</li>
-        <li><strong>Productos No Conformes</strong>: se encontraron {sum(1 for p in d['pnc'] if float(p['fisico'] or 0)>0)} artículos por valor de {fmtm(pnc_total)}.</li>
+        <li><strong>{d['sin_costo']}</strong> artículos aún no tienen costo manual asignado en Effi (sin stock físico, no afectan valorización).</li>
+        <li><strong>Productos No Conformes</strong>: {sum(1 for p in d['pnc'] if float(p['fisico'] or 0)>0)} artículos por valor de {fmtm(pnc_total)}.</li>
     </ul>
 </div>
 
-<h2>5. Ajustes Recomendados y Próximos Pasos</h2>
+<h2>6. Ajustes Recomendados y Próximos Pasos</h2>
 <div class="recomendaciones">
-    <strong>Recomendaciones:</strong>
     <ul>
         <li>Generar ajuste de inventario en Effi para alinear stock del sistema con el conteo físico.</li>
         <li>Investigar las 20 inconsistencias críticas antes de ajustar — algunas pueden ser errores de registro corregibles.</li>
-        <li>Asignar costo manual a los {d['sin_costo']} artículos que no lo tienen para completar la valorización.</li>
+        <li>Asignar costo manual a los {d['sin_costo']} artículos que aún no lo tienen.</li>
         <li>Definir destino de los productos no conformes (disposición, reproceso o baja).</li>
         <li>Implementar inventarios parciales periódicos (semanal por categoría o quincenal por valor ABC).</li>
         <li>Este informe se aprueba como <strong>nueva línea base</strong> del inventario.</li>
