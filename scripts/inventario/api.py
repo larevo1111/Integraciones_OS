@@ -583,23 +583,137 @@ def estado_teorico(fecha: str):
 class NuevoInventario(BaseModel):
     fecha_inventario: str
     usuario: str
+    tipo: str = 'completo'  # 'completo' o 'parcial'
+    articulos: Optional[list] = None  # lista de id_effi para parcial
+
+
+@app.get("/api/inventario/sugerir-articulos")
+def sugerir_articulos(cantidad: int = 15):
+    """Sugiere artículos para inventario parcial con criterios inteligentes."""
+    import random
+
+    # 1. Artículos con mayor diferencia en el último inventario
+    ultima_fecha = db_query(DB_INV, "SELECT MAX(fecha_inventario) AS f FROM inv_conteos")[0]['f']
+    con_diferencia = []
+    if ultima_fecha:
+        con_diferencia = db_query(DB_INV, """
+            SELECT c.id_effi, c.nombre, c.categoria, c.bodega, c.costo_manual,
+                   c.inventario_fisico, c.inventario_teorico, c.diferencia,
+                   COALESCE(r.grupo,'') AS grupo
+            FROM inv_conteos c
+            LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+            WHERE c.fecha_inventario = %s AND c.excluido = 0 AND c.bodega = 'Principal'
+              AND c.diferencia IS NOT NULL AND ROUND(c.diferencia, 2) != 0
+            ORDER BY ABS(c.diferencia * COALESCE(c.costo_manual, 0)) DESC
+        """, (ultima_fecha,))
+
+    # 2. Artículos con mayor valor de stock (alto riesgo económico)
+    alto_valor = db_query(DB_INV, """
+        SELECT c.id_effi, c.nombre, c.categoria, c.bodega, c.costo_manual,
+               c.inventario_fisico, c.inventario_teorico, c.diferencia,
+               COALESCE(r.grupo,'') AS grupo
+        FROM inv_conteos c
+        LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+        WHERE c.fecha_inventario = %s AND c.excluido = 0 AND c.bodega = 'Principal'
+          AND c.inventario_fisico IS NOT NULL AND c.inventario_fisico > 0
+        ORDER BY c.inventario_fisico * COALESCE(c.costo_manual, 0) DESC
+    """, (ultima_fecha,)) if ultima_fecha else []
+
+    # Construir lista priorizada sin duplicados
+    seleccionados = {}
+    def agregar(art, razon, prioridad):
+        eid = art['id_effi']
+        if eid not in seleccionados or prioridad < seleccionados[eid]['prioridad']:
+            seleccionados[eid] = {
+                'id_effi': eid, 'nombre': art['nombre'], 'categoria': art['categoria'] or '',
+                'grupo': art['grupo'], 'costo_manual': float(art['costo_manual'] or 0),
+                'razon': razon, 'prioridad': prioridad, 'seleccionado': True
+            }
+
+    # Criterio 1: top diferencias (40% del cupo)
+    cupo_dif = max(1, int(cantidad * 0.4))
+    for a in con_diferencia[:cupo_dif]:
+        dif = float(a['diferencia'] or 0)
+        imp = abs(dif * float(a['costo_manual'] or 0))
+        agregar(a, f'Diferencia alta: {dif:+.1f} (${imp:,.0f})', 1)
+
+    # Criterio 2: alto valor económico (30% del cupo)
+    cupo_val = max(1, int(cantidad * 0.3))
+    added = 0
+    for a in alto_valor:
+        if a['id_effi'] not in seleccionados and added < cupo_val:
+            val = float(a['inventario_fisico'] or 0) * float(a['costo_manual'] or 0)
+            agregar(a, f'Alto valor: ${val:,.0f}', 2)
+            added += 1
+
+    # Criterio 3: aleatorios para completar (30% restante), distribuidos por grupo
+    if ultima_fecha:
+        todos = db_query(DB_INV, """
+            SELECT c.id_effi, c.nombre, c.categoria, c.bodega, c.costo_manual,
+                   c.inventario_fisico, c.inventario_teorico, c.diferencia,
+                   COALESCE(r.grupo,'') AS grupo
+            FROM inv_conteos c
+            LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+            WHERE c.fecha_inventario = %s AND c.excluido = 0 AND c.bodega = 'Principal'
+              AND c.inventario_fisico IS NOT NULL
+        """, (ultima_fecha,))
+        disponibles = [a for a in todos if a['id_effi'] not in seleccionados]
+        random.shuffle(disponibles)
+        faltantes = cantidad - len(seleccionados)
+        for a in disponibles[:max(0, faltantes)]:
+            agregar(a, 'Verificación aleatoria', 3)
+
+    result = sorted(seleccionados.values(), key=lambda x: x['prioridad'])
+    return result[:cantidad]
 
 
 @app.post("/api/inventario/nuevo")
 def crear_inventario(data: NuevoInventario):
-    """Crea un nuevo evento de inventario ejecutando el depurador."""
-    import subprocess
-    result = subprocess.run(
-        ['python3', os.path.join(BASE_DIR, 'scripts/inventario/depurar_inventario.py'),
-         '--fecha', data.fecha_inventario],
-        capture_output=True, text=True, cwd=BASE_DIR
-    )
-    if result.returncode != 0:
-        raise HTTPException(status_code=500, detail=result.stderr or 'Error al crear inventario')
+    """Crea un nuevo evento de inventario (completo o parcial)."""
+    if data.tipo == 'completo':
+        import subprocess
+        result = subprocess.run(
+            ['python3', os.path.join(BASE_DIR, 'scripts/inventario/depurar_inventario.py'),
+             '--fecha', data.fecha_inventario],
+            capture_output=True, text=True, cwd=BASE_DIR
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=result.stderr or 'Error al crear inventario')
+        registrar_auditoria(0, 'nuevo_inventario', data.usuario, None, data.fecha_inventario,
+                            f'Inventario COMPLETO creado para {data.fecha_inventario}')
+        return {"ok": True, "output": result.stdout}
+
+    # Parcial: crear solo los artículos seleccionados
+    if not data.articulos or len(data.articulos) == 0:
+        raise HTTPException(400, 'Debe seleccionar al menos un artículo para inventario parcial')
+
+    placeholders = ','.join(['%s'] * len(data.articulos))
+    arts = db_query(DB_EFFI, f"""
+        SELECT id, cod_barras, nombre, categoria,
+               CAST(REPLACE(COALESCE(costo_manual,'0'),',','.') AS DECIMAL(12,2)) AS costo_manual,
+               CAST(REPLACE(COALESCE(stock_bodega_principal_sucursal_principal,'0'),',','.') AS DECIMAL(12,2)) AS stock
+        FROM zeffi_inventario WHERE id IN ({placeholders}) AND vigencia = 'Vigente'
+    """, data.articulos)
+
+    if not arts:
+        raise HTTPException(404, 'No se encontraron artículos válidos')
+
+    # Limpiar filas previas de esta fecha (si se re-crea)
+    db_execute(DB_INV, "DELETE FROM inv_conteos WHERE fecha_inventario = %s", (data.fecha_inventario,))
+
+    for a in arts:
+        stock = float(a['stock'] or 0)
+        db_execute(DB_INV, """
+            INSERT INTO inv_conteos
+                (fecha_inventario, bodega, id_effi, cod_barras, nombre, categoria,
+                 excluido, inventario_teorico, costo_manual, estado)
+            VALUES (%s, 'Principal', %s, %s, %s, %s, 0, %s, %s, 'pendiente')
+        """, (data.fecha_inventario, a['id'], a['cod_barras'], a['nombre'],
+              a['categoria'], stock, a['costo_manual']))
 
     registrar_auditoria(0, 'nuevo_inventario', data.usuario, None, data.fecha_inventario,
-                        f'Inventario creado para {data.fecha_inventario}')
-    return {"ok": True, "output": result.stdout}
+                        f'Inventario PARCIAL creado: {len(arts)} artículos')
+    return {"ok": True, "articulos": len(arts)}
 
 
 @app.post("/api/inventario/reiniciar")

@@ -63,17 +63,63 @@
 
     <!-- MODAL NUEVO INVENTARIO -->
     <div v-if="mostrarNuevoInv" class="inv-overlay" @click.self="mostrarNuevoInv = false">
-      <div class="inv-modal inv-modal-sm">
+      <div class="inv-modal" :class="nuevoInvTipo === 'parcial' && sugeridos.length ? 'inv-modal-lg' : 'inv-modal-sm'">
         <div class="inv-modal-header">
           <span>Nuevo inventario</span>
           <button class="action-btn" @click="mostrarNuevoInv = false"><span class="material-icons">close</span></button>
         </div>
         <div class="inv-modal-body">
-          <label class="inv-form-label">Fecha de corte del inventario</label>
+          <label class="inv-form-label">Fecha de corte</label>
           <input v-model="nuevaFechaInv" type="date" class="inv-form-input">
-          <p class="inv-form-hint">Se generarán los artículos inventariables con el stock teórico a esta fecha.</p>
-          <button class="inv-btn-primary" :disabled="!nuevaFechaInv || creandoInv" @click="crearInventario">
-            {{ creandoInv ? 'Creando...' : 'Crear inventario' }}
+
+          <label class="inv-form-label" style="margin-top:12px">Tipo de inventario</label>
+          <div class="inv-tipo-toggle">
+            <button class="inv-tipo-btn" :class="{ active: nuevoInvTipo === 'completo' }" @click="nuevoInvTipo = 'completo'; sugeridos = []">
+              <span class="material-icons" style="font-size:16px">select_all</span> Completo
+            </button>
+            <button class="inv-tipo-btn" :class="{ active: nuevoInvTipo === 'parcial' }" @click="nuevoInvTipo = 'parcial'">
+              <span class="material-icons" style="font-size:16px">checklist</span> Parcial
+            </button>
+          </div>
+
+          <template v-if="nuevoInvTipo === 'completo'">
+            <p class="inv-form-hint">Se generarán todos los artículos inventariables con el stock a esta fecha.</p>
+          </template>
+
+          <template v-if="nuevoInvTipo === 'parcial'">
+            <div class="inv-parcial-config">
+              <label class="inv-form-label">Cantidad de artículos</label>
+              <div class="inv-parcial-row">
+                <input v-model.number="cantidadParcial" type="number" min="5" max="50" class="inv-form-input" style="width:80px">
+                <button class="inv-btn-secondary" :disabled="sugiriend" @click="sugerirArticulos">
+                  <span class="material-icons" :class="{ spin: sugiriend }" style="font-size:14px">auto_awesome</span>
+                  {{ sugiriend ? 'Cargando...' : 'Sugerir artículos' }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="sugeridos.length" class="inv-sugeridos">
+              <div class="inv-sugeridos-header">
+                <span class="inv-form-label" style="margin:0">{{ sugeridos.filter(s => s.seleccionado).length }} seleccionados de {{ sugeridos.length }}</span>
+                <button class="inv-link-btn" @click="sugeridos.forEach(s => s.seleccionado = true)">Todos</button>
+                <button class="inv-link-btn" @click="sugeridos.forEach(s => s.seleccionado = false)">Ninguno</button>
+              </div>
+              <div class="inv-sugeridos-list">
+                <label v-for="s in sugeridos" :key="s.id_effi" class="inv-sugerido-item" :class="{ checked: s.seleccionado }">
+                  <input type="checkbox" v-model="s.seleccionado">
+                  <span class="inv-sug-cod">{{ s.id_effi }}</span>
+                  <span class="inv-sug-nombre">{{ s.nombre }}</span>
+                  <span class="inv-sug-grupo">{{ s.grupo }}</span>
+                  <span class="inv-sug-razon">{{ s.razon }}</span>
+                </label>
+              </div>
+            </div>
+          </template>
+
+          <button class="inv-btn-primary" style="margin-top:12px"
+            :disabled="!nuevaFechaInv || creandoInv || (nuevoInvTipo === 'parcial' && sugeridos.filter(s => s.seleccionado).length === 0)"
+            @click="crearInventario">
+            {{ creandoInv ? 'Creando...' : nuevoInvTipo === 'completo' ? 'Crear inventario completo' : `Crear inventario parcial (${sugeridos.filter(s => s.seleccionado).length} art.)` }}
           </button>
         </div>
       </div>
@@ -1175,6 +1221,10 @@ const politicas = ref({ acciones: {} })
 const mostrarNuevoInv = ref(false)
 const nuevaFechaInv = ref('')
 const creandoInv = ref(false)
+const nuevoInvTipo = ref('completo')
+const cantidadParcial = ref(15)
+const sugeridos = ref([])
+const sugiriend = ref(false)
 const mostrarConfirmReiniciar = ref(false)
 const textoConfirmReiniciar = ref('')
 const mostrarConfirmEliminar = ref(false)
@@ -1978,18 +2028,46 @@ function verFoto(a) {
 }
 
 // ── Gestión de inventarios ──
+async function sugerirArticulos() {
+  sugiriend.value = true
+  try {
+    const data = await fetchApi(`/api/inventario/sugerir-articulos?cantidad=${cantidadParcial.value}`)
+    sugeridos.value = data.map(a => ({ ...a, seleccionado: true }))
+  } catch (e) {
+    alert('Error sugiriendo artículos: ' + e.message)
+  } finally {
+    sugiriend.value = false
+  }
+}
+
 async function crearInventario() {
   if (!nuevaFechaInv.value) return
   creandoInv.value = true
-  await fetch(API + '/api/inventario/nuevo', {
-    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fecha_inventario: nuevaFechaInv.value, usuario: usuario.value })
-  })
-  mostrarNuevoInv.value = false
-  nuevaFechaInv.value = ''
-  creandoInv.value = false
-  await cargarFechas()
-  cambiarFecha(nuevaFechaInv.value || FECHA.value)
+  const body = {
+    fecha_inventario: nuevaFechaInv.value,
+    usuario: usuario.value,
+    tipo: nuevoInvTipo.value
+  }
+  if (nuevoInvTipo.value === 'parcial') {
+    body.articulos = sugeridos.value.filter(s => s.seleccionado).map(s => s.id_effi)
+  }
+  try {
+    await fetch(API + '/api/inventario/nuevo', {
+      method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    const fechaCreada = nuevaFechaInv.value
+    mostrarNuevoInv.value = false
+    nuevaFechaInv.value = ''
+    nuevoInvTipo.value = 'completo'
+    sugeridos.value = []
+    await cargarFechas()
+    cambiarFecha(fechaCreada)
+  } catch (e) {
+    alert('Error creando inventario: ' + e.message)
+  } finally {
+    creandoInv.value = false
+  }
 }
 
 function confirmarReiniciar() { mostrarConfirmReiniciar.value = true }
@@ -2414,9 +2492,35 @@ onUnmounted(() => clearInterval(clockInterval))
 .inv-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 50; display: flex; align-items: center; justify-content: center; }
 .inv-modal { background: var(--bg-card, #1c1c1e); border: 1px solid var(--border-default); border-radius: 8px; width: 460px; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 80px rgba(0,0,0,0.8); transition: width 0.2s ease; }
 .inv-modal-sm { width: 380px; }
+.inv-modal-lg { width: 560px; }
 .inv-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); font-weight: 500; }
-.inv-modal-body { padding: 16px; }
-.inv-modal-expanded { width: 500px; }
+.inv-modal-body { padding: 16px; overflow-y: auto; }
+
+/* Toggle tipo inventario */
+.inv-tipo-toggle { display: flex; gap: 6px; margin-bottom: 8px; }
+.inv-tipo-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 6px; border: 1px solid var(--border-default); background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 100ms; }
+.inv-tipo-btn.active { background: var(--accent-muted); border-color: var(--accent-border); color: var(--accent); }
+.inv-tipo-btn:hover:not(.active) { border-color: var(--border-strong); color: var(--text-primary); }
+
+/* Config parcial */
+.inv-parcial-config { margin: 8px 0; }
+.inv-parcial-row { display: flex; align-items: center; gap: 8px; }
+.inv-btn-secondary { display: flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--accent-border); background: var(--accent-muted); color: var(--accent); font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.inv-btn-secondary:disabled { opacity: 0.4; cursor: default; }
+
+/* Lista sugeridos */
+.inv-sugeridos { margin-top: 10px; border: 1px solid var(--border-default); border-radius: 6px; overflow: hidden; }
+.inv-sugeridos-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); background: rgba(255,255,255,0.02); }
+.inv-link-btn { background: none; border: none; color: var(--accent); font-size: 11px; cursor: pointer; font-family: inherit; text-decoration: underline; padding: 0; }
+.inv-sugeridos-list { max-height: 300px; overflow-y: auto; }
+.inv-sugerido-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; font-size: 11px; border-bottom: 1px solid var(--border-subtle); transition: background 60ms; }
+.inv-sugerido-item:hover { background: var(--bg-row-hover); }
+.inv-sugerido-item.checked { background: rgba(0,200,83,0.04); }
+.inv-sugerido-item input[type="checkbox"] { margin: 0; accent-color: var(--accent); cursor: pointer; }
+.inv-sug-cod { width: 35px; color: var(--text-tertiary); font-size: 10px; }
+.inv-sug-nombre { flex: 1; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv-sug-grupo { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+.inv-sug-razon { font-size: 9px; color: var(--text-tertiary); white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .inv-modal-tabs { display: flex; border-bottom: 1px solid var(--border-subtle); padding: 0 16px; }
 .inv-modal-tab { padding: 8px 14px; font-size: 12px; font-weight: 500; color: var(--text-tertiary); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.1s; }
 .inv-modal-tab:hover { color: var(--text-secondary); }
@@ -2722,7 +2826,7 @@ onUnmounted(() => clearInterval(clockInterval))
   .action-btn { width: 16px; height: 16px; }
 
   /* Modales */
-  .inv-modal, .inv-modal-sm { width: calc(100vw - 16px); margin: 8px; }
+  .inv-modal, .inv-modal-sm, .inv-modal-lg { width: calc(100vw - 16px); margin: 8px; }
 
   /* FAB */
   .inv-fab { width: 44px; height: 44px; bottom: 12px; right: 10px; }
