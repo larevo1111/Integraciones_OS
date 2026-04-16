@@ -904,6 +904,46 @@ def gestion_dashboard(fecha: str):
     }
 
 
+# ── Observaciones ──────────────────────────────────
+
+class ObservacionInput(BaseModel):
+    fecha_inventario: str
+    tipo: str = 'manual'
+    descripcion: str
+    detalle: Optional[str] = None
+    usuario: str = 'sistema'
+
+@app.get("/api/inventario/observaciones")
+def listar_observaciones(fecha: str):
+    rows = db_query(DB_INV, """
+        SELECT id, tipo, descripcion, detalle, registrado_por, created_at
+        FROM inv_observaciones WHERE fecha_inventario = %s ORDER BY created_at DESC
+    """, (fecha,))
+    for r in rows:
+        r['created_at'] = str(r['created_at']) if r['created_at'] else None
+    return rows
+
+@app.post("/api/inventario/observaciones")
+def agregar_observacion(data: ObservacionInput):
+    db_execute(DB_INV, """
+        INSERT INTO inv_observaciones (fecha_inventario, tipo, descripcion, detalle, registrado_por)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (data.fecha_inventario, data.tipo, data.descripcion, data.detalle, data.usuario))
+    return {"ok": True}
+
+@app.delete("/api/inventario/observaciones/{obs_id}")
+def eliminar_observacion(obs_id: int):
+    db_execute(DB_INV, "DELETE FROM inv_observaciones WHERE id = %s", (obs_id,))
+    return {"ok": True}
+
+def registrar_observacion(fecha, tipo, descripcion, detalle=None, usuario='sistema'):
+    """Helper para registrar observaciones automáticas."""
+    db_execute(DB_INV, """
+        INSERT INTO inv_observaciones (fecha_inventario, tipo, descripcion, detalle, registrado_por)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (fecha, tipo, descripcion, detalle, usuario))
+
+
 @app.get("/api/inventario/informe")
 def generar_informe(fecha: str):
     """Genera y descarga el informe PDF del inventario."""

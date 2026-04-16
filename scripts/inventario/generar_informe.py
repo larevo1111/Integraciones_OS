@@ -130,10 +130,17 @@ def recopilar(fecha):
         ORDER BY c.categoria, c.nombre
     """, (fecha,))
 
+    # Observaciones de BD
+    observaciones = q("""
+        SELECT tipo, descripcion, detalle, registrado_por, created_at
+        FROM inv_observaciones WHERE fecha_inventario = %s ORDER BY tipo, created_at
+    """, (fecha,))
+
     return {
         'fecha': fecha, 'resumen': resumen, 'val': val,
         'bodegas': bodegas, 'tipos': tipos, 'categorias': categorias,
-        'top20': top20, 'pnc': pnc, 'sin_costo': sin_costo, 'listado': listado
+        'top20': top20, 'pnc': pnc, 'sin_costo': sin_costo, 'listado': listado,
+        'observaciones': observaciones
     }
 
 
@@ -212,6 +219,43 @@ def generar_html(d):
             <td class="r">{fmtm(l['valor_fisico'])}</td>
             <td class="r {cls_dif}">{fmtm(l['impacto'])}</td>
         </tr>"""
+
+    # Observaciones agrupadas por tipo
+    obs = d.get('observaciones', [])
+    obs_errores = [o for o in obs if o['tipo'] == 'error_conteo']
+    obs_costos = [o for o in obs if o['tipo'] == 'correccion_costo']
+    obs_hallazgos = [o for o in obs if o['tipo'] == 'hallazgo']
+    obs_manuales = [o for o in obs if o['tipo'] == 'manual']
+
+    filas_observaciones = ''
+    if obs_errores:
+        filas_observaciones += '<h3>4.1 Errores de registro en conteo físico</h3><div class="hallazgos"><ul>'
+        for o in obs_errores:
+            filas_observaciones += f'<li><strong>{o["descripcion"]}</strong>'
+            if o['detalle']:
+                filas_observaciones += f'<br/><span style="font-size:8pt;color:#666">{o["detalle"]}</span>'
+            filas_observaciones += '</li>'
+        filas_observaciones += '</ul></div>'
+
+    if obs_costos:
+        filas_observaciones += f'<h3>4.{2 if obs_errores else 1} Costos manuales corregidos en Effi</h3>'
+        filas_observaciones += f'<div class="hallazgos"><p>Se corrigieron <strong>{len(obs_costos)}</strong> artículos con costo manual incorrecto:</p><ul>'
+        for o in obs_costos:
+            filas_observaciones += f'<li>{o["descripcion"]}</li>'
+        filas_observaciones += '</ul></div>'
+
+    if obs_hallazgos or obs_manuales:
+        n = 3 if obs_errores and obs_costos else (2 if obs_errores or obs_costos else 1)
+        filas_observaciones += f'<h3>4.{n} Observaciones adicionales</h3><div class="hallazgos"><ul>'
+        for o in obs_hallazgos + obs_manuales:
+            filas_observaciones += f'<li>{o["descripcion"]}'
+            if o['detalle']:
+                filas_observaciones += f' — <em>{o["detalle"]}</em>'
+            filas_observaciones += f' <span style="font-size:7pt;color:#999">({o["registrado_por"]})</span></li>'
+        filas_observaciones += '</ul></div>'
+
+    if not obs:
+        filas_observaciones = '<p style="color:#999;font-style:italic">No se registraron observaciones para este inventario.</p>'
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -347,37 +391,7 @@ Se contaron <strong>{r['contados']}</strong> de {r['total']} artículos registra
 <!-- ═══ PÁGINA 4: CORRECCIONES, HALLAZGOS Y RECOMENDACIONES ═══ -->
 <div class="page-break"></div>
 <h2>4. Errores Detectados y Correcciones Aplicadas</h2>
-
-<h3>4.1 Error de registro en conteo físico</h3>
-<div class="hallazgos">
-    <p>Durante la revisión se detectó que el conteo de <strong>25,30 kg de Nibs de Cacao</strong> fue registrado en el artículo equivocado:</p>
-    <table style="margin:8px 0">
-        <tr><th>Cód</th><th>Artículo</th><th>Antes</th><th>Después</th></tr>
-        <tr><td>358</td><td>NIBS DE CACAO SF X KG</td><td>Físico: 25,30</td><td class="neg">Físico: 0 (error de registro)</td></tr>
-        <tr><td>178</td><td>NIBS DE CACAO X KG LT</td><td>Físico: 0</td><td class="pos">Físico: 25,30 (valor correcto)</td></tr>
-    </table>
-    <p>Impacto: la diferencia del cód 178 pasó de -44,45 a -19,15 (-$459.600 menos de faltante).</p>
-</div>
-
-<h3>4.2 Costos manuales corregidos en Effi</h3>
-<div class="hallazgos">
-    <p>Se detectaron <strong>11 artículos</strong> con costo manual incorrecto ($0 o $1) que distorsionaban la valorización. Se corrigieron en Effi:</p>
-    <table style="margin:8px 0">
-        <tr><th>Cód</th><th>Artículo</th><th>Costo anterior</th><th>Costo corregido</th></tr>
-        <tr><td>275</td><td>CHOCOBEETAL X KG</td><td class="neg">$0</td><td>$26.964</td></tr>
-        <tr><td>509</td><td>ALMENDRA x 100 GRS</td><td class="neg">$1</td><td>$11.603</td></tr>
-        <tr><td>512</td><td>Macadamia Tostada x 100 GRS</td><td class="neg">$1</td><td>$8.803</td></tr>
-        <tr><td>485</td><td>MANTECA DE CACAO TEMPLADA X KG</td><td class="neg">$45</td><td>$50.000</td></tr>
-        <tr><td>195</td><td>MARAÑON x KILO MARZO 2024</td><td class="neg">$0</td><td>$62.000</td></tr>
-        <tr><td>513</td><td>Marañon x 100 GRS</td><td class="neg">$1</td><td>$8.503</td></tr>
-        <tr><td>173</td><td>Muestra Chocolate de mesa 2 porciones</td><td class="neg">$0</td><td>$2.000</td></tr>
-        <tr><td>142</td><td>RECIPACK 2.0 160X240</td><td class="neg">$0</td><td>$279</td></tr>
-        <tr><td>140</td><td>RECIPACK 2.0 100X180</td><td class="neg">$0</td><td>$236</td></tr>
-        <tr><td>141</td><td>RECIPACK 2.0 133X210</td><td class="neg">$0</td><td>$216</td></tr>
-        <tr><td>NM-*</td><td>Miel os 275 / Miel panal 150 (No Matriculados)</td><td class="neg">$0</td><td>$7.362 / $4.589</td></tr>
-    </table>
-    <p>Impacto: la valorización del inventario subió <strong>$354.754</strong> tras las correcciones de costos.</p>
-</div>
+{filas_observaciones}
 
 <h2>5. Hallazgos Generales</h2>
 <div class="hallazgos">

@@ -465,6 +465,38 @@
           </button>
         </div>
 
+        <!-- OBSERVACIONES -->
+        <div class="ges-observaciones">
+          <div class="ges-obs-header" @click="obsExpanded = !obsExpanded">
+            <span class="material-icons ges-chevron" :class="{ expandido: obsExpanded }">chevron_right</span>
+            <span style="font-weight:600;font-size:12px">Observaciones del inventario</span>
+            <span class="ges-subtab-badge" v-if="observaciones.length">{{ observaciones.length }}</span>
+          </div>
+          <div v-if="obsExpanded" class="ges-obs-body">
+            <div v-for="obs in observaciones" :key="obs.id" class="ges-obs-item">
+              <span class="ges-obs-tipo" :class="'obs-' + obs.tipo">{{ {error_conteo:'Error conteo',correccion_costo:'Corrección costo',hallazgo:'Hallazgo',manual:'Nota'}[obs.tipo] || obs.tipo }}</span>
+              <span class="ges-obs-texto">{{ obs.descripcion }}</span>
+              <span class="ges-obs-fecha">{{ obs.registrado_por }} · {{ obs.created_at?.slice(0,10) }}</span>
+              <button v-if="puede('cerrar_inventario')" class="ges-obs-del" @click.stop="eliminarObservacion(obs.id)" title="Eliminar">
+                <span class="material-icons" style="font-size:12px">close</span>
+              </button>
+            </div>
+            <div v-if="!observaciones.length" style="font-size:11px;color:var(--text-tertiary);padding:6px 0">Sin observaciones</div>
+            <form class="ges-obs-form" @submit.prevent="agregarObservacion">
+              <select v-model="nuevaObsTipo" class="ges-obs-select">
+                <option value="manual">Nota</option>
+                <option value="hallazgo">Hallazgo</option>
+                <option value="error_conteo">Error conteo</option>
+                <option value="correccion_costo">Corrección costo</option>
+              </select>
+              <input v-model="nuevaObsTexto" class="ges-obs-input" placeholder="Escribir observación..." />
+              <button type="submit" class="ges-obs-add" :disabled="!nuevaObsTexto.trim()">
+                <span class="material-icons" style="font-size:14px">add</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
         <!-- ACORDEONES POR GRUPO -->
         <div class="ges-acordeones" v-if="gesDash?.por_grupo">
           <div v-for="g in gesDash.por_grupo.filter(x => x.total > 0)" :key="g.grupo" class="ges-grupo-acordeon">
@@ -1183,6 +1215,11 @@ const costosColumns = ref([
   { key: 'valor_fisico', label: 'Val. Físico', visible: true, nowrap: true },
   { key: 'impacto', label: 'Impacto $', visible: true, nowrap: true },
 ])
+// Observaciones
+const observaciones = ref([])
+const obsExpanded = ref(false)
+const nuevaObsTipo = ref('manual')
+const nuevaObsTexto = ref('')
 // Sub-pestaña de Gestión
 const gesSubtab = ref('dashboard')
 // Auditoría OPs
@@ -1653,6 +1690,25 @@ function gesEstadoLabel(est) {
   return map[est] || est
 }
 
+async function cargarObservaciones() {
+  try {
+    observaciones.value = await fetchApi(`/api/inventario/observaciones?fecha=${FECHA.value}`)
+  } catch (e) { console.error(e) }
+}
+async function agregarObservacion() {
+  if (!nuevaObsTexto.value.trim()) return
+  await fetchApi('/api/inventario/observaciones', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fecha_inventario: FECHA.value, tipo: nuevaObsTipo.value, descripcion: nuevaObsTexto.value.trim(), usuario: usuario.value })
+  })
+  nuevaObsTexto.value = ''
+  await cargarObservaciones()
+}
+async function eliminarObservacion(id) {
+  await fetchApi(`/api/inventario/observaciones/${id}`, { method: 'DELETE' })
+  await cargarObservaciones()
+}
+
 async function descargarInforme() {
   generandoInforme.value = true
   try {
@@ -1675,6 +1731,7 @@ async function descargarInforme() {
 async function cargarGestion() {
   await cargarGesDashboard()
   await cargarGesArticulos()
+  await cargarObservaciones()
 }
 
 async function cargarGesDashboard() {
@@ -2695,6 +2752,28 @@ onUnmounted(() => clearInterval(clockInterval))
 .cp-footer { border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
 .cp-clear-btn { width: 100%; height: 26px; border-radius: 4px; border: none; background: transparent; font-size: 12px; color: #f87171; cursor: pointer; font-family: inherit; }
 .cp-clear-btn:hover { background: rgba(248,113,113,0.08); }
+
+/* ── OBSERVACIONES ── */
+.ges-observaciones { margin: 0 0 10px; border: 1px solid var(--border-default); border-radius: 6px; overflow: hidden; }
+.ges-obs-header { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; background: var(--bg-card); }
+.ges-obs-header:hover { background: var(--bg-row-hover); }
+.ges-obs-body { padding: 8px 12px; border-top: 1px solid var(--border-subtle); }
+.ges-obs-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border-subtle); font-size: 11px; }
+.ges-obs-tipo { font-size: 9px; font-weight: 600; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+.obs-error_conteo { background: rgba(248,113,113,0.15); color: #f87171; }
+.obs-correccion_costo { background: rgba(251,191,36,0.15); color: #f59e0b; }
+.obs-hallazgo { background: rgba(96,165,250,0.15); color: #60a5fa; }
+.obs-manual { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.ges-obs-texto { flex: 1; color: var(--text-primary); }
+.ges-obs-fecha { font-size: 10px; color: var(--text-tertiary); white-space: nowrap; }
+.ges-obs-del { background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 2px; border-radius: 3px; }
+.ges-obs-del:hover { background: rgba(248,113,113,0.15); color: #f87171; }
+.ges-obs-form { display: flex; gap: 6px; margin-top: 8px; }
+.ges-obs-select { height: 28px; border-radius: 4px; border: 1px solid var(--border-default); background: var(--bg-input); color: var(--text-primary); font-size: 11px; padding: 0 6px; font-family: inherit; }
+.ges-obs-input { flex: 1; height: 28px; border-radius: 4px; border: 1px solid var(--border-default); background: var(--bg-input); color: var(--text-primary); font-size: 11px; padding: 0 8px; font-family: inherit; }
+.ges-obs-input:focus { border-color: var(--accent); outline: none; }
+.ges-obs-add { height: 28px; width: 28px; border-radius: 4px; border: 1px solid var(--accent); background: var(--accent-muted); color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.ges-obs-add:disabled { opacity: 0.3; cursor: default; }
 
 /* ── COSTOS ── */
 .costos-container {
