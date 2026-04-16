@@ -904,6 +904,26 @@ def gestion_dashboard(fecha: str):
     }
 
 
+@app.get("/api/inventario/informe")
+def generar_informe(fecha: str):
+    """Genera y descarga el informe PDF del inventario."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("generar_informe",
+        os.path.join(os.path.dirname(__file__), 'generar_informe.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    generar_pdf = mod.generar_pdf
+    output_dir = os.path.join(BASE_DIR, 'inventario', 'informes')
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f'informe_inventario_{fecha}.pdf')
+    try:
+        generar_pdf(fecha, output_path)
+    except Exception as e:
+        raise HTTPException(500, f'Error generando informe: {e}')
+    return FileResponse(output_path, media_type='application/pdf',
+                        filename=f'Informe_Inventario_OS_{fecha}.pdf')
+
+
 @app.get("/api/inventario/costos")
 def listar_costos(fecha: str):
     """Datos de valorización para la pestaña Costos — usa costo_manual."""

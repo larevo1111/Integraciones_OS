@@ -459,6 +459,10 @@
           <span class="ges-accion-info">{{ gesTotalFiltrados }} artículos</span>
           <button class="ges-action-btn-sec" @click="expandirTodos">Expandir todos</button>
           <button class="ges-action-btn-sec" @click="colapsarTodos">Colapsar todos</button>
+          <button class="ges-action-btn" :disabled="generandoInforme" @click="descargarInforme" style="margin-left:auto">
+            <span class="material-icons" :class="{ spin: generandoInforme }" style="font-size:15px">picture_as_pdf</span>
+            {{ generandoInforme ? 'Generando...' : 'Informe PDF' }}
+          </button>
         </div>
 
         <!-- ACORDEONES POR GRUPO -->
@@ -1207,6 +1211,7 @@ const gesFiltroGrupo = ref(null)
 const gesAnalizando = ref(false)
 const gesProgreso = ref(0)
 const gesTotal = ref(0)
+const generandoInforme = ref(false)
 const gesDetalleVisible = ref(false)
 const gesDetalleData = ref(null)
 const gesGruposExpandidos = ref({})
@@ -1646,6 +1651,25 @@ function fmtMoney(val) {
 function gesEstadoLabel(est) {
   const map = { pendiente: 'Pendiente', analizado: 'Analizado', justificada: 'Justificada', requiere_ajuste: 'Req. ajuste', ajustada: 'Ajustada' }
   return map[est] || est
+}
+
+async function descargarInforme() {
+  generandoInforme.value = true
+  try {
+    const resp = await fetch(`${API}/api/inventario/informe?fecha=${FECHA.value}`)
+    if (!resp.ok) throw new Error('Error generando informe')
+    const blob = await resp.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Informe_Inventario_OS_${FECHA.value}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    alert('Error generando informe: ' + e.message)
+  } finally {
+    generandoInforme.value = false
+  }
 }
 
 async function cargarGestion() {
