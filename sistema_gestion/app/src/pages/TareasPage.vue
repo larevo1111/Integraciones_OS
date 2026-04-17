@@ -849,24 +849,23 @@ const qaIALoading   = ref(false)  // indicador visual de sugerencia en curso
 // Función central: sugerir categoría IA si el usuario no eligió manualmente
 // Se llama desde: (1) debounce 1.5s, (2) blur del input, (3) submit si aún no hay categoría
 async function qaSugerirSiNecesario() {
-  if (qaCatManual.value) { console.log('[IA-cat] skip: manual'); return }
-  if (!qaTitulo.value || qaTitulo.value.length < 4) { console.log('[IA-cat] skip: titulo corto'); return }
-  if (qaCatId.value && !qaCatManual.value) { console.log('[IA-cat] skip: ya sugerida', qaCatId.value); return }
-  console.log('[IA-cat] llamando IA para:', qaTitulo.value)
+  if (qaCatManual.value) return           // usuario eligió chip en ESTA tarea
+  if (!qaTitulo.value || qaTitulo.value.length < 4) return
+  if (qaCatId.value) return               // ya sugerida para este título
   qaIALoading.value = true
   const sug = await sugerirCategoria(qaTitulo.value)
   qaIALoading.value = false
-  console.log('[IA-cat] resultado:', sug)
   if (sug?.categoria_id && !qaCatManual.value) qaCatId.value = sug.categoria_id
 }
 
-// Debounce: dispara sugerencia 1.5s después de parar de escribir
+// Debounce: dispara sugerencia 1s después de parar de escribir
 let qaDebounceTimer = null
 watch(qaTitulo, (val) => {
   if (qaDebounceTimer) clearTimeout(qaDebounceTimer)
-  if (!val || val.length < 4 || qaCatManual.value) return
-  // Reset categoría IA previa al cambiar el título
-  if (!qaCatManual.value) qaCatId.value = null
+  if (!val || val.length < 4) return
+  // Título cambió → la selección manual anterior ya no aplica
+  qaCatManual.value = false
+  qaCatId.value = null
   qaDebounceTimer = setTimeout(qaSugerirSiNecesario, 1000)
 })
 
