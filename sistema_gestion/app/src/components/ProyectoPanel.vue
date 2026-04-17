@@ -58,7 +58,7 @@
             <button v-if="!item?.id" class="btn-icon" title="Crear" :disabled="!form.nombre?.trim()" @click="crear">
               <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
             </button>
-            <button v-if="item?.id" class="btn-icon" title="Listo" @click="$emit('cerrar')">
+            <button v-if="item?.id" class="btn-icon" title="Guardar y cerrar" @click="guardarYCerrar">
               <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
             </button>
             <button v-if="item?.id" class="btn-icon" title="Eliminar" @click="eliminar">
@@ -554,6 +554,29 @@ async function guardarRelacion(campo, valor) {
     })
     emit('guardado', { ...props.item, ...form.value, _accion: 'editado' })
   } catch (e) { console.error('Error guardando relación:', e) }
+}
+
+// ── Guardar todo y cerrar (modo editar) ──
+async function guardarYCerrar() {
+  if (!props.item?.id) return
+  try {
+    // Leer el valor actual del textarea (por si no hizo blur)
+    const tituloEl = tituloRef.value
+    const tituloActual = tituloEl?.value?.trim() || form.value.nombre
+    const body = {
+      nombre: tituloActual,
+      estado: form.value.estado,
+      prioridad: form.value.prioridad,
+      color: form.value.color,
+      categoria_id: form.value.categoria_id,
+      fecha_estimada_fin: form.value.fecha_estimada_fin,
+    }
+    await api(`/api/gestion/proyectos/${props.item.id}`, {
+      method: 'PUT', body: JSON.stringify(body)
+    })
+    emit('guardado', { ...props.item, ...form.value, nombre: tituloActual, _accion: 'editado' })
+  } catch (e) { console.error('Error guardando:', e) }
+  emit('cerrar')
 }
 
 // ── Crear nuevo ──
