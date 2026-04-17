@@ -454,9 +454,21 @@ Al encontrar un bug de pre-fill, hubo que arreglarlo en **los dos lugares**. Al 
 
 ## 7. FLUJO DE TRABAJO OBLIGATORIO
 
+### ⚠️ REGLA ABSOLUTA: LEER ANTES DE ESCRIBIR
+
+**NUNCA escribir código sin leer primero el código existente del archivo que se va a modificar.**
+
+Antes de CADA edición:
+1. Leer el archivo o la sección relevante
+2. Entender cómo funciona actualmente
+3. Verificar si ya existe solución
+4. Solo entonces escribir el cambio
+
+**Por qué existe:** Claude ha causado bugs al escribir código sin entender el contexto — duplicando lógica, rompiendo funcionalidad existente, agregando código que contradice lo implementado.
+
 **Orden de construcción (INVIOLABLE):**
 ```
-VISIÓN → BASE DE DATOS (estructura) → IMPLEMENTACIÓN
+LEER CÓDIGO EXISTENTE → VISIÓN → BASE DE DATOS (estructura) → IMPLEMENTACIÓN
 ```
 No se puede construir sin entender qué quiere Santi. No se debe generar código sin que la base de datos esté estructurada primero. Siempre partir del estado de la BD, sus campos y reglas.
 
