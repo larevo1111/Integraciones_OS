@@ -765,15 +765,29 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
 })
 
 // GET /api/gestion/sugerir-categoria?titulo=...
+// Caché de categorías para sugerir-categoria (no depender de BD en cada llamada)
+let categoriasCache = null
+let categoriasCacheTs = 0
+async function getCategorias() {
+  if (categoriasCache && Date.now() - categoriasCacheTs < 300000) return categoriasCache // 5min
+  try {
+    const [cats] = await db.gestion.query('SELECT id, nombre FROM g_categorias WHERE activa = 1 ORDER BY orden')
+    categoriasCache = cats
+    categoriasCacheTs = Date.now()
+    return cats
+  } catch {
+    return categoriasCache || [] // si la BD falla, usar cache anterior
+  }
+}
+
 app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
   const titulo = (req.query.titulo || '').trim()
   console.log(`[sugerir-cat] "${titulo}" de ${req.usuario.email}`)
   if (!titulo) return res.json({ ok: false, categoria_id: null })
 
   try {
-    const [cats] = await db.gestion.query(
-      'SELECT id, nombre FROM g_categorias WHERE activa = 1 ORDER BY orden'
-    )
+    const cats = await getCategorias()
+    if (!cats.length) return res.json({ ok: false, error: 'Sin categorías' })
     const nombres = cats.map(c => c.nombre)
     const variosId = (cats.find(c => c.nombre === 'Varios') || {}).id || null
 

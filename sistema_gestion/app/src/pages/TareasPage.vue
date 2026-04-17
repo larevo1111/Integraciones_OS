@@ -914,15 +914,18 @@ async function qaAgregar() {
     const tarea = await crearTarea(body)
     onTareaGuardada(tarea)
     qaTitulo.value     = ''
-    qaCatId.value      = null
-    qaCatManual.value  = false
     qaOp.value         = ''
     qaRemision.value   = ''
     qaPedido.value     = ''
     qaProyectoId.value = null
     qaEtiquetas.value  = []
     qaActivo.value     = false
-  } catch (e) { console.error(e) } finally { qaGuardando.value = false }
+  } catch (e) { console.error(e) } finally {
+    // SIEMPRE resetear flags de IA — nunca dejar qaCatManual en true para la siguiente tarea
+    qaCatId.value      = null
+    qaCatManual.value  = false
+    qaGuardando.value  = false
+  }
 }
 
 const FILTROS = [
