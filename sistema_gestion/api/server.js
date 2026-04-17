@@ -767,6 +767,7 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
 // GET /api/gestion/sugerir-categoria?titulo=...
 app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
   const titulo = (req.query.titulo || '').trim()
+  console.log(`[sugerir-cat] "${titulo}" de ${req.usuario.email}`)
   if (!titulo) return res.json({ ok: false, categoria_id: null })
 
   try {

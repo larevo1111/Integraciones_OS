@@ -849,11 +849,14 @@ const qaIALoading   = ref(false)  // indicador visual de sugerencia en curso
 // Función central: sugerir categoría IA si el usuario no eligió manualmente
 // Se llama desde: (1) debounce 1.5s, (2) blur del input, (3) submit si aún no hay categoría
 async function qaSugerirSiNecesario() {
-  if (qaCatManual.value || !qaTitulo.value || qaTitulo.value.length < 4) return
-  if (qaCatId.value && !qaCatManual.value) return  // ya sugerida por IA, no repetir
+  if (qaCatManual.value) { console.log('[IA-cat] skip: manual'); return }
+  if (!qaTitulo.value || qaTitulo.value.length < 4) { console.log('[IA-cat] skip: titulo corto'); return }
+  if (qaCatId.value && !qaCatManual.value) { console.log('[IA-cat] skip: ya sugerida', qaCatId.value); return }
+  console.log('[IA-cat] llamando IA para:', qaTitulo.value)
   qaIALoading.value = true
   const sug = await sugerirCategoria(qaTitulo.value)
   qaIALoading.value = false
+  console.log('[IA-cat] resultado:', sug)
   if (sug?.categoria_id && !qaCatManual.value) qaCatId.value = sug.categoria_id
 }
 
@@ -892,8 +895,10 @@ async function qaAgregar() {
   try {
     const defs = defaultsFromFilters.value
     // Si no hay categoría (ni manual ni IA), llamar IA ahora
+    console.log('[IA-cat] submit — qaCatId:', qaCatId.value, 'manual:', qaCatManual.value)
     if (!qaCatId.value) await qaSugerirSiNecesario()
     const catId = qaCatId.value || categorias.value.find(c => c.nombre === 'Varios')?.id
+    console.log('[IA-cat] catId final:', catId)
     const body = {
       titulo:       qaTitulo.value,
       categoria_id: catId,
