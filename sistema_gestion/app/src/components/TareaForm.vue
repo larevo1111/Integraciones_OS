@@ -16,7 +16,7 @@
               <button class="btn-icon" title="Guardar" :disabled="!form.titulo || !form.categoria_id || guardando" @click="guardar">
                 <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
               </button>
-              <button class="btn-icon" title="Cerrar" @click="$emit('update:modelValue', false)">
+              <button type="button" class="btn-icon" title="Cerrar" @click="$emit('update:modelValue', false)">
                 <span class="material-icons" style="font-size:18px">close</span>
               </button>
             </div>
@@ -40,6 +40,7 @@
             </div>
             <div class="cats-grid">
               <button
+                type="button"
                 v-for="c in categorias"
                 :key="c.id"
                 class="cat-chip"
@@ -98,7 +99,7 @@
 
           <!-- Footer con botones -->
           <div class="form-footer">
-            <button class="form-btn-cancel" @click="$emit('update:modelValue', false)">Cancelar</button>
+            <button type="button" class="form-btn-cancel" @click="$emit('update:modelValue', false)">Cancelar</button>
             <button class="form-btn-crear" :disabled="!form.titulo || !form.categoria_id || guardando" @click="guardar">
               {{ guardando ? 'Guardando...' : (editar ? 'Guardar tarea' : 'Crear tarea') }}
             </button>

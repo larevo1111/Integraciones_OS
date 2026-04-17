@@ -138,7 +138,7 @@
             :key="c.id"
             class="cat-chip"
             :class="{ selected: qaCatId === c.id }"
-            @click="qaCatId = c.id; qaCatManual = true"
+            @click="qaCatId = c.id; qaChipClickCount++"
           >
             <span class="cat-dot" :style="{ background: c.color }"></span>
             {{ c.nombre.replace(/_/g, ' ') }}
@@ -843,29 +843,27 @@ const qaGuardando   = ref(false)
 const qaInputRef    = ref(null)
 const qaEtiquetas   = ref([])
 
-const qaCatManual   = ref(false)  // true si el usuario eligió chip manualmente
-const qaIALoading   = ref(false)  // indicador visual de sugerencia en curso
+const qaIALoading   = ref(false)
+// Contador de clicks manuales en chips — se incrementa con click, se resetea al cambiar título
+// La IA solo escribe qaCatId si clickCount no cambió durante su await
+let qaChipClickCount = 0
 
-// Función central: sugerir categoría IA si el usuario no eligió manualmente
-// Se llama desde: (1) debounce 1.5s, (2) blur del input, (3) submit si aún no hay categoría
 async function qaSugerirSiNecesario() {
-  if (qaCatManual.value) return           // usuario eligió chip en ESTA tarea
   if (!qaTitulo.value || qaTitulo.value.length < 4) return
-  if (qaCatId.value) return               // ya sugerida para este título
+  if (qaCatId.value) return  // ya tiene categoría (por chip o IA previa)
+  const clicksBefore = qaChipClickCount
   qaIALoading.value = true
   const sug = await sugerirCategoria(qaTitulo.value)
   qaIALoading.value = false
-  if (sug?.categoria_id && !qaCatManual.value) qaCatId.value = sug.categoria_id
+  // Solo asignar si el usuario NO clickeó un chip mientras la IA procesaba
+  if (sug?.categoria_id && qaChipClickCount === clicksBefore) qaCatId.value = sug.categoria_id
 }
 
-// Debounce: dispara sugerencia 1s después de parar de escribir
 let qaDebounceTimer = null
 watch(qaTitulo, (val) => {
   if (qaDebounceTimer) clearTimeout(qaDebounceTimer)
   if (!val || val.length < 4) return
-  // Título cambió → la selección manual anterior ya no aplica
-  qaCatManual.value = false
-  qaCatId.value = null
+  qaCatId.value = null  // título cambió → resetear categoría
   qaDebounceTimer = setTimeout(qaSugerirSiNecesario, 1000)
 })
 
@@ -880,7 +878,7 @@ function qaCancelar() {
   qaActivo.value    = false
   qaTitulo.value    = ''
   qaCatId.value     = null
-  qaCatManual.value = false
+  qaChipClickCount  = 0
   qaOp.value        = ''
   qaRemision.value  = ''
   qaPedido.value    = ''
@@ -894,7 +892,7 @@ async function qaAgregar() {
   try {
     const defs = defaultsFromFilters.value
     // Si no hay categoría (ni manual ni IA), llamar IA ahora
-    console.log('[IA-cat] submit — qaCatId:', qaCatId.value, 'manual:', qaCatManual.value)
+    console.log('[IA-cat] submit — qaCatId:', qaCatId.value)
     if (!qaCatId.value) await qaSugerirSiNecesario()
     const catId = qaCatId.value || categorias.value.find(c => c.nombre === 'Varios')?.id
     console.log('[IA-cat] catId final:', catId)
@@ -920,9 +918,9 @@ async function qaAgregar() {
     qaEtiquetas.value  = []
     qaActivo.value     = false
   } catch (e) { console.error(e) } finally {
-    // SIEMPRE resetear flags de IA — nunca dejar qaCatManual en true para la siguiente tarea
+    // SIEMPRE resetear para la siguiente tarea
     qaCatId.value      = null
-    qaCatManual.value  = false
+    qaChipClickCount   = 0
     qaGuardando.value  = false
   }
 }
