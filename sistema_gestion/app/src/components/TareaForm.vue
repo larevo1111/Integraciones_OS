@@ -158,7 +158,7 @@ let tfDebounce = null
 watch(() => form.value.titulo, (val) => {
   if (tfDebounce) clearTimeout(tfDebounce)
   if (!val || val.length < 4 || catManual.value || editar.value) return
-  tfDebounce = setTimeout(tfSugerirSiNecesario, 1500)
+  tfDebounce = setTimeout(tfSugerirSiNecesario, 1000)
 })
 
 const editar = computed(() => !!props.tareaEditar)

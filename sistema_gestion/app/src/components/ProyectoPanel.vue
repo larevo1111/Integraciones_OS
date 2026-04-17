@@ -410,7 +410,7 @@ watch(nuevaTareaTitulo, (val) => {
   if (ntDebounce) clearTimeout(ntDebounce)
   if (!val || val.length < 4 || nuevaTareaCatManual.value) return
   if (!nuevaTareaCatManual.value) nuevaTareaCatId.value = null
-  ntDebounce = setTimeout(ntSugerirSiNecesario, 1500)
+  ntDebounce = setTimeout(ntSugerirSiNecesario, 1000)
 })
 
 async function crearTareaEnProyecto() {

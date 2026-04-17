@@ -864,7 +864,7 @@ watch(qaTitulo, (val) => {
   if (!val || val.length < 4 || qaCatManual.value) return
   // Reset categoría IA previa al cambiar el título
   if (!qaCatManual.value) qaCatId.value = null
-  qaDebounceTimer = setTimeout(qaSugerirSiNecesario, 1500)
+  qaDebounceTimer = setTimeout(qaSugerirSiNecesario, 1000)
 })
 
 const qaCatEsProduccion = computed(() =>
