@@ -55,6 +55,12 @@
         <div class="pp-header">
           <span class="panel-header-tipo">{{ LABELS[tipoLocal].singular }}</span>
           <div class="panel-header-actions">
+            <button v-if="!item?.id" class="btn-icon" title="Crear" :disabled="!form.nombre?.trim()" @click="crear">
+              <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+            </button>
+            <button v-if="item?.id" class="btn-icon" title="Listo" @click="$emit('cerrar')">
+              <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+            </button>
             <button v-if="item?.id" class="btn-icon" title="Eliminar" @click="eliminar">
               <span class="material-icons" style="font-size:16px">delete_outline</span>
             </button>
