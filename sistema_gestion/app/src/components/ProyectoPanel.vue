@@ -271,6 +271,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch, inject } from 'vue'
+import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
 import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import CategoriaSelector from './CategoriaSelector.vue'
@@ -287,6 +288,7 @@ const props = defineProps({
   etiquetas:   { type: Array, default: () => [] },
 })
 const emit = defineEmits(['cerrar', 'guardado', 'eliminado'])
+const auth = useAuthStore()
 const recargarSidebar = inject('recargarSidebar', () => {})
 
 const LABELS = {
@@ -503,7 +505,7 @@ function initForm() {
       prioridad: 'Media',
       color: '#607D8B',
       categoria_id: null,
-      responsables: [],
+      responsables: auth.usuario?.email ? [auth.usuario.email] : [],
       etiquetas_ids: [],
       fecha_estimada_fin: null,
     }
