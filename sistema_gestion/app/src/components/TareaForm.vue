@@ -23,7 +23,7 @@
           </div>
 
           <!-- Body -->
-          <form class="form-body" @submit.prevent="guardar">
+          <div class="form-body">
             <!-- Título -->
             <input
               ref="tituloRef"
@@ -45,7 +45,7 @@
                 :key="c.id"
                 class="cat-chip"
                 :class="{ selected: form.categoria_id === c.id }"
-                @click="form.categoria_id = c.id; catManual = true"
+                @click="form.categoria_id = c.id; tfChipClickCount++"
               >
                 <span class="cat-dot" :style="{ background: c.color }"></span>
                 {{ c.nombre.replace(/_/g, ' ') }}
@@ -95,7 +95,7 @@
               <label class="input-label">Descripción (opcional)</label>
               <textarea class="input-field" v-model="form.descripcion" rows="3" placeholder="Contexto, pasos, notas..." />
             </div>
-          </form>
+          </div>
 
           <!-- Footer con botones -->
           <div class="form-footer">
@@ -142,23 +142,24 @@ const form = ref({
   fecha_limite: '', id_op: '', etiquetas: []
 })
 
-const catManual   = ref(false)
 const iaLoading   = ref(false)
+let tfChipClickCount = 0
 
-// Función central: sugerir categoría IA si el usuario no eligió manualmente
 async function tfSugerirSiNecesario() {
-  if (catManual.value || editar.value || !form.value.titulo || form.value.titulo.length < 4) return
+  if (editar.value || !form.value.titulo || form.value.titulo.length < 4) return
+  if (form.value.categoria_id) return  // ya tiene categoría
+  const clicksBefore = tfChipClickCount
   iaLoading.value = true
   const sug = await sugerirCategoria(form.value.titulo)
   iaLoading.value = false
-  if (sug?.categoria_id && !catManual.value) form.value.categoria_id = sug.categoria_id
+  if (sug?.categoria_id && tfChipClickCount === clicksBefore) form.value.categoria_id = sug.categoria_id
 }
 
-// Debounce 1.5s (solo tareas nuevas)
 let tfDebounce = null
 watch(() => form.value.titulo, (val) => {
   if (tfDebounce) clearTimeout(tfDebounce)
-  if (!val || val.length < 4 || catManual.value || editar.value) return
+  if (!val || val.length < 4 || editar.value) return
+  form.value.categoria_id = null  // título cambió → resetear categoría
   tfDebounce = setTimeout(tfSugerirSiNecesario, 1000)
 })
 
@@ -206,7 +207,7 @@ async function guardar() {
       tarea = data.tarea
     } else {
       // Sugerencia IA si no eligió categoría
-      if (!form.value.categoria_id || !catManual.value) await tfSugerirSiNecesario()
+      if (!form.value.categoria_id) await tfSugerirSiNecesario()
       if (!form.value.categoria_id) return // categoría requerida
       tarea = await crearTarea(form.value)
     }

@@ -225,7 +225,7 @@
                   type="button"
                   class="cat-chip"
                   :class="{ selected: nuevaTareaCatId === c.id }"
-                  @click="nuevaTareaCatId = c.id; nuevaTareaCatManual = true"
+                  @click="nuevaTareaCatId = c.id; ntChipClickCount++"
                 >
                   <span class="cat-dot" :style="{ background: c.color }"></span>
                   {{ c.nombre.replace(/_/g, ' ') }}
@@ -395,27 +395,26 @@ async function cargarProyectos() {
 const mostrarFormTarea    = ref(false)
 const nuevaTareaTitulo    = ref('')
 const nuevaTareaCatId     = ref(null)
-const nuevaTareaCatManual = ref(false)
 const nuevaTareaIALoading = ref(false)
 const nuevaTareaEtiquetas = ref([])
 const nuevaTareaFecha     = ref('')
+let ntChipClickCount = 0
 
-// Función central: sugerir categoría IA si el usuario no eligió manualmente
 async function ntSugerirSiNecesario() {
-  if (nuevaTareaCatManual.value || !nuevaTareaTitulo.value || nuevaTareaTitulo.value.length < 4) return
-  if (nuevaTareaCatId.value && !nuevaTareaCatManual.value) return
+  if (!nuevaTareaTitulo.value || nuevaTareaTitulo.value.length < 4) return
+  if (nuevaTareaCatId.value) return
+  const clicksBefore = ntChipClickCount
   nuevaTareaIALoading.value = true
   const sug = await sugerirCategoria(nuevaTareaTitulo.value)
   nuevaTareaIALoading.value = false
-  if (sug?.categoria_id && !nuevaTareaCatManual.value) nuevaTareaCatId.value = sug.categoria_id
+  if (sug?.categoria_id && ntChipClickCount === clicksBefore) nuevaTareaCatId.value = sug.categoria_id
 }
 
-// Debounce 1.5s
 let ntDebounce = null
 watch(nuevaTareaTitulo, (val) => {
   if (ntDebounce) clearTimeout(ntDebounce)
-  if (!val || val.length < 4 || nuevaTareaCatManual.value) return
-  if (!nuevaTareaCatManual.value) nuevaTareaCatId.value = null
+  if (!val || val.length < 4) return
+  nuevaTareaCatId.value = null
   ntDebounce = setTimeout(ntSugerirSiNecesario, 1000)
 })
 
@@ -439,7 +438,7 @@ async function crearTareaEnProyecto() {
     await crearTarea(body)
     nuevaTareaTitulo.value = ''
     nuevaTareaCatId.value = null
-    nuevaTareaCatManual.value = false
+    ntChipClickCount = 0
     nuevaTareaEtiquetas.value = []
     nuevaTareaFecha.value = ''
     mostrarFormTarea.value = false
