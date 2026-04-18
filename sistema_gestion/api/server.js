@@ -793,7 +793,6 @@ app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
     const nombres = cats.map(c => c.nombre)
     const variosId = (cats.find(c => c.nombre === 'Varios') || {}).id || null
 
-    const https = require('http')
     const body = JSON.stringify({
       prompt: titulo,
       contexto: 'Clasificador de tareas de Origen Silvestre — empresa de producción y venta de chocolate artesanal, miel, propóleo y productos orgánicos. Pistas: Produccion (fabricar, procesar, empacar), Ventas (clientes, pedidos, despachos, precios, cotizar), Reuniones (reunión, informe semanal/mensual), Compras (comprar, insumos, proveedores), Pagos (pagar, descargar pagos, factura proveedor, transferencia), Cartera (cobrar, cartera, saldo cliente), Administrativo (trámites, documentos, INVIMA). Elegí la categoría más apropiada. Si no encaja claramente, elegí Varios.',
