@@ -4,26 +4,48 @@
     <!-- Lista principal -->
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">
 
-      <!-- Header de proyecto activo (breadcrumb) -->
-      <div v-if="proyectoFiltro" class="proyecto-header-bar">
-        <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
-          <span class="material-icons" style="font-size:15px">arrow_back</span>
-          {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
-        </a>
-        <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
-        <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
-        <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
-      </div>
+      <!-- Header: título + búsqueda -->
+      <div class="page-header-bar">
+        <!-- Breadcrumb si hay proyecto/etiqueta -->
+        <template v-if="proyectoFiltro">
+          <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
+            <span class="material-icons" style="font-size:15px">arrow_back</span>
+            {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
+          </a>
+          <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
+          <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
+          <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
+        </template>
+        <template v-else-if="etiquetaFiltro">
+          <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
+            <span class="material-icons" style="font-size:15px">arrow_back</span>
+            {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
+          </a>
+          <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
+          <span class="proyecto-dot-hdr" :style="{ background: etiquetaFiltro.color || '#888' }"></span>
+          <span class="proyecto-header-nombre">{{ etiquetaFiltro.nombre }}</span>
+        </template>
+        <template v-else>
+          <span class="page-header-titulo">{{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}</span>
+        </template>
 
-      <!-- Header de etiqueta activa (breadcrumb) -->
-      <div v-if="etiquetaFiltro && !proyectoFiltro" class="proyecto-header-bar">
-        <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
-          <span class="material-icons" style="font-size:15px">arrow_back</span>
-          {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
-        </a>
-        <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
-        <span class="proyecto-dot-hdr" :style="{ background: etiquetaFiltro.color || '#888' }"></span>
-        <span class="proyecto-header-nombre">{{ etiquetaFiltro.nombre }}</span>
+        <!-- Búsqueda rápida -->
+        <div class="quick-search" :class="{ expanded: qsExpanded }">
+          <button class="btn-icon qs-toggle" @click="qsExpanded = !qsExpanded; $nextTick(() => qsExpanded && $refs.qsInput?.focus())">
+            <span class="material-icons" style="font-size:16px">search</span>
+          </button>
+          <input
+            v-show="qsExpanded"
+            ref="qsInput"
+            v-model="qsQuery"
+            class="qs-input"
+            placeholder="Buscar tarea..."
+            @keydown.escape="qsExpanded = false; qsQuery = ''"
+          />
+          <button v-if="qsExpanded && qsQuery" class="btn-icon qs-clear" @click="qsQuery = ''; $refs.qsInput?.focus()">
+            <span class="material-icons" style="font-size:14px">close</span>
+          </button>
+        </div>
       </div>
 
       <!-- Barra de filtros -->
@@ -673,6 +695,27 @@ const tareaSeleccionada = ref(null)
 const mostrarForm       = ref(false)
 const mostrarCompletadas = ref(false)
 
+// Búsqueda rápida
+const qsExpanded = ref(false)
+const qsQuery    = ref('')
+const qsResultados = ref([])
+let qsDebounce = null
+watch(qsQuery, (val) => {
+  if (qsDebounce) clearTimeout(qsDebounce)
+  if (!val || val.length < 2) { qsResultados.value = []; return }
+  qsDebounce = setTimeout(async () => {
+    const params = new URLSearchParams()
+    params.set('nombre', val)
+    if (props.soloMias) params.set('solo_mias', '1')
+    if (proyectoFiltroId.value) params.set('proyecto_id', proyectoFiltroId.value)
+    if (etiquetaFiltroId.value) params.set('etiquetas', etiquetaFiltroId.value)
+    try {
+      const data = await api(`/api/gestion/tareas?${params}`)
+      qsResultados.value = data.tareas || []
+    } catch { qsResultados.value = [] }
+  }, 300)
+})
+
 // Multi-selección
 const seleccionMultiIds = ref([])   // array de IDs seleccionados
 const multiMenuFecha     = ref(false)
@@ -1307,9 +1350,10 @@ function buildGrupos(lista) {
   return []
 }
 
-const gruposAtrasadas = computed(() => buildGrupos(tareasAtrasadas.value))
-const grupos = computed(() => buildGrupos(tareasNormales.value))
-const gruposCompletadas = computed(() => buildGrupos(completadasFiltradas.value))
+const buscandoActivo = computed(() => qsQuery.value.length >= 2)
+const gruposAtrasadas = computed(() => buscandoActivo.value ? [] : buildGrupos(tareasAtrasadas.value))
+const grupos = computed(() => buscandoActivo.value ? buildGrupos(qsResultados.value) : buildGrupos(tareasNormales.value))
+const gruposCompletadas = computed(() => buscandoActivo.value ? [] : buildGrupos(completadasFiltradas.value))
 
 function formatGrupoFecha(iso) {
   if (iso === 'Sin fecha') return 'Sin fecha'
@@ -1703,6 +1747,29 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Header: título + búsqueda */
+.page-header-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 14px 2px; min-height: 32px;
+}
+.page-header-titulo {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+}
+.quick-search {
+  display: flex; align-items: center; margin-left: auto;
+}
+.qs-toggle { flex-shrink: 0; }
+.qs-input {
+  background: transparent; border: none; border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary); font-size: 13px; padding: 2px 4px; width: 160px;
+  font-family: inherit; outline: none;
+}
+.qs-input:focus { border-bottom-color: var(--accent); }
+.qs-clear { flex-shrink: 0; }
+@media (max-width: 768px) {
+  .qs-input { width: 120px; }
+}
+
 /* Espacio para el badge de subtareas que flota debajo del círculo de estado */
 .sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
 
