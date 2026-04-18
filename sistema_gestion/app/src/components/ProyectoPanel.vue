@@ -77,11 +77,11 @@
           <textarea
             ref="tituloRef"
             class="pp-titulo"
-            :value="form.nombre"
+            v-model="form.nombre"
             :placeholder="LABELS[tipoLocal].placeholder"
             rows="1"
             @input="autoResizeTitulo"
-            @blur="guardarCampo('nombre', $event.target.value.trim())"
+            @blur="guardarCampo('nombre', form.nombre?.trim())"
             @keydown.enter.prevent="e => e.target.blur()"
           />
 
@@ -317,6 +317,11 @@ const tipoLocal = computed(() => props.item?.tipo || props.tipo)
 const estadosDisponibles = computed(() => ESTADOS[tipoLocal.value] || ESTADOS.proyecto)
 const guardando = ref(false)
 const tituloRef = ref(null)
+
+function onTituloInput(e) {
+  form.value.nombre = e.target.value
+  autoResizeTitulo(e)
+}
 
 function autoResizeTitulo(e) {
   const el = e?.target || tituloRef.value
