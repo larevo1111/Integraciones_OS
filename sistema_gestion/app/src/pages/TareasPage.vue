@@ -4,48 +4,26 @@
     <!-- Lista principal -->
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0">
 
-      <!-- Header: título + búsqueda -->
-      <div class="page-header-bar">
-        <!-- Breadcrumb si hay proyecto/etiqueta -->
-        <template v-if="proyectoFiltro">
-          <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
-            <span class="material-icons" style="font-size:15px">arrow_back</span>
-            {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
-          </a>
-          <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
-          <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
-          <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
-        </template>
-        <template v-else-if="etiquetaFiltro">
-          <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
-            <span class="material-icons" style="font-size:15px">arrow_back</span>
-            {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
-          </a>
-          <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
-          <span class="proyecto-dot-hdr" :style="{ background: etiquetaFiltro.color || '#888' }"></span>
-          <span class="proyecto-header-nombre">{{ etiquetaFiltro.nombre }}</span>
-        </template>
-        <template v-else>
-          <span class="page-header-titulo">{{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}</span>
-        </template>
+      <!-- Header de proyecto activo (breadcrumb) -->
+      <div v-if="proyectoFiltro" class="proyecto-header-bar">
+        <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
+          <span class="material-icons" style="font-size:15px">arrow_back</span>
+          {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
+        </a>
+        <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
+        <span class="proyecto-dot-hdr" :style="{ background: proyectoFiltro.color || '#607D8B' }"></span>
+        <span class="proyecto-header-nombre">{{ proyectoFiltro.nombre }}</span>
+      </div>
 
-        <!-- Búsqueda rápida -->
-        <div class="quick-search" :class="{ expanded: qsExpanded }">
-          <button class="btn-icon qs-toggle" @click="qsExpanded = !qsExpanded; $nextTick(() => qsExpanded && $refs.qsInput?.focus())">
-            <span class="material-icons" style="font-size:16px">search</span>
-          </button>
-          <input
-            v-show="qsExpanded"
-            ref="qsInput"
-            v-model="qsQuery"
-            class="qs-input"
-            placeholder="Buscar tarea..."
-            @keydown.escape="qsExpanded = false; qsQuery = ''"
-          />
-          <button v-if="qsExpanded && qsQuery" class="btn-icon qs-clear" @click="qsQuery = ''; $refs.qsInput?.focus()">
-            <span class="material-icons" style="font-size:14px">close</span>
-          </button>
-        </div>
+      <!-- Header de etiqueta activa (breadcrumb) -->
+      <div v-if="etiquetaFiltro && !proyectoFiltro" class="proyecto-header-bar">
+        <a class="proyecto-back-link" @click="router.replace(props.soloMias ? '/tareas' : '/equipo')">
+          <span class="material-icons" style="font-size:15px">arrow_back</span>
+          {{ props.soloMias ? 'Mis Tareas' : 'Equipo' }}
+        </a>
+        <span class="material-icons" style="font-size:13px;color:var(--text-tertiary)">chevron_right</span>
+        <span class="proyecto-dot-hdr" :style="{ background: etiquetaFiltro.color || '#888' }"></span>
+        <span class="proyecto-header-nombre">{{ etiquetaFiltro.nombre }}</span>
       </div>
 
       <!-- Barra de filtros -->
@@ -695,9 +673,8 @@ const tareaSeleccionada = ref(null)
 const mostrarForm       = ref(false)
 const mostrarCompletadas = ref(false)
 
-// Búsqueda rápida
-const qsExpanded = ref(false)
-const qsQuery    = ref('')
+// Búsqueda rápida (qsQuery viene del MainLayout via inject)
+const qsQuery      = inject('qsQuery', ref(''))
 const qsResultados = ref([])
 let qsDebounce = null
 watch(qsQuery, (val) => {
@@ -1747,29 +1724,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Header: título + búsqueda */
-.page-header-bar {
-  display: flex; align-items: center; gap: 6px;
-  padding: 10px 14px 2px; min-height: 32px;
-}
-.page-header-titulo {
-  font-size: 15px; font-weight: 600; color: var(--text-primary);
-}
-.quick-search {
-  display: flex; align-items: center; margin-left: auto;
-}
-.qs-toggle { flex-shrink: 0; }
-.qs-input {
-  background: transparent; border: none; border-bottom: 1px solid var(--border-default);
-  color: var(--text-primary); font-size: 13px; padding: 2px 4px; width: 160px;
-  font-family: inherit; outline: none;
-}
-.qs-input:focus { border-bottom-color: var(--accent); }
-.qs-clear { flex-shrink: 0; }
-@media (max-width: 768px) {
-  .qs-input { width: 120px; }
-}
-
 /* Espacio para el badge de subtareas que flota debajo del círculo de estado */
 .sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
 

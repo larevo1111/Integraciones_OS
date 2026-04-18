@@ -318,7 +318,22 @@
           <span class="material-icons">menu</span>
         </button>
         <span class="topbar-title">{{ tituloRuta }}</span>
-        <slot name="topbar-actions" />
+        <div v-if="esPaginaTareas" class="quick-search" :class="{ expanded: qsExpanded }">
+          <button class="btn-icon qs-toggle" @click="qsExpanded = !qsExpanded; $nextTick(() => qsExpanded && $refs.qsInput?.focus())">
+            <span class="material-icons" style="font-size:16px">search</span>
+          </button>
+          <input
+            v-show="qsExpanded"
+            ref="qsInput"
+            v-model="qsQuery"
+            class="qs-input"
+            placeholder="Buscar tarea..."
+            @keydown.escape="qsExpanded = false; qsQuery = ''"
+          />
+          <button v-if="qsExpanded && qsQuery" class="btn-icon qs-clear" @click="qsQuery = ''; $refs.qsInput?.focus()">
+            <span class="material-icons" style="font-size:14px">close</span>
+          </button>
+        </div>
       </div>
 
       <!-- Contenido de la página -->
@@ -566,7 +581,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, provide, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, provide, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
@@ -574,7 +589,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.5.6'
+const APP_VERSION = 'v2.5.7'
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)
@@ -846,6 +861,14 @@ async function eliminarEtiqueta() {
 
 const ruta = computed(() => route.path)
 
+// Búsqueda rápida de tareas (vive en MainLayout, se consume en TareasPage via inject)
+const qsExpanded = ref(false)
+const qsQuery    = ref('')
+const esPaginaTareas = computed(() => ruta.value.startsWith('/tareas') || ruta.value.startsWith('/equipo'))
+provide('qsQuery', qsQuery)
+// Limpiar al cambiar de ruta
+watch(ruta, () => { qsQuery.value = ''; qsExpanded.value = false })
+
 const TITULOS = {
   '/tareas':          'Mis Tareas',
   '/equipo':          'Equipo',
@@ -885,6 +908,18 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 </script>
 
 <style scoped>
+/* Búsqueda rápida en topbar */
+.quick-search { display: flex; align-items: center; margin-left: auto; }
+.qs-toggle { flex-shrink: 0; }
+.qs-input {
+  background: transparent; border: none; border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary); font-size: 13px; padding: 2px 4px; width: 160px;
+  font-family: inherit; outline: none;
+}
+.qs-input:focus { border-bottom-color: var(--accent); }
+.qs-clear { flex-shrink: 0; }
+@media (max-width: 768px) { .qs-input { width: 120px; } }
+
 .d-mobile-only { display: none; }
 @media (max-width: 768px) {
   .d-mobile-only { display: flex; }
