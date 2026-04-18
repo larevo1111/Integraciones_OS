@@ -8,7 +8,7 @@
 
 ## Convenciones globales
 
-- Todos los servicios corren en `localhost` — no están expuestos a internet directamente
+- Todos los servicios corren en `localhost` — algunos expuestos por Cloudflare Tunnel para acceso remoto (VPS)
 - Body y respuestas siempre JSON (`Content-Type: application/json`)
 - Respuesta siempre incluye `"ok": true|false`
 - Errores retornan campo `"error"` con descripción
@@ -17,8 +17,10 @@
 
 ## 1. Servicio IA — `ia_service`
 
-**Base URL**: `http://localhost:5100`
-**Proceso**: systemd `ia-service.service`
+**Base URL local**: `http://localhost:5100`
+**Base URL remota**: `https://ia-api.oscomunidad.com` (Cloudflare Tunnel → servidor local:5100)
+**Proceso**: systemd `ia-service.service` (solo corre en servidor local, no en VPS)
+**Acceso desde VPS**: via `.env` → `IA_SERVICE_URL=https://ia-api.oscomunidad.com`
 **BD**: `ia_service_os` (MariaDB local)
 **Propósito**: Motor de IA central para toda la empresa. Consultas en lenguaje natural, análisis SQL, redacción, búsqueda web, etc.
 
