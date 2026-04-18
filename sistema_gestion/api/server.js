@@ -10,6 +10,7 @@
 const express  = require('express')
 const path     = require('path')
 const https    = require('https')
+const http     = require('http')
 const fs       = require('fs')
 const crypto   = require('crypto')
 const jwt      = require('jsonwebtoken')
@@ -34,6 +35,7 @@ if (fs.existsSync(envPath)) {
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const JWT_SECRET       = process.env.JWT_SECRET
+const IA_SERVICE_URL   = process.env.IA_SERVICE_URL || 'http://127.0.0.1:5100'
 const PORT             = 9300
 
 /** Fecha YYYY-MM-DD en hora Colombia (UTC-5), sin depender de la zona del server */
@@ -801,7 +803,9 @@ app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
       fallback: 'cerebras-llama'
     })
 
-    const iaReq = https.request({ hostname: '127.0.0.1', port: 5100, path: '/ia/simple', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, timeout: 5000 }, iaRes => {
+    const iaUrl = new URL('/ia/simple', IA_SERVICE_URL)
+    const transport = iaUrl.protocol === 'https:' ? https : http
+    const iaReq = transport.request(iaUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, timeout: 5000 }, iaRes => {
       let data = ''
       iaRes.on('data', d => data += d)
       iaRes.on('end', () => {
