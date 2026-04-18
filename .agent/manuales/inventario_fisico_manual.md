@@ -882,6 +882,18 @@ Requisito: nivel >= 5 (Supervisor).
 
 ## 19. Flujo: ajuste de inventario en Effi {#19-flujo-ajuste}
 
+### Concepto fundamental — fecha de corte
+
+**El ajuste de inventario se calcula SIEMPRE contra la fecha de corte del inventario, NUNCA contra el stock del día en que se aplica.**
+
+Ejemplo: si al 31 de marzo el teórico era 100 y el físico fue 80, la diferencia es -20. Esos -20 son un error que existía al 31 de marzo y se arrastra para siempre en el stock de Effi hasta que se corrija. No importa si el ajuste se aplica el 1 de abril, el 15 o el 30 — la diferencia sigue siendo -20 porque es un desfase fijo del corte.
+
+**Lo que pase después del corte (ventas, producción, compras) no afecta la diferencia del ajuste.** Si entre el 31 de marzo y hoy se vendieron 30 unidades, el stock actual será 100 - 30 = 70. Con el ajuste de -20 queda en 50. Eso es correcto: el stock real al 31 era 80, menos 30 vendidas = 50 hoy.
+
+**Regla**: ajuste = físico_al_corte - teórico_al_corte. Si negativo → egreso. Si positivo → ingreso. Se aplica en cualquier fecha posterior y el resultado es correcto.
+
+**Error común a evitar**: pensar que el ajuste "resta doble" porque entre el corte y la aplicación hubo movimientos. NO. El ajuste corrige un error fijo del pasado, los movimientos posteriores son operación normal.
+
 Script Playwright para crear ajustes de inventario directamente en Effi.
 
 **Cuando usarlo:** Despues de analizar las diferencias del inventario fisico vs teorico, para corregir el stock en Effi.
