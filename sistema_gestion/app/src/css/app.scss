@@ -146,6 +146,43 @@ body {
 .q-header { background: var(--bg-app) !important; box-shadow: none !important; }
 .q-footer { box-shadow: none !important; }
 
+/* Sidebar popover (mini-mode) — QMenu se teletransporta al body, CSS global */
+.sidebar-popover {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg);
+  max-width: 260px;
+}
+.sidebar-popover .q-list {
+  max-width: 260px;
+}
+.sidebar-popover-title {
+  font-size: 12px !important;
+  font-weight: 600;
+  color: var(--text-primary) !important;
+  padding: 8px 12px 4px !important;
+}
+.sidebar-popover .q-item {
+  min-height: 30px !important;
+  padding: 4px 12px !important;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.sidebar-popover .q-item__label--header {
+  padding: 8px 12px 4px !important;
+}
+.sidebar-popover .q-item:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+.sidebar-popover .q-item__section--main {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
 /* ─── FILTROS CHIPS ─── */
 .filtros-bar-wrap {
   position: relative;

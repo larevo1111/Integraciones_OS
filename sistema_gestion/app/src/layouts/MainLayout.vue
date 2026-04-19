@@ -144,11 +144,50 @@
             </q-expansion-item>
           </template>
 
-          <!-- Mini mode: Mis Tareas (ícono simple, sin popover) -->
+          <!-- Mini mode: Mis Tareas (click navega, hover abre popover) -->
           <template v-if="isMini">
-            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }" to="/tareas">
+            <q-item
+              clickable dense
+              class="sidebar-item sidebar-item-mini"
+              :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }"
+              to="/tareas"
+              @mouseenter="showHover('mis')"
+              @mouseleave="hideHover('mis')"
+            >
               <q-item-section avatar class="sidebar-item-icon"><q-icon name="check_circle_outline" /></q-item-section>
-              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]" :delay="400">Mis Tareas</q-tooltip>
+              <q-menu
+                v-model="hoverMenus.mis"
+                no-parent-event
+                anchor="center right" self="center left"
+                :offset="[8, 0]"
+                class="sidebar-popover"
+                @mouseenter="showHover('mis')"
+                @mouseleave="hideHover('mis')"
+              >
+                <q-list dense style="min-width: 220px">
+                  <q-item-label header class="sidebar-popover-title">Mis Tareas</q-item-label>
+                  <template v-for="sec in SECCIONES_SIDEBAR" :key="'mini-mis-'+sec.tipo">
+                    <q-item
+                      v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id"
+                      clickable dense v-close-popup
+                      :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                    >
+                      <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" /></q-item-section>
+                      <q-item-section>{{ p.nombre }}</q-item-section>
+                      <q-item-section side v-if="p.tareas_pendientes"><span class="sidebar-count">{{ p.tareas_pendientes }}</span></q-item-section>
+                    </q-item>
+                  </template>
+                  <q-separator v-if="etiquetasGlobal.filter(e => e.mis_tareas_total).length" />
+                  <q-item
+                    v-for="e in etiquetasGlobal.filter(e => e.mis_tareas_total)" :key="e.id"
+                    clickable dense v-close-popup
+                    :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
+                  >
+                    <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: e.color || '#888' }" /></q-item-section>
+                    <q-item-section>{{ e.nombre }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
             </q-item>
           </template>
 
@@ -277,11 +316,41 @@
             </q-expansion-item>
           </template>
 
-          <!-- Mini mode: Equipo -->
+          <!-- Mini mode: Equipo (click navega, hover abre popover) -->
           <template v-if="isMini">
-            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/equipo' }" to="/equipo">
+            <q-item
+              clickable dense
+              class="sidebar-item sidebar-item-mini"
+              :class="{ active: ruta === '/equipo' }"
+              to="/equipo"
+              @mouseenter="showHover('eq')"
+              @mouseleave="hideHover('eq')"
+            >
               <q-item-section avatar class="sidebar-item-icon"><q-icon name="group" /></q-item-section>
-              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]" :delay="400">Equipo</q-tooltip>
+              <q-menu
+                v-model="hoverMenus.eq"
+                no-parent-event
+                anchor="center right" self="center left"
+                :offset="[8, 0]"
+                class="sidebar-popover"
+                @mouseenter="showHover('eq')"
+                @mouseleave="hideHover('eq')"
+              >
+                <q-list dense style="min-width: 220px">
+                  <q-item-label header class="sidebar-popover-title">Equipo</q-item-label>
+                  <template v-for="sec in SECCIONES_SIDEBAR" :key="'mini-eq-'+sec.tipo">
+                    <q-item
+                      v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id"
+                      clickable dense v-close-popup
+                      :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
+                    >
+                      <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" /></q-item-section>
+                      <q-item-section>{{ p.nombre }}</q-item-section>
+                      <q-item-section side v-if="p.tareas_pendientes"><span class="sidebar-count">{{ p.tareas_pendientes }}</span></q-item-section>
+                    </q-item>
+                  </template>
+                </q-list>
+              </q-menu>
             </q-item>
           </template>
 
@@ -478,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.1'
+const APP_VERSION = 'v2.7.2'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -486,6 +555,17 @@ const drawerOpen       = ref(false)
 const miniState        = ref(false)
 const isMobile         = computed(() => $q.screen.lt.md)
 const isMini           = computed(() => miniState.value && !isMobile.value)
+
+// ─── Hover menus (mini-mode popover tipo Kommo) ───
+const hoverMenus = reactive({ mis: false, eq: false })
+const hoverTimers = {}
+function showHover(key) {
+  clearTimeout(hoverTimers[key])
+  hoverMenus[key] = true
+}
+function hideHover(key) {
+  hoverTimers[key] = setTimeout(() => { hoverMenus[key] = false }, 180)
+}
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)
@@ -921,19 +1001,7 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
   overflow: hidden;
 }
 
-/* Popover en mini mode */
-.sidebar-popover {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-lg);
-}
-.sidebar-popover-title {
-  font-size: 12px !important;
-  font-weight: 600;
-  color: var(--text-primary) !important;
-  padding: 8px 12px 4px !important;
-}
+/* Popover en mini mode → movido a app.scss porque QMenu se teletransporta al body */
 
 /* Expansion item overrides */
 .sidebar-drawer :deep(.q-expansion-item__container > .q-item) {
