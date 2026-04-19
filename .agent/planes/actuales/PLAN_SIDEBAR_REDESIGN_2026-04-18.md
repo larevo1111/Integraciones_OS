@@ -18,10 +18,28 @@
 - [x] Botón de colapsar visible en header del sidebar — devuelto v2.6.1
 - [x] Referentes UX documentados en MANIFESTO (Nielsen, Linear, HubSpot)
 
-### ⚠️ ANTES DE EMPEZAR: verificar/revertir daños de v2.6.1
-- [ ] **Verificar que la sidebar expandida funciona igual que antes** — label TABLAS visible, acordeones funcionan, subitems se ven, spacing no roto. Si algo se rompió, revertir el CSS al estado pre-rediseño.
-- [ ] **Verificar que el botón de colapsar funciona** — flecha < para colapsar, > para expandir.
-- [ ] **Verificar bottom tab bar en mobile** — puede estar oculta por conflicto de clases CSS.
+### ⚠️ ANTES DE EMPEZAR: limpiar código ensuciado en v2.6.1
+
+**Problemas en app.scss:**
+- `.sidebar-collapse-btn` está DUPLICADO (líneas ~283 y ~341) — eliminar duplicado
+- Líneas ~312-317: CSS de collapsed oculta `.sidebar-section-label`, `.sidebar-section-indented`, `.sidebar-acordeon-header` — esto ROMPE la sidebar expandida (label TABLAS desaparece). Estas reglas solo deben aplicar en `.sidebar.collapsed`, verificar que NO afectan la expandida.
+- CSS de tooltip `::after` (línea ~321) — funcional, puede quedarse pero verificar
+
+**Problemas en MainLayout.vue:**
+- `data-tooltip` en nav-items — está bien, no rompe nada
+- Botón `.sidebar-collapse-btn` — verificar que muestra `>` cuando colapsada y `<` cuando expandida
+
+**Lo que NO tocar:**
+- Bottom tab bar (`.bottom-tab-bar` + `.btab`) — funciona, dejar
+- Logo OS — funciona, dejar
+
+**Pasos:**
+- [ ] Eliminar duplicado de `.sidebar-collapse-btn` en app.scss
+- [ ] Verificar que las reglas `.sidebar.collapsed .sidebar-section-label { display: none }` etc. SOLO aplican dentro de `.sidebar.collapsed` (no en expandida)
+- [ ] Testear sidebar expandida: label TABLAS visible, acordeones funcionan
+- [ ] Testear sidebar colapsada: solo íconos, sin texto cortado
+- [ ] Testear bottom tab bar en mobile
+- [ ] Testear botón colapsar/expandir (< / >)
 
 ### Pendiente ❌
 - [ ] **Spacing visiblemente más compacto** — items de 30px → 28px min-height, secciones con menos padding, que se NOTE la diferencia. Referente: Linear usa ~32px por item, 4-8px entre secciones.
