@@ -7,11 +7,10 @@
       <div class="sidebar-logo">
         <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
         <span class="sidebar-logo-name">OS Gestión</span>
+        <button class="sidebar-collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir' : 'Colapsar'">
+          <span class="material-icons" style="font-size:16px">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+        </button>
       </div>
-      <!-- Botón colapso en el borde derecho del sidebar -->
-      <button class="sidebar-edge-toggle" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir' : 'Colapsar'">
-        <span class="material-icons" style="font-size:14px">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
-      </button>
 
       <!-- Nav -->
       <nav class="sidebar-nav">
@@ -350,7 +349,7 @@
       </div>
 
       <!-- Bottom tab bar (solo mobile) -->
-      <nav class="bottom-tab-bar d-mobile-only">
+      <nav class="bottom-tab-bar">
         <RouterLink to="/tareas" class="btab" :class="{ active: ruta.startsWith('/tareas') }">
           <span class="material-icons">check_circle_outline</span>
           <span class="btab-label">Tareas</span>
