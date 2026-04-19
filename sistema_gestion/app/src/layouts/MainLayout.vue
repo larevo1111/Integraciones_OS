@@ -5,7 +5,7 @@
     <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <!-- Logo -->
       <div class="sidebar-logo">
-        <div class="sidebar-logo-icon">G</div>
+        <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
         <span class="sidebar-logo-name">OS Gestión</span>
         <span
           class="material-icons sidebar-collapse-btn"
@@ -404,7 +404,7 @@
         <div v-if="drawerOpen" class="drawer-overlay" @click="drawerOpen = false">
           <aside class="drawer-panel" @click.stop>
             <div class="sidebar-logo" style="border-bottom:1px solid var(--border-subtle)">
-              <div class="sidebar-logo-icon">G</div>
+              <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
               <span class="sidebar-logo-name">OS Gestión</span>
               <button class="btn-icon" style="margin-left:auto" @click="drawerOpen = false">
                 <span class="material-icons">close</span>

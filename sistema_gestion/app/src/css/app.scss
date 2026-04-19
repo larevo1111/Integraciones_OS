@@ -173,13 +173,11 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
-.sidebar-logo-icon {
-  width: 24px; height: 24px;
-  background: var(--accent);
-  border-radius: var(--radius-md);
-  display: flex; align-items: center; justify-content: center;
+.sidebar-logo-img {
+  width: 28px; height: 28px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
-  font-weight: 700; font-size: 11px; color: #000;
+  object-fit: cover;
 }
 .sidebar-logo-name {
   font-size: 12px; font-weight: 600; color: var(--text-primary);
@@ -299,7 +297,6 @@ body {
   justify-content: center;
   padding: 0 8px;
 }
-.sidebar.collapsed .sidebar-logo-icon { display: none; }
 .sidebar.collapsed .sidebar-logo-name { display: none; }
 
 /* Ocultar labels de nav cuando colapsado */
