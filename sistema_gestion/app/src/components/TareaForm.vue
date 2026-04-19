@@ -111,12 +111,15 @@
               <!-- Responsable -->
               <q-chip clickable dense icon="person_outline" class="tf-chip" :class="{ 'tf-chip-filled': form.responsable }">
                 <span>{{ responsableLabel || 'Responsable' }}</span>
-                <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-                  <q-list dense style="min-width:200px;max-height:260px;overflow-y:auto">
-                    <q-item v-for="u in usuarios" :key="u.email" clickable v-close-popup :active="form.responsable === u.email" @click="form.responsable = u.email">
-                      <q-item-section>{{ u.nombre }}</q-item-section>
-                    </q-item>
-                  </q-list>
+                <q-menu class="tf-menu tf-menu-wide" anchor="top middle" self="bottom middle" :offset="[0, 6]" no-focus>
+                  <div class="tf-menu-inner">
+                    <ResponsablesSelector
+                      :model-value="form.responsable ? [form.responsable] : []"
+                      :usuarios="usuarios"
+                      single
+                      @update:model-value="v => form.responsable = v[0] || ''"
+                    />
+                  </div>
                 </q-menu>
               </q-chip>
 
@@ -163,9 +166,10 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { api } from 'src/services/api'
 import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
-import OpSelector        from 'src/components/OpSelector.vue'
-import ProyectoSelector  from 'src/components/ProyectoSelector.vue'
-import EtiquetasSelector from 'src/components/EtiquetasSelector.vue'
+import OpSelector           from 'src/components/OpSelector.vue'
+import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
+import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
+import ResponsablesSelector from 'src/components/ResponsablesSelector.vue'
 
 const props = defineProps({
   modelValue:  Boolean,
