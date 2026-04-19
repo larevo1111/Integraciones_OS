@@ -349,6 +349,30 @@
         </div>
         <router-view :key="refreshKey" />
       </div>
+
+      <!-- Bottom tab bar (solo mobile) -->
+      <nav class="bottom-tab-bar d-mobile-only">
+        <RouterLink to="/tareas" class="btab" :class="{ active: ruta.startsWith('/tareas') }">
+          <span class="material-icons">check_circle_outline</span>
+          <span class="btab-label">Tareas</span>
+        </RouterLink>
+        <RouterLink to="/equipo" class="btab" :class="{ active: ruta.startsWith('/equipo') }">
+          <span class="material-icons">group</span>
+          <span class="btab-label">Equipo</span>
+        </RouterLink>
+        <RouterLink to="/jornadas" class="btab" :class="{ active: ruta.startsWith('/jornadas') }">
+          <span class="material-icons">schedule</span>
+          <span class="btab-label">Jornadas</span>
+        </RouterLink>
+        <RouterLink to="/proyectos-tabla" class="btab" :class="{ active: ruta.startsWith('/proyectos') }">
+          <span class="material-icons">folder_open</span>
+          <span class="btab-label">Proyectos</span>
+        </RouterLink>
+        <button class="btab" @click="drawerOpen = true">
+          <span class="material-icons">menu</span>
+          <span class="btab-label">Más</span>
+        </button>
+      </nav>
     </div>
 
     <!-- Panel lateral crear/editar -->
@@ -561,7 +585,7 @@
 
               <!-- Footer usuario (móvil) -->
               <div style="margin-top:auto; padding:12px 8px; border-top:1px solid var(--border-subtle)">
-                <div class="nav-item" style="margin-bottom:4px" @click="toggleTema; drawerOpen=false">
+                <div class="nav-item" style="margin-bottom:4px" @click="toggleTema(); drawerOpen=false">
                   <span class="nav-item-icon material-icons">{{ auth.tema === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
                   <span class="nav-item-label">{{ auth.tema === 'dark' ? 'Modo claro' : 'Modo oscuro' }}</span>
                 </div>
@@ -589,7 +613,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.5.8'
+const APP_VERSION = 'v2.6.0'
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)

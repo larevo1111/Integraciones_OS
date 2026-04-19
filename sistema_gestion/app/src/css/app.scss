@@ -191,7 +191,7 @@ body {
   padding: 8px 0;
 }
 .sidebar-section {
-  padding: 16px 0 4px;
+  padding: 8px 0 2px;
 }
 .sidebar-section-label {
   font-size: 10px;
@@ -1221,6 +1221,31 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 }
 .bottom-nav-item.active { color: var(--accent); }
 .bottom-nav-icon { font-size: 20px; }
+
+/* Bottom tab bar (mobile) */
+.bottom-tab-bar {
+  display: none;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  padding: 4px 0 env(safe-area-inset-bottom, 0);
+}
+@media (max-width: 768px) { .bottom-tab-bar { display: flex; } }
+.btab {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px; padding: 6px 0;
+  font-size: 9px; font-weight: 500;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  cursor: pointer;
+  background: none; border: none;
+  font-family: inherit;
+  transition: color 80ms;
+}
+.btab .material-icons { font-size: 20px; }
+.btab-label { white-space: nowrap; }
+.btab.active { color: var(--accent); }
+.btab:hover { color: var(--text-primary); }
 
 /* ─── LOGIN ─── */
 .login-page {
