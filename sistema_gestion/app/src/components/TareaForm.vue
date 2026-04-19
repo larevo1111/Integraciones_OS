@@ -108,8 +108,13 @@
                 class="tf-inline-selector"
               />
 
-              <!-- Proyecto: selector original, un solo click -->
-              <ProyectoSelector v-model="form.proyecto_id" :proyectos="proyectos" class="tf-inline-selector" />
+              <!-- Proyecto: selector original, un solo click. crear-item delega al panel del sidebar -->
+              <ProyectoSelector
+                v-model="form.proyecto_id"
+                :proyectos="proyectos"
+                class="tf-inline-selector"
+                @crear-item="tipo => abrirPanelItem(tipo)"
+              />
             </div>
 
             <!-- Descripción -->
@@ -134,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, inject } from 'vue'
 import { api } from 'src/services/api'
 import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
@@ -155,6 +160,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'guardada'])
 
 const auth      = useAuthStore()
+const abrirPanelItem = inject('abrirPanelItem', () => {})
 const guardando = ref(false)
 const tituloRef = ref(null)
 const isMobile  = computed(() => window.innerWidth <= 768)
