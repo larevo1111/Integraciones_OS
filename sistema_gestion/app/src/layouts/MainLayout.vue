@@ -547,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.2'
+const APP_VERSION = 'v2.7.3'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -900,8 +900,14 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
   color: var(--text-secondary);
   transition: background 80ms, color 80ms;
 }
-.sidebar-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.sidebar-item.active { background: var(--bg-row-selected); color: var(--text-primary); font-weight: 500; }
+.sidebar-item:hover { background: var(--bg-row-hover); color: var(--text-primary) !important; }
+.sidebar-item.active,
+.sidebar-item.q-router-link--active,
+.sidebar-item.q-router-link--exact-active {
+  background: var(--bg-row-selected);
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
 
 .sidebar-item-mini { justify-content: center; }
 
@@ -929,7 +935,7 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 }
 
 /* Sub-sections (inside expansion items) */
-.sidebar-sub-section { padding-left: 16px; }
+.sidebar-sub-section { padding-left: 20px; }
 .sidebar-sub-header {
   display: flex; align-items: center; gap: 4px;
   padding: 3px 12px; font-size: 11px;
@@ -945,13 +951,34 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 }
 .sidebar-sub-header:hover .sidebar-add-btn { opacity: 1; }
 
-/* Project items */
+/* Project items (sub-level dentro de acordeones) */
 .sidebar-project-item {
-  min-height: 28px !important;
-  padding: 2px 8px !important;
+  min-height: 26px !important;
+  padding: 2px 8px 2px 16px !important;
   margin: 0 4px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+}
+.sidebar-project-item :deep(.q-item__section--main),
+.sidebar-project-item .q-item__section--main {
+  font-size: 12px !important;
+  color: var(--text-secondary);
+}
+.sidebar-project-item:hover {
+  background: var(--bg-row-hover);
+  color: var(--text-primary) !important;
+}
+.sidebar-project-item.active,
+.sidebar-project-item.q-router-link--active,
+.sidebar-project-item.q-router-link--exact-active {
+  background: var(--bg-row-selected);
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
+.sidebar-project-item.q-router-link--active :deep(.q-item__section--main),
+.sidebar-project-item.q-router-link--exact-active :deep(.q-item__section--main) {
+  color: var(--text-primary);
 }
 
 /* Count badge */
