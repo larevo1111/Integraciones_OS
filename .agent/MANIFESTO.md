@@ -30,7 +30,17 @@
 
 ## ⚠️ REGLAS CRÍTICAS DE FRONTEND (leer antes de cualquier tarea de UI)
 
-**ANTES de crear cualquier componente, vista, layout o elemento visual del ERP:**
+### Referentes UX obligatorios
+
+Toda decisión de UI/UX debe basarse en estos referentes, en este orden:
+
+1. **Nielsen Norman Group** (nngroup.com) — reglas de usabilidad, navegación, patrones
+2. **Linear.app** — referente principal de diseño (sidebar, paneles, tareas, dark mode)
+3. **HubSpot / Kommo** — referente de sidebar colapsada (submenu flotante, no acordeón)
+
+**Principio:** cuando hay duda sobre cómo hacer algo en la UI, buscar cómo lo hace Linear primero. Si Linear no aplica, buscar en Nielsen Norman Group.
+
+### Antes de crear cualquier componente visual:
 
 1. **Leer el manual**: `frontend/design-system/MANUAL_ESTILOS.md`
 2. **Consultar capturas de referencia**: `frontend/design-system/screenshots/` (88 imágenes de Linear.app) + `INDEX.md`
