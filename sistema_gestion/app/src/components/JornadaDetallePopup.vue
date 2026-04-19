@@ -719,7 +719,7 @@ function durPausa(p) {
 /* Form nueva/editar pausa */
 .nueva-pausa-form {
   margin-top: 8px; padding: 12px;
-  background: rgba(255,255,255,0.02);
+  background: var(--bg-row-hover);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   display: flex; flex-direction: column; gap: 6px;

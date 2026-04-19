@@ -234,7 +234,7 @@ onMounted(() => { cargar(); cargarDatos() })
   font-size: 12px; font-weight: 600; cursor: pointer;
   font-family: var(--font-sans);
 }
-.btn-crear:hover { background: #e8e8e8; }
+.btn-crear:hover { background: var(--bg-card-hover); }
 @media (max-width: 768px) {
   .btn-crear { padding: 0 10px; min-width: 32px; }
   .btn-crear .btn-crear-label { display: none; }

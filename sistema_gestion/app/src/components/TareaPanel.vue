@@ -680,7 +680,7 @@ function completar() {
 .sub-link-circle {
   display: flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; flex-shrink: 0;
-  border: 1.5px solid rgba(255,255,255,0.55);
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-full);
   background: transparent; color: #000; cursor: pointer; padding: 0;
 }

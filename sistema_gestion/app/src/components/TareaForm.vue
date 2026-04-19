@@ -361,7 +361,7 @@ async function guardar() {
   font-family: var(--font-sans);
 }
 .form-btn-crear:disabled { opacity: 0.4; cursor: default; }
-.form-btn-crear:hover:not(:disabled) { background: #e8e8e8; }
+.form-btn-crear:hover:not(:disabled) { background: var(--bg-card-hover); }
 
 /* Transiciones */
 .modal-enter-active, .modal-leave-active { transition: opacity 150ms; }

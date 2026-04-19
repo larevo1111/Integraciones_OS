@@ -774,7 +774,7 @@ function fmtFecha(iso) {
   font-family: var(--font-sans);
 }
 .pp-btn-crear:disabled { opacity: 0.4; cursor: default; }
-.pp-btn-crear:hover:not(:disabled) { background: #e8e8e8; }
+.pp-btn-crear:hover:not(:disabled) { background: var(--bg-card-hover); }
 
 /* Handle arrastrable — solo visible en mobile */
 .pp-handle-area {
