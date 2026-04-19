@@ -42,22 +42,8 @@
             <span v-if="f.key === 'personalizado' && filtroPersonalizadoCount" class="chip-count">{{ filtroPersonalizadoCount }}</span>
           </button>
 
-          <!-- Nueva tarea (desktop) -->
-          <q-btn
-            dense
-            unelevated
-            color="primary"
-            icon="add"
-            label="Nueva tarea"
-            size="sm"
-            class="gt-sm q-ml-auto"
-            @click="abrirNuevaTarea"
-          >
-            <q-tooltip>Tecla N</q-tooltip>
-          </q-btn>
-
           <!-- Ordenar / Agrupar -->
-          <div style="position:relative;flex-shrink:0" class="q-ml-sm" ref="btnAgruparWrap">
+          <div style="position:relative;margin-left:auto;flex-shrink:0" ref="btnAgruparWrap">
             <button class="chip chip-agrupar" @click="toggleMenuOrdenar" ref="btnOrdenarRef">
               <span class="material-icons" style="font-size:13px">sort</span>
               <span class="material-icons" style="font-size:13px">expand_more</span>
@@ -116,6 +102,71 @@
         <div class="cal-dia-info">
           <span class="cal-dia-label">{{ calDiaLabel }}</span>
           <span class="cal-dia-count">{{ tareas.length }} tarea{{ tareas.length !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+
+      <!-- QuickAdd (desktop y mobile) -->
+      <div class="quickadd-wrap">
+        <form class="quickadd-row" :class="{ activo: qaActivo }" @submit.prevent="qaAgregar">
+          <span class="material-icons quickadd-plus">add</span>
+          <input
+            ref="qaInputRef"
+            class="quickadd-input"
+            v-model="qaTitulo"
+            placeholder="Agregar una tarea..."
+            @focus="qaActivo = true"
+            @blur="qaSugerirSiNecesario"
+            @keydown.escape="qaCancelar"
+          />
+          <template v-if="qaActivo">
+            <button type="submit" class="btn-icon" :disabled="!qaTitulo || qaGuardando" title="Agregar">
+              <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+            </button>
+            <button type="button" class="btn-icon" @click="qaCancelar" title="Cancelar">
+              <span class="material-icons" style="font-size:18px">close</span>
+            </button>
+          </template>
+        </form>
+
+        <!-- Categorías chips + OP -->
+        <div v-if="qaActivo" class="quickadd-cats">
+          <span v-if="qaIALoading" class="ia-loading" title="IA sugiriendo categoría...">
+            <span class="material-icons spin" style="font-size:12px;color:var(--accent)">autorenew</span>
+          </span>
+          <button
+            v-for="c in categorias"
+            :key="c.id"
+            class="cat-chip"
+            :class="{ selected: qaCatId === c.id }"
+            @click="qaCatId = c.id; qaChipClickCount++"
+          >
+            <span class="cat-dot" :style="{ background: c.color }"></span>
+            {{ c.nombre.replace(/_/g, ' ') }}
+          </button>
+        </div>
+        <!-- Proyecto + etiquetas + OP -->
+        <div v-if="qaActivo" class="quickadd-extra">
+          <ProyectoSelector
+            v-model="qaProyectoId"
+            :proyectos="proyectos"
+            @crear-item="tipo => abrirPanelItem(tipo)"
+          />
+          <EtiquetasSelector
+            v-model="qaEtiquetas"
+            :etiquetas="etiquetas"
+            @etiqueta-creada="e => etiquetas.push(e)"
+            @etiqueta-actualizada="e => { const i = etiquetas.findIndex(x => x.id === e.id); if (i !== -1) etiquetas[i] = e }"
+            @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
+          />
+        </div>
+        <div v-if="qaActivo && qaCatEsProduccion" class="quickadd-op">
+          <OpSelector v-model="qaOp" style="max-width:360px" />
+        </div>
+        <div v-if="qaActivo && qaCatEsEmpaque" class="quickadd-op">
+          <div style="display:flex;flex-direction:column;gap:6px;max-width:360px">
+            <RemisionSelector v-model="qaRemision" />
+            <PedidoSelector   v-model="qaPedido" />
+          </div>
         </div>
       </div>
 
@@ -538,7 +589,7 @@
 import { ref, computed, inject, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from 'src/services/api'
-import { crearTarea, crearSubtarea } from 'src/composables/useTareas'
+import { crearTarea, crearSubtarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
 
 const props = defineProps({
@@ -547,6 +598,11 @@ const props = defineProps({
 import TareaItem            from 'src/components/TareaItem.vue'
 import TareaPanel           from 'src/components/TareaPanel.vue'
 import TareaForm            from 'src/components/TareaForm.vue'
+import OpSelector           from 'src/components/OpSelector.vue'
+import RemisionSelector     from 'src/components/RemisionSelector.vue'
+import PedidoSelector       from 'src/components/PedidoSelector.vue'
+import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
+import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
 import { calcDuracionVivo } from 'src/services/crono'
 import Sortable             from 'sortablejs'
@@ -795,20 +851,98 @@ async function guardarSubtarea(padre) {
   } catch (e) { console.error(e) }
 }
 
-// Abrir modal Nueva tarea (reemplaza al antiguo QuickAdd)
-function abrirNuevaTarea() {
-  mostrarForm.value = true
+// QuickAdd desktop
+const qaActivo      = ref(false)
+const qaTitulo      = ref('')
+const qaCatId       = ref(null)
+const qaOp          = ref('')
+const qaRemision    = ref('')
+const qaPedido      = ref('')
+const qaProyectoId  = ref(null)
+const qaGuardando   = ref(false)
+const qaInputRef    = ref(null)
+const qaEtiquetas   = ref([])
+
+const qaIALoading   = ref(false)
+// Contador de clicks manuales en chips — se incrementa con click, se resetea al cambiar título
+// La IA solo escribe qaCatId si clickCount no cambió durante su await
+let qaChipClickCount = 0
+
+async function qaSugerirSiNecesario() {
+  if (!qaTitulo.value || qaTitulo.value.length < 4) return
+  if (qaCatId.value) return  // ya tiene categoría (por chip o IA previa)
+  const clicksBefore = qaChipClickCount
+  qaIALoading.value = true
+  const sug = await sugerirCategoria(qaTitulo.value)
+  qaIALoading.value = false
+  // Solo asignar si el usuario NO clickeó un chip mientras la IA procesaba
+  if (sug?.categoria_id && qaChipClickCount === clicksBefore) qaCatId.value = sug.categoria_id
 }
 
-// Atajo de teclado "N" para abrir Nueva tarea (desktop)
-function onKeydownGlobal(ev) {
-  if (ev.key !== 'n' && ev.key !== 'N') return
-  if (ev.ctrlKey || ev.metaKey || ev.altKey) return
-  const t = ev.target
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-  if (mostrarForm.value) return
-  ev.preventDefault()
-  abrirNuevaTarea()
+let qaDebounceTimer = null
+watch(qaTitulo, (val) => {
+  if (qaDebounceTimer) clearTimeout(qaDebounceTimer)
+  if (!val || val.length < 4) return
+  qaCatId.value = null  // título cambió → resetear categoría
+  qaDebounceTimer = setTimeout(qaSugerirSiNecesario, 1000)
+})
+
+const qaCatEsProduccion = computed(() =>
+  categorias.value.find(c => c.id === qaCatId.value)?.es_produccion
+)
+const qaCatEsEmpaque = computed(() =>
+  categorias.value.find(c => c.id === qaCatId.value)?.es_empaque
+)
+
+function qaCancelar() {
+  qaActivo.value    = false
+  qaTitulo.value    = ''
+  qaCatId.value     = null
+  qaChipClickCount  = 0
+  qaOp.value        = ''
+  qaRemision.value  = ''
+  qaPedido.value    = ''
+  qaProyectoId.value = null
+  qaEtiquetas.value  = []
+}
+
+async function qaAgregar() {
+  if (!qaTitulo.value || qaGuardando.value) return
+  qaGuardando.value = true
+  try {
+    const defs = defaultsFromFilters.value
+    // Si no hay categoría (ni manual ni IA), llamar IA ahora
+    console.log('[IA-cat] submit — qaCatId:', qaCatId.value)
+    if (!qaCatId.value) await qaSugerirSiNecesario()
+    const catId = qaCatId.value || categorias.value.find(c => c.nombre === 'Varios')?.id
+    console.log('[IA-cat] catId final:', catId)
+    const body = {
+      titulo:       qaTitulo.value,
+      categoria_id: catId,
+      proyecto_id:  qaProyectoId.value ?? defs.proyecto_id ?? null,
+      prioridad:    defs.prioridad || undefined,
+      responsable:  defs.responsable || undefined,
+      id_op:        qaOp.value      || defs.id_op || null,
+      id_remision:  qaRemision.value || defs.id_remision || null,
+      id_pedido:    qaPedido.value   || defs.id_pedido || null,
+      etiquetas:    qaEtiquetas.value.length ? qaEtiquetas.value : (defs.etiquetas || []),
+      fecha_limite: defs.fecha_limite || null
+    }
+    const tarea = await crearTarea(body)
+    onTareaGuardada(tarea)
+    qaTitulo.value     = ''
+    qaOp.value         = ''
+    qaRemision.value   = ''
+    qaPedido.value     = ''
+    qaProyectoId.value = null
+    qaEtiquetas.value  = []
+    qaActivo.value     = false
+  } catch (e) { console.error(e) } finally {
+    // SIEMPRE resetear para la siguiente tarea
+    qaCatId.value      = null
+    qaChipClickCount   = 0
+    qaGuardando.value  = false
+  }
 }
 
 const FILTROS = [
@@ -1578,14 +1712,12 @@ async function eliminar(tarea) {
 onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeyDown)
-  window.addEventListener('keydown', onKeydownGlobal)
   document.addEventListener('click', onDocumentClick, true)
   await Promise.all([cargarTareas(), cargarCatalogos()])
 })
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
-  window.removeEventListener('keydown', onKeydownGlobal)
   document.removeEventListener('click', onDocumentClick, true)
   destroySortables()
 })
@@ -1595,6 +1727,8 @@ onUnmounted(() => {
 /* Espacio para el badge de subtareas que flota debajo del círculo de estado */
 .sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
 
+/* Spinner IA sugerencia */
+.ia-loading { display: inline-flex; align-items: center; margin-right: 4px; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1603,6 +1737,35 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .d-desktop-only { display: none !important; }
   .d-mobile-only  { display: flex; }
+  /* QuickAdd en mobile: padding ajustado */
+  .quickadd-wrap { padding: 0 12px 8px; }
+  /* Chips de categoría: scroll horizontal en lugar de wrap */
+  .quickadd-cats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-left: 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .quickadd-cats::-webkit-scrollbar { display: none; }
+  /* Extra (proyecto + etiquetas) en móvil */
+  .quickadd-extra { padding-left: 0; }
+  /* Selectores OP/Remisión/Pedido: ancho completo sin padding excesivo */
+  .quickadd-op { padding-left: 0; }
+  .quickadd-op > div { max-width: 100% !important; }
+}
+
+/* QuickAdd */
+.quickadd-wrap {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 16px 10px;
+}
+/* OP row */
+.quickadd-op {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 0 26px;
 }
 
 /* Panel */
