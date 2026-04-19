@@ -547,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.3'
+const APP_VERSION = 'v2.7.4'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -938,12 +938,12 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 .sidebar-sub-section { padding-left: 20px; }
 .sidebar-sub-header {
   display: flex; align-items: center; gap: 4px;
-  padding: 3px 12px; font-size: 11px;
-  color: var(--text-tertiary); cursor: pointer;
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  color: var(--text-secondary); cursor: pointer;
   border-radius: 4px; transition: color 80ms;
   user-select: none;
 }
-.sidebar-sub-header:hover { color: var(--text-secondary); }
+.sidebar-sub-header:hover { color: var(--text-primary); }
 .sidebar-add-btn {
   color: var(--text-tertiary) !important;
   opacity: 0;
