@@ -81,15 +81,8 @@
                 </q-menu>
               </q-chip>
 
-              <!-- Etiquetas -->
-              <q-chip clickable dense icon="local_offer" class="tf-chip" :class="{ 'tf-chip-filled': form.etiquetas.length }">
-                <span>{{ etiquetasLabel || 'Etiquetas' }}</span>
-                <q-menu class="tf-menu tf-menu-wide" anchor="top middle" self="bottom middle" :offset="[0, 6]" no-focus>
-                  <div class="tf-menu-inner">
-                    <EtiquetasSelector v-model="form.etiquetas" :etiquetas="etiquetas" />
-                  </div>
-                </q-menu>
-              </q-chip>
+              <!-- Etiquetas: selector original, un solo click -->
+              <EtiquetasSelector v-model="form.etiquetas" :etiquetas="etiquetas" class="tf-inline-selector" />
 
               <!-- Fecha -->
               <q-chip clickable dense :icon="form.fecha_limite ? 'event' : 'event_note'" class="tf-chip" :class="{ 'tf-chip-filled': form.fecha_limite }">
@@ -108,36 +101,15 @@
                 </q-menu>
               </q-chip>
 
-              <!-- Responsable -->
-              <q-chip clickable dense icon="person_outline" class="tf-chip" :class="{ 'tf-chip-filled': form.responsable }">
-                <span>{{ responsableLabel || 'Responsable' }}</span>
-                <q-menu class="tf-menu tf-menu-wide" anchor="top middle" self="bottom middle" :offset="[0, 6]" no-focus>
-                  <div class="tf-menu-inner">
-                    <ResponsablesSelector
-                      :model-value="form.responsable ? [form.responsable] : []"
-                      :usuarios="usuarios"
-                      single
-                      @update:model-value="v => form.responsable = v[0] || ''"
-                    />
-                  </div>
-                </q-menu>
-              </q-chip>
+              <!-- Responsable: selector original multi, un solo click -->
+              <ResponsablesSelector
+                v-model="form.responsables"
+                :usuarios="usuarios"
+                class="tf-inline-selector"
+              />
 
-              <!-- Proyecto -->
-              <q-chip
-                clickable dense
-                icon="folder_outline"
-                class="tf-chip"
-                :class="{ 'tf-chip-filled': proyectoSeleccionado }"
-                :style="proyectoSeleccionado ? { background: hexAlpha(proyectoSeleccionado.color || '#888', 0.12), borderColor: proyectoSeleccionado.color || 'var(--border-default)' } : {}"
-              >
-                <span>{{ proyectoSeleccionado?.nombre || 'Proyecto' }}</span>
-                <q-menu class="tf-menu tf-menu-wide" anchor="top middle" self="bottom middle" :offset="[0, 6]" no-focus>
-                  <div class="tf-menu-inner">
-                    <ProyectoSelector v-model="form.proyecto_id" :proyectos="proyectos" />
-                  </div>
-                </q-menu>
-              </q-chip>
+              <!-- Proyecto: selector original, un solo click -->
+              <ProyectoSelector v-model="form.proyecto_id" :proyectos="proyectos" class="tf-inline-selector" />
             </div>
 
             <!-- Descripción -->
@@ -189,7 +161,8 @@ const isMobile  = computed(() => window.innerWidth <= 768)
 
 const form = ref({
   titulo: '', descripcion: '', categoria_id: null, proyecto_id: null,
-  prioridad: 'Media', responsable: auth.usuario?.email || '',
+  prioridad: 'Media',
+  responsables: auth.usuario?.email ? [auth.usuario.email] : [],
   fecha_limite: '', id_op: '', etiquetas: []
 })
 
@@ -256,25 +229,28 @@ function hexAlpha(hex, a) {
 watch(() => props.modelValue, async (val) => {
   if (!val) return
   if (props.tareaEditar) {
+    const existingResp = props.tareaEditar.responsables
+      || (props.tareaEditar.responsable ? [props.tareaEditar.responsable] : [])
     form.value = {
       titulo:       props.tareaEditar.titulo || '',
       descripcion:  props.tareaEditar.descripcion || '',
       categoria_id: props.tareaEditar.categoria_id,
       proyecto_id:  props.tareaEditar.proyecto_id || null,
       prioridad:    props.tareaEditar.prioridad || 'Media',
-      responsable:  props.tareaEditar.responsable || auth.usuario?.email || '',
+      responsables: existingResp,
       fecha_limite: props.tareaEditar.fecha_limite || '',
       id_op:        props.tareaEditar.id_op || '',
       etiquetas:    (props.tareaEditar.etiquetas || []).map(e => e.id)
     }
   } else {
     const d = props.defaults || {}
+    const defaultResp = auth.usuario?.email ? [auth.usuario.email] : []
     form.value = {
       titulo: '', descripcion: '',
       categoria_id: d.categoria_id || props.categorias[0]?.id || null,
       proyecto_id: d.proyecto_id || null,
       prioridad: d.prioridad || 'Media',
-      responsable: d.responsable || auth.usuario?.email || '',
+      responsables: d.responsables || defaultResp,
       fecha_limite: d.fecha_limite || '',
       id_op: d.id_op || '',
       etiquetas: d.etiquetas || []
@@ -289,14 +265,18 @@ async function guardar() {
   guardando.value = true
   try {
     let tarea
+    const body = {
+      ...form.value,
+      responsable: form.value.responsables[0] || auth.usuario?.email || ''
+    }
     if (editar.value) {
-      const data = await api(`/api/gestion/tareas/${props.tareaEditar.id}`, { method: 'PUT', body: JSON.stringify(form.value) })
+      const data = await api(`/api/gestion/tareas/${props.tareaEditar.id}`, { method: 'PUT', body: JSON.stringify(body) })
       tarea = data.tarea
     } else {
       // Sugerencia IA si no eligió categoría
       if (!form.value.categoria_id) await tfSugerirSiNecesario()
       if (!form.value.categoria_id) return // categoría requerida
-      tarea = await crearTarea(form.value)
+      tarea = await crearTarea(body)
     }
     emit('guardada', tarea)
     emit('update:modelValue', false)
@@ -411,11 +391,16 @@ async function guardar() {
   flex-shrink: 0;
 }
 
-/* Chips fecha/responsable/prioridad */
+/* Fila de chips + selectores originales */
 .form-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
+}
+/* Selectores originales inline (sin label ni margen extra) */
+.form-chips :deep(.tf-inline-selector) {
+  display: inline-flex;
   align-items: center;
 }
 .tf-chip {
