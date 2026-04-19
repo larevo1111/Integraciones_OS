@@ -112,6 +112,7 @@
               <ProyectoSelector
                 v-model="form.proyecto_id"
                 :proyectos="proyectos"
+                empty-label="Proyecto"
                 class="tf-inline-selector"
                 @crear-item="tipo => abrirPanelItem(tipo)"
               />
@@ -161,6 +162,15 @@ const emit = defineEmits(['update:modelValue', 'guardada'])
 
 const auth      = useAuthStore()
 const abrirPanelItem = inject('abrirPanelItem', () => {})
+const ultimoItemGuardado = inject('ultimoItemGuardado', ref(null))
+
+// Auto-seleccionar proyecto recién creado desde el popover "+ Nuevo proyecto"
+watch(ultimoItemGuardado, (p) => {
+  if (!p || !props.modelValue) return
+  if (p._accion === 'creado' && (p.tipo === 'proyecto' || !p.tipo)) {
+    form.value.proyecto_id = p.id
+  }
+})
 const guardando = ref(false)
 const tituloRef = ref(null)
 const isMobile  = computed(() => window.innerWidth <= 768)

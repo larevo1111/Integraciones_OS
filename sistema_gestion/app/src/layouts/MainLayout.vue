@@ -547,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.7'
+const APP_VERSION = 'v2.7.8'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -681,6 +681,10 @@ function abrirPanel(tipo, item = null) {
 provide('abrirPanelItem', abrirPanel)
 provide('recargarSidebar', cargarProyectos)
 
+// Notificación a páginas (TareasPage/EquipoPage) cuando se crea/edita un item desde el panel
+const ultimoItemGuardado = ref(null)
+provide('ultimoItemGuardado', ultimoItemGuardado)
+
 function onItemGuardado(p) {
   if (p._accion === 'creado') {
     todosItems.value.push(p)
@@ -692,6 +696,7 @@ function onItemGuardado(p) {
     const idx = todosItems.value.findIndex(x => x.id === p.id)
     if (idx !== -1) todosItems.value[idx] = { ...todosItems.value[idx], ...p }
   }
+  ultimoItemGuardado.value = { ...p, _ts: Date.now() }
 }
 
 function onItemEliminado(p) {

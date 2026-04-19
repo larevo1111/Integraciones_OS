@@ -2,7 +2,8 @@
   <div class="proyecto-selector" ref="wrapRef">
     <button class="proyecto-btn" @click.stop="abrirMenu" :class="{ 'has-value': modelValue }">
       <span v-if="proyectoSeleccionado" class="proyecto-dot" :style="{ background: proyectoSeleccionado.color }"></span>
-      <span class="proyecto-btn-label">{{ proyectoSeleccionado?.nombre || 'Sin asignar' }}</span>
+      <span v-else class="material-icons" style="font-size:14px;opacity:0.7">folder_open</span>
+      <span class="proyecto-btn-label">{{ proyectoSeleccionado?.nombre || emptyLabel }}</span>
       <span class="material-icons" style="font-size:14px;color:var(--text-tertiary)">expand_more</span>
     </button>
 
@@ -64,7 +65,8 @@ import { api } from 'src/services/api'
 
 const props = defineProps({
   modelValue: { type: Number, default: null },
-  proyectos:  { type: Array, default: null }
+  proyectos:  { type: Array, default: null },
+  emptyLabel: { type: String, default: 'Sin asignar' }
 })
 const emit = defineEmits(['update:modelValue', 'crear-item'])
 

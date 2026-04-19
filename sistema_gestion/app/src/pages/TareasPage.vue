@@ -613,6 +613,19 @@ const router = useRouter()
 const abrirPanelItem = inject('abrirPanelItem', () => {})
 const recargarSidebar = inject('recargarSidebar', () => {})
 
+// Notificación del MainLayout: item creado/editado desde el panel del sidebar
+const ultimoItemGuardado = inject('ultimoItemGuardado', ref(null))
+watch(ultimoItemGuardado, (p) => {
+  if (!p) return
+  if (p._accion === 'creado') {
+    // Agregar a proyectos locales si no existe
+    if (!proyectos.value.some(x => x.id === p.id)) proyectos.value.push(p)
+  } else {
+    const idx = proyectos.value.findIndex(x => x.id === p.id)
+    if (idx !== -1) proyectos.value[idx] = { ...proyectos.value[idx], ...p }
+  }
+})
+
 // Detección mobile (≤768px) — controla bottom sheet vs panel lateral
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
 function onResize() { isMobile.value = window.innerWidth <= 768 }
