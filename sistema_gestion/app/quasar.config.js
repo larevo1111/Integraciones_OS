@@ -21,7 +21,9 @@ export default defineConfig(() => {
       proxy: { '/api': 'http://localhost:9300' }
     },
     framework: {
-      config: {},
+      config: {
+        screen: { bodyClasses: true }
+      },
       plugins: ['Notify', 'Dialog', 'Loading']
     },
     animations: [],

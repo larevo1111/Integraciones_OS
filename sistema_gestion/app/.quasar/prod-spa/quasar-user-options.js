@@ -17,5 +17,5 @@ import {Notify,Dialog,Loading} from 'quasar'
 
 
 
-export default { config: {},plugins: {Notify,Dialog,Loading} }
+export default { config: {"screen":{"bodyClasses":true}},plugins: {Notify,Dialog,Loading} }
 

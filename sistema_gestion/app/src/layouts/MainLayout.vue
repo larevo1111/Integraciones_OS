@@ -1,381 +1,473 @@
 <template>
-  <div class="gestion-layout">
+  <q-layout view="lHh LpR lFf">
 
-    <!-- SIDEBAR (desktop) -->
-    <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-      <!-- Logo -->
+    <!-- ═══ SIDEBAR / DRAWER ═══ -->
+    <q-drawer
+      v-model="drawerOpen"
+      side="left"
+      :mini="isMini"
+      :width="240"
+      :mini-width="56"
+      :breakpoint="768"
+      show-if-above
+      bordered
+      class="sidebar-drawer"
+      :class="{ 'mini-mode': miniState && !isMobile }"
+    >
+      <!-- Logo header -->
       <div class="sidebar-logo">
         <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
-        <span class="sidebar-logo-name">OS Gestión</span>
-        <span
-          class="material-icons sidebar-collapse-btn"
-          style="font-size:18px;margin-left:auto"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-        >chevron_left</span>
+        <span v-if="!isMini" class="sidebar-logo-name">OS Gesti&oacute;n</span>
+        <q-btn
+          flat dense round
+          :icon="miniState ? 'chevron_right' : 'chevron_left'"
+          size="xs"
+          class="sidebar-toggle-btn gt-sm"
+          :class="{ 'q-ml-auto': !isMini }"
+          @click="miniState = !miniState"
+        />
+        <q-btn
+          flat dense round icon="close" size="sm"
+          class="q-ml-auto lt-md"
+          @click="drawerOpen = false"
+        />
       </div>
 
-      <!-- Nav -->
-      <nav class="sidebar-nav">
-        <!-- ═══ MIS TAREAS (acordeón) ═══ -->
-        <div class="sidebar-section">
-          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }" data-tooltip="Mis Tareas">
-            <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-mis')">{{ acordeonAbierto['bloque-mis'] ? 'expand_more' : 'chevron_right' }}</span>
-            <RouterLink to="/tareas" class="nav-item-link-grow">
-              <span class="nav-item-icon material-icons">check_circle_outline</span>
-              <span class="nav-item-label">Mis Tareas</span>
-            </RouterLink>
-          </div>
-        </div>
+      <!-- Nav content -->
+      <div class="sidebar-scroll">
+        <q-list dense>
 
-        <template v-if="acordeonAbierto['bloque-mis']">
-        <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-section sidebar-section-indented">
-          <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
-            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
-            <span style="flex:1">{{ sec.label }}</span>
-            <span v-if="misItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ misItemsPorTipo(sec.tipo).length }}</span>
-            <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click.stop="abrirPanel(sec.tipo)">
-              <span class="material-icons" style="font-size:14px">add</span>
-            </button>
-          </div>
-          <template v-if="acordeonAbierto['mis-'+sec.tipo]">
-            <div
-              v-for="p in misItemsPorTipo(sec.tipo)"
-              :key="p.id"
-              class="nav-item-proyecto-wrap"
-              @mouseenter="proyectoHover = p.id"
-              @mouseleave="proyectoHover = null"
+          <!-- ═══ MIS TAREAS (acordeón) ═══ -->
+          <template v-if="!isMini">
+            <q-expansion-item
+              v-model="acordeonAbierto['bloque-mis']"
+              icon="check_circle_outline"
+              label="Mis Tareas"
+              header-class="sidebar-item"
+              :header-style="ruta === '/tareas' && !$route.query.proyecto_id ? 'background: var(--bg-row-selected)' : ''"
+              dense
             >
-              <RouterLink
-                :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                class="nav-item nav-item-proyecto"
-                :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
-              >
-                <span class="nav-item-icon">
-                  <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
-                </span>
-                <span class="nav-item-label">{{ p.nombre }}</span>
-                <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                <template v-if="proyectoHover === p.id">
-                  <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
-                    <span class="material-icons" style="font-size:15px">check_circle_outline</span>
-                  </button>
-                  <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
-                    <span class="material-icons" style="font-size:16px">more_vert</span>
-                  </button>
-                </template>
-              </RouterLink>
-            </div>
-            <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
-              Sin {{ sec.label.toLowerCase() }}
-            </div>
-          </template>
-        </div>
+              <template #header>
+                <q-item-section avatar class="sidebar-item-icon">
+                  <q-icon name="check_circle_outline" />
+                </q-item-section>
+                <q-item-section class="sidebar-item-label cursor-pointer" @click.stop="$router.push('/tareas'); drawerOpen = false">
+                  Mis Tareas
+                </q-item-section>
+              </template>
 
-        <!-- Etiquetas -->
-        <div class="sidebar-section sidebar-section-indented">
-          <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-etiquetas')">
-            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
-            <span style="flex:1">Etiquetas</span>
-            <span v-if="misEtiquetasCount" class="acordeon-count">{{ misEtiquetasCount }}</span>
-          </div>
-          <template v-if="acordeonAbierto['mis-etiquetas']">
-            <div
-              v-for="e in etiquetasGlobal"
-              v-show="e.mis_tareas_total"
-              :key="e.id"
-              class="nav-item-proyecto-wrap"
-              @mouseenter="etiquetaHover = e.id"
-              @mouseleave="etiquetaHover = null"
-            >
-              <RouterLink
-                :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
-                class="nav-item nav-item-proyecto"
-                :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }"
-              >
-                <span class="nav-item-icon">
-                  <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
-                </span>
-                <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
-                  <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
-                  <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
-                    <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
-                  </form>
-                  <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
-                    <span class="material-icons" style="font-size:15px">check</span>
-                  </button>
-                  <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
-                    <span class="material-icons" style="font-size:15px">close</span>
-                  </button>
+              <!-- Subitems Mis Tareas -->
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="toggleAcordeon('mis-'+sec.tipo)">
+                  <q-icon :name="acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs" style="flex:1">{{ sec.label }}</span>
+                  <span v-if="misItemsPorTipo(sec.tipo).length" class="sidebar-count">{{ misItemsPorTipo(sec.tipo).length }}</span>
+                  <q-btn flat dense round size="xs" icon="add" class="sidebar-add-btn" @click.stop="abrirPanel(sec.tipo)" />
                 </div>
-                <template v-else>
-                  <span class="nav-item-label">{{ e.nombre }}</span>
-                  <span v-if="e.mis_tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.mis_tareas_pendientes }}</span>
-                  <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
-                    <span class="material-icons" style="font-size:16px">more_vert</span>
-                  </button>
+                <template v-if="acordeonAbierto['mis-'+sec.tipo]">
+                  <q-item
+                    v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id"
+                    clickable dense
+                    class="sidebar-project-item"
+                    :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
+                    :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                    @click="drawerOpen = false"
+                    @mouseenter="proyectoHover = p.id"
+                    @mouseleave="proyectoHover = null"
+                  >
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
+                    </q-item-section>
+                    <q-item-section class="sidebar-item-label">{{ p.nombre }}</q-item-section>
+                    <q-item-section side v-if="p.tareas_pendientes && proyectoHover !== p.id">
+                      <span class="sidebar-count">{{ p.tareas_pendientes }}</span>
+                    </q-item-section>
+                    <q-item-section side v-if="proyectoHover === p.id" class="sidebar-hover-actions">
+                      <div class="row no-wrap items-center">
+                        <q-btn flat dense round size="xs" icon="check_circle_outline" @click.prevent.stop="completarItem(p)" />
+                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuProyecto($event, p)" />
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                  <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty">
+                    Sin {{ sec.label.toLowerCase() }}
+                  </div>
                 </template>
-              </RouterLink>
-            </div>
-            <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
-          </template>
-        </div>
-        </template>
+              </div>
 
-        <!-- ═══ SEPARADOR ═══ -->
-        <div class="sidebar-separator" />
-
-        <!-- ═══ EQUIPO (acordeón) ═══ -->
-        <div class="sidebar-section">
-          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/equipo' }" data-tooltip="Equipo">
-            <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-eq')">{{ acordeonAbierto['bloque-eq'] ? 'expand_more' : 'chevron_right' }}</span>
-            <RouterLink to="/equipo" class="nav-item-link-grow">
-              <span class="nav-item-icon material-icons">group</span>
-              <span class="nav-item-label">Equipo</span>
-            </RouterLink>
-          </div>
-        </div>
-
-        <template v-if="acordeonAbierto['bloque-eq']">
-        <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-section sidebar-section-indented">
-          <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
-            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
-            <span style="flex:1">{{ sec.label }}</span>
-            <span v-if="equipoItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ equipoItemsPorTipo(sec.tipo).length }}</span>
-            <button class="btn-icon-tiny" :title="`Nuevo ${sec.singular}`" @click.stop="abrirPanel(sec.tipo)">
-              <span class="material-icons" style="font-size:14px">add</span>
-            </button>
-          </div>
-          <template v-if="acordeonAbierto['eq-'+sec.tipo]">
-            <div
-              v-for="p in equipoItemsPorTipo(sec.tipo)"
-              :key="p.id"
-              class="nav-item-proyecto-wrap"
-              @mouseenter="proyectoHover = p.id"
-              @mouseleave="proyectoHover = null"
-            >
-              <RouterLink
-                :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
-                class="nav-item nav-item-proyecto"
-                :class="{ active: ruta === '/equipo' && String($route.query.proyecto_id) === String(p.id) }"
-              >
-                <span class="nav-item-icon">
-                  <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span>
-                </span>
-                <span class="nav-item-label">{{ p.nombre }}</span>
-                <span v-if="p.tareas_pendientes && proyectoHover !== p.id" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                <template v-if="proyectoHover === p.id">
-                  <button class="btn-proyecto-check" title="Completar" @click.prevent.stop="completarItem(p)">
-                    <span class="material-icons" style="font-size:15px">check_circle_outline</span>
-                  </button>
-                  <button class="btn-proyecto-menu" @click.prevent.stop="abrirMenuProyecto($event, p)">
-                    <span class="material-icons" style="font-size:16px">more_vert</span>
-                  </button>
-                </template>
-              </RouterLink>
-            </div>
-            <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">
-              Sin {{ sec.label.toLowerCase() }}
-            </div>
-          </template>
-        </div>
-
-        <!-- Etiquetas (equipo) -->
-        <div class="sidebar-section sidebar-section-indented">
-          <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-etiquetas')">
-            <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
-            <span style="flex:1">Etiquetas</span>
-            <span v-if="eqEtiquetasCount" class="acordeon-count">{{ eqEtiquetasCount }}</span>
-          </div>
-          <template v-if="acordeonAbierto['eq-etiquetas']">
-            <div
-              v-for="e in etiquetasGlobal"
-              v-show="e.tareas_total"
-              :key="e.id"
-              class="nav-item-proyecto-wrap"
-              @mouseenter="etiquetaHover = e.id"
-              @mouseleave="etiquetaHover = null"
-            >
-              <RouterLink
-                :to="{ path: '/equipo', query: { etiqueta_id: e.id } }"
-                class="nav-item nav-item-proyecto"
-                :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }"
-              >
-                <span class="nav-item-icon">
-                  <span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span>
-                </span>
-                <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
-                  <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
-                  <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
-                    <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
-                  </form>
-                  <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
-                    <span class="material-icons" style="font-size:15px">check</span>
-                  </button>
-                  <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
-                    <span class="material-icons" style="font-size:15px">close</span>
-                  </button>
+              <!-- Etiquetas (mis tareas) -->
+              <div class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="toggleAcordeon('mis-etiquetas')">
+                  <q-icon :name="acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs" style="flex:1">Etiquetas</span>
+                  <span v-if="misEtiquetasCount" class="sidebar-count">{{ misEtiquetasCount }}</span>
                 </div>
-                <template v-else>
-                  <span class="nav-item-label">{{ e.nombre }}</span>
-                  <span v-if="e.tareas_pendientes && etiquetaHover !== e.id" class="nav-item-count">{{ e.tareas_pendientes }}</span>
-                  <button v-if="etiquetaHover === e.id" class="btn-proyecto-menu" @click.prevent.stop="abrirMenuEtiqueta($event, e)">
-                    <span class="material-icons" style="font-size:16px">more_vert</span>
-                  </button>
+                <template v-if="acordeonAbierto['mis-etiquetas']">
+                  <q-item
+                    v-for="e in etiquetasGlobal" :key="e.id"
+                    v-show="e.mis_tareas_total"
+                    clickable dense
+                    class="sidebar-project-item"
+                    :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }"
+                    :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
+                    @click="drawerOpen = false"
+                    @mouseenter="etiquetaHover = e.id"
+                    @mouseleave="etiquetaHover = null"
+                  >
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: e.color || '#888' }" />
+                    </q-item-section>
+                    <!-- Edición inline -->
+                    <q-item-section v-if="etiquetaEditandoId === e.id" class="sidebar-item-label" @click.prevent.stop>
+                      <div class="etiqueta-edit-row">
+                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
+                        </form>
+                        <q-btn flat dense round size="xs" icon="check" color="positive" @click.prevent.stop="guardarEtiquetaEdit(e)" />
+                        <q-btn flat dense round size="xs" icon="close" @click.prevent.stop="etiquetaEditandoId = null" />
+                      </div>
+                    </q-item-section>
+                    <template v-else>
+                      <q-item-section class="sidebar-item-label">{{ e.nombre }}</q-item-section>
+                      <q-item-section side v-if="e.mis_tareas_pendientes && etiquetaHover !== e.id">
+                        <span class="sidebar-count">{{ e.mis_tareas_pendientes }}</span>
+                      </q-item-section>
+                      <q-item-section side v-if="etiquetaHover === e.id">
+                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuEtiqueta($event, e)" />
+                      </q-item-section>
+                    </template>
+                  </q-item>
+                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty">Sin etiquetas</div>
                 </template>
-              </RouterLink>
-            </div>
-            <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
+              </div>
+            </q-expansion-item>
           </template>
-        </div>
 
-        <!-- Completados -->
-        <div v-if="proyectosCompletados.length" class="completados-wrap" style="padding:0 8px">
-          <div class="completados-header" @click="mostrarCompletados = !mostrarCompletados">
-            <span class="material-icons" style="font-size:14px">{{ mostrarCompletados ? 'expand_more' : 'chevron_right' }}</span>
-            Completados ({{ proyectosCompletados.length }})
-          </div>
-          <template v-if="mostrarCompletados">
-            <div
-              v-for="p in proyectosCompletados"
-              :key="p.id"
-              class="nav-item nav-item-proyecto nav-item-completado"
+          <!-- Mini mode: Mis Tareas (solo ícono + popover) -->
+          <template v-if="isMini">
+            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/tareas' }" @click="$router.push('/tareas')">
+              <q-item-section avatar class="sidebar-item-icon"><q-icon name="check_circle_outline" /></q-item-section>
+              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]">Mis Tareas</q-tooltip>
+              <!-- Popover subitems -->
+              <q-menu anchor="top end" self="top start" :offset="[4, 0]" class="sidebar-popover">
+                <q-list dense style="min-width: 180px">
+                  <q-item-label header class="sidebar-popover-title">Mis Tareas</q-item-label>
+                  <template v-for="sec in SECCIONES_SIDEBAR" :key="'mini-mis-'+sec.tipo">
+                    <q-item
+                      v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id"
+                      clickable dense v-close-popup
+                      :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                    >
+                      <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" /></q-item-section>
+                      <q-item-section>{{ p.nombre }}</q-item-section>
+                      <q-item-section side v-if="p.tareas_pendientes"><span class="sidebar-count">{{ p.tareas_pendientes }}</span></q-item-section>
+                    </q-item>
+                  </template>
+                  <q-separator v-if="etiquetasGlobal.filter(e => e.mis_tareas_total).length" />
+                  <q-item
+                    v-for="e in etiquetasGlobal.filter(e => e.mis_tareas_total)" :key="e.id"
+                    clickable dense v-close-popup
+                    :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
+                  >
+                    <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: e.color || '#888' }" /></q-item-section>
+                    <q-item-section>{{ e.nombre }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-item>
+          </template>
+
+          <!-- ═══ SEPARADOR ═══ -->
+          <q-separator class="q-my-xs q-mx-md" />
+
+          <!-- ═══ EQUIPO (acordeón) ═══ -->
+          <template v-if="!isMini">
+            <q-expansion-item
+              v-model="acordeonAbierto['bloque-eq']"
+              icon="group"
+              label="Equipo"
+              header-class="sidebar-item"
+              :header-style="ruta === '/equipo' ? 'background: var(--bg-row-selected)' : ''"
+              dense
             >
-              <span class="nav-item-icon">
-                <span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B', opacity: 0.5 }"></span>
-              </span>
-              <span class="nav-item-label nav-item-label-completado">{{ p.nombre }}</span>
-            </div>
+              <template #header>
+                <q-item-section avatar class="sidebar-item-icon">
+                  <q-icon name="group" />
+                </q-item-section>
+                <q-item-section class="sidebar-item-label cursor-pointer" @click.stop="$router.push('/equipo'); drawerOpen = false">
+                  Equipo
+                </q-item-section>
+              </template>
+
+              <!-- Subitems Equipo -->
+              <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="toggleAcordeon('eq-'+sec.tipo)">
+                  <q-icon :name="acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs" style="flex:1">{{ sec.label }}</span>
+                  <span v-if="equipoItemsPorTipo(sec.tipo).length" class="sidebar-count">{{ equipoItemsPorTipo(sec.tipo).length }}</span>
+                  <q-btn flat dense round size="xs" icon="add" class="sidebar-add-btn" @click.stop="abrirPanel(sec.tipo)" />
+                </div>
+                <template v-if="acordeonAbierto['eq-'+sec.tipo]">
+                  <q-item
+                    v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id"
+                    clickable dense
+                    class="sidebar-project-item"
+                    :class="{ active: ruta === '/equipo' && String($route.query.proyecto_id) === String(p.id) }"
+                    :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
+                    @click="drawerOpen = false"
+                    @mouseenter="proyectoHover = p.id"
+                    @mouseleave="proyectoHover = null"
+                  >
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
+                    </q-item-section>
+                    <q-item-section class="sidebar-item-label">{{ p.nombre }}</q-item-section>
+                    <q-item-section side v-if="p.tareas_pendientes && proyectoHover !== p.id">
+                      <span class="sidebar-count">{{ p.tareas_pendientes }}</span>
+                    </q-item-section>
+                    <q-item-section side v-if="proyectoHover === p.id" class="sidebar-hover-actions">
+                      <div class="row no-wrap items-center">
+                        <q-btn flat dense round size="xs" icon="check_circle_outline" @click.prevent.stop="completarItem(p)" />
+                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuProyecto($event, p)" />
+                      </div>
+                    </q-item-section>
+                  </q-item>
+                  <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty">
+                    Sin {{ sec.label.toLowerCase() }}
+                  </div>
+                </template>
+              </div>
+
+              <!-- Etiquetas (equipo) -->
+              <div class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="toggleAcordeon('eq-etiquetas')">
+                  <q-icon :name="acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs" style="flex:1">Etiquetas</span>
+                  <span v-if="eqEtiquetasCount" class="sidebar-count">{{ eqEtiquetasCount }}</span>
+                </div>
+                <template v-if="acordeonAbierto['eq-etiquetas']">
+                  <q-item
+                    v-for="e in etiquetasGlobal" :key="e.id"
+                    v-show="e.tareas_total"
+                    clickable dense
+                    class="sidebar-project-item"
+                    :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }"
+                    :to="{ path: '/equipo', query: { etiqueta_id: e.id } }"
+                    @click="drawerOpen = false"
+                    @mouseenter="etiquetaHover = e.id"
+                    @mouseleave="etiquetaHover = null"
+                  >
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: e.color || '#888' }" />
+                    </q-item-section>
+                    <q-item-section v-if="etiquetaEditandoId === e.id" class="sidebar-item-label" @click.prevent.stop>
+                      <div class="etiqueta-edit-row">
+                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
+                        </form>
+                        <q-btn flat dense round size="xs" icon="check" color="positive" @click.prevent.stop="guardarEtiquetaEdit(e)" />
+                        <q-btn flat dense round size="xs" icon="close" @click.prevent.stop="etiquetaEditandoId = null" />
+                      </div>
+                    </q-item-section>
+                    <template v-else>
+                      <q-item-section class="sidebar-item-label">{{ e.nombre }}</q-item-section>
+                      <q-item-section side v-if="e.tareas_pendientes && etiquetaHover !== e.id">
+                        <span class="sidebar-count">{{ e.tareas_pendientes }}</span>
+                      </q-item-section>
+                      <q-item-section side v-if="etiquetaHover === e.id">
+                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuEtiqueta($event, e)" />
+                      </q-item-section>
+                    </template>
+                  </q-item>
+                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty">Sin etiquetas</div>
+                </template>
+              </div>
+
+              <!-- Completados -->
+              <div v-if="proyectosCompletados.length" class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="mostrarCompletados = !mostrarCompletados">
+                  <q-icon :name="mostrarCompletados ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs">Completados ({{ proyectosCompletados.length }})</span>
+                </div>
+                <template v-if="mostrarCompletados">
+                  <q-item v-for="p in proyectosCompletados" :key="p.id" dense class="sidebar-project-item" style="opacity:0.45;pointer-events:none">
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
+                    </q-item-section>
+                    <q-item-section class="sidebar-item-label" style="text-decoration:line-through">{{ p.nombre }}</q-item-section>
+                  </q-item>
+                </template>
+              </div>
+            </q-expansion-item>
           </template>
-        </div>
-        </template>
 
-        <!-- ═══ SEPARADOR ═══ -->
-        <div class="sidebar-separator" />
+          <!-- Mini mode: Equipo -->
+          <template v-if="isMini">
+            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/equipo' }" @click="$router.push('/equipo')">
+              <q-item-section avatar class="sidebar-item-icon"><q-icon name="group" /></q-item-section>
+              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]">Equipo</q-tooltip>
+              <q-menu anchor="top end" self="top start" :offset="[4, 0]" class="sidebar-popover">
+                <q-list dense style="min-width: 180px">
+                  <q-item-label header class="sidebar-popover-title">Equipo</q-item-label>
+                  <template v-for="sec in SECCIONES_SIDEBAR" :key="'mini-eq-'+sec.tipo">
+                    <q-item
+                      v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id"
+                      clickable dense v-close-popup
+                      :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
+                    >
+                      <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" /></q-item-section>
+                      <q-item-section>{{ p.nombre }}</q-item-section>
+                      <q-item-section side v-if="p.tareas_pendientes"><span class="sidebar-count">{{ p.tareas_pendientes }}</span></q-item-section>
+                    </q-item>
+                  </template>
+                </q-list>
+              </q-menu>
+            </q-item>
+          </template>
 
-        <!-- ═══ JORNADAS ═══ -->
-        <div class="sidebar-section">
-          <RouterLink to="/jornadas" class="nav-item" :class="{ active: ruta === '/jornadas' }" data-tooltip="Jornadas">
-            <span class="nav-item-icon material-icons">schedule</span>
-            <span class="nav-item-label">Jornadas</span>
-          </RouterLink>
-        </div>
+          <!-- ═══ SEPARADOR ═══ -->
+          <q-separator class="q-my-xs q-mx-md" />
 
-        <!-- Tablas -->
-        <div class="sidebar-section">
-          <div class="sidebar-section-label">Tablas</div>
-          <RouterLink to="/proyectos-tabla" class="nav-item" :class="{ active: ruta === '/proyectos-tabla' }" data-tooltip="Proyectos">
-            <span class="nav-item-icon material-icons">folder_open</span>
-            <span class="nav-item-label">Proyectos</span>
-          </RouterLink>
-          <RouterLink to="/dificultades" class="nav-item" :class="{ active: ruta === '/dificultades' }" data-tooltip="Dificultades">
-            <span class="nav-item-icon material-icons">warning_amber</span>
-            <span class="nav-item-label">Dificultades</span>
-          </RouterLink>
-          <RouterLink to="/compromisos" class="nav-item" :class="{ active: ruta === '/compromisos' }" data-tooltip="Compromisos">
-            <span class="nav-item-icon material-icons">task_alt</span>
-            <span class="nav-item-label">Compromisos</span>
-          </RouterLink>
-          <RouterLink to="/ideas" class="nav-item" :class="{ active: ruta === '/ideas' }" data-tooltip="Ideas">
-            <span class="nav-item-icon material-icons">lightbulb_outline</span>
-            <span class="nav-item-label">Ideas</span>
-          </RouterLink>
-        </div>
-      </nav>
+          <!-- ═══ JORNADAS ═══ -->
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/jornadas' }" :to="'/jornadas'" @click="drawerOpen = false">
+            <q-item-section avatar class="sidebar-item-icon"><q-icon name="schedule" /></q-item-section>
+            <q-item-section v-if="!isMini" class="sidebar-item-label">Jornadas</q-item-section>
+            <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Jornadas</q-tooltip>
+          </q-item>
 
-      <!-- Footer usuario -->
+          <!-- ═══ TABLAS ═══ -->
+          <q-item-label v-if="!isMini" header class="sidebar-section-lbl">Tablas</q-item-label>
+
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/proyectos-tabla' }" to="/proyectos-tabla" @click="drawerOpen = false">
+            <q-item-section avatar class="sidebar-item-icon"><q-icon name="folder_open" /></q-item-section>
+            <q-item-section v-if="!isMini" class="sidebar-item-label">Proyectos</q-item-section>
+            <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Proyectos</q-tooltip>
+          </q-item>
+
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/dificultades' }" to="/dificultades" @click="drawerOpen = false">
+            <q-item-section avatar class="sidebar-item-icon"><q-icon name="warning_amber" /></q-item-section>
+            <q-item-section v-if="!isMini" class="sidebar-item-label">Dificultades</q-item-section>
+            <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Dificultades</q-tooltip>
+          </q-item>
+
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/compromisos' }" to="/compromisos" @click="drawerOpen = false">
+            <q-item-section avatar class="sidebar-item-icon"><q-icon name="task_alt" /></q-item-section>
+            <q-item-section v-if="!isMini" class="sidebar-item-label">Compromisos</q-item-section>
+            <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Compromisos</q-tooltip>
+          </q-item>
+
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/ideas' }" to="/ideas" @click="drawerOpen = false">
+            <q-item-section avatar class="sidebar-item-icon"><q-icon name="lightbulb_outline" /></q-item-section>
+            <q-item-section v-if="!isMini" class="sidebar-item-label">Ideas</q-item-section>
+            <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Ideas</q-tooltip>
+          </q-item>
+
+        </q-list>
+      </div>
+
+      <!-- Footer sidebar -->
       <div class="sidebar-footer">
-        <!-- Toggle tema -->
-        <div class="nav-item" style="margin-bottom:4px" @click="toggleTema">
-          <span class="nav-item-icon material-icons">{{ auth.tema === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
-          <span class="nav-item-label">{{ auth.tema === 'dark' ? 'Modo claro' : 'Modo oscuro' }}</span>
-        </div>
-        <!-- Usuario -->
-        <div class="sidebar-user" @click="menuUsuario = !menuUsuario">
-          <img :src="auth.usuario?.foto || ''" :alt="auth.usuario?.nombre" class="sidebar-user-foto" @error="e => e.target.style.display='none'" />
-          <div class="sidebar-user-info">
-            <div class="sidebar-user-name">{{ auth.usuario?.nombre }} <span style="font-size:9px;color:var(--text-tertiary);font-weight:400">{{ APP_VERSION }}</span></div>
+        <q-separator />
+        <q-item clickable dense class="sidebar-item q-mt-xs" @click="toggleTema">
+          <q-item-section avatar class="sidebar-item-icon">
+            <q-icon :name="auth.tema === 'dark' ? 'light_mode' : 'dark_mode'" />
+          </q-item-section>
+          <q-item-section v-if="!isMini" class="sidebar-item-label">
+            {{ auth.tema === 'dark' ? 'Modo claro' : 'Modo oscuro' }}
+          </q-item-section>
+          <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">
+            {{ auth.tema === 'dark' ? 'Modo claro' : 'Modo oscuro' }}
+          </q-tooltip>
+        </q-item>
+
+        <q-item v-if="!isMini" dense class="sidebar-user" clickable @click="menuUsuario = !menuUsuario">
+          <q-item-section avatar class="sidebar-item-icon">
+            <q-avatar size="24px">
+              <img :src="auth.usuario?.foto || ''" @error="e => e.target.style.display='none'" />
+            </q-avatar>
+          </q-item-section>
+          <q-item-section class="sidebar-item-label">
+            <div class="sidebar-user-name">{{ auth.usuario?.nombre }} <span class="sidebar-version">{{ APP_VERSION }}</span></div>
             <div class="sidebar-user-empresa">{{ auth.empresa_activa?.siglas || auth.empresa_activa?.uid }}</div>
-          </div>
-        </div>
+          </q-item-section>
+        </q-item>
+
         <!-- Menú usuario -->
-        <div v-if="menuUsuario" class="usuario-menu">
-          <div class="usuario-menu-item" @click="cerrarSesion">
-            <span class="material-icons" style="font-size:16px">logout</span>
-            Cerrar sesión
+        <div v-if="menuUsuario && !isMini" class="usuario-menu">
+          <q-item clickable dense @click="cerrarSesion">
+            <q-item-section avatar style="min-width:28px"><q-icon name="logout" size="16px" /></q-item-section>
+            <q-item-section>Cerrar sesi&oacute;n</q-item-section>
+          </q-item>
+        </div>
+      </div>
+    </q-drawer>
+
+    <!-- ═══ PAGE CONTAINER ═══ -->
+    <q-page-container>
+      <q-page class="main-page">
+        <!-- Jornada header — siempre visible -->
+        <JornadaHeader />
+
+        <!-- Topbar — siempre visible -->
+        <div class="topbar">
+          <q-btn flat dense round icon="menu" class="lt-md" @click="drawerOpen = !drawerOpen" />
+          <span class="topbar-title">{{ tituloRuta }}</span>
+          <div v-if="esPaginaTareas" class="quick-search" :class="{ expanded: qsExpanded }">
+            <q-btn flat dense round size="xs" icon="search" @click="qsExpanded = !qsExpanded; $nextTick(() => qsExpanded && $refs.qsInput?.focus())" />
+            <input
+              v-show="qsExpanded"
+              ref="qsInput"
+              v-model="qsQuery"
+              class="qs-input"
+              placeholder="Buscar tarea..."
+              @keydown.escape="qsExpanded = false; qsQuery = ''"
+            />
+            <q-btn v-if="qsExpanded && qsQuery" flat dense round size="xs" icon="close" @click="qsQuery = ''; $refs.qsInput?.focus()" />
           </div>
         </div>
-      </div>
-    </aside>
 
-    <!-- MAIN -->
-    <div class="main-content">
-      <!-- Header jornada — arriba de todo -->
-      <JornadaHeader />
-
-      <!-- Topbar mobile -->
-      <div class="topbar">
-        <button class="btn-icon d-mobile-only" @click="drawerOpen = true">
-          <span class="material-icons">menu</span>
-        </button>
-        <span class="topbar-title">{{ tituloRuta }}</span>
-        <div v-if="esPaginaTareas" class="quick-search" :class="{ expanded: qsExpanded }">
-          <button class="btn-icon qs-toggle" @click="qsExpanded = !qsExpanded; $nextTick(() => qsExpanded && $refs.qsInput?.focus())">
-            <span class="material-icons" style="font-size:16px">search</span>
-          </button>
-          <input
-            v-show="qsExpanded"
-            ref="qsInput"
-            v-model="qsQuery"
-            class="qs-input"
-            placeholder="Buscar tarea..."
-            @keydown.escape="qsExpanded = false; qsQuery = ''"
-          />
-          <button v-if="qsExpanded && qsQuery" class="btn-icon qs-clear" @click="qsQuery = ''; $refs.qsInput?.focus()">
-            <span class="material-icons" style="font-size:14px">close</span>
-          </button>
+        <!-- Contenido con pull-to-refresh -->
+        <div class="page-body" ref="pageBodyRef"
+          @touchstart.passive="onPullStart"
+          @touchmove.passive="onPullMove"
+          @touchend="onPullEnd"
+        >
+          <div class="ptr-indicator" :class="{ visible: pullY > 0, refreshing: pullRefreshing }" :style="{ height: Math.min(pullY, 60) + 'px' }">
+            <span v-if="pullRefreshing" class="material-icons ptr-spin">refresh</span>
+            <span v-else class="material-icons" :style="{ transform: `rotate(${Math.min(pullY / 60, 1) * 180}deg)` }">arrow_downward</span>
+          </div>
+          <router-view :key="refreshKey" />
         </div>
-      </div>
+      </q-page>
+    </q-page-container>
 
-      <!-- Contenido de la página -->
-      <div class="page-body" ref="pageBodyRef"
-        @touchstart.passive="onPullStart"
-        @touchmove.passive="onPullMove"
-        @touchend="onPullEnd"
-      >
-        <!-- Indicador pull-to-refresh -->
-        <div class="ptr-indicator" :class="{ visible: pullY > 0, refreshing: pullRefreshing }" :style="{ height: Math.min(pullY, 60) + 'px' }">
-          <span v-if="pullRefreshing" class="material-icons ptr-spin">refresh</span>
-          <span v-else class="material-icons" :style="{ transform: `rotate(${Math.min(pullY / 60, 1) * 180}deg)` }">arrow_downward</span>
-        </div>
-        <router-view :key="refreshKey" />
-      </div>
+    <!-- ═══ FOOTER — Bottom tab bar (mobile only via CSS lt-md) ═══ -->
+    <q-footer bordered class="bottom-tab-bar lt-md">
+      <RouterLink to="/tareas" class="btab" :class="{ active: ruta.startsWith('/tareas') }">
+        <span class="material-icons">check_circle_outline</span>
+        <span class="btab-label">Tareas</span>
+      </RouterLink>
+      <RouterLink to="/equipo" class="btab" :class="{ active: ruta.startsWith('/equipo') }">
+        <span class="material-icons">group</span>
+        <span class="btab-label">Equipo</span>
+      </RouterLink>
+      <RouterLink to="/jornadas" class="btab" :class="{ active: ruta.startsWith('/jornadas') }">
+        <span class="material-icons">schedule</span>
+        <span class="btab-label">Jornadas</span>
+      </RouterLink>
+      <RouterLink to="/proyectos-tabla" class="btab" :class="{ active: ruta.startsWith('/proyectos') }">
+        <span class="material-icons">folder_open</span>
+        <span class="btab-label">Proyectos</span>
+      </RouterLink>
+      <button class="btab" @click="drawerOpen = true">
+        <span class="material-icons">menu</span>
+        <span class="btab-label">M&aacute;s</span>
+      </button>
+    </q-footer>
 
-      <!-- Bottom tab bar (solo mobile) -->
-      <nav class="bottom-tab-bar">
-        <RouterLink to="/tareas" class="btab" :class="{ active: ruta.startsWith('/tareas') }">
-          <span class="material-icons">check_circle_outline</span>
-          <span class="btab-label">Tareas</span>
-        </RouterLink>
-        <RouterLink to="/equipo" class="btab" :class="{ active: ruta.startsWith('/equipo') }">
-          <span class="material-icons">group</span>
-          <span class="btab-label">Equipo</span>
-        </RouterLink>
-        <RouterLink to="/jornadas" class="btab" :class="{ active: ruta.startsWith('/jornadas') }">
-          <span class="material-icons">schedule</span>
-          <span class="btab-label">Jornadas</span>
-        </RouterLink>
-        <RouterLink to="/proyectos-tabla" class="btab" :class="{ active: ruta.startsWith('/proyectos') }">
-          <span class="material-icons">folder_open</span>
-          <span class="btab-label">Proyectos</span>
-        </RouterLink>
-        <button class="btab" @click="drawerOpen = true">
-          <span class="material-icons">menu</span>
-          <span class="btab-label">Más</span>
-        </button>
-      </nav>
-    </div>
-
-    <!-- Panel lateral crear/editar -->
+    <!-- ═══ Panel lateral crear/editar ═══ -->
     <ProyectoPanel
       v-if="panelVisible"
       :item="panelItem"
@@ -388,232 +480,54 @@
       @eliminado="onItemEliminado"
     />
 
-    <!-- Menú contextual ⋮ -->
+    <!-- ═══ Men&uacute; contextual ⋮ ═══ -->
     <Teleport to="body">
       <div v-if="menuProyecto.visible" class="proyecto-ctx-menu" :style="menuProyecto.style" @click.stop>
         <div class="ctx-item" @click="editarItem(menuProyecto.proyecto)">
-          <span class="material-icons" style="font-size:15px">edit</span>
-          Editar
+          <span class="material-icons" style="font-size:15px">edit</span> Editar
         </div>
         <div class="ctx-item" @click="verTabla(menuProyecto.proyecto)">
-          <span class="material-icons" style="font-size:15px">table_chart</span>
-          Ver tabla
+          <span class="material-icons" style="font-size:15px">table_chart</span> Ver tabla
         </div>
         <div class="ctx-item ctx-item-warn" @click="archivarProyecto(menuProyecto.proyecto)">
-          <span class="material-icons" style="font-size:15px">archive</span>
-          Archivar
+          <span class="material-icons" style="font-size:15px">archive</span> Archivar
         </div>
         <div class="ctx-item ctx-item-danger" @click="eliminarProyecto(menuProyecto.proyecto)">
-          <span class="material-icons" style="font-size:15px">delete_outline</span>
-          Eliminar
+          <span class="material-icons" style="font-size:15px">delete_outline</span> Eliminar
         </div>
       </div>
-      <!-- Menú contextual etiqueta -->
       <div v-if="menuEtiqueta.visible" class="ctx-backdrop" @click="menuEtiqueta.visible = false" />
       <div v-if="menuEtiqueta.visible" class="proyecto-ctx-menu" :style="menuEtiqueta.style" @click.stop>
         <div class="ctx-item" @click="editarEtiqueta">
-          <span class="material-icons" style="font-size:15px">edit</span>
-          Editar nombre
+          <span class="material-icons" style="font-size:15px">edit</span> Editar nombre
         </div>
         <div class="ctx-item ctx-item-danger" @click="eliminarEtiqueta">
-          <span class="material-icons" style="font-size:15px">delete_outline</span>
-          Eliminar
+          <span class="material-icons" style="font-size:15px">delete_outline</span> Eliminar
         </div>
       </div>
     </Teleport>
 
-    <!-- DRAWER mobile -->
-    <Teleport to="body">
-      <Transition name="drawer">
-        <div v-if="drawerOpen" class="drawer-overlay" @click="drawerOpen = false">
-          <aside class="drawer-panel" @click.stop>
-            <div class="sidebar-logo" style="border-bottom:1px solid var(--border-subtle)">
-              <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
-              <span class="sidebar-logo-name">OS Gestión</span>
-              <button class="btn-icon" style="margin-left:auto" @click="drawerOpen = false">
-                <span class="material-icons">close</span>
-              </button>
-            </div>
-            <nav class="sidebar-nav" style="overflow-y:auto">
-              <!-- ═══ MIS TAREAS (acordeón) ═══ -->
-              <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
-                <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-mis')">{{ acordeonAbierto['bloque-mis'] ? 'expand_more' : 'chevron_right' }}</span>
-                <RouterLink to="/tareas" class="nav-item-link-grow" @click="drawerOpen=false">
-                  <span class="nav-item-icon material-icons">check_circle_outline</span>
-                  <span class="nav-item-label">Mis Tareas</span>
-                </RouterLink>
-              </div>
-
-              <template v-if="acordeonAbierto['bloque-mis']">
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'dm-'+sec.tipo" class="sidebar-section sidebar-section-indented">
-                <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-'+sec.tipo)">
-                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
-                  <span style="flex:1">{{ sec.label }}</span>
-                  <span v-if="misItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ misItemsPorTipo(sec.tipo).length }}</span>
-                  <button class="btn-icon-tiny" @click.stop="drawerOpen=false; abrirPanel(sec.tipo)"><span class="material-icons" style="font-size:14px">add</span></button>
-                </div>
-                <template v-if="acordeonAbierto['mis-'+sec.tipo]">
-                  <div v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id" class="nav-item-proyecto-wrap">
-                    <RouterLink :to="{ path: '/tareas', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
-                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span></span>
-                      <span class="nav-item-label">{{ p.nombre }}</span>
-                      <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuProyecto($event, p)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
-                    </RouterLink>
-                  </div>
-                  <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
-                </template>
-              </div>
-
-              <!-- Etiquetas (mis tareas — mobile) -->
-              <div class="sidebar-section sidebar-section-indented">
-                <div class="sidebar-acordeon-header" @click="toggleAcordeon('mis-etiquetas')">
-                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
-                  <span style="flex:1">Etiquetas</span>
-                  <span v-if="misEtiquetasCount" class="acordeon-count">{{ misEtiquetasCount }}</span>
-                </div>
-                <template v-if="acordeonAbierto['mis-etiquetas']">
-                  <div v-for="e in etiquetasGlobal" v-show="e.mis_tareas_total" :key="e.id" class="nav-item-proyecto-wrap">
-                    <RouterLink :to="{ path: '/tareas', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
-                      :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }">
-                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
-                      <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
-                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
-                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
-                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" />
-                        </form>
-                        <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
-                          <span class="material-icons" style="font-size:15px">check</span>
-                        </button>
-                        <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
-                          <span class="material-icons" style="font-size:15px">close</span>
-                        </button>
-                      </div>
-                      <template v-else>
-                        <span class="nav-item-label">{{ e.nombre }}</span>
-                        <span v-if="e.mis_tareas_pendientes" class="nav-item-count">{{ e.mis_tareas_pendientes }}</span>
-                        <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
-                      </template>
-                    </RouterLink>
-                  </div>
-                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
-                </template>
-              </div>
-              </template>
-
-              <div class="sidebar-separator" />
-
-              <!-- ═══ EQUIPO (acordeón) ═══ -->
-              <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/equipo' }">
-                <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-eq')">{{ acordeonAbierto['bloque-eq'] ? 'expand_more' : 'chevron_right' }}</span>
-                <RouterLink to="/equipo" class="nav-item-link-grow" @click="drawerOpen=false">
-                  <span class="nav-item-icon material-icons">group</span>
-                  <span class="nav-item-label">Equipo</span>
-                </RouterLink>
-              </div>
-
-              <template v-if="acordeonAbierto['bloque-eq']">
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'de-'+sec.tipo" class="sidebar-section sidebar-section-indented">
-                <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-'+sec.tipo)">
-                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right' }}</span>
-                  <span style="flex:1">{{ sec.label }}</span>
-                  <span v-if="equipoItemsPorTipo(sec.tipo).length" class="acordeon-count">{{ equipoItemsPorTipo(sec.tipo).length }}</span>
-                  <button class="btn-icon-tiny" @click.stop="drawerOpen=false; abrirPanel(sec.tipo)"><span class="material-icons" style="font-size:14px">add</span></button>
-                </div>
-                <template v-if="acordeonAbierto['eq-'+sec.tipo]">
-                  <div v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id" class="nav-item-proyecto-wrap">
-                    <RouterLink :to="{ path: '/equipo', query: { proyecto_id: p.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false">
-                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: p.color || '#607D8B' }"></span></span>
-                      <span class="nav-item-label">{{ p.nombre }}</span>
-                      <span v-if="p.tareas_pendientes" class="nav-item-count">{{ p.tareas_pendientes }}</span>
-                      <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuProyecto($event, p)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
-                    </RouterLink>
-                  </div>
-                  <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty-hint">Sin {{ sec.label.toLowerCase() }}</div>
-                </template>
-              </div>
-
-              <!-- Etiquetas (equipo — mobile) -->
-              <div class="sidebar-section sidebar-section-indented">
-                <div class="sidebar-acordeon-header" @click="toggleAcordeon('eq-etiquetas')">
-                  <span class="material-icons" style="font-size:14px">{{ acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right' }}</span>
-                  <span style="flex:1">Etiquetas</span>
-                  <span v-if="eqEtiquetasCount" class="acordeon-count">{{ eqEtiquetasCount }}</span>
-                </div>
-                <template v-if="acordeonAbierto['eq-etiquetas']">
-                  <div v-for="e in etiquetasGlobal" v-show="e.tareas_total" :key="e.id" class="nav-item-proyecto-wrap">
-                    <RouterLink :to="{ path: '/equipo', query: { etiqueta_id: e.id } }" class="nav-item nav-item-proyecto" @click="drawerOpen=false"
-                      :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }">
-                      <span class="nav-item-icon"><span class="proyecto-dot-sm" :style="{ background: e.color || '#888' }"></span></span>
-                      <div v-if="etiquetaEditandoId === e.id" class="etiqueta-edit-row" @click.prevent.stop>
-                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
-                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
-                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" />
-                        </form>
-                        <button class="etiqueta-edit-btn etiqueta-edit-ok" @click.prevent.stop="guardarEtiquetaEdit(e)" title="Guardar">
-                          <span class="material-icons" style="font-size:15px">check</span>
-                        </button>
-                        <button class="etiqueta-edit-btn etiqueta-edit-cancel" @click.prevent.stop="etiquetaEditandoId = null" title="Cancelar">
-                          <span class="material-icons" style="font-size:15px">close</span>
-                        </button>
-                      </div>
-                      <template v-else>
-                        <span class="nav-item-label">{{ e.nombre }}</span>
-                        <span v-if="e.tareas_pendientes" class="nav-item-count">{{ e.tareas_pendientes }}</span>
-                        <button class="btn-proyecto-menu btn-mobile-always" @click.prevent.stop="abrirMenuEtiqueta($event, e)"><span class="material-icons" style="font-size:16px">more_vert</span></button>
-                      </template>
-                    </RouterLink>
-                  </div>
-                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty-hint">Sin etiquetas</div>
-                </template>
-              </div>
-              </template>
-
-              <div class="sidebar-separator" />
-
-              <!-- ═══ JORNADAS ═══ -->
-              <RouterLink to="/jornadas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">schedule</span><span class="nav-item-label">Jornadas</span></RouterLink>
-
-              <!-- Links tablas -->
-              <div class="sidebar-section">
-                <div class="sidebar-section-label">Tablas</div>
-                <RouterLink to="/proyectos-tabla" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">folder_open</span><span class="nav-item-label">Proyectos</span></RouterLink>
-                <RouterLink to="/dificultades" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">warning_amber</span><span class="nav-item-label">Dificultades</span></RouterLink>
-                <RouterLink to="/compromisos" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">task_alt</span><span class="nav-item-label">Compromisos</span></RouterLink>
-                <RouterLink to="/ideas" class="nav-item" @click="drawerOpen=false"><span class="material-icons nav-item-icon">lightbulb_outline</span><span class="nav-item-label">Ideas</span></RouterLink>
-              </div>
-
-              <!-- Footer usuario (móvil) -->
-              <div style="margin-top:auto; padding:12px 8px; border-top:1px solid var(--border-subtle)">
-                <div class="nav-item" style="margin-bottom:4px" @click="toggleTema(); drawerOpen=false">
-                  <span class="nav-item-icon material-icons">{{ auth.tema === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
-                  <span class="nav-item-label">{{ auth.tema === 'dark' ? 'Modo claro' : 'Modo oscuro' }}</span>
-                </div>
-                <div class="nav-item" @click="cerrarSesion">
-                  <span class="nav-item-icon material-icons">logout</span>
-                  <span class="nav-item-label">Cerrar sesión</span>
-                  <span style="font-size:9px;color:var(--text-tertiary);margin-left:auto">{{ APP_VERSION }}</span>
-                </div>
-              </div>
-            </nav>
-          </aside>
-        </div>
-      </Transition>
-    </Teleport>
-
-  </div>
+  </q-layout>
 </template>
 
 <script setup>
 import { ref, reactive, computed, provide, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
 import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.6.2'
+const APP_VERSION = 'v2.7.0'
+const $q = useQuasar()
+
+// ─── Layout state ───
+const drawerOpen       = ref(false)
+const miniState        = ref(false)
+const isMobile         = computed(() => $q.screen.lt.md)
+const isMini           = computed(() => miniState.value && !isMobile.value)
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)
@@ -650,11 +564,10 @@ function onPullEnd() {
     pullY.value = 0
   }
 }
+
 const auth             = useAuthStore()
 const router           = useRouter()
 const route            = useRoute()
-const sidebarCollapsed = ref(false)
-const drawerOpen       = ref(false)
 const menuUsuario      = ref(false)
 
 // ── Secciones del sidebar ──
@@ -667,7 +580,6 @@ const SECCIONES_SIDEBAR = [
 const ESTADOS_COMPLETADO = { proyecto: 'Completado', dificultad: 'Resuelta', compromiso: 'Cumplido', idea: 'Aprobada' }
 const RUTAS_TABLA = { proyecto: '/proyectos-tabla', dificultad: '/dificultades', compromiso: '/compromisos', idea: '/ideas' }
 
-// Items en sidebar (todos los tipos activos juntos)
 const todosItems          = ref([])
 const proyectosCompletados = ref([])
 const mostrarCompletados  = ref(false)
@@ -676,22 +588,14 @@ const proyectoHover       = ref(null)
 const etiquetaHover       = ref(null)
 const menuEtiqueta        = ref({ visible: false, etiqueta: null, style: {} })
 
-// Panel lateral
 const panelVisible = ref(false)
 const panelItem    = ref(null)
 const panelTipo    = ref('proyecto')
 
-// Datos compartidos para el panel
 const categorias     = ref([])
 const usuarios       = ref([])
 const etiquetasGlobal = ref([])
-
-// Menú contextual ⋮
 const menuProyecto = ref({ visible: false, proyecto: null, style: {} })
-
-function itemsPorTipo(tipo) {
-  return todosItems.value.filter(p => p.tipo === tipo)
-}
 
 const miEmail = computed(() => auth.usuario?.email || '')
 
@@ -701,22 +605,15 @@ function misItemsPorTipo(tipo) {
 function equipoItemsPorTipo(tipo) {
   return todosItems.value.filter(p => p.tipo === tipo)
 }
-// Acordeones individuales: 'mis-proyecto', 'mis-dificultad', 'eq-proyecto', etc.
+
 const acordeonAbierto = reactive({})
 function toggleAcordeon(key) { acordeonAbierto[key] = !acordeonAbierto[key] }
-
-// Alias para compatibilidad template (completados no filtran por tipo)
-const proyectos = todosItems // renombrado internamente
 
 async function cargarProyectos() {
   cargandoProyectos.value = true
   try {
-    const [activos, resueltos] = await Promise.all([
-      api('/api/gestion/proyectos'),
-      Promise.resolve({ proyectos: [] }) // completados se cargan aparte si hay
-    ])
+    const activos = await api('/api/gestion/proyectos')
     const all = activos.proyectos || []
-    // Separar activos de completados/resueltos/cumplidos/aprobados
     const estadosCompletados = Object.values(ESTADOS_COMPLETADO)
     todosItems.value          = all.filter(p => !estadosCompletados.includes(p.estado) && p.estado !== 'Archivado' && p.estado !== 'Cerrada' && p.estado !== 'Cancelado' && p.estado !== 'Descartada')
     proyectosCompletados.value = all.filter(p => estadosCompletados.includes(p.estado))
@@ -750,7 +647,6 @@ function onItemGuardado(p) {
   if (p._accion === 'creado') {
     todosItems.value.push(p)
     panelVisible.value = false
-    // Abrir el acordeón correspondiente para que se vea el item nuevo
     const bloque = (p.responsables || []).includes(miEmail.value) ? 'bloque-mis' : 'bloque-eq'
     acordeonAbierto[bloque] = true
     acordeonAbierto[(bloque === 'bloque-mis' ? 'mis-' : 'eq-') + (p.tipo || 'proyecto')] = true
@@ -768,31 +664,21 @@ function onItemEliminado(p) {
 function abrirMenuProyecto(event, proyecto) {
   const rect = event.currentTarget.getBoundingClientRect()
   menuProyecto.value = {
-    visible: true,
-    proyecto,
-    style: {
-      position: 'fixed',
-      top: `${rect.bottom + 4}px`,
-      left: `${rect.left}px`,
-      zIndex: 9999
-    }
+    visible: true, proyecto,
+    style: { position: 'fixed', top: `${rect.bottom + 4}px`, left: `${rect.left}px`, zIndex: 9999 }
   }
   setTimeout(() => document.addEventListener('click', cerrarMenuProyecto, { once: true }), 0)
 }
 
-function cerrarMenuProyecto() {
-  menuProyecto.value.visible = false
-}
+function cerrarMenuProyecto() { menuProyecto.value.visible = false }
 
 function editarItem(p) {
   cerrarMenuProyecto()
   abrirPanel(p.tipo || 'proyecto', p)
 }
-
 function verTabla(p) {
   cerrarMenuProyecto()
-  const ruta = RUTAS_TABLA[p.tipo || 'proyecto'] || '/proyectos-tabla'
-  router.push(ruta)
+  router.push(RUTAS_TABLA[p.tipo || 'proyecto'] || '/proyectos-tabla')
 }
 
 async function completarItem(p) {
@@ -801,8 +687,7 @@ async function completarItem(p) {
   const estadoFinal = ESTADOS_COMPLETADO[p.tipo || 'proyecto']
   try {
     await api(`/api/gestion/proyectos/${p.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ estado: estadoFinal, fecha_finalizacion_real: hoy })
+      method: 'PUT', body: JSON.stringify({ estado: estadoFinal, fecha_finalizacion_real: hoy })
     })
     todosItems.value = todosItems.value.filter(x => x.id !== p.id)
     proyectosCompletados.value.unshift({ ...p, estado: estadoFinal, fecha_finalizacion_real: hoy })
@@ -813,10 +698,7 @@ async function completarItem(p) {
 async function archivarProyecto(p) {
   cerrarMenuProyecto()
   try {
-    await api(`/api/gestion/proyectos/${p.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ estado: 'Archivado' })
-    })
+    await api(`/api/gestion/proyectos/${p.id}`, { method: 'PUT', body: JSON.stringify({ estado: 'Archivado' }) })
     todosItems.value = todosItems.value.filter(x => x.id !== p.id)
     if (String(route.query.proyecto_id) === String(p.id)) router.replace('/tareas')
   } catch (e) { console.error(e) }
@@ -836,8 +718,7 @@ async function eliminarProyecto(p) {
 function abrirMenuEtiqueta(event, etiqueta) {
   const rect = event.currentTarget.getBoundingClientRect()
   menuEtiqueta.value = {
-    visible: true,
-    etiqueta,
+    visible: true, etiqueta,
     style: { position: 'fixed', top: `${rect.bottom + 4}px`, left: `${rect.left}px`, zIndex: 9999 }
   }
 }
@@ -866,7 +747,7 @@ async function guardarEtiquetaEdit(e) {
   if (color && color !== e.color) body.color = color
   if (!Object.keys(body).length) return
   try {
-    const data = await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify(body) })
+    await api(`/api/gestion/etiquetas/${e.id}`, { method: 'PUT', body: JSON.stringify(body) })
     const idx = etiquetasGlobal.value.findIndex(x => x.id === e.id)
     if (idx !== -1) etiquetasGlobal.value[idx] = { ...etiquetasGlobal.value[idx], ...body }
   } catch (err) { console.error(err) }
@@ -885,19 +766,14 @@ async function eliminarEtiqueta() {
 
 const ruta = computed(() => route.path)
 
-// Búsqueda rápida de tareas (vive en MainLayout, se consume en TareasPage via inject)
+// Búsqueda rápida
 const qsExpanded = ref(false)
 const qsQuery    = ref('')
 const esPaginaTareas = computed(() => ruta.value.startsWith('/tareas') || ruta.value.startsWith('/equipo'))
 provide('qsQuery', qsQuery)
-// Limpiar al cambiar de ruta
 watch(ruta, () => { qsQuery.value = ''; qsExpanded.value = false })
 
-const TITULOS = {
-  '/tareas':          'Mis Tareas',
-  '/equipo':          'Equipo',
-  '/jornadas':        'Jornadas',
-}
+const TITULOS = { '/tareas': 'Mis Tareas', '/equipo': 'Equipo', '/jornadas': 'Jornadas' }
 const tituloRuta = computed(() => {
   for (const [path, titulo] of Object.entries(TITULOS)) {
     if (ruta.value.startsWith(path)) return titulo
@@ -908,7 +784,6 @@ const tituloRuta = computed(() => {
 function toggleTema() {
   auth.cambiarTema(auth.tema === 'dark' ? 'light' : 'dark')
 }
-
 function cerrarSesion() {
   auth.cerrarSesion()
   router.push('/login')
@@ -932,142 +807,285 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 </script>
 
 <style scoped>
-/* Búsqueda rápida en topbar */
-.quick-search { display: flex; align-items: center; margin-left: auto; }
-.qs-toggle { flex-shrink: 0; }
-.qs-input {
-  background: transparent; border: none; border-bottom: 1px solid var(--border-default);
-  color: var(--text-primary); font-size: 13px; padding: 2px 4px; width: 160px;
-  font-family: inherit; outline: none;
+/* ─── Sidebar drawer overrides ─── */
+.sidebar-drawer {
+  background: var(--bg-sidebar) !important;
 }
-.qs-input:focus { border-bottom-color: var(--accent); }
-.qs-clear { flex-shrink: 0; }
-@media (max-width: 768px) { .qs-input { width: 120px; } }
-
-.d-mobile-only { display: none; }
-@media (max-width: 768px) {
-  .d-mobile-only { display: flex; }
-  .sidebar { display: none; }
+.sidebar-drawer :deep(.q-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-/* Proyectos sidebar */
-.btn-icon-tiny {
-  display: flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; border-radius: 4px;
-  background: transparent; border: none; cursor: pointer;
-  color: var(--text-tertiary); transition: background 80ms, color 80ms;
+/* Scroll area */
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
 }
-.btn-icon-tiny:hover { background: var(--bg-row-hover); color: var(--text-primary); }
 
-.nav-item-proyecto { position: relative; }
-.nav-item-count {
-  margin-left: auto; font-size: 11px;
+/* Logo */
+.sidebar-logo {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.sidebar-logo-img {
+  width: 28px; height: 28px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0; object-fit: cover;
+}
+.sidebar-logo-name {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.sidebar-toggle-btn {
   color: var(--text-tertiary);
-  min-width: 16px; text-align: right;
 }
-.proyecto-dot-sm {
-  width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+.sidebar-toggle-btn:hover { color: var(--text-primary); }
+
+/* Nav items — Linear style */
+.sidebar-item {
+  min-height: 32px !important;
+  padding: 0 8px !important;
+  margin: 1px 4px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  transition: background 80ms, color 80ms;
 }
-.sidebar-empty-hint {
-  padding: 4px 16px 6px;
+.sidebar-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+.sidebar-item.active { background: var(--bg-row-selected); color: var(--text-primary); font-weight: 500; }
+
+.sidebar-item-mini { justify-content: center; }
+
+.sidebar-item-icon {
+  min-width: 28px !important;
+  max-width: 28px;
+}
+.sidebar-item-icon .q-icon { font-size: 16px; opacity: 0.55; }
+.sidebar-item:hover .sidebar-item-icon .q-icon,
+.sidebar-item.active .sidebar-item-icon .q-icon { opacity: 0.9; }
+
+.sidebar-item-label {
+  font-size: 13px;
+}
+
+/* Section label */
+.sidebar-section-lbl {
+  font-size: 10px !important;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary) !important;
+  padding: 12px 16px 2px !important;
+  min-height: 24px !important;
+}
+
+/* Sub-sections (inside expansion items) */
+.sidebar-sub-section { padding-left: 16px; }
+.sidebar-sub-header {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 12px; font-size: 11px;
+  color: var(--text-tertiary); cursor: pointer;
+  border-radius: 4px; transition: color 80ms;
+  user-select: none;
+}
+.sidebar-sub-header:hover { color: var(--text-secondary); }
+.sidebar-add-btn {
+  color: var(--text-tertiary) !important;
+  opacity: 0;
+  transition: opacity 80ms;
+}
+.sidebar-sub-header:hover .sidebar-add-btn { opacity: 1; }
+
+/* Project items */
+.sidebar-project-item {
+  min-height: 28px !important;
+  padding: 2px 8px !important;
+  margin: 0 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Count badge */
+.sidebar-count {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  min-width: 14px; text-align: right;
+}
+
+/* Proyecto dot */
+.proyecto-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Hover actions */
+.sidebar-hover-actions .q-btn { color: var(--text-tertiary); }
+.sidebar-hover-actions .q-btn:hover { color: var(--text-primary); }
+
+/* Empty hint */
+.sidebar-empty {
+  padding: 2px 16px 4px;
   font-size: 11px; color: var(--text-tertiary); font-style: italic;
 }
 
-/* Proyecto nav item con hover */
-.nav-item-proyecto-wrap { position: relative; }
+/* Footer */
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 0 4px 8px;
+}
+.sidebar-user { padding: 4px 8px !important; }
+.sidebar-user-name {
+  font-size: 11px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-version { font-size: 9px; color: var(--text-tertiary); font-weight: 400; }
+.sidebar-user-empresa { font-size: 10px; color: var(--text-tertiary); }
 
-/* Botón ⋮ dentro del nav-item */
-.btn-proyecto-check {
+/* User menu */
+.usuario-menu {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  margin: 4px;
+  overflow: hidden;
+}
+
+/* Popover en mini mode */
+.sidebar-popover {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg);
+}
+.sidebar-popover-title {
+  font-size: 12px !important;
+  font-weight: 600;
+  color: var(--text-primary) !important;
+  padding: 8px 12px 4px !important;
+}
+
+/* Expansion item overrides */
+.sidebar-drawer :deep(.q-expansion-item__container > .q-item) {
+  min-height: 32px;
+  padding: 0 8px;
+  margin: 1px 4px;
+  border-radius: 6px;
+}
+.sidebar-drawer :deep(.q-expansion-item__content) {
+  padding: 0;
+}
+
+/* ─── Topbar ─── */
+.topbar {
+  height: 44px;
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  background: var(--bg-app);
+}
+.topbar-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-primary); flex: 1;
+}
+.mobile-header {
+  background: var(--bg-app) !important;
+  color: var(--text-primary);
+}
+
+/* ─── Quick search ─── */
+.quick-search { display: flex; align-items: center; margin-left: auto; }
+.qs-input {
+  background: transparent; border: none;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary); font-size: 13px;
+  padding: 2px 4px; width: 160px;
+  font-family: inherit; outline: none;
+}
+.qs-input:focus { border-bottom-color: var(--accent); }
+@media (max-width: 768px) { .qs-input { width: 120px; } }
+
+/* ─── Main page ─── */
+.main-page {
+  display: flex; flex-direction: column;
+  min-height: 100%;
+  padding: 0 !important;
+}
+.page-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ─── Pull to refresh ─── */
+.ptr-indicator {
   display: flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: var(--radius-sm);
-  background: transparent; border: none; cursor: pointer;
-  color: var(--text-tertiary); margin-left: auto; flex-shrink: 0;
-  transition: background 80ms, color 80ms;
+  height: 0; overflow: hidden;
+  color: var(--text-tertiary);
+  transition: height 150ms ease;
 }
-.btn-proyecto-check:hover { color: var(--accent); background: var(--accent-muted); }
+.ptr-indicator.visible { transition: none; }
+.ptr-indicator .material-icons { font-size: 20px; transition: transform 150ms; }
+.ptr-spin { animation: ptr-spin 600ms linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
 
-.btn-proyecto-menu {
-  display: flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: var(--radius-sm);
-  background: transparent; border: none; cursor: pointer;
-  color: var(--text-tertiary); flex-shrink: 0;
-  transition: background 80ms, color 80ms;
+/* ─── Bottom tab bar ─── */
+.bottom-tab-bar {
+  display: flex;
+  background: var(--bg-surface) !important;
+  padding: 4px 0 env(safe-area-inset-bottom, 0);
 }
-.btn-proyecto-menu:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.btn-mobile-always { opacity: 0.5; }
-.btn-mobile-always:active { opacity: 1; background: var(--bg-row-hover); }
+.btab {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 1px; padding: 6px 0;
+  font-size: 9px; font-weight: 500;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  cursor: pointer;
+  background: none; border: none;
+  font-family: inherit;
+  transition: color 80ms;
+}
+.btab .material-icons { font-size: 20px; }
+.btab-label { white-space: nowrap; }
+.btab.active { color: var(--accent); }
+.btab:hover { color: var(--text-primary); }
 
-/* Separador entre bloques */
-.sidebar-separator {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 8px 12px;
-}
-
-/* Acordeón de sección equipo */
-.sidebar-acordeon-header {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 12px; font-size: 11px;
-  color: var(--text-tertiary); cursor: pointer;
-  border-radius: var(--radius-sm); transition: color 80ms;
-  user-select: none; margin: 2px 0;
-}
-.sidebar-acordeon-header:hover { color: var(--text-secondary); }
-
-/* Acordeón principal (Mis Tareas / Equipo) */
-.nav-item-acordeon {
-  display: flex; align-items: center; gap: 0;
-  padding: 0 4px 0 4px;
-}
-.nav-item-toggle {
-  font-size: 16px; cursor: pointer; flex-shrink: 0;
-  color: var(--text-tertiary); padding: 4px;
-  border-radius: var(--radius-sm);
-  transition: color 80ms, background 80ms;
-}
-.nav-item-toggle:hover { color: var(--text-primary); background: var(--bg-row-hover); }
-.nav-item-link-grow {
-  display: flex; align-items: center; gap: 10px;
-  flex: 1; min-width: 0;
-  text-decoration: none; color: inherit;
-}
-.acordeon-count {
-  font-size: 10px; color: var(--text-tertiary);
-  min-width: 14px; text-align: right; margin-right: 4px;
-}
-
-/* Acordeón completados */
-.completados-wrap { margin-top: 4px; }
-.completados-header {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 8px; font-size: 11px;
-  color: var(--text-tertiary); cursor: pointer;
-  border-radius: var(--radius-sm); transition: color 80ms;
-  user-select: none;
-}
-.completados-header:hover { color: var(--text-secondary); }
-.nav-item-completado { opacity: 0.55; pointer-events: none; }
-.nav-item-label-completado { text-decoration: line-through; }
-
-/* Menú contextual ⋮ */
+/* ─── Menú contextual ─── */
 .proyecto-ctx-menu {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  min-width: 150px;
-  overflow: hidden;
+  min-width: 150px; overflow: hidden;
 }
 .ctx-item {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; font-size: 13px; color: var(--text-secondary);
+  padding: 8px 12px; font-size: 13px;
+  color: var(--text-secondary);
   cursor: pointer; transition: background 60ms;
 }
 .ctx-item:hover { background: var(--bg-row-hover); color: var(--text-primary); }
-.ctx-item-success:hover { color: var(--accent); }
 .ctx-item-warn:hover { color: var(--color-warning); }
 .ctx-item-danger:hover { color: var(--color-error); }
 .ctx-backdrop { position: fixed; inset: 0; z-index: 9998; }
+
+/* ─── Etiqueta edit inline ─── */
 .etiqueta-edit-row {
   display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0;
 }
@@ -1084,32 +1102,4 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 }
 .etiqueta-edit-color::-webkit-color-swatch-wrapper { padding: 0; }
 .etiqueta-edit-color::-webkit-color-swatch { border: none; border-radius: 50%; }
-.etiqueta-edit-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border: none; border-radius: var(--radius-sm);
-  background: transparent; cursor: pointer; flex-shrink: 0; padding: 0;
-}
-.etiqueta-edit-ok { color: var(--accent); }
-.etiqueta-edit-ok:hover { background: var(--accent-muted); }
-.etiqueta-edit-cancel { color: var(--text-tertiary); }
-.etiqueta-edit-cancel:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-
-/* Menú usuario */
-.usuario-menu {
-  background: var(--bg-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
-  margin: 4px 0;
-  overflow: hidden;
-}
-.usuario-menu-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 80ms;
-}
-.usuario-menu-item:hover { background: var(--bg-row-hover); color: var(--color-error); }
 </style>
