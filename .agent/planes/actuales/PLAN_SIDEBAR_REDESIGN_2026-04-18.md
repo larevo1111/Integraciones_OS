@@ -18,6 +18,11 @@
 - [x] Botón de colapsar visible en header del sidebar — devuelto v2.6.1
 - [x] Referentes UX documentados en MANIFESTO (Nielsen, Linear, HubSpot)
 
+### ⚠️ ANTES DE EMPEZAR: verificar/revertir daños de v2.6.1
+- [ ] **Verificar que la sidebar expandida funciona igual que antes** — label TABLAS visible, acordeones funcionan, subitems se ven, spacing no roto. Si algo se rompió, revertir el CSS al estado pre-rediseño.
+- [ ] **Verificar que el botón de colapsar funciona** — flecha < para colapsar, > para expandir.
+- [ ] **Verificar bottom tab bar en mobile** — puede estar oculta por conflicto de clases CSS.
+
 ### Pendiente ❌
 - [ ] **Spacing visiblemente más compacto** — items de 30px → 28px min-height, secciones con menos padding, que se NOTE la diferencia. Referente: Linear usa ~32px por item, 4-8px entre secciones.
 - [ ] **Popover flotante para subitems en colapsada** — cuando el sidebar está colapsado y el usuario hace hover sobre un ícono que tiene subitems (Mis Tareas, Equipo), aparece un panel flotante a la derecha con los subitems (Proyectos, Dificultades, Compromisos, Ideas, Etiquetas). Referente: Kommo/HubSpot (imagen enviada por Santi).
