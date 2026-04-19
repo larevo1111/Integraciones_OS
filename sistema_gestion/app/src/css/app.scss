@@ -299,15 +299,63 @@ body {
 }
 .sidebar.collapsed .sidebar-logo-name { display: none; }
 
-/* Ocultar labels de nav cuando colapsado */
+/* ── Sidebar colapsada ── */
 .sidebar.collapsed .nav-item-label { display: none; }
-.sidebar.collapsed .nav-item { justify-content: center; padding: 0; }
-.sidebar.collapsed .sidebar-section { padding: 8px 0 4px; }
+.sidebar.collapsed .nav-item { justify-content: center; padding: 0; position: relative; }
+.sidebar.collapsed .sidebar-section { padding: 4px 0 2px; }
 .sidebar.collapsed .sidebar-footer { padding: 4px; }
 .sidebar.collapsed .sidebar-user-foto { margin: 0 auto; }
 .sidebar.collapsed .sidebar-user { justify-content: center; }
+.sidebar.collapsed .sidebar-user-info { display: none; }
 .sidebar.collapsed .btn-icon-tiny { display: none; }
 .sidebar.collapsed .nav-item-count { display: none; }
+.sidebar.collapsed .nav-item-toggle { display: none; }
+.sidebar.collapsed .sidebar-section-label { display: none; }
+.sidebar.collapsed .sidebar-section-indented { display: none; }
+.sidebar.collapsed .sidebar-acordeon-header { display: none; }
+.sidebar.collapsed .sidebar-separator { margin: 2px 8px; }
+.sidebar.collapsed .completados-wrap { display: none; }
+
+/* Tooltips al hover en collapsed */
+.sidebar.collapsed .nav-item:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* Botón de colapso en el borde derecho del sidebar (aparece al hover) */
+.sidebar { position: relative; }
+.sidebar-edge-toggle {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
+  width: 24px; height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  display: none; align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: var(--shadow-xs);
+  color: var(--text-secondary);
+}
+.sidebar:hover .sidebar-edge-toggle { display: flex; }
+.sidebar-edge-toggle:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
 /* ─── MAIN CONTENT ─── */
 .main-content {

@@ -7,18 +7,17 @@
       <div class="sidebar-logo">
         <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
         <span class="sidebar-logo-name">OS Gestión</span>
-        <span
-          class="material-icons sidebar-collapse-btn"
-          style="font-size:18px;margin-left:auto"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-        >chevron_left</span>
       </div>
+      <!-- Botón colapso en el borde derecho del sidebar -->
+      <button class="sidebar-edge-toggle" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir' : 'Colapsar'">
+        <span class="material-icons" style="font-size:14px">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+      </button>
 
       <!-- Nav -->
       <nav class="sidebar-nav">
         <!-- ═══ MIS TAREAS (acordeón) ═══ -->
         <div class="sidebar-section">
-          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }">
+          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }" data-tooltip="Mis Tareas">
             <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-mis')">{{ acordeonAbierto['bloque-mis'] ? 'expand_more' : 'chevron_right' }}</span>
             <RouterLink to="/tareas" class="nav-item-link-grow">
               <span class="nav-item-icon material-icons">check_circle_outline</span>
@@ -126,7 +125,7 @@
 
         <!-- ═══ EQUIPO (acordeón) ═══ -->
         <div class="sidebar-section">
-          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/equipo' }">
+          <div class="nav-item nav-item-acordeon" :class="{ active: ruta === '/equipo' }" data-tooltip="Equipo">
             <span class="nav-item-toggle material-icons" @click.stop="toggleAcordeon('bloque-eq')">{{ acordeonAbierto['bloque-eq'] ? 'expand_more' : 'chevron_right' }}</span>
             <RouterLink to="/equipo" class="nav-item-link-grow">
               <span class="nav-item-icon material-icons">group</span>
@@ -254,7 +253,7 @@
 
         <!-- ═══ JORNADAS ═══ -->
         <div class="sidebar-section">
-          <RouterLink to="/jornadas" class="nav-item" :class="{ active: ruta === '/jornadas' }">
+          <RouterLink to="/jornadas" class="nav-item" :class="{ active: ruta === '/jornadas' }" data-tooltip="Jornadas">
             <span class="nav-item-icon material-icons">schedule</span>
             <span class="nav-item-label">Jornadas</span>
           </RouterLink>
@@ -263,19 +262,19 @@
         <!-- Tablas -->
         <div class="sidebar-section">
           <div class="sidebar-section-label">Tablas</div>
-          <RouterLink to="/proyectos-tabla" class="nav-item" :class="{ active: ruta === '/proyectos-tabla' }">
+          <RouterLink to="/proyectos-tabla" class="nav-item" :class="{ active: ruta === '/proyectos-tabla' }" data-tooltip="Proyectos">
             <span class="nav-item-icon material-icons">folder_open</span>
             <span class="nav-item-label">Proyectos</span>
           </RouterLink>
-          <RouterLink to="/dificultades" class="nav-item" :class="{ active: ruta === '/dificultades' }">
+          <RouterLink to="/dificultades" class="nav-item" :class="{ active: ruta === '/dificultades' }" data-tooltip="Dificultades">
             <span class="nav-item-icon material-icons">warning_amber</span>
             <span class="nav-item-label">Dificultades</span>
           </RouterLink>
-          <RouterLink to="/compromisos" class="nav-item" :class="{ active: ruta === '/compromisos' }">
+          <RouterLink to="/compromisos" class="nav-item" :class="{ active: ruta === '/compromisos' }" data-tooltip="Compromisos">
             <span class="nav-item-icon material-icons">task_alt</span>
             <span class="nav-item-label">Compromisos</span>
           </RouterLink>
-          <RouterLink to="/ideas" class="nav-item" :class="{ active: ruta === '/ideas' }">
+          <RouterLink to="/ideas" class="nav-item" :class="{ active: ruta === '/ideas' }" data-tooltip="Ideas">
             <span class="nav-item-icon material-icons">lightbulb_outline</span>
             <span class="nav-item-label">Ideas</span>
           </RouterLink>
@@ -613,7 +612,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.6.0'
+const APP_VERSION = 'v2.6.1'
 
 // ─── Pull-to-refresh ───
 const pageBodyRef    = ref(null)
