@@ -183,6 +183,35 @@ body {
   max-width: 200px;
 }
 
+/* Popovers de chips del TareaForm (fecha/responsable/prioridad) — QMenu se teletransporta al body */
+.tf-menu {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+}
+.tf-menu .q-item {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.tf-menu .q-item:hover,
+.tf-menu .q-item--active {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+}
+.tf-menu .q-date {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none;
+  min-width: 260px;
+}
+.tf-menu .q-date__header { background: var(--bg-sidebar) !important; }
+.tf-menu-wide { min-width: 280px; }
+.tf-menu-inner { padding: 8px; min-width: 260px; }
+
 /* ─── FILTROS CHIPS ─── */
 .filtros-bar-wrap {
   position: relative;
