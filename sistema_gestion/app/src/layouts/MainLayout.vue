@@ -7,9 +7,11 @@
       <div class="sidebar-logo">
         <img src="/logo-os.png" class="sidebar-logo-img" alt="OS" />
         <span class="sidebar-logo-name">OS Gestión</span>
-        <button class="sidebar-collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir' : 'Colapsar'">
-          <span class="material-icons" style="font-size:16px">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
-        </button>
+        <span
+          class="material-icons sidebar-collapse-btn"
+          style="font-size:18px;margin-left:auto"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+        >chevron_left</span>
       </div>
 
       <!-- Nav -->
