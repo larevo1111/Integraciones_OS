@@ -144,37 +144,11 @@
             </q-expansion-item>
           </template>
 
-          <!-- Mini mode: Mis Tareas (solo ícono + popover) -->
+          <!-- Mini mode: Mis Tareas (ícono simple, sin popover) -->
           <template v-if="isMini">
-            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/tareas' }" @click="$router.push('/tareas')">
+            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/tareas' && !$route.query.proyecto_id }" to="/tareas">
               <q-item-section avatar class="sidebar-item-icon"><q-icon name="check_circle_outline" /></q-item-section>
-              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]">Mis Tareas</q-tooltip>
-              <!-- Popover subitems -->
-              <q-menu anchor="top end" self="top start" :offset="[4, 0]" class="sidebar-popover">
-                <q-list dense style="min-width: 180px">
-                  <q-item-label header class="sidebar-popover-title">Mis Tareas</q-item-label>
-                  <template v-for="sec in SECCIONES_SIDEBAR" :key="'mini-mis-'+sec.tipo">
-                    <q-item
-                      v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id"
-                      clickable dense v-close-popup
-                      :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                    >
-                      <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" /></q-item-section>
-                      <q-item-section>{{ p.nombre }}</q-item-section>
-                      <q-item-section side v-if="p.tareas_pendientes"><span class="sidebar-count">{{ p.tareas_pendientes }}</span></q-item-section>
-                    </q-item>
-                  </template>
-                  <q-separator v-if="etiquetasGlobal.filter(e => e.mis_tareas_total).length" />
-                  <q-item
-                    v-for="e in etiquetasGlobal.filter(e => e.mis_tareas_total)" :key="e.id"
-                    clickable dense v-close-popup
-                    :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
-                  >
-                    <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: e.color || '#888' }" /></q-item-section>
-                    <q-item-section>{{ e.nombre }}</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
+              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]" :delay="400">Mis Tareas</q-tooltip>
             </q-item>
           </template>
 
@@ -305,25 +279,9 @@
 
           <!-- Mini mode: Equipo -->
           <template v-if="isMini">
-            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/equipo' }" @click="$router.push('/equipo')">
+            <q-item clickable dense class="sidebar-item sidebar-item-mini" :class="{ active: ruta === '/equipo' }" to="/equipo">
               <q-item-section avatar class="sidebar-item-icon"><q-icon name="group" /></q-item-section>
-              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]">Equipo</q-tooltip>
-              <q-menu anchor="top end" self="top start" :offset="[4, 0]" class="sidebar-popover">
-                <q-list dense style="min-width: 180px">
-                  <q-item-label header class="sidebar-popover-title">Equipo</q-item-label>
-                  <template v-for="sec in SECCIONES_SIDEBAR" :key="'mini-eq-'+sec.tipo">
-                    <q-item
-                      v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id"
-                      clickable dense v-close-popup
-                      :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
-                    >
-                      <q-item-section avatar style="min-width:20px"><span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" /></q-item-section>
-                      <q-item-section>{{ p.nombre }}</q-item-section>
-                      <q-item-section side v-if="p.tareas_pendientes"><span class="sidebar-count">{{ p.tareas_pendientes }}</span></q-item-section>
-                    </q-item>
-                  </template>
-                </q-list>
-              </q-menu>
+              <q-tooltip anchor="center right" self="center left" :offset="[8, 0]" :delay="400">Equipo</q-tooltip>
             </q-item>
           </template>
 
@@ -520,7 +478,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.0'
+const APP_VERSION = 'v2.7.1'
 const $q = useQuasar()
 
 // ─── Layout state ───
