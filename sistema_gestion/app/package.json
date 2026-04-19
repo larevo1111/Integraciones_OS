@@ -5,7 +5,8 @@
   "productName": "OS Gestión",
   "scripts": {
     "dev": "quasar dev",
-    "build": "quasar build"
+    "build": "quasar build -m pwa",
+    "deploy": "bash ../deploy.sh"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.12",
