@@ -61,84 +61,27 @@
               <PedidoSelector v-model="form.id_pedido" />
             </div>
 
-            <!-- Fila de chips: categoría, prioridad, etiquetas, fecha, responsable, proyecto -->
-            <div class="form-chips">
-              <!-- Categoría -->
-              <q-chip
-                clickable dense
-                :icon="categoriaSeleccionada ? null : 'label_outline'"
-                class="tf-chip"
-                :class="{ 'tf-chip-filled': categoriaSeleccionada }"
-                :style="categoriaSeleccionada ? { background: hexAlpha(categoriaSeleccionada.color, 0.15), borderColor: categoriaSeleccionada.color, color: categoriaSeleccionada.color } : {}"
-              >
-                <span v-if="categoriaSeleccionada" class="cat-dot" :style="{ background: categoriaSeleccionada.color, marginRight: '5px' }"></span>
-                <span>{{ categoriaSeleccionada ? categoriaSeleccionada.nombre.replace(/_/g, ' ') : 'Categoría' }}</span>
-                <span v-if="iaLoading" class="material-icons" style="font-size:12px;color:var(--accent);animation:spin 1s linear infinite;margin-left:4px">autorenew</span>
-                <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-                  <q-list dense style="min-width:220px;max-height:300px;overflow-y:auto">
-                    <q-item
-                      v-for="c in categorias"
-                      :key="c.id"
-                      clickable v-close-popup
-                      :active="form.categoria_id === c.id"
-                      @click="form.categoria_id = c.id; tfChipClickCount++"
-                    >
-                      <q-item-section avatar><span class="cat-dot" :style="{ background: c.color }"></span></q-item-section>
-                      <q-item-section>{{ c.nombre.replace(/_/g, ' ') }}</q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-chip>
-
-              <!-- Prioridad -->
-              <q-chip clickable dense icon="flag" class="tf-chip" :class="{ 'tf-chip-filled': form.prioridad && form.prioridad !== 'Media' }" :style="prioridadStyle">
-                <span>{{ form.prioridad || 'Prioridad' }}</span>
-                <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-                  <q-list dense style="min-width:140px">
-                    <q-item v-for="p in ['Urgente','Alta','Media','Baja']" :key="p" clickable v-close-popup :active="form.prioridad === p" @click="form.prioridad = p">
-                      <q-item-section avatar><q-icon name="flag" :style="{ color: _COLORES_PRIO[p] }" /></q-item-section>
-                      <q-item-section>{{ p }}</q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-chip>
-
-              <!-- Etiquetas: selector original, un solo click -->
-              <EtiquetasSelector v-model="form.etiquetas" :etiquetas="etiquetas" class="tf-inline-selector" />
-
-              <!-- Fecha -->
-              <q-chip clickable dense :icon="form.fecha_limite ? 'event' : 'event_note'" class="tf-chip" :class="{ 'tf-chip-filled': form.fecha_limite }">
-                <span>{{ form.fecha_limite ? fechaLabel : 'Fecha' }}</span>
-                <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-                  <q-date
-                    :model-value="form.fecha_limite"
-                    mask="YYYY-MM-DD"
-                    today-btn
-                    minimal
-                    @update:model-value="val => form.fecha_limite = val || ''"
-                  />
-                  <div v-if="form.fecha_limite" class="row justify-end q-pa-xs">
-                    <q-btn flat dense size="sm" label="Quitar" v-close-popup @click="form.fecha_limite = ''" />
-                  </div>
-                </q-menu>
-              </q-chip>
-
-              <!-- Responsable: selector original multi, un solo click -->
-              <ResponsablesSelector
-                v-model="form.responsables"
-                :usuarios="usuarios"
-                class="tf-inline-selector"
-              />
-
-              <!-- Proyecto: selector original, un solo click. crear-item delega al panel del sidebar -->
-              <ProyectoSelector
-                v-model="form.proyecto_id"
-                :proyectos="proyectos"
-                empty-label="Proyecto"
-                class="tf-inline-selector"
-                @crear-item="tipo => abrirPanelItem(tipo)"
-              />
-            </div>
+            <!-- Fila de chips compartida -->
+            <TareaMetaChips
+              :categoria-id="form.categoria_id"
+              :prioridad="form.prioridad"
+              :etiquetas="form.etiquetas"
+              :fecha-limite="form.fecha_limite"
+              :responsables="form.responsables"
+              :proyecto-id="form.proyecto_id"
+              :categorias="categorias"
+              :etiquetas-disponibles="etiquetas"
+              :usuarios="usuarios"
+              :proyectos="proyectos"
+              :ia-loading="iaLoading"
+              @update:categoria-id="val => { form.categoria_id = val; tfChipClickCount++ }"
+              @update:prioridad="val => form.prioridad = val"
+              @update:etiquetas="val => form.etiquetas = val"
+              @update:fecha-limite="val => form.fecha_limite = val"
+              @update:responsables="val => form.responsables = val"
+              @update:proyecto-id="val => form.proyecto_id = val"
+              @crear-item="tipo => abrirPanelItem(tipo)"
+            />
 
             <!-- Descripción -->
             <div class="input-group">
@@ -169,9 +112,7 @@ import { useAuthStore } from 'src/stores/authStore'
 import OpSelector           from 'src/components/OpSelector.vue'
 import RemisionSelector     from 'src/components/RemisionSelector.vue'
 import PedidoSelector       from 'src/components/PedidoSelector.vue'
-import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
-import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
-import ResponsablesSelector from 'src/components/ResponsablesSelector.vue'
+import TareaMetaChips       from 'src/components/TareaMetaChips.vue'
 
 const props = defineProps({
   modelValue:  Boolean,
@@ -249,42 +190,6 @@ watch(() => form.value.titulo, (val) => {
 
 const editar = computed(() => !!props.tareaEditar)
 const categoriaSeleccionada = computed(() => props.categorias.find(c => c.id === form.value.categoria_id))
-
-// Helpers para chips
-const _COLORES_PRIO = { 'Urgente': '#ef4444', 'Alta': '#f59e0b', 'Media': '#6b7280', 'Baja': '#374151' }
-const proyectoSeleccionado = computed(() => props.proyectos.find(p => p.id === form.value.proyecto_id))
-const fechaLabel = computed(() => {
-  if (!form.value.fecha_limite) return ''
-  const [y, m, d] = form.value.fecha_limite.split('-')
-  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-  return `${d} ${meses[+m - 1]}`
-})
-const responsableLabel = computed(() => {
-  if (!form.value.responsable) return ''
-  const u = props.usuarios.find(x => x.email === form.value.responsable)
-  return u?.nombre || form.value.responsable.split('@')[0]
-})
-const etiquetasLabel = computed(() => {
-  const ids = form.value.etiquetas
-  if (!ids.length) return ''
-  if (ids.length === 1) return props.etiquetas.find(e => e.id === ids[0])?.nombre || '1 etiq'
-  return `${ids.length} etiquetas`
-})
-const prioridadStyle = computed(() => {
-  const p = form.value.prioridad
-  if (!p || p === 'Media') return {}
-  const c = _COLORES_PRIO[p]
-  return c ? { borderColor: c, color: c } : {}
-})
-function hexAlpha(hex, a) {
-  if (!hex) return null
-  const h = hex.replace('#', '')
-  if (h.length !== 6) return null
-  const r = parseInt(h.slice(0, 2), 16)
-  const g = parseInt(h.slice(2, 4), 16)
-  const b = parseInt(h.slice(4, 6), 16)
-  return `rgba(${r},${g},${b},${a})`
-}
 
 watch(() => props.modelValue, async (val) => {
   if (!val) return
@@ -464,38 +369,6 @@ async function guardar() {
   border-radius: 50%;
   flex-shrink: 0;
 }
-
-/* Fila de chips + selectores originales */
-.form-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-/* Selectores originales inline (sin label ni margen extra) */
-.form-chips :deep(.tf-inline-selector) {
-  display: inline-flex;
-  align-items: center;
-}
-.tf-chip {
-  background: transparent !important;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary) !important;
-  font-size: 12px;
-  min-height: 26px;
-  padding: 0 10px;
-}
-.tf-chip:hover {
-  background: var(--bg-row-hover) !important;
-  border-color: var(--border-default);
-  color: var(--text-primary) !important;
-}
-.tf-chip.tf-chip-filled {
-  background: var(--bg-row-hover) !important;
-  color: var(--text-primary) !important;
-  font-weight: 500;
-}
-.tf-chip :deep(.q-icon) { opacity: 0.75; font-size: 14px; }
 
 /* Filas */
 .form-row-2 {
