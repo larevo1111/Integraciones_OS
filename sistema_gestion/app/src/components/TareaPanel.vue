@@ -38,25 +38,33 @@
 
     <!-- Body -->
     <div class="tarea-panel-body">
-      <!-- Campos -->
-      <div class="field-row" style="align-items:flex-start;padding-top:4px">
-        <span class="field-label" style="padding-top:2px">Estado</span>
-        <div class="prioridad-chips">
-          <button
-            v-for="e in ESTADOS"
-            :key="e.key"
-            class="prioridad-chip"
-            :class="{ active: tarea.estado === e.key }"
-            :style="tarea.estado === e.key ? { background: e.color + '22', borderColor: e.color, color: e.color } : {}"
-            @click="cambiarEstado(e.key)"
-          >
-            <span class="p-dot" :style="{ background: e.color }"></span>
-            {{ e.label }}
-          </button>
-        </div>
-      </div>
-      <!-- Fila de chips: categoría, prioridad, etiquetas, fecha, responsable, proyecto -->
+      <!-- Fila de chips: estado, categoría, prioridad, etiquetas, fecha, responsable, proyecto -->
       <div class="form-chips">
+        <!-- Estado -->
+        <q-chip
+          clickable dense
+          class="tf-chip"
+          :class="{ 'tf-chip-filled': estadoSeleccionado }"
+          :style="estadoSeleccionado ? { background: estadoSeleccionado.color + '22', borderColor: estadoSeleccionado.color, color: estadoSeleccionado.color } : {}"
+        >
+          <span class="cat-dot" :style="{ background: estadoSeleccionado?.color || '#6b7280', marginRight: '5px' }"></span>
+          <span>{{ estadoSeleccionado?.label || 'Estado' }}</span>
+          <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+            <q-list dense style="min-width:160px">
+              <q-item
+                v-for="e in ESTADOS"
+                :key="e.key"
+                clickable v-close-popup
+                :active="tarea.estado === e.key"
+                @click="cambiarEstado(e.key)"
+              >
+                <q-item-section avatar><span class="cat-dot" :style="{ background: e.color }"></span></q-item-section>
+                <q-item-section>{{ e.label }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-chip>
+
         <!-- Categoría -->
         <q-chip
           clickable dense
@@ -451,7 +459,10 @@ function fmtDT(val) {
   return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-// Chips (categoría / prioridad / fecha)
+// Chips (estado / categoría / prioridad / fecha)
+const estadoSeleccionado = computed(() =>
+  ESTADOS.find(e => e.key === props.tarea?.estado) || null
+)
 const categoriaSeleccionada = computed(() =>
   props.categorias.find(c => c.id === props.tarea?.categoria_id) || null
 )
