@@ -7,12 +7,15 @@ genera un solo archivo SQL y lo envía en una conexión SSH.
 
 import re
 import subprocess
+import sys
 import tempfile
 import os
 import mysql.connector
 
-# ── Conexiones ──
-LOCAL_DB = dict(host='localhost', user='osadmin', password='Epist2487.', database='nextcloud')
+# ── Conexiones (via helper central) ──
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local, cfg_remota_ssh, cfg_remota_db
+LOCAL_DB = dict(**cfg_local(), database='nextcloud')
 
 CALENDARIOS = {
     '01_Ventas': 1,
@@ -30,8 +33,10 @@ EMPRESA = 'Ori_Sil_2'
 EMAIL_SANTI = 'ssierra047@gmail.com'
 EMAIL_JEN = 'jennifercanogarcia@gmail.com'
 
-SSH_BASE = 'ssh -i /home/osserver/.ssh/sos_erp -p 65002 u768061575@109.106.250.195'
-MYSQL_REMOTE = "mysql -u u768061575_os_gestion -p'Epist2487.' u768061575_os_gestion"
+_ssh = cfg_remota_ssh('GESTION')
+_dbg = cfg_remota_db('GESTION')
+SSH_BASE = f"ssh -i {_ssh['key']} -p {_ssh['port']} {_ssh['user']}@{_ssh['host']}"
+MYSQL_REMOTE = f"mysql -u {_dbg['user']} -p'{_dbg['password']}' {_dbg['database']}"
 
 
 def ssh_mysql_file(sql_file_path):

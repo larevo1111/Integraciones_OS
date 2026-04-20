@@ -22,8 +22,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / '.env')
-
-DB_CFG  = dict(host='localhost', user='osadmin', password='Epist2487.', database='effi_data')
+sys.path.insert(0, str(Path(__file__).parent))
+from lib import cfg_local
+DB_CFG  = dict(**cfg_local(), database='effi_data')
 DRY_RUN = '--dry-run' in sys.argv
 TODOS   = '--todos'   in sys.argv
 USE_GROQ= '--groq'    in sys.argv

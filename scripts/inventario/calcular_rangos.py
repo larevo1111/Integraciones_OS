@@ -11,10 +11,11 @@ Grupos:
 
 Uso: python3 calcular_rangos.py
 """
-import re, pymysql
-
-DB_EFFI = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='effi_data')
-DB_INV = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='os_inventario')
+import re, pymysql, sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib import cfg_local
+DB_EFFI = dict(**cfg_local(), database='effi_data')
+DB_INV  = dict(**cfg_local(), database='os_inventario')
 
 
 def detectar_unidad(nombre):

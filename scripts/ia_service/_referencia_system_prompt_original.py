@@ -754,12 +754,11 @@ GROUP BY DATE(fecha_de_creacion);
 
 
 def main():
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from lib import cfg_local
     conn = pymysql.connect(
-        host='127.0.0.1',
-        port=3306,
-        user='osadmin',
-        password='Epist2487.',
-        database='ia_service_os',
+        **cfg_local(), database='ia_service_os',
         cursorclass=pymysql.cursors.DictCursor,
         charset='utf8mb4',
     )

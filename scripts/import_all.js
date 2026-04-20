@@ -14,11 +14,13 @@ const path    = require('path');
 
 const EXPORTS_DIR = '/exports';
 
+// Conexión via helper central (lee integracion_conexionesbd.env al importarse)
+require('../lib/db_conn');
 const DB = {
-  host:     '127.0.0.1',
-  port:     3306,
-  user:     'osadmin',
-  password: 'Epist2487.',
+  host:     process.env.DB_LOCAL_HOST || '127.0.0.1',
+  port:     parseInt(process.env.DB_LOCAL_PORT || '3306', 10),
+  user:     process.env.DB_LOCAL_USER,
+  password: process.env.DB_LOCAL_PASS,
   database: 'effi_data',
   charset:  'utf8mb4',
 };

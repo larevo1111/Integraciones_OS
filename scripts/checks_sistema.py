@@ -32,11 +32,13 @@ def _fix(txt):  return f'🔧 {txt}'
 
 # ── BD ia_service_os ──────────────────────────────────────────────────────────
 
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local
+
 def _db_ia():
     return pymysql.connect(
-        host='localhost', port=3306,
-        user='osadmin', password='Epist2487.',
-        database='ia_service_os', charset='utf8mb4',
+        **cfg_local(), database='ia_service_os', charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=True, connect_timeout=5,
     )

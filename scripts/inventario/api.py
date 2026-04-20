@@ -42,8 +42,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_INV = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='os_inventario')
-DB_EFFI = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='effi_data')
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+from lib import cfg_local
+DB_INV  = dict(**cfg_local(), database='os_inventario')
+DB_EFFI = dict(**cfg_local(), database='effi_data')
 
 
 def db_query(db_config, sql, params=None):

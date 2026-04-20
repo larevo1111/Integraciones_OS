@@ -109,11 +109,9 @@ app.use((req, res, next) => {
   next()
 })
 
-// ─── BD ia_service_os ──────────────────────────────────────────────
-const db = mysql.createPool({
-  host: 'localhost', user: 'osadmin', password: 'Epist2487.',
-  database: 'ia_service_os', waitForConnections: true, connectionLimit: 10
-})
+// ─── BD ia_service_os (via helper central) ─────────────────────────
+const dbConn = require('../../lib/db_conn')
+const db = dbConn.local('ia_service_os')
 
 // ─── Validar id_token con Google ─────────────────────────────────
 function validarTokenGoogle(idToken) {

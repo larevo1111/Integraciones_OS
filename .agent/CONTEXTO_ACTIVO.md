@@ -1,5 +1,5 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-03
+**Actualizado**: 2026-04-20
 
 ## Módulos activos en paralelo
 
@@ -13,9 +13,18 @@
 | Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | App activa inv.oscomunidad.com, BD + scripts listos | Alta |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
-## Trabajo activo (2026-04-03)
+## Trabajo activo (2026-04-20)
 
-### Completado esta sesión
+### Completado 2026-04-20 — Centralización de conexiones BD
+- **Todas las credenciales de BD movidas a `integracion_conexionesbd.env`** (raíz del repo, gitignored).
+- Plantilla versionada: `integracion_conexionesbd.env.example`.
+- Helpers: `lib/db_conn.js` (Node) y `scripts/lib/db_conn.py` (Python). Cargan el `.env` automáticamente.
+- 35 archivos refactorizados (5 servicios Node + 30 scripts Python): ningún host/user/pass/database hardcoded.
+- API Node: `db.local('effi_data')`, `db.integracion()`, `db.gestion()`, `db.comunidad()`.
+- API Python: `with local(db) as conn:`, `with integracion() as conn:`, `with gestion()`, `with comunidad()`, o `cfg_local()` / `cfg_remota_ssh(prefijo)` / `cfg_remota_db(prefijo)` para scripts legados.
+- Validado: 7 servicios reiniciados y respondiendo. Smoke Python OK. Próximo paso: migrar `os_integracion` y `os_gestion` al VPS → solo editando el `.env`.
+
+### Completado sesiones anteriores
 - **Hostinger inalcanzable**: ISP bloqueaba la IP. Solución: Cloudflare WARP instalado (`warp-cli connect/disconnect`).
 - **OpenCode modelo removido**: `mimo-v2-pro-free` ya no existe en OpenCode. Cambiado a `opencode/qwen3.6-plus-free` en `superagente_oc.py`.
 - **Bot conflictos polling**: Múltiples restarts lo resolvieron. Causado por cambios de red (WARP).

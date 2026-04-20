@@ -11,11 +11,15 @@ Uso desde api.py:
 import re
 import json
 import subprocess
+import sys
+import os
 import pymysql
 from datetime import datetime
 
-DB_EFFI = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='effi_data')
-DB_INV = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='os_inventario')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib import cfg_local
+DB_EFFI = dict(**cfg_local(), database='effi_data')
+DB_INV  = dict(**cfg_local(), database='os_inventario')
 
 CAUSAS = {
     'FALTA_FACTURAR': 'Faltó remisionar o facturar',

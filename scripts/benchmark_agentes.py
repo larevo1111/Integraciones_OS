@@ -7,12 +7,13 @@ Guarda resultados detallados para evaluación posterior.
 Uso: python3 benchmark_agentes.py
 """
 
-import requests, json, time, datetime, pymysql, os
+import requests, json, time, datetime, pymysql, os, sys
 
 # ─── Config ──────────────────────────────────────────────────────────────────
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local
 IA_URL     = "http://localhost:5100/ia/consultar"
-DB_CONFIG  = dict(host="127.0.0.1", user="osadmin", password="Epist2487.",
-                  database="ia_service_os", charset="utf8mb4")
+DB_CONFIG  = dict(**cfg_local(), database="ia_service_os", charset="utf8mb4")
 EMPRESA    = "ori_sil_2"
 USUARIO    = "benchmark_test"
 CANAL      = "api"

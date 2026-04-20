@@ -1033,13 +1033,10 @@ app.get('/api/export/:recurso', async (req, res) => {
 app.get('/api/bot/tabla', async (req, res) => {
   const { token } = req.query
   if (!token) return res.status(400).json({ ok: false, error: 'Token requerido' })
-  const mysql2 = require('mysql2/promise')
-  let conn
+  const central = require('../../lib/db_conn')
   try {
-    conn = await mysql2.createConnection({
-      host: 'localhost', user: 'osadmin', password: 'Epist2487.', database: 'ia_service_os'
-    })
-    const [rows] = await conn.execute(
+    const pool = await central.local('ia_service_os')
+    const [rows] = await pool.execute(
       'SELECT pregunta, columnas, filas FROM bot_tablas_temp WHERE token = ? AND created_at > NOW() - INTERVAL 24 HOUR',
       [token]
     )
@@ -1053,8 +1050,6 @@ app.get('/api/bot/tabla', async (req, res) => {
     })
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message })
-  } finally {
-    if (conn) conn.end()
   }
 })
 

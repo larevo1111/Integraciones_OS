@@ -21,23 +21,18 @@ import pymysql
 
 # ─── Configuración ─────────────────────────────────────────────────────────────
 
-DB_EFFI = dict(
-    host='127.0.0.1', port=3306,
-    user='osadmin', password='Epist2487.',
-    database='effi_data', charset='utf8mb4',
-)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local, cfg_remota_ssh, cfg_remota_db
 
-SSH_HOST = '109.106.250.195'
-SSH_PORT = 65002
-SSH_USER = 'u768061575'
-SSH_KEY  = os.path.expanduser('~/.ssh/sos_erp')
+DB_EFFI = dict(**cfg_local(), database='effi_data', charset='utf8mb4')
 
-DB_HOSTINGER = dict(
-    user='u768061575_osserver',
-    password='Epist2487.',
-    database='u768061575_os_integracion',
-    charset='utf8mb4',
-)
+_ssh = cfg_remota_ssh('INTEGRACION')
+SSH_HOST = _ssh['host']
+SSH_PORT = _ssh['port']
+SSH_USER = _ssh['user']
+SSH_KEY  = _ssh['key']
+
+DB_HOSTINGER = cfg_remota_db('INTEGRACION')
 
 TABLA = 'inv_catalogo_articulos'
 BATCH = 500

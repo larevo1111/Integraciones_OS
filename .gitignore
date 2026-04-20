@@ -12,6 +12,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Conexiones BD centralizadas (ver integracion_conexionesbd.env.example)
+integracion_conexionesbd.env
+
 # IDE
 .vscode/
 .idea/

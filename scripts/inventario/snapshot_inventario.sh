@@ -19,7 +19,9 @@ python3 scripts/orquestador.py --forzar >> "$LOG" 2>&1
 
 # 2. Exportar zeffi_inventario completo a CSV
 ARCHIVO="$SNAP_DIR/inventario_${FECHA}_${HORA}.csv"
-mysql -u osadmin -pEpist2487. effi_data -e "
+# shellcheck disable=SC1091
+set -a; . /home/osserver/Proyectos_Antigravity/Integraciones_OS/integracion_conexionesbd.env; set +a
+mysql -u "$DB_LOCAL_USER" -p"$DB_LOCAL_PASS" -h "$DB_LOCAL_HOST" -P "$DB_LOCAL_PORT" effi_data -e "
   SELECT id, nombre, categoria, vigencia,
          REPLACE(stock_total_empresa, ',', '.') AS stock_total,
          REPLACE(costo_manual, ',', '.') AS costo_manual,

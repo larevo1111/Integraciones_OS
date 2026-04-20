@@ -13,10 +13,13 @@ def agente_con_capacidad(capacidad: str) -> dict | None:
     Retorna el dict del agente o None si no hay ninguno disponible.
     """
     import pymysql, pymysql.cursors, json as _json
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from lib import cfg_local
     try:
         conn = pymysql.connect(
-            host='localhost', user='osadmin', password='Epist2487.',
-            database='ia_service_os', cursorclass=pymysql.cursors.DictCursor
+            **cfg_local(), database='ia_service_os',
+            cursorclass=pymysql.cursors.DictCursor
         )
         with conn.cursor() as cur:
             cur.execute(

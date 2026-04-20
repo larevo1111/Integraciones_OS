@@ -22,24 +22,18 @@ Ejecutar manualmente:
 """
 
 import json
+import os
 import subprocess
 import sys
 
 import mysql.connector
 
 # ─── Configuración ─────────────────────────────────────────────────────────────
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local
 
-DB_LOCAL = dict(
-    host='127.0.0.1', port=3306,
-    user='osadmin', password='Epist2487.',
-    database='effi_data',
-)
-
-DB_ESPO = dict(
-    host='127.0.0.1', port=3306,
-    user='osadmin', password='Epist2487.',
-    database='espocrm',
-)
+DB_LOCAL = dict(**cfg_local(), database='effi_data')
+DB_ESPO  = dict(**cfg_local(), database='espocrm')
 
 ESPOCRM_CONTAINER = 'espocrm'
 

@@ -12,8 +12,11 @@ from datetime import date
 DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(DIR, 'config_depuracion.json')
 
-DB_EFFI = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='effi_data')
-DB_INV  = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='os_inventario')
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib import cfg_local
+DB_EFFI = dict(**cfg_local(), database='effi_data')
+DB_INV  = dict(**cfg_local(), database='os_inventario')
 
 # Columnas de stock por bodega en zeffi_inventario → nombre limpio
 BODEGAS = {

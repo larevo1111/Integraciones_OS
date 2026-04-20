@@ -37,15 +37,9 @@ app.use((req, res, next) => {
   next()
 })
 
-// ─── Pool MySQL ────────────────────────────────────────────────────
-const pool = mysql.createPool({
-  host: '127.0.0.1',
-  user: 'osadmin',
-  password: 'Epist2487.',
-  database: 'ia_local',
-  waitForConnections: true,
-  connectionLimit: 5
-})
+// ─── Pool MySQL (via helper central) ───────────────────────────────
+const dbConn = require('../lib/db_conn')
+const pool = dbConn.local('ia_local')
 
 // ─── Helpers ───────────────────────────────────────────────────────
 function estimarTokens(texto) {

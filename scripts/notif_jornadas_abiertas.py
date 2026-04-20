@@ -10,6 +10,7 @@ Fuentes de datos:
 - NUNCA consultar ia_service_os para datos de usuarios.
 """
 import os
+import sys
 import pymysql
 import requests
 from datetime import date
@@ -18,19 +19,21 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-# ── Config ──────────────────────────────────────────────────────
-SSH_HOST     = '109.106.250.195'
-SSH_PORT     = 65002
-SSH_USER     = 'u768061575'
-SSH_KEY      = os.path.expanduser('~/.ssh/sos_erp')
+# ── Config (via helper central) ─────────────────────────────────
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_remota_ssh, cfg_remota_db
 
-GESTION_DB   = 'u768061575_os_gestion'
-GESTION_USER = 'u768061575_os_gestion'
-GESTION_PASS = 'Epist2487.'
+_ssh_g = cfg_remota_ssh('GESTION')
+SSH_HOST = _ssh_g['host']
+SSH_PORT = _ssh_g['port']
+SSH_USER = _ssh_g['user']
+SSH_KEY  = _ssh_g['key']
 
-COMUNIDAD_DB   = 'u768061575_os_comunidad'
-COMUNIDAD_USER = 'u768061575_ssierra047'
-COMUNIDAD_PASS = 'Epist2487.'
+_dbg = cfg_remota_db('GESTION')
+GESTION_DB, GESTION_USER, GESTION_PASS = _dbg['database'], _dbg['user'], _dbg['password']
+
+_dbc = cfg_remota_db('COMUNIDAD')
+COMUNIDAD_DB, COMUNIDAD_USER, COMUNIDAD_PASS = _dbc['database'], _dbc['user'], _dbc['password']
 
 WA_BRIDGE_URL = 'http://localhost:3100'
 ADMIN_PHONE   = '573022921455'  # Santiago (ssierra047@gmail.com)

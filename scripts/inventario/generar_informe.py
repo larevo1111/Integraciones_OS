@@ -5,7 +5,9 @@ from datetime import datetime
 import pymysql
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_INV = dict(host='localhost', user='osadmin', password='Epist2487.', database='os_inventario',
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib import cfg_local
+DB_INV = dict(**cfg_local(), database='os_inventario',
               cursorclass=pymysql.cursors.DictCursor)
 
 NOMBRES_GRUPO = {

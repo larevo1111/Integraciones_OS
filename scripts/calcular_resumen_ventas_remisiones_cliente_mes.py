@@ -10,17 +10,14 @@ Incluye: 'Pendiente de facturar' + convertidas a factura
 Excluye: anuladas verdaderas
 """
 
+import os, sys
 import datetime
 from calendar import monthrange
 import mysql.connector
 
-DB = dict(
-    host='127.0.0.1',
-    port=3306,
-    user='osadmin',
-    password='Epist2487.',
-    database='effi_data',
-)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local
+DB = dict(**cfg_local(), database='effi_data')
 
 # ─── Utilidades ───────────────────────────────────────────────────────────────
 

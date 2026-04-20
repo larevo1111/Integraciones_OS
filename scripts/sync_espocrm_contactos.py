@@ -16,6 +16,7 @@ Ejecutar manualmente:
   python3 scripts/sync_espocrm_contactos.py
 """
 
+import os
 import re
 import secrets
 import sys
@@ -25,17 +26,11 @@ from datetime import datetime, timezone
 import mysql.connector
 
 # ─── Configuración ─────────────────────────────────────────────────────────────
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local
 
-DB_EFFI = dict(
-    host='127.0.0.1', port=3306,
-    user='osadmin', password='Epist2487.',
-    database='effi_data',
-)
-DB_ESPO = dict(
-    host='127.0.0.1', port=3306,
-    user='osadmin', password='Epist2487.',
-    database='espocrm',
-)
+DB_EFFI = dict(**cfg_local(), database='effi_data')
+DB_ESPO = dict(**cfg_local(), database='espocrm')
 
 CREATED_BY_ID = '69ab7a26c5d84edd9'   # ssierra — responsable de la importación
 

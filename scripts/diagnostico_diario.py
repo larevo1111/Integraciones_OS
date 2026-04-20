@@ -55,10 +55,15 @@ APPS_WEB = [
 
 BDS_LOCALES = ['ia_service_os', 'effi_data', 'os_inventario', 'os_whatsapp', 'espocrm']
 
+sys.path.insert(0, BASE_DIR)
+from lib import cfg_remota_ssh, cfg_remota_db
+
+_ssh_i = cfg_remota_ssh('INTEGRACION')
+_db_i  = cfg_remota_db('INTEGRACION')
 HOSTINGER_CFG = dict(
-    host='109.106.250.195', port=3306,
-    user='u768061575_osserver', password='Epist2487.',
-    database='u768061575_os_integracion',
+    host=_ssh_i['host'], port=3306,
+    user=_db_i['user'], password=_db_i['password'],
+    database=_db_i['database'],
     connect_timeout=10, read_timeout=10,
 )
 
@@ -130,9 +135,9 @@ def check_bds_locales():
     resultados, fallos = [], 0
     for bd in BDS_LOCALES:
         try:
+            from lib import cfg_local
             conn = pymysql.connect(
-                host='localhost', user='osadmin', password='Epist2487.',
-                database=bd, connect_timeout=5,
+                **cfg_local(), database=bd, connect_timeout=5,
             )
             conn.close()
             resultados.append(_ok(bd))

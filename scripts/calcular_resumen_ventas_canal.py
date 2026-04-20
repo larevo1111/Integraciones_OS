@@ -6,17 +6,14 @@ PK: (mes, canal) — ventas agrupadas por canal de marketing y mes.
 Se ejecuta como paso 3b del pipeline, después de calcular_resumen_ventas.py.
 """
 
+import os, sys
 import datetime
 from calendar import monthrange
 import mysql.connector
 
-DB = dict(
-    host='127.0.0.1',
-    port=3306,
-    user='osadmin',
-    password='Epist2487.',
-    database='effi_data',
-)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lib import cfg_local
+DB = dict(**cfg_local(), database='effi_data')
 
 # ─── Utilidades ───────────────────────────────────────────────────────────────
 

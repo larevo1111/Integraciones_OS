@@ -39,8 +39,11 @@ from openpyxl import Workbook
 
 # ─── Configuración ─────────────────────────────────────────────────────────────
 
-DB_ESPO = dict(host='127.0.0.1', port=3306, user='osadmin', password='Epist2487.', database='espocrm')
-DB_EFFI = dict(host='127.0.0.1', port=3306, user='osadmin', password='Epist2487.', database='effi_data')
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from lib import cfg_local
+DB_ESPO = dict(**cfg_local(), database='espocrm')
+DB_EFFI = dict(**cfg_local(), database='effi_data')
 
 OUTPUT_DIR = Path('/tmp')
 EMAIL_RESPONSABLE = 'equipo.origensilvestre@gmail.com'

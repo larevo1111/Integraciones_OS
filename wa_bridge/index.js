@@ -32,13 +32,6 @@ const CONFIG = {
   empresa:        process.env.WA_EMPRESA || 'ori_sil_2',
   allowedNumbers: null,  // null = todos; o ['573001234567@s.whatsapp.net']
   reconnectDelay: 3,
-  db: {
-    host:     'localhost',
-    user:     'osadmin',
-    password: 'Epist2487.',
-    database: 'os_whatsapp',
-    charset:  'utf8mb4',
-  },
   // Cargados desde wa_config en BD al iniciar
   mediaDir:     `/home/osserver/wa_media/${process.env.WA_EMPRESA || 'ori_sil_2'}`,
   webhookUrl:   null,
@@ -55,8 +48,9 @@ const logErr = (msg, err) => {
   console.error(`[wa_bridge] ERROR ${msg}`, err?.message || err);
 };
 
-// ── Pool de BD ─────────────────────────────────────────────────────────────────
-const pool = mysql.createPool({ ...CONFIG.db, waitForConnections: true, connectionLimit: 5 });
+// ── Pool de BD (via helper central) ────────────────────────────────────────────
+const dbConn = require('../lib/db_conn');
+const pool = dbConn.local('os_whatsapp');
 
 async function dbRun(sql, params = []) {
   const [result] = await pool.execute(sql, params);
@@ -105,6 +99,10 @@ async function cargarConfig() {
 let sock            = null;
 let connectionState = 'disconnected';
 let qrCode          = null;
+
+// Cache LID → JID real (persiste en memoria mientras el proceso vive)
+// WhatsApp usa @lid como identificador interno en lugar del número real
+const lidToPhoneCache = new Map();
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function formatJid(number) {
@@ -330,8 +328,37 @@ async function connectToWhatsApp() {
 
       const fromJid  = msg.key.remoteJid;
       const esGrupo  = fromJid.endsWith('@g.us');
+      const esLid    = fromJid.endsWith('@lid');
       const senderJid= esGrupo ? msg.key.participant : null;
-      const fromNumber = jidToNumber(esGrupo ? senderJid : fromJid);
+
+      // Resolver LID → número real
+      // Baileys expone el número real en msg.key.senderPn o en msg.verifiedBizName / pushName
+      // Adicionalmente buscar en participant y en los campos del mensaje
+      let jidReal = esGrupo ? senderJid : fromJid;
+      if (esLid || (esGrupo && senderJid?.endsWith('@lid'))) {
+        // Loguear para diagnóstico
+        log('DEBUG msg.key LID', {
+          remoteJid: msg.key.remoteJid,
+          senderPn:  msg.key.senderPn,
+          participant: msg.key.participant,
+          participantPn: msg.key.participantPn,
+          id: msg.key.id,
+        });
+      }
+      if (esLid) {
+        if (msg.key.senderPn) {
+          jidReal = msg.key.senderPn;
+          lidToPhoneCache.set(fromJid, jidReal);
+        } else if (lidToPhoneCache.has(fromJid)) {
+          jidReal = lidToPhoneCache.get(fromJid);
+        }
+      }
+      if (esGrupo && senderJid?.endsWith('@lid') && msg.key.participantPn) {
+        jidReal = msg.key.participantPn;
+        lidToPhoneCache.set(senderJid, jidReal);
+      }
+
+      const fromNumber = jidToNumber(jidReal);
       const fromName = msg.pushName || msg.verifiedBizName || null;
 
       if (CONFIG.allowedNumbers && !CONFIG.allowedNumbers.includes(fromJid)) continue;

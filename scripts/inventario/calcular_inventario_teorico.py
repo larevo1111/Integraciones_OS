@@ -40,8 +40,11 @@ from datetime import date, datetime
 import json
 
 # ─── Configuración ────────────────────────────────────────────────
-DB_INV = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='os_inventario')
-DB_EFFI = dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='effi_data')
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib import cfg_local
+DB_INV  = dict(**cfg_local(), database='os_inventario')
+DB_EFFI = dict(**cfg_local(), database='effi_data')
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(SCRIPT_DIR, '..', '..', 'logs')
