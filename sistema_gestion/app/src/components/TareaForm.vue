@@ -4,10 +4,22 @@
       <div v-if="modelValue" class="form-overlay" @click.self="$emit('update:modelValue', false)">
 
         <!-- Contenedor: modal en desktop, bottom sheet en mobile -->
-        <div class="form-container" :class="isMobile ? 'is-sheet' : 'is-modal'">
+        <div
+          class="form-container"
+          :class="isMobile ? 'is-sheet' : 'is-modal'"
+          :style="isMobile && sheetDragY > 0 ? { transform: `translateY(${sheetDragY}px)`, transition: 'none' } : {}"
+        >
 
-          <!-- Handle (solo mobile) -->
-          <div v-if="isMobile" class="sheet-handle"></div>
+          <!-- Handle draggable (solo mobile) -->
+          <div
+            v-if="isMobile"
+            class="sheet-handle-wrap"
+            @touchstart.passive="onDragStart"
+            @touchmove.passive="onDragMove"
+            @touchend="onDragEnd"
+          >
+            <div class="sheet-handle"></div>
+          </div>
 
           <!-- Header -->
           <div class="form-header">
@@ -37,6 +49,16 @@
             <div v-if="categoriaSeleccionada?.es_produccion" class="input-group">
               <label class="input-label">OP Effi</label>
               <OpSelector v-model="form.id_op" />
+            </div>
+
+            <!-- Remisión + Pedido (solo si categoría es empaque) -->
+            <div v-if="categoriaSeleccionada?.es_empaque" class="input-group">
+              <label class="input-label">Remisión</label>
+              <RemisionSelector v-model="form.id_remision" />
+            </div>
+            <div v-if="categoriaSeleccionada?.es_empaque" class="input-group">
+              <label class="input-label">Pedido</label>
+              <PedidoSelector v-model="form.id_pedido" />
             </div>
 
             <!-- Fila de chips: categoría, prioridad, etiquetas, fecha, responsable, proyecto -->
@@ -145,6 +167,8 @@ import { api } from 'src/services/api'
 import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
 import OpSelector           from 'src/components/OpSelector.vue'
+import RemisionSelector     from 'src/components/RemisionSelector.vue'
+import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
 import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import ResponsablesSelector from 'src/components/ResponsablesSelector.vue'
@@ -175,11 +199,31 @@ const guardando = ref(false)
 const tituloRef = ref(null)
 const isMobile  = computed(() => window.innerWidth <= 768)
 
+// Drag-to-dismiss del bottom sheet en mobile
+const sheetDragY = ref(0)
+let sheetDragStartY = 0
+function onDragStart(ev) {
+  sheetDragStartY = ev.touches[0].clientY
+}
+function onDragMove(ev) {
+  const dy = ev.touches[0].clientY - sheetDragStartY
+  sheetDragY.value = Math.max(0, dy)
+}
+function onDragEnd() {
+  // Si arrastró más de 120px → cerrar
+  if (sheetDragY.value > 120) {
+    sheetDragY.value = 0
+    emit('update:modelValue', false)
+  } else {
+    sheetDragY.value = 0
+  }
+}
+
 const form = ref({
   titulo: '', descripcion: '', categoria_id: null, proyecto_id: null,
   prioridad: 'Media',
   responsables: auth.usuario?.email ? [auth.usuario.email] : [],
-  fecha_limite: '', id_op: '', etiquetas: []
+  fecha_limite: '', id_op: '', id_remision: '', id_pedido: '', etiquetas: []
 })
 
 const iaLoading   = ref(false)
@@ -256,6 +300,8 @@ watch(() => props.modelValue, async (val) => {
       responsables: existingResp,
       fecha_limite: props.tareaEditar.fecha_limite || '',
       id_op:        props.tareaEditar.id_op || '',
+      id_remision:  props.tareaEditar.id_remision || '',
+      id_pedido:    props.tareaEditar.id_pedido || '',
       etiquetas:    (props.tareaEditar.etiquetas || []).map(e => e.id)
     }
   } else {
@@ -269,6 +315,8 @@ watch(() => props.modelValue, async (val) => {
       responsables: d.responsables || defaultResp,
       fecha_limite: d.fecha_limite || '',
       id_op: d.id_op || '',
+      id_remision: d.id_remision || '',
+      id_pedido: d.id_pedido || '',
       etiquetas: d.etiquetas || []
     }
   }
@@ -338,13 +386,23 @@ async function guardar() {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Handle bar (mobile) */
+/* Handle bar (mobile) — área touch amplia para arrastrar */
+.sheet-handle-wrap {
+  padding: 8px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  justify-content: center;
+}
+.sheet-handle-wrap:active { cursor: grabbing; }
 .sheet-handle {
-  width: 36px; height: 4px;
+  width: 40px; height: 4px;
   background: var(--border-strong);
   border-radius: 2px;
-  margin: 10px auto 2px;
 }
+
+/* Transición suave al soltar el drag */
+.is-sheet { transition: transform 200ms ease; }
 
 .form-header {
   display: flex; align-items: center;
