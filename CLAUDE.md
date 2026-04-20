@@ -1,30 +1,26 @@
 # Integraciones_OS — Instrucciones para Claude
 
-## ⚠️ PRINCIPIO RECTOR — Simplicidad + 5S japonesa
-
-**Lo más importante: buscar SIEMPRE la solución más simple.** Aplicar 5S japonesa a absolutamente todo:
-- **Seiri** (clasificar): eliminar lo innecesario — código muerto, helpers no usados, abstracciones prematuras.
-- **Seiton** (ordenar): un lugar para cada cosa — componentes, utils, contextos.
-- **Seisō** (limpiar): no dejar duplicación, comentarios obsoletos, imports fantasma.
-- **Seiketsu** (estandarizar): una operación = una función. No duplicar lógica.
-- **Shitsuke** (disciplina): seguir el checklist siempre, sin atajos.
-
-Si la solución parece compleja → estás haciéndolo mal. Simplificar antes de escribir.
-
 ## ⚠️ CHECKLIST antes de implementar CUALQUIER cosa
 
 Ejecutar esta lista mentalmente en orden. No saltar pasos.
 
-1. **Leer primero el código o `.md` relevante** antes de proponer o escribir. No asumir, no overcodear.
-2. **Anotar plan en `.agent/planes/activos/`** si la tarea tiene 2+ pasos o es significativa. Nunca perder contexto.
-3. **Entender el alcance EXACTO** — cambiar solo lo pedido. Si dudo → pregunto ANTES. Lo no mencionado no se toca.
-4. **¿Existe ya?** — reusar componente/función antes de crear. Buscar con Grep.
-5. **¿Voy a copiar markup a 2+ lugares?** → extraer componente compartido PRIMERO. Nunca "copio y refactorizo después".
-6. **Si es UI** — leer `frontend/design-system/MANUAL_ESTILOS.md` y usar Quasar (no CSS crudo, no HTML nativo).
-7. **Timezone** — `hoyLocal()` / `localDateCO()` / `NOW()`. Nunca `toISOString().slice(0,10)` ni `CURDATE()`.
-8. **Test mobile + desktop con Chrome DevTools MCP** antes de entregar. No asumir que funciona.
-9. **Commit + push** con mensaje descriptivo en español.
-10. **Actualizar plan** (mover a `.agent/planes/completados/`) **y `.agent/contextos/<modulo>.md`** si cambió algo estructural.
+1. **Pensar la manera más simple y sencilla** — si la solución parece compleja, simplificar ANTES de escribir. Lo más importante de todo.
+2. **Aplicar 5S japonesa** a todo lo que toco:
+   - *Seiri* (clasificar): eliminar lo innecesario — código muerto, helpers no usados, abstracciones prematuras.
+   - *Seiton* (ordenar): un lugar para cada cosa — componentes, utils, contextos.
+   - *Seisō* (limpiar): no dejar duplicación, comentarios obsoletos, imports fantasma.
+   - *Seiketsu* (estandarizar): una operación = una función.
+   - *Shitsuke* (disciplina): seguir el checklist siempre, sin atajos.
+3. **Leer primero el código o `.md` relevante** antes de proponer o escribir. No asumir, no overcodear.
+4. **Anotar plan en `.agent/planes/activos/`** si la tarea tiene 2+ pasos o es significativa. Nunca perder contexto.
+5. **Entender el alcance EXACTO** — cambiar solo lo pedido. Si dudo → pregunto ANTES. Lo no mencionado no se toca.
+6. **¿Existe ya?** — reusar componente/función antes de crear. Buscar con Grep.
+7. **¿Voy a copiar markup a 2+ lugares?** → extraer componente compartido PRIMERO. Nunca "copio y refactorizo después".
+8. **Si es UI** — leer `frontend/design-system/MANUAL_ESTILOS.md` y usar Quasar (no CSS crudo, no HTML nativo).
+9. **Timezone** — `hoyLocal()` / `localDateCO()` / `NOW()`. Nunca `toISOString().slice(0,10)` ni `CURDATE()`.
+10. **Test mobile + desktop con Chrome DevTools MCP** antes de entregar. No asumir que funciona.
+11. **Commit + push** con mensaje descriptivo en español.
+12. **Actualizar plan** (mover a `.agent/planes/completados/`) **y `.agent/contextos/<modulo>.md`** si cambió algo estructural.
 
 ## Autonomía operativa
 
