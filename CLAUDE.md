@@ -1,5 +1,20 @@
 # Integraciones_OS — Instrucciones para Claude
 
+## ⚠️ CHECKLIST antes de implementar CUALQUIER cosa
+
+Ejecutar esta lista mentalmente en orden. No saltar pasos.
+
+1. **Entender el alcance EXACTO** — cambiar solo lo pedido. Si dudo → pregunto ANTES. Lo no mencionado no se toca.
+2. **¿Existe ya?** — reusar componente/función antes de crear. Buscar con Grep.
+3. **¿Voy a copiar markup a 2+ lugares?** → extraer componente compartido PRIMERO. Nunca "copio y refactorizo después".
+4. **Si es UI** — leer `frontend/design-system/MANUAL_ESTILOS.md` y usar Quasar (no CSS crudo, no HTML nativo).
+5. **Timezone** — `hoyLocal()` / `localDateCO()` / `NOW()`. Nunca `toISOString().slice(0,10)` ni `CURDATE()`.
+6. **Forms con Enter** — `<form @submit.prevent>`. Nunca `@keydown.enter` (rompe IME móvil).
+7. **Bump versión** — actualizar `APP_VERSION` en `sistema_gestion/app/src/layouts/MainLayout.vue` (u otro MainLayout) en cada commit de gestión.
+8. **Test mobile + desktop** con Chrome DevTools MCP / Playwright antes de entregar. No asumir que funciona.
+9. **Commit + push** con mensaje descriptivo en español.
+10. **Actualizar contexto** — `.agent/contextos/<modulo>.md` si cambió algo estructural.
+
 ## Autonomía operativa
 
 Trabaja de forma autónoma sin pedir confirmación para:
