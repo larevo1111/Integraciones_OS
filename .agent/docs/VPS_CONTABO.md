@@ -140,20 +140,34 @@ journalctl -u os-gestion -f
 | Config | `/etc/cloudflared/config.yml` |
 | Estado | Activo — pero **DNS siguen apuntando al servidor local** |
 
-**Dominios configurados en el tunnel:**
+**Dominios configurados en el tunnel VPS (`vps-os`):**
 ```
-wp.oscomunidad.com       → 80    (WordPress — DNS apunta al VPS ✅)
-gestion.oscomunidad.com  → 9300  (DNS aún en servidor local — pendiente corte)
-menu.oscomunidad.com     → 9100  (DNS aún en servidor local — pendiente corte)
-inv.oscomunidad.com      → 9401  (DNS aún en servidor local — pendiente corte)
+wp.oscomunidad.com           → 80    (WordPress — DNS apunta al VPS ✅)
+code-vps.oscomunidad.com     → 9400  (code-server VPS ✅)
+gestion-vps.oscomunidad.com  → 9300  (Gestión en VPS, instancia dev/backup ✅)
+gestion.oscomunidad.com      → 9300  (Reservado para cuando se corte DNS de producción)
+menu.oscomunidad.com         → 9100  (Reservado)
+inv.oscomunidad.com          → 9401  (Reservado)
 ```
 
-**Para cortar dominios al VPS** (cuando Santi confirme que todo funciona):
+**Dominios configurados en el tunnel LOCAL (`os` — ID `9cacb3dc`):**
+```
+gestion.oscomunidad.com    → 9300  (Producción ✅)
+menu.oscomunidad.com       → 9100  (Producción ✅)
+inv.oscomunidad.com        → 9401  (Producción ✅)
+crm.oscomunidad.com        → 8083  (EspoCRM producción ✅)
+ia-api.oscomunidad.com     → 5100  (IA Service expuesto para que el VPS lo use ✅)
++ 13 servicios más (nocodb, n8n, nextcloud, grafana, etc.)
+```
+
+⚠️ **Regla de SSL de Cloudflare gratis**: solo cubre 1 nivel (`*.oscomunidad.com`). Por eso el dev usa `gestion-vps.oscomunidad.com` (con guión) y no `vps.gestion.oscomunidad.com` (2 niveles, no cubierto).
+
+**Para cortar dominios al VPS** (cuando se decida invertir local/VPS):
 ```bash
-# Desde el VPS o desde el servidor local con cert.pem
-cloudflared tunnel route dns --overwrite-dns vps-os gestion.oscomunidad.com
-cloudflared tunnel route dns --overwrite-dns vps-os menu.oscomunidad.com
-cloudflared tunnel route dns --overwrite-dns vps-os inv.oscomunidad.com
+# Desde el servidor local (tiene cert.pem):
+cloudflared tunnel route dns --overwrite-dns fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a gestion.oscomunidad.com
+cloudflared tunnel route dns --overwrite-dns fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a menu.oscomunidad.com
+cloudflared tunnel route dns --overwrite-dns fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a inv.oscomunidad.com
 ```
 
 ---
@@ -179,22 +193,73 @@ Verificar: `ssh -i ~/.ssh/sos_erp -p 65002 u768061575@109.106.250.195 echo OK`
 
 ---
 
-## Estado de migración (2026-04-11)
+## Estrategia: LOCAL = producción, VPS = dev/respaldo (2026-04-18)
 
-| App | VPS listo | DNS en VPS | Notas |
+**Decisión**: mientras Santi está en desarrollo activo (arregla bugs en tiempo real sobre la sesión que los usuarios están usando), **el servidor local sigue siendo producción**. El VPS es respaldo y ambiente dev.
+
+| Dominio | Apunta a | Rol |
+|---|---|---|
+| `gestion.oscomunidad.com` | Local | **Producción** |
+| `menu.oscomunidad.com` | Local | **Producción** |
+| `inv.oscomunidad.com` | Local | **Producción** |
+| `crm.oscomunidad.com` | Local | **Producción** |
+| `gestion-vps.oscomunidad.com` | VPS | Dev / respaldo |
+| `code-vps.oscomunidad.com` | VPS | code-server remoto |
+| `wp.oscomunidad.com` | VPS | WordPress (solo VPS) |
+
+Cuando Santi estabilice la app, se puede invertir: VPS como producción y local como dev.
+
+## IA Service: cómo lo llama el VPS
+
+El IA Service corre **solo en local** (usa GPU/Ollama). El VPS no puede tenerlo.
+Pero el VPS **sí necesita llamarlo** (ej: sugerir categoría de tareas).
+
+**Solución**: se expuso el IA Service por Cloudflare Tunnel local como `ia-api.oscomunidad.com`.
+
+- **Desde local**: `IA_SERVICE_URL=http://127.0.0.1:5100` (default, no necesita .env)
+- **Desde VPS**: `IA_SERVICE_URL=https://ia-api.oscomunidad.com` (configurado en `.env`)
+
+El código detecta protocolo http/https automáticamente. Misma URL path (`/ia/simple`), mismo contrato, sin if/else en el código. Ver `sistema_gestion/api/server.js` → función `sugerir-categoria`.
+
+## Sync repo local → VPS (cron + API)
+
+El VPS pull del repo automáticamente cada 5 min. También tiene un endpoint HTTP para pull manual.
+
+| Componente | Ubicación |
+|---|---|
+| Script sync | `/home/osserver/sync-repo.sh` (VPS) |
+| Cron | cada 5 min (`crontab -u root`) |
+| Log | `/home/osserver/sync.log` (VPS) |
+| API HTTP | `http://94.72.115.156:9500/sync` (POST, header `x-token: os-sync-2487`) |
+| Servicio | `os-sync-api.service` (Node.js) |
+
+El script detecta qué archivos cambiaron y reinicia solo los servicios afectados:
+- `sistema_gestion/` → reinicia `os-gestion`
+- `frontend/` → reinicia `os-erp-frontend`
+- `scripts/inventario/` → reinicia `os-inventario-api`
+
+**Sync manual desde cualquier lado:**
+```bash
+curl -X POST -H "x-token: os-sync-2487" http://94.72.115.156:9500/sync
+```
+
+## Estado de migración (2026-04-18)
+
+| App | VPS listo | DNS | Notas |
 |---|---|---|---|
-| Sistema Gestión (`gestion.oscomunidad.com`) | ✅ | ❌ pendiente corte | Funcionando en 9300 |
-| ERP Frontend (`menu.oscomunidad.com`) | ✅ | ❌ pendiente corte | Funcionando en 9100 |
-| Inventario (`inv.oscomunidad.com`) | ✅ | ❌ pendiente corte | Funcionando en 9401 |
-| EspoCRM (`crm.oscomunidad.com`) | ✅ Docker | ❌ pendiente corte | Docker puerto 8083 |
-| WordPress (`wp.oscomunidad.com`) | ✅ | ✅ DNS en VPS | **Pendiente: completar wizard instalación** |
-| IA Service | ❌ no aplica | — | Se queda local (usa GPU/Ollama) |
+| Sistema Gestión | ✅ | Prod local + `gestion-vps.*` en VPS | IA categoría funciona en ambos |
+| ERP Frontend | ✅ | Solo local (prod) | VPS listo pero sin dev subdom |
+| Inventario | ✅ | Solo local (prod) | VPS listo pero sin dev subdom |
+| EspoCRM | ✅ Docker | Solo local (prod) | VPS Docker puerto 8083 |
+| WordPress | ✅ | `wp.oscomunidad.com` → VPS ✅ | **Pendiente: completar wizard** |
+| code-server VPS | ✅ | `code-vps.oscomunidad.com` ✅ | 25 extensiones + settings copiados |
+| IA Service | ❌ no aplica | `ia-api.oscomunidad.com` (local) | Se queda local, expuesto para VPS |
 | Bot Telegram | ❌ no aplica | — | Se queda local |
 | Pipeline Effi | ❌ no aplica | — | Se queda local |
 | WA Bridge | ❌ no aplica | — | Se queda local |
 
-**Recursos VPS (2026-04-11):**
-- Disco: 7.8G usado / 96G total (9% — mucho espacio libre)
+**Recursos VPS (2026-04-18):**
+- Disco: 7.9G usado / 96G total (9%)
 - RAM: 1.3G usada / 11G total
 
 **Probar VPS directamente (sin DNS):**
