@@ -2055,13 +2055,46 @@ app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => 
     // Calcular última actividad de tareas para indicador de confianza
     const ultimaAct = await ultimaActividadTareas(req.usuario.email, jornada.fecha)
 
+    // Auto-pause: pausar cronómetros del usuario que queden corriendo — evita que
+    // tareas olvidadas sigan acumulando segundos días después (ver tareas 392/409/412).
+    const [tareasRunning] = await db.gestion.query(`
+      SELECT DISTINCT t.id, t.titulo,
+        COALESCE(TIMESTAMPDIFF(SECOND, t.crono_inicio, NOW()), 0) AS seg_recuperados
+      FROM g_tareas t
+      LEFT JOIN g_tareas_responsables tr ON tr.tarea_id = t.id AND tr.email = ?
+      WHERE t.empresa = ?
+        AND t.crono_inicio IS NOT NULL
+        AND (t.responsable = ? OR tr.email = ?)
+    `, [req.usuario.email, req.empresa, req.usuario.email, req.usuario.email])
+
+    if (tareasRunning.length) {
+      const ids = tareasRunning.map(t => t.id)
+      // 1. Volcar delta a duracion_cronometro_seg y limpiar crono_inicio
+      await db.gestion.query(`
+        UPDATE g_tareas SET
+          duracion_cronometro_seg = duracion_cronometro_seg + COALESCE(TIMESTAMPDIFF(SECOND, crono_inicio, NOW()), 0),
+          crono_inicio = NULL,
+          usuario_ult_modificacion = ?
+        WHERE id IN (?) AND crono_inicio IS NOT NULL
+      `, [req.usuario.email, ids])
+      // 2. Sincronizar duracion_usuario_seg = duracion_cronometro_seg si está En Progreso
+      await db.gestion.query(`
+        UPDATE g_tareas SET duracion_usuario_seg = duracion_cronometro_seg
+        WHERE id IN (?) AND estado = 'En Progreso'
+      `, [ids])
+    }
+
     await db.gestion.query(`
       UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = ?, ultima_actividad_tareas = ?, usuario_ult_modificacion = ?
       WHERE id = ?
     `, [horaFin, ahora, ultimaAct, req.usuario.email, jornada.id])
 
     const [[updated]] = await db.gestion.query('SELECT * FROM g_jornadas WHERE id = ?', [jornada.id])
-    res.json({ ok: true, jornada: updated })
+    res.json({
+      ok: true,
+      jornada: updated,
+      tareas_pausadas: tareasRunning.map(t => ({ id: t.id, titulo: t.titulo, seg_recuperados: t.seg_recuperados }))
+    })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 

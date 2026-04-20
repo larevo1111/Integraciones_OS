@@ -47,11 +47,11 @@ export const useJornadaStore = defineStore('jornada', {
     },
 
     async finalizarJornada(horaFin) {
-      if (!this.jornada) return
+      if (!this.jornada) return null
       const body = horaFin ? JSON.stringify({ hora_fin: horaFin }) : undefined
       const data = await api(`/api/gestion/jornadas/${this.jornada.id}/finalizar`, { method: 'PUT', body })
       this.jornada = { ...this.jornada, ...data.jornada }
-      return data.jornada
+      return { jornada: data.jornada, tareasPausadas: data.tareas_pausadas || [] }
     },
 
     async reabrirJornada() {

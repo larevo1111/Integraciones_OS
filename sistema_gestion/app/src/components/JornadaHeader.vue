@@ -130,11 +130,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { useQuasar } from 'quasar'
 import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import JornadaPopover from './JornadaPopover.vue'
 import PausaDialog from './PausaDialog.vue'
 import { hoyLocal } from 'src/services/fecha'
+
+const $q = useQuasar()
 
 const auth  = useAuthStore()
 const store = useJornadaStore()
@@ -260,7 +263,17 @@ function confirmarFinalizar() {
   popover.anchorEl = btnFin.value
   popover.onConfirmar = async (horaISO) => {
     popover.visible = false
-    await store.finalizarJornada(horaISO)
+    const result = await store.finalizarJornada(horaISO)
+    const pausadas = result?.tareasPausadas || []
+    if (pausadas.length) {
+      $q.notify({
+        type: 'info',
+        message: `${pausadas.length} tarea${pausadas.length > 1 ? 's' : ''} pausada${pausadas.length > 1 ? 's' : ''} automáticamente`,
+        caption: pausadas.slice(0, 3).map(t => `· ${t.titulo}`).join('\n') + (pausadas.length > 3 ? `\n...y ${pausadas.length - 3} más` : ''),
+        timeout: 6000,
+        position: 'top'
+      })
+    }
   }
   popover.visible = true
 }

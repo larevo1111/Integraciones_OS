@@ -547,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.20'
+const APP_VERSION = 'v2.7.21'
 const $q = useQuasar()
 
 // ─── Layout state ───
