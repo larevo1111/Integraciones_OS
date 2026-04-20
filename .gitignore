@@ -5,6 +5,12 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Environment
 .env
 .env.local
@@ -14,6 +20,7 @@ yarn-error.log*
 
 # Conexiones BD centralizadas (ver integracion_conexionesbd.env.example)
 integracion_conexionesbd.env
+integracion_conexionesbd.*.env
 
 # IDE
 .vscode/
