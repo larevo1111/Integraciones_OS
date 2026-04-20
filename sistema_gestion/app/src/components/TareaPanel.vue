@@ -55,66 +55,94 @@
           </button>
         </div>
       </div>
-      <div class="field-row" style="align-items:flex-start;padding-top:4px">
-        <span class="field-label" style="padding-top:2px">Prioridad</span>
-        <div class="prioridad-chips">
-          <button
-            v-for="p in PRIORIDADES"
-            :key="p.key"
-            class="prioridad-chip"
-            :class="{ active: tarea.prioridad === p.key }"
-            :style="tarea.prioridad === p.key ? { background: p.color + '22', borderColor: p.color, color: p.color } : {}"
-            @click="actualizar('prioridad', p.key)"
-          >
-            <span class="p-dot" :style="{ background: p.color }"></span>
-            {{ p.key }}
-          </button>
-        </div>
-      </div>
-      <div class="field-row">
-        <span class="field-label">Categoría</span>
-        <CategoriaSelector
-          :model-value="tarea.categoria_id"
-          :categorias="categorias"
-          @update:model-value="actualizar('categoria_id', $event)"
-        />
-      </div>
-      <div class="field-row">
-        <span class="field-label">Proyecto</span>
-        <ProyectoSelector
-          ref="proyectoSelectorRef"
-          :model-value="tarea.proyecto_id"
-          :proyectos="proyectos"
-          @update:model-value="actualizar('proyecto_id', $event)"
-          @crear-item="tipo => $emit('crear-item', tipo)"
-        />
-      </div>
-      <div class="field-row" style="align-items:flex-start">
-        <span class="field-label" style="padding-top:4px">Etiquetas</span>
+      <!-- Fila de chips: categoría, prioridad, etiquetas, fecha, responsable, proyecto -->
+      <div class="form-chips">
+        <!-- Categoría -->
+        <q-chip
+          clickable dense
+          :icon="categoriaSeleccionada ? null : 'label_outline'"
+          class="tf-chip"
+          :class="{ 'tf-chip-filled': categoriaSeleccionada }"
+          :style="categoriaSeleccionada ? { background: hexAlpha(categoriaSeleccionada.color, 0.15), borderColor: categoriaSeleccionada.color, color: categoriaSeleccionada.color } : {}"
+        >
+          <span v-if="categoriaSeleccionada" class="cat-dot" :style="{ background: categoriaSeleccionada.color, marginRight: '5px' }"></span>
+          <span>{{ categoriaSeleccionada ? categoriaSeleccionada.nombre.replace(/_/g, ' ') : 'Categoría' }}</span>
+          <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+            <q-list dense style="min-width:220px;max-height:300px;overflow-y:auto">
+              <q-item
+                v-for="c in categorias"
+                :key="c.id"
+                clickable v-close-popup
+                :active="tarea.categoria_id === c.id"
+                @click="actualizar('categoria_id', c.id)"
+              >
+                <q-item-section avatar><span class="cat-dot" :style="{ background: c.color }"></span></q-item-section>
+                <q-item-section>{{ c.nombre.replace(/_/g, ' ') }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-chip>
+
+        <!-- Prioridad -->
+        <q-chip clickable dense icon="flag" class="tf-chip" :class="{ 'tf-chip-filled': tarea.prioridad && tarea.prioridad !== 'Media' }" :style="prioridadStyle">
+          <span>{{ tarea.prioridad || 'Prioridad' }}</span>
+          <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+            <q-list dense style="min-width:140px">
+              <q-item v-for="p in ['Urgente','Alta','Media','Baja']" :key="p" clickable v-close-popup :active="tarea.prioridad === p" @click="actualizar('prioridad', p)">
+                <q-item-section avatar><q-icon name="flag" :style="{ color: _COLORES_PRIO[p] }" /></q-item-section>
+                <q-item-section>{{ p }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-chip>
+
+        <!-- Etiquetas -->
         <EtiquetasSelector
           :model-value="(tarea.etiquetas||[]).map(e=>e.id)"
           :etiquetas="etiquetas"
+          class="tf-inline-selector"
           @update:model-value="actualizarEtiquetas"
           @etiqueta-creada="e => etiquetas.push(e)"
           @etiqueta-actualizada="e => { const i = etiquetas.findIndex(x => x.id === e.id); if (i !== -1) etiquetas[i] = e }"
           @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
         />
-      </div>
-      <div class="field-row" style="align-items:flex-start">
-        <span class="field-label" style="padding-top:4px">Responsables</span>
+
+        <!-- Fecha -->
+        <q-chip clickable dense :icon="tarea.fecha_limite ? 'event' : 'event_note'" class="tf-chip" :class="{ 'tf-chip-filled': tarea.fecha_limite }">
+          <span>{{ tarea.fecha_limite ? fechaLabel : 'Fecha' }}</span>
+          <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+            <q-date
+              :model-value="tarea.fecha_limite ? String(tarea.fecha_limite).slice(0,10) : ''"
+              mask="YYYY-MM-DD"
+              today-btn
+              minimal
+              @update:model-value="val => actualizarFechaEstimada(val || '')"
+            />
+            <div v-if="tarea.fecha_limite" class="row justify-end q-pa-xs">
+              <q-btn flat dense size="sm" label="Quitar" v-close-popup @click="actualizarFechaEstimada('')" />
+            </div>
+          </q-menu>
+        </q-chip>
+
+        <!-- Responsables -->
         <ResponsablesSelector
           :single="false"
           :model-value="tarea.responsables || (tarea.responsable ? [tarea.responsable] : [])"
           :usuarios="usuarios"
+          class="tf-inline-selector"
           @update:model-value="v => actualizar('responsables', v)"
         />
-      </div>
-      <!-- Fecha estimada (campo principal) -->
-      <div class="field-row">
-        <span class="field-label">Fecha estimada</span>
-        <input type="date" class="input-field" style="height:28px;font-size:12px"
-          :value="tarea.fecha_limite ? String(tarea.fecha_limite).slice(0,10) : ''"
-          @change="actualizarFechaEstimada($event.target.value)" />
+
+        <!-- Proyecto -->
+        <ProyectoSelector
+          ref="proyectoSelectorRef"
+          :model-value="tarea.proyecto_id"
+          :proyectos="proyectos"
+          empty-label="Proyecto"
+          class="tf-inline-selector"
+          @update:model-value="actualizar('proyecto_id', $event)"
+          @crear-item="tipo => $emit('crear-item', tipo)"
+        />
       </div>
 
       <div v-if="esProduccion" class="field-row" style="align-items:flex-start">
@@ -315,7 +343,6 @@ import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
 import CronoDisplay         from './CronoDisplay.vue'
 import ProyectoSelector     from './ProyectoSelector.vue'
-import CategoriaSelector    from './CategoriaSelector.vue'
 import EtiquetasSelector    from './EtiquetasSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import OpSelector           from './OpSelector.vue'
@@ -336,6 +363,18 @@ const PRIORIDADES = [
   { key: 'Media',   color: '#6b7280' },
   { key: 'Baja',    color: '#374151' }
 ]
+
+const _COLORES_PRIO = { 'Urgente': '#ef4444', 'Alta': '#f59e0b', 'Media': '#6b7280', 'Baja': '#374151' }
+
+function hexAlpha(hex, a) {
+  if (!hex) return null
+  const h = hex.replace('#', '')
+  if (h.length !== 6) return null
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${a})`
+}
 
 const props = defineProps({
   tarea:      { type: Object, default: null },
@@ -411,6 +450,25 @@ function fmtDT(val) {
   const d = new Date(String(val).replace(' ', 'T'))
   return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+// Chips (categoría / prioridad / fecha)
+const categoriaSeleccionada = computed(() =>
+  props.categorias.find(c => c.id === props.tarea?.categoria_id) || null
+)
+const prioridadStyle = computed(() => {
+  const p = props.tarea?.prioridad
+  if (!p || p === 'Media') return {}
+  const c = _COLORES_PRIO[p]
+  return c ? { borderColor: c, color: c } : {}
+})
+const fechaLabel = computed(() => {
+  const val = props.tarea?.fecha_limite
+  if (!val) return ''
+  const iso = String(val).slice(0, 10)
+  const [y, m, d] = iso.split('-')
+  const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+  return `${d} ${meses[+m - 1]}`
+})
 
 // Mostrar OP Effi solo si la categoría seleccionada es Producción
 const esProduccion = computed(() => {
@@ -788,4 +846,41 @@ function completar() {
 
 .modal-enter-active, .modal-leave-active { transition: opacity 120ms; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
+
+/* Fila de chips (categoría / prioridad / etiquetas / fecha / responsable / proyecto) */
+.form-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+}
+.form-chips :deep(.tf-inline-selector) {
+  display: inline-flex;
+  align-items: center;
+}
+.tf-chip {
+  background: transparent !important;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary) !important;
+  font-size: 12px;
+  min-height: 26px;
+  padding: 0 10px;
+}
+.tf-chip:hover {
+  background: var(--bg-row-hover) !important;
+  border-color: var(--border-default);
+  color: var(--text-primary) !important;
+}
+.tf-chip.tf-chip-filled {
+  background: var(--bg-row-hover) !important;
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
+.tf-chip :deep(.q-icon) { opacity: 0.75; font-size: 14px; }
+.cat-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 </style>
