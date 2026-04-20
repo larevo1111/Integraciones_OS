@@ -17,10 +17,10 @@ Ejecutar esta lista mentalmente en orden. No saltar pasos.
 6. **¿Existe ya?** — reusar componente/función antes de crear. Buscar con Grep.
 7. **¿Voy a copiar markup a 2+ lugares?** → extraer componente compartido PRIMERO. Nunca "copio y refactorizo después".
 8. **Si es UI** — leer `frontend/design-system/MANUAL_ESTILOS.md` y usar Quasar (no CSS crudo, no HTML nativo).
-9. **Timezone** — `hoyLocal()` / `localDateCO()` / `NOW()`. Nunca `toISOString().slice(0,10)` ni `CURDATE()`.
-10. **Test mobile + desktop con Chrome DevTools MCP** antes de entregar. No asumir que funciona.
+9. **Timezone SIEMPRE hora local** (nunca UTC) — usar `hoyLocal()` / `localDateCO()` / `NOW()`. Nunca `toISOString().slice(0,10)` ni `CURDATE()`.
+10. **Test mobile + web SIEMPRE** antes de entregar — preferible con Chrome DevTools MCP. Si no está activa, informar y usar Playwright como soporte. Nunca saltar el test.
 11. **Commit + push** con mensaje descriptivo en español.
-12. **Actualizar plan** (mover a `.agent/planes/completados/`) **y `.agent/contextos/<modulo>.md`** si cambió algo estructural.
+12. **Actualizar plan** (mover a `.agent/planes/completados/`), **`.agent/CONTEXTO_ACTIVO.md`** y **`.agent/contextos/<modulo>.md`** si cambió algo estructural.
 
 ## Autonomía operativa
 
