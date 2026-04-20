@@ -76,9 +76,20 @@ def cfg_remota_db(prefijo):
 _tuneles = {}  # prefijo → SSHTunnelForwarder activo
 
 
+def _es_local(prefijo):
+    """Detecta si la BD remota es realmente local (mismo servidor). Salta SSH tunnel."""
+    h = (os.getenv(f'DB_{prefijo.upper()}_SSH_HOST', '') or '').lower()
+    return h in ('localhost', '127.0.0.1', '', 'direct')
+
+
 def abrir_tunel(prefijo):
-    """Abre (o reusa) un SSHTunnelForwarder para el prefijo dado. Retorna el tunel."""
+    """Abre (o reusa) un SSHTunnelForwarder para el prefijo dado. Retorna el tunel.
+
+    Si DB_<prefijo>_SSH_HOST es localhost/127.0.0.1/direct, retorna None: el caller
+    debe conectar directo al MariaDB local sin pasar por tunnel."""
     P = prefijo.upper()
+    if _es_local(P):
+        return None
     if P in _tuneles and _tuneles[P].is_active:
         return _tuneles[P]
     s = cfg_remota_ssh(P)
@@ -125,11 +136,21 @@ def local(db_name, dict_cursor=False):
 
 @contextmanager
 def remota(prefijo, dict_cursor=False):
-    """Conexión a una BD remota vía SSH tunnel. prefijo ∈ {INTEGRACION, GESTION, COMUNIDAD}."""
+    """Conexión a una BD remota. prefijo ∈ {INTEGRACION, GESTION, COMUNIDAD}.
+
+    Usa SSH tunnel salvo que DB_<prefijo>_SSH_HOST sea localhost/127.0.0.1/direct,
+    en cuyo caso conecta directo al MariaDB del mismo servidor."""
     tunel = abrir_tunel(prefijo)
     db = cfg_remota_db(prefijo)
+    ssh = cfg_remota_ssh(prefijo)
+    if tunel is None:
+        host = ssh['remote_host']
+        port = ssh['remote_port']
+    else:
+        host = '127.0.0.1'
+        port = tunel.local_bind_port
     kwargs = dict(
-        host='127.0.0.1', port=tunel.local_bind_port,
+        host=host, port=port,
         user=db['user'], password=db['password'], database=db['database'],
         connect_timeout=15, read_timeout=30,
     )
