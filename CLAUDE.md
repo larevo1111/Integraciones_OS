@@ -55,6 +55,73 @@ Antes de cualquier tarea, revisar estos archivos en orden:
 4. **Para tareas frontend**: `frontend/design-system/MANUAL_ESTILOS.md` — manual de estilos obligatorio
 5. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`, `/timezone`
 
+## ⚠️ REGLA ABSOLUTA — Conexiones a BD
+
+**Todas las credenciales y hosts de BD del proyecto viven en UN ÚNICO archivo: `integracion_conexionesbd.env` en la raíz del repo.** Ningún archivo `.js` / `.py` / `.sh` puede tener `host`, `user`, `password`, `database` ni IP/puerto SSH hardcoded. Migrar a otro servidor = editar ese archivo, cero cambios de código.
+
+### Archivos de conexión
+- **Real** (gitignored): [integracion_conexionesbd.env](integracion_conexionesbd.env)
+- **Plantilla versionada**: [integracion_conexionesbd.env.example](integracion_conexionesbd.env.example)
+- **Helper Node**: [lib/db_conn.js](lib/db_conn.js) — carga el `.env`, expone pools mysql2 con SSH tunnel (ssh2)
+- **Helper Python**: [scripts/lib/db_conn.py](scripts/lib/db_conn.py) — carga el `.env`, expone context managers pymysql + sshtunnel
+
+### API obligatoria
+
+**Node**:
+```js
+const db = require('<ruta-al-repo>/lib/db_conn')
+const pool = await db.local('effi_data')   // o ia_service_os, os_whatsapp, os_inventario, espocrm, ia_local, nextcloud...
+const pool = await db.integracion()         // os_integracion (Hostinger hoy, VPS mañana)
+const pool = await db.gestion()             // os_gestion (Hostinger hoy, VPS mañana)
+const pool = await db.comunidad()           // os_comunidad (Hostinger permanente)
+```
+
+**Python** (context managers — recomendado para código nuevo):
+```python
+from lib import local, integracion, gestion, comunidad
+with local('effi_data') as conn:
+    ...
+with integracion(dict_cursor=True) as conn:
+    ...
+```
+
+**Python** (dicts raw — compatible con scripts que arman `pymysql.connect(**DB)`):
+```python
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))            # scripts/foo.py
+# ó os.path.dirname(os.path.dirname(os.path.abspath(__file__)))           # scripts/sub/foo.py
+from lib import cfg_local, cfg_remota_ssh, cfg_remota_db
+DB_EFFI = dict(**cfg_local(), database='effi_data')
+_ssh = cfg_remota_ssh('INTEGRACION')
+_db  = cfg_remota_db('INTEGRACION')
+```
+
+**Bash**:
+```bash
+set -a; . /home/osserver/Proyectos_Antigravity/Integraciones_OS/integracion_conexionesbd.env; set +a
+mysql -u "$DB_LOCAL_USER" -p"$DB_LOCAL_PASS" -h "$DB_LOCAL_HOST" effi_data -e "..."
+```
+
+### PROHIBIDO
+- Literales `'Epist2487.'`, `'osadmin'`, `'109.106.250.195'`, `'65002'`, `'u768061575_*'`, `'/home/osserver/.ssh/sos_erp'`.
+- `dict(host='127.0.0.1', user='osadmin', password='Epist2487.', ...)` inline.
+- Abrir `SSHTunnelForwarder((SSH_HOST, SSH_PORT), ...)` con valores literales.
+
+### OBLIGATORIO al crear un script nuevo
+1. Importar del helper central.
+2. `grep -n "Epist2487\|osadmin" <archivo>` debe devolver cero hits.
+
+### Añadir un nuevo destino remoto (ej: `reporteria`)
+1. Agregar bloque `DB_REPORTERIA_*` en `integracion_conexionesbd.env` y `.example`.
+2. En `lib/db_conn.js`: agregar entrada en `_remotas` y exportar `reporteria()`.
+3. En `scripts/lib/db_conn.py`: agregar `def reporteria(...)` delegando a `remota('REPORTERIA')`.
+
+### Regla para modo autónomo (cron, trainer, scripts `claude -p`)
+Aplica idéntico: leer del helper central. Nunca escribir credenciales en código aunque sea una "solución rápida". Si el helper no carga por algún motivo, FALLAR explícito — nunca fallback a creds literales.
+
+### Referencia de la migración
+Commit `ece85a4` (2026-04-20) refactorizó 35 archivos a este patrón. Plan completo: [.agent/planes/completados/migracion_bd_env_centralizado_2026-04-20.md](.agent/planes/completados/migracion_bd_env_centralizado_2026-04-20.md). Memoria: [feedback_conexiones_bd_env.md](../../.claude/projects/-home-osserver-Proyectos-Antigravity-Integraciones-OS/memory/feedback_conexiones_bd_env.md).
+
 ## ⚠️ REGLA ABSOLUTA — TIMEZONE
 
 **Todo el sistema opera en hora Colombia (UTC-5). El offset se configura en `.env` como `APP_TIMEZONE=-05:00`.**

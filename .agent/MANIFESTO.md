@@ -16,6 +16,7 @@
 - [5B. Filosofía 5S japonesa](#5b-filosofía-5s-japonesa--simplicidad-al-máximo)
 - [7. Flujo de trabajo obligatorio](#7-flujo-de-trabajo-obligatorio)
 - [8. Regla transversal de entornos](#8-regla-transversal-de-entornos)
+- [8B. Conexiones a BD — centralización obligatoria](#8b-conexiones-a-bd--centralización-obligatoria)
 - [9. Contexto y estructura del proyecto](#9-contexto-y-estructura-del-proyecto)
 - [10. Reglas técnicas aprendidas](#10-reglas-técnicas-aprendidas)
 - [12. Manual de estilos frontend](#12-manual-de-estilos--frontend-erp)
@@ -548,6 +549,94 @@ Un agente que toque Producción manualmente comete una falta crítica.
 Las tablas `resumen_ventas_*` tienen como única fuente de verdad `u768061575_os_integracion`.
 El pipeline las calcula en local (staging temporal), las copia a Hostinger, y luego las borra de local.
 **NO existen en `effi_data` local entre corridas. No leer ni escribir la versión local.**
+
+---
+
+## 8B. CONEXIONES A BD — CENTRALIZACIÓN OBLIGATORIA
+
+> **Regla activa desde 2026-04-20** (commit `ece85a4`). Aplica a TODO agente que toque el repo: Claude Code, subagentes, Antigravity Google Labs, y cualquier script autónomo (`claude -p`, crons, trainers).
+
+**Todas las credenciales y hosts de BD viven en UN SOLO archivo: `integracion_conexionesbd.env` en la raíz del repo.** Ningún archivo de código (`.js`, `.py`, `.sh`) puede contener host, puerto, usuario, password, nombre de BD, ni ruta SSH hardcoded. Migrar entre servidores = editar ese archivo, cero cambios de código.
+
+### Artefactos del sistema
+| Archivo | Propósito |
+|---|---|
+| [integracion_conexionesbd.env](../integracion_conexionesbd.env) | Creds reales (gitignored) |
+| [integracion_conexionesbd.env.example](../integracion_conexionesbd.env.example) | Plantilla versionada |
+| [lib/db_conn.js](../lib/db_conn.js) | Helper Node — pools mysql2 + SSH tunnel ssh2 |
+| [scripts/lib/db_conn.py](../scripts/lib/db_conn.py) | Helper Python — context managers pymysql + sshtunnel |
+| [package.json](../package.json) | Deps compartidas (mysql2 + ssh2) de la raíz |
+
+### Prefijos de conexión disponibles
+- `DB_LOCAL_*` — MariaDB local (cubre `effi_data`, `ia_service_os`, `os_whatsapp`, `os_inventario`, `espocrm`, `ia_local`, `nextcloud`, `nocodb_meta`).
+- `DB_INTEGRACION_*` — BD `os_integracion` (hoy Hostinger vía SSH, mañana VPS).
+- `DB_GESTION_*` — BD `os_gestion` (hoy Hostinger, mañana VPS).
+- `DB_COMUNIDAD_*` — BD `os_comunidad` (Hostinger permanente, ERP real Effi — solo lectura).
+
+Cada prefijo remoto incluye su propio `*_SSH_HOST`, `*_SSH_PORT`, `*_SSH_USER`, `*_SSH_KEY`, `*_LOCAL_PORT` (puerto local del tunnel), `*_NAME`, `*_USER`, `*_PASS`.
+
+### API obligatoria
+
+**Node** — `const db = require('<repo>/lib/db_conn')`:
+- `await db.local(nombreBD)` — pool a BD local cualquiera.
+- `await db.integracion()` / `db.gestion()` / `db.comunidad()` — pools remotos (abren SSH tunnel la primera vez, con reconexión automática).
+- Timezone Colombia (`-05:00`) aplicado automáticamente en cada conexión.
+
+**Python** — dos modos:
+```python
+# Modo moderno (context manager)
+from lib import local, integracion, gestion, comunidad
+with local('effi_data') as conn: ...
+with integracion(dict_cursor=True) as conn: ...
+
+# Modo legado (dict raw para pymysql.connect(**DB))
+from lib import cfg_local, cfg_remota_ssh, cfg_remota_db
+DB_EFFI = dict(**cfg_local(), database='effi_data')
+_ssh = cfg_remota_ssh('INTEGRACION')   # host/port/user/key/remote_host/remote_port
+_db  = cfg_remota_db('INTEGRACION')    # user/password/database/charset
+```
+
+Para agregar `scripts/lib/` al `sys.path` desde cualquier script, usar el snippet canónico:
+```python
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))            # scripts/foo.py
+# ó parent-parent desde scripts/sub/foo.py
+```
+
+**Bash**:
+```bash
+set -a; . /home/osserver/Proyectos_Antigravity/Integraciones_OS/integracion_conexionesbd.env; set +a
+mysql -u "$DB_LOCAL_USER" -p"$DB_LOCAL_PASS" -h "$DB_LOCAL_HOST" effi_data -e "..."
+```
+
+### PROHIBIDO (falta crítica — equivale a tocar producción sin autorización)
+- Literales `'Epist2487.'`, `'osadmin'`, `'109.106.250.195'`, `'65002'`, `'u768061575_*'`, `'/home/osserver/.ssh/sos_erp'` en cualquier archivo del repo.
+- Dict inline tipo `dict(host='127.0.0.1', user='osadmin', password='Epist2487.', database='X')`.
+- Llamar a `SSHTunnelForwarder((SSH_HOST, SSH_PORT), ssh_username='u768061575', ...)` con valores literales.
+- Reimplementar la lógica de tunnel/pool en vez de reusar los helpers.
+- Fallbacks de tipo `os.getenv('DB_PASS', 'Epist2487.')` — si el `.env` no carga, FALLAR explícito.
+
+### OBLIGATORIO al crear código que toque BD
+1. Importar del helper central (una de las formas arriba).
+2. Verificar con `grep -n "Epist2487\|osadmin\|u768061575" <archivo>`: cero hits.
+3. Si el script corre en un entorno nuevo, confirmar que `integracion_conexionesbd.env` existe (en producción siempre; en nuevo checkout, crear desde `.example`).
+
+### Añadir un nuevo destino remoto
+1. Agregar bloque `DB_<NOMBRE>_*` al `.env` real y al `.example`.
+2. Node: agregar entrada en `_remotas` de `lib/db_conn.js` y método `nombre()`.
+3. Python: agregar `def nombre(...)` en `scripts/lib/db_conn.py` delegando a `remota('NOMBRE')`.
+
+### Migración entre servidores (referencia)
+Para mover `os_integracion` y/o `os_gestion` a otro servidor (ej: Hostinger → VPS Contabo):
+1. Dump + import en el servidor destino.
+2. Editar los bloques `DB_INTEGRACION_SSH_*` / `DB_GESTION_SSH_*` en `integracion_conexionesbd.env` (host, puerto SSH, usuario, key, nombre BD, usuario/pass MySQL).
+3. Reiniciar servicios afectados (`os-gestion`, `os-erp-frontend`, `ia-service`, `wa-bridge` si aplica).
+4. Rollback si falla = revertir ese archivo, restart.
+
+### Registro histórico
+- Commit `ece85a4` (2026-04-20): refactorización de 35 archivos (5 servicios Node + 30 scripts Python) al patrón centralizado.
+- Plan completo archivado: `.agent/planes/completados/migracion_bd_env_centralizado_2026-04-20.md`.
+- Feedback permanente: `memory/feedback_conexiones_bd_env.md` (en memoria Claude).
 
 ---
 
