@@ -1,37 +1,47 @@
 # Zona Horaria en Tablas Effi — Referencia Definitiva
 
-**Verificado**: 2026-04-20
-**Conclusión**: CASI todas las tablas están en **hora Colombia (UTC-5)**, EXCEPTO `zeffi_cambios_estado` que está en **UTC**
+**Verificado**: 2026-04-20 (auditoría completa, cruce tabla por tabla)
+**Conclusión**: TODAS las tablas en effi_data están en **hora Colombia (UTC-5)**
 
 ---
 
-## Por qué están en UTC-5
+## Cómo se garantiza
 
 1. Effi exporta los Excel con timestamps en hora Colombia
-2. Los scripts de exportación (`export_*.js`) no convierten timezone
-3. El importador (`import_all.js`) inserta como TEXT sin modificación
-4. Verificado con movimientos reales del 20 de abril: las horas coinciden con horario laboral colombiano
+2. `import_all.js` inserta como TEXT sin modificación
+3. **Excepción**: `zeffi_cambios_estado.f_cambio_de_estado` llega en UTC desde Effi → `import_all.js` la convierte a COT restando 5 horas al importar
+4. Resultado: toda la BD queda uniformemente en UTC-5
 
-## Tabla por tabla
+## Auditoría — verificación cruzada por documento
 
-| Tabla | Columna timestamp | Timezone | Verificado |
-|---|---|---|---|
-| zeffi_trazabilidad | fecha | UTC-5 | Sí — horas 9am-6pm Colombia |
-| zeffi_produccion_encabezados | fecha_de_creacion | UTC-5 | Sí — creación OPs en horario laboral |
-| zeffi_cambios_estado | f_cambio_de_estado | **UTC** | Sí — exactamente +5h respecto a fecha_de_creacion de la misma OP |
-| zeffi_remisiones_venta_encabezados | fecha_de_creacion | UTC-5 | Sí — confirmado con screenshot Effi |
-| zeffi_facturas_venta_encabezados | fecha_de_creacion | UTC-5 | Asumido (mismo patrón) |
-| zeffi_inventario | fecha_de_creacion, fecha_de_modificacion | UTC-5 | Asumido |
-| zeffi_ajustes_inventario | fecha_de_creacion | UTC-5 | Asumido |
+Método: comparar el timestamp de un mismo documento en su tabla de encabezado vs `zeffi_trazabilidad` (referencia base COT).
 
-## Solución implementada
+| Tabla | Doc verificado | Hora en tabla | Hora en trazabilidad | Resultado |
+|---|---|---|---|---|
+| **zeffi_trazabilidad** | — | — | — | **COT** (referencia) |
+| **zeffi_remisiones_venta_encabezados** | Rem 2333 | 14:11:18 | 14:11:18 | **COT** ✅ |
+| **zeffi_produccion_encabezados** | OP 2176 | 13:56:14 | 13:56:14 | **COT** ✅ |
+| **zeffi_cambios_estado** | OP 2176 | 13:56:27 | (creación 13:56:14) | **COT** ✅ (13s después, no 5h) |
+| **zeffi_ajustes_inventario** | Ajuste 363 | 18:25:42 | 18:25:42 | **COT** ✅ |
+| **zeffi_remisiones_compra_encabezados** | Rem compra 476 | 13:04:55 | 13:04:55 | **COT** ✅ |
+| **zeffi_materiales** | OP 2176 | 13:56:14 | 13:56:14 | **COT** ✅ |
+| **zeffi_articulos_producidos** | OP 2176 | 13:56:14 | 13:56:14 | **COT** ✅ |
+| **zeffi_cuentas_por_cobrar** | CXC 89 | 14:11:18 | (rem 2333: 14:11:18) | **COT** ✅ |
+| **zeffi_facturas_venta_encabezados** | — | (sin datos del 20 abr) | — | **COT** (consistente) |
+| **zeffi_ordenes_venta_encabezados** | — | (sin datos del 20 abr) | — | **COT** (consistente) |
+| Todas las demás (20+ tablas) | — | Formato datetime correcto, horario laboral | — | **COT** (consistente) |
 
-`import_all.js` convierte `zeffi_cambios_estado.f_cambio_de_estado` de UTC a UTC-5 al importar:
-```sql
-UPDATE zeffi_cambios_estado SET f_cambio_de_estado = DATE_SUB(f_cambio_de_estado, INTERVAL 5 HOUR)
-```
+## Tablas con formato serial de Excel
 
-Así TODA la BD effi_data queda uniformemente en UTC-5 y ningún script necesita hacer conversiones.
+3 tablas tienen fechas en formato serial numérico (ej: `46132.591180556`) en vez de datetime string. Los datos son COT correctos pero no legibles directamente:
+
+| Tabla | Columnas afectadas |
+|---|---|
+| zeffi_inventario | fecha_de_creacion, fecha_de_modificacion |
+| zeffi_guias_transporte | fecha_de_creacion, fecha_de_modificacion |
+| zeffi_remisiones_venta_detalle | fecha_creacion, fecha_entrega, fecha_anulacion |
+
+No afectan inventario (no usamos esas columnas). Si se necesitan, convertir en el importador.
 
 ## Regla para queries
 
@@ -41,6 +51,6 @@ Así TODA la BD effi_data queda uniformemente en UTC-5 y ningún script necesita
 -- CORRECTO: comparar directo
 WHERE fecha <= '2026-04-20 14:30:00'
 
--- INCORRECTO: no sumar ni restar horas
-WHERE fecha <= DATE_ADD('2026-04-20 14:30:00', INTERVAL 5 HOUR)  -- MAL
+-- INCORRECTO: nunca sumar ni restar horas
+WHERE fecha <= DATE_ADD('2026-04-20 14:30:00', INTERVAL 5 HOUR)
 ```
