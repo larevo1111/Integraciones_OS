@@ -15,6 +15,21 @@
 
 ## Trabajo activo (2026-04-20)
 
+### Completado 2026-04-20 — Migración Hostinger → VPS Contabo (BDs)
+- **`os_integracion` y `os_gestion` migradas de Hostinger a VPS Contabo** (94.72.115.156).
+- Servicios LOCALES intactos: `effi_data`, `ia_service_os`, `espocrm`, `os_inventario`, `os_whatsapp` siguen en servidor de casa.
+- `os_comunidad` se queda en Hostinger (ERP real, prohibido tocar).
+- Proceso del corte:
+  1. Freeze 7 servicios systemd
+  2. Dump delta Hostinger → re-import VPS (DROP+CREATE+restore, re-grant)
+  3. `cp integracion_conexionesbd.vps.env integracion_conexionesbd.env` (switch)
+  4. Restart servicios
+  5. Golden path OK: Gestión login + tareas + ERP ventas + IA bot + Python helpers
+- Backup Hostinger conservado: `/home/osserver/Proyectos_Antigravity/backups/u768061575_os_{integracion,gestion}/`
+- Plan completo: `.agent/planes/completados/migracion_bd_hostinger_a_vps_contabo_2026-04-20.md`
+- SSH key osserver@VPS autorizada desde servidor local (id_ed25519).
+- MariaDB VPS: `default-time-zone=-05:00` nativo.
+
 ### Completado 2026-04-20 — Centralización de conexiones BD
 - **Todas las credenciales de BD movidas a `integracion_conexionesbd.env`** (raíz del repo, gitignored).
 - Plantilla versionada: `integracion_conexionesbd.env.example`.
