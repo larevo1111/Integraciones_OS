@@ -34,8 +34,8 @@
             </div>
           </div>
 
-          <!-- Body -->
-          <div class="form-body">
+          <!-- Body (form wrapper: Enter en cualquier input dispara guardar; textarea no) -->
+          <form class="form-body" @submit.prevent="guardar">
             <!-- Título -->
             <input
               ref="tituloRef"
@@ -88,7 +88,7 @@
               <label class="input-label">Descripción (opcional)</label>
               <textarea class="input-field" v-model="form.descripcion" rows="3" placeholder="Contexto, pasos, notas..." />
             </div>
-          </div>
+          </form>
 
           <!-- Footer con botones -->
           <div class="form-footer">

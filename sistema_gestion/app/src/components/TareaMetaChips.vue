@@ -250,8 +250,8 @@ function hexAlpha(hex, a) {
   color: var(--text-primary) !important;
   font-weight: 500;
 }
-.tf-chip :deep(.q-icon) { font-size: 18px !important; opacity: 1 !important; }
-.tf-chip :deep(.q-chip__icon--left) { font-size: 18px !important; margin-right: 4px; }
+.tf-chip :deep(.q-icon) { font-size: 18px !important; opacity: 1 !important; color: currentColor !important; }
+.tf-chip :deep(.q-chip__icon--left) { font-size: 18px !important; margin-right: 4px; color: currentColor !important; }
 
 .cat-dot {
   width: 8px; height: 8px;
