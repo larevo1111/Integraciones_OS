@@ -200,21 +200,54 @@ Verificar: `ssh -i ~/.ssh/sos_erp -p 65002 u768061575@109.106.250.195 echo OK`
 
 ---
 
-## Estrategia: LOCAL = producción, VPS = dev/respaldo (2026-04-18)
+## Estrategia de dominios (actualizado 2026-04-20 corte parcial)
 
-**Decisión**: mientras Santi está en desarrollo activo (arregla bugs en tiempo real sobre la sesión que los usuarios están usando), **el servidor local sigue siendo producción**. El VPS es respaldo y ambiente dev.
+**Decisión**: migración gradual de producción del servidor local al VPS. Gestión se queda en local como producción estable mientras se testea el VPS. ERP e inventario ya cortados al VPS.
 
-| Dominio | Apunta a | Rol |
-|---|---|---|
-| `gestion.oscomunidad.com` | Local | **Producción** |
-| `menu.oscomunidad.com` | Local | **Producción** |
-| `inv.oscomunidad.com` | Local | **Producción** |
-| `crm.oscomunidad.com` | Local | **Producción** |
-| `gestion-vps.oscomunidad.com` | VPS | Dev / respaldo |
-| `code-vps.oscomunidad.com` | VPS | code-server remoto |
-| `wp.oscomunidad.com` | VPS | WordPress (solo VPS) |
+| Dominio | Apunta a | Rol | Notas |
+|---|---|---|---|
+| `gestion.oscomunidad.com` | **Local** | **Producción** | Queda en local; usuarios siguen ahí |
+| `gestion-vps.oscomunidad.com` | VPS | **Producción paralela** (Santi) | Misma BD que producción local |
+| `menu.oscomunidad.com` | **VPS** ← 2026-04-20 | **Producción en VPS** | Corte DNS ejecutado |
+| `inv.oscomunidad.com` | **VPS** ← 2026-04-20 | **Producción en VPS** | Corte DNS ejecutado |
+| `crm.oscomunidad.com` | Local | **Producción** | EspoCRM Docker local — no migrado |
+| `code-vps.oscomunidad.com` | VPS | code-server VS Code remoto | — |
+| `wp.oscomunidad.com` | VPS | WordPress (solo VPS) | — |
 
-Cuando Santi estabilice la app, se puede invertir: VPS como producción y local como dev.
+### Arquitectura de datos tras el corte BD (2026-04-20)
+
+Las BDs `os_integracion` y `os_gestion` viven ahora en el VPS. Hay una sola fuente de verdad, por lo que **cualquier app** (sea local o VPS) lee/escribe las mismas tablas:
+
+- Apps en **servidor local** → SSH tunnel al VPS (`lib/db_conn.js` modo SSH)
+- Apps en **VPS** → conexión directa al MariaDB del propio VPS (`lib/db_conn.js` modo directo, detecta `SSH_HOST=localhost`)
+- `os_comunidad` sigue en Hostinger (ERP real Effi, prohibido tocar) — ambos lados la consultan vía SSH tunnel
+
+### Testing / dev
+
+Para probar cambios antes de deployar, Santi usa el servidor local en `localhost`:
+- `http://localhost:9300` → Gestión (conecta al VPS via SSH tunnel, misma BD que producción)
+- `http://localhost:9100` → ERP
+- `http://localhost:9401` → Inventario
+
+Google OAuth ya tiene `localhost:9300` registrado como origen (por el dev server `quasar dev`), así que el login funciona en local sin configuración extra.
+
+⚠️ **Cuidado**: al ser la misma BD que producción, una escritura en localhost también afecta producción. Escrituras de prueba deben hacerse con conciencia.
+
+### Corte DNS (cómo se hizo)
+
+Desde el servidor local, con `cloudflared` autenticado al tunnel VPS:
+```bash
+cloudflared tunnel route dns --overwrite-dns fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a menu.oscomunidad.com
+cloudflared tunnel route dns --overwrite-dns fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a inv.oscomunidad.com
+```
+
+Para **revertir** al tunnel local:
+```bash
+cloudflared tunnel route dns --overwrite-dns 9cacb3dc menu.oscomunidad.com
+cloudflared tunnel route dns --overwrite-dns 9cacb3dc inv.oscomunidad.com
+```
+
+Verificación usada: detener el servicio en el servidor local y comprobar que la URL sigue respondiendo HTTP 200 → confirma que el tráfico va al VPS.
 
 ## IA Service: cómo lo llama el VPS
 

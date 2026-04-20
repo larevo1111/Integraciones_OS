@@ -15,6 +15,20 @@
 
 ## Trabajo activo (2026-04-20)
 
+### Completado 2026-04-20 — Corte DNS menu + inv al VPS
+- `menu.oscomunidad.com` → VPS tunnel (antes: servidor local)
+- `inv.oscomunidad.com` → VPS tunnel (antes: servidor local)
+- Gestión se queda en `gestion.oscomunidad.com` servidor local; `gestion-vps.oscomunidad.com` (VPS) sigue como producción paralela.
+- Verificado con test destructivo: `systemctl stop os-erp-frontend.service` en local → menu.oscomunidad.com sigue HTTP 200 (confirma ruta VPS).
+- Testing local vía `http://localhost:9100`, `:9300`, `:9401` (mismas BDs del VPS vía SSH tunnel).
+
+### Completado 2026-04-20 — VPS apps funcionando con `.env` propio
+- Helper `lib/db_conn.js`/`scripts/lib/db_conn.py` extendido con **modo directo**: si `SSH_HOST=localhost`, salta tunnel SSH y conecta directo al MariaDB del mismo servidor.
+- Creado `integracion_conexionesbd.env` en el VPS con modo directo para integracion+gestion, SSH a Hostinger para comunidad.
+- Instaladas deps Python (`pymysql`, `sshtunnel`, `python-dotenv`) en el venv del VPS.
+- `.gitignore` ajustado: `__pycache__/` y `*.pyc` removidos del tracking (59 archivos).
+- Arreglado `sync-repo.sh` del VPS que fallaba silenciosamente por conflicto de pycache sin trackear.
+
 ### Completado 2026-04-20 — Migración Hostinger → VPS Contabo (BDs)
 - **`os_integracion` y `os_gestion` migradas de Hostinger a VPS Contabo** (94.72.115.156).
 - Servicios LOCALES intactos: `effi_data`, `ia_service_os`, `espocrm`, `os_inventario`, `os_whatsapp` siguen en servidor de casa.
