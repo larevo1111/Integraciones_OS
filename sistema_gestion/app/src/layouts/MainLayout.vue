@@ -547,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.16'
+const APP_VERSION = 'v2.7.17'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -884,6 +884,12 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
   border-radius: var(--radius-full);
   flex-shrink: 0; object-fit: cover;
 }
+/* En modo mini (56px), ocultar el logo-img y centrar el toggle btn */
+.mini-mode .sidebar-logo {
+  padding: 0;
+  justify-content: center;
+}
+.mini-mode .sidebar-logo-img { display: none; }
 .sidebar-logo-name {
   font-size: 12px; font-weight: 600;
   color: var(--text-primary);
