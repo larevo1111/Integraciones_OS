@@ -302,13 +302,14 @@ onUnmounted(() => {
 
 /* Badge expandir subtareas — texto sutil pero target táctil grande */
 .subtareas-badge {
-  display: inline-flex; align-items: center; gap: 2px;
-  padding: 4px 6px; min-height: 22px;
+  display: inline-flex; align-items: center; gap: 1px;
+  padding: 3px 5px; min-height: 20px;
   border: none; border-radius: var(--radius-sm); background: transparent;
-  font-size: 10px; color: var(--text-secondary);
+  font-size: 10px; font-weight: 500; color: var(--text-tertiary);
   cursor: pointer; flex-shrink: 0;
   transition: color 80ms, background 80ms;
   white-space: nowrap; line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .subtareas-badge:hover, .subtareas-badge.expandida {
   color: var(--accent);
@@ -316,7 +317,7 @@ onUnmounted(() => {
 }
 @media (max-width: 768px) {
   .subtareas-badge {
-    min-height: 32px; padding: 6px 8px; font-size: 11px;
+    min-height: 28px; padding: 5px 7px; font-size: 10.5px;
   }
 }
 
@@ -384,10 +385,10 @@ onUnmounted(() => {
 }
 
 /* Subtarea: indentación + tipografía un poco más grande y mejor contraste */
-.is-subtarea { padding-left: 40px !important; }
+.is-subtarea { padding-left: 56px !important; }
 .is-subtarea .tarea-titulo { font-size: 11px; color: var(--text-primary); }
 @media (max-width: 768px) {
-  .is-subtarea { padding-left: 32px !important; }
+  .is-subtarea { padding-left: 48px !important; }
   .is-subtarea .tarea-titulo { font-size: 12px; }
 }
 
