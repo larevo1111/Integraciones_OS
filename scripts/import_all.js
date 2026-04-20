@@ -202,7 +202,18 @@ async function importTable(conn, tableName, headers, rows) {
       }
 
       const inserted = await importTable(conn, tableName, parsed.headers, parsed.rows);
-      console.log(`✅ ${inserted} filas`);
+
+      // zeffi_cambios_estado: convertir f_cambio_de_estado de UTC a UTC-5 (Colombia)
+      if (tableName.toLowerCase().includes('cambios') && tableName.toLowerCase().includes('estado')) {
+        await conn.query(`
+          UPDATE zeffi_cambios_estado
+          SET f_cambio_de_estado = DATE_SUB(f_cambio_de_estado, INTERVAL 5 HOUR)
+          WHERE f_cambio_de_estado IS NOT NULL AND f_cambio_de_estado != ''
+        `);
+        console.log(`✅ ${inserted} filas (f_cambio_de_estado convertido UTC→COT)`);
+      } else {
+        console.log(`✅ ${inserted} filas`);
+      }
       ok++;
     } catch (e) {
       console.log(`❌ ${e.message}`);

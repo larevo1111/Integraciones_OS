@@ -7,22 +7,15 @@ Fórmula:
                   + materiales_OPs_generadas_al_corte
                   - productos_OPs_generadas_al_corte
 
-TIMEZONE (IMPORTANTE — Effi usa timezones MIXTOS):
+TIMEZONE (verificado 2026-04-20):
   Tabla/campo                                    | Timezone
   -----------------------------------------------|--------
-  zeffi_trazabilidad.fecha                       | COT (local, igual al corte)
-  zeffi_produccion_encabezados.fecha_de_creacion | COT
-  zeffi_produccion_encabezados.fecha_de_anulacion| COT
-  zeffi_cambios_estado.f_cambio_de_estado        | UTC (+5h respecto al corte)
+  zeffi_trazabilidad.fecha                       | COT (UTC-5) — comparar directo con corte
+  zeffi_produccion_encabezados.fecha_de_creacion | COT (UTC-5) — comparar directo con corte
+  zeffi_cambios_estado.f_cambio_de_estado        | UTC — sumar 5h al corte para comparar
 
-  Verificación empírica:
-  - zeffi_trazabilidad: horas 7-23 (nunca 0-6) → COT
-  - zeffi_cambios_estado: 278 registros entre 0-6 → UTC
-  - Comparación cruzada: trazabilidad de una OP y fecha_de_creacion tienen
-    el mismo timestamp exacto → ambos COT.
-
-  El offset se lee de APP_TIMEZONE del .env (default -05:00 = 5 horas).
-  Solo se aplica a zeffi_cambios_estado.
+  Verificación: OP 2153 creada 12:25 COT, cambio_estado 17:25 UTC = misma hora.
+  Solo zeffi_cambios_estado necesita conversión (+5h al corte).
 
 DETERMINISMO:
   El cálculo debe ser inmutable: el teórico de una fecha histórica debe ser
@@ -198,12 +191,12 @@ def obtener_ops_generadas_al_corte(corte_ts):
             OR (e.vigencia = 'Anulado' AND e.fecha_de_anulacion > %s)
           )
           -- 3. Estado 'Generada' al corte: sin cambio a 'Procesada' antes del corte
-          --    f_cambio_de_estado está en UTC → convertir corte COT a UTC sumando offset
+          --    f_cambio_de_estado ya convertido a COT en import_all.js
           AND NOT EXISTS (
             SELECT 1 FROM zeffi_cambios_estado ce
             WHERE ce.id_orden = e.id_orden
               AND ce.nuevo_estado = 'Procesada'
-              AND ce.f_cambio_de_estado <= DATE_ADD(%s, INTERVAL {OFFSET_A_UTC} HOUR)
+              AND ce.f_cambio_de_estado <= %s
           )
     """, (corte_ts, corte_ts, corte_ts))
     return [r['id_orden'] for r in rows]
@@ -242,11 +235,14 @@ def obtener_productos_ops(ops_ids):
 
 
 # ─── Cálculo principal ─────────────────────────────────────────────
-def calcular(fecha_corte, usuario=None):
-    """Ejecuta el cálculo completo y guarda en inv_teorico."""
-    corte_ts = f"{fecha_corte} 23:59:59"
+def calcular(fecha_corte, usuario=None, hora_corte=None):
+    """Ejecuta el cálculo completo y guarda en inv_teorico.
+    hora_corte: opcional, formato HH:MM:SS. Si no se da, usa 23:59:59.
+    """
+    hora = hora_corte or '23:59:59'
+    corte_ts = f"{fecha_corte} {hora}"
     log.info(f"=== INICIO CÁLCULO TEÓRICO ===")
-    log.info(f"Fecha corte: {fecha_corte} 23:59:59 ({TIMEZONE})")
+    log.info(f"Fecha corte: {corte_ts} ({TIMEZONE})")
     log.info(f"Offset a UTC (para zeffi_cambios_estado): +{OFFSET_A_UTC}h")
     log.info(f"Usuario: {usuario or 'cli'}")
 
@@ -389,10 +385,10 @@ def poblar_ops_revisar(fecha_corte, ops_incluidas_ids, ahora):
     op_ids = [str(o['id_orden']) for o in ops]
     placeholders = ','.join(['%s'] * len(op_ids))
 
-    # Cambios a Procesada para todas estas OPs (UTC, restamos offset para comparar con corte COT)
+    # Cambios a Procesada para todas estas OPs (ya en COT tras conversión en import_all.js)
     cambios_rows = query(DB_EFFI, f"""
         SELECT id_orden,
-               MIN(DATE_SUB(f_cambio_de_estado, INTERVAL {OFFSET_A_UTC} HOUR)) AS fecha_procesada_cot
+               MIN(f_cambio_de_estado) AS fecha_procesada_cot
         FROM zeffi_cambios_estado
         WHERE id_orden IN ({placeholders})
           AND nuevo_estado = 'Procesada'
@@ -519,6 +515,7 @@ def poblar_ops_revisar(fecha_corte, ops_incluidas_ids, ahora):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Calcular inventario teórico a fecha de corte')
     parser.add_argument('--fecha', default=str(date.today()), help='Fecha de corte YYYY-MM-DD')
+    parser.add_argument('--hora', default=None, help='Hora de corte HH:MM:SS (default 23:59:59)')
     parser.add_argument('--usuario', default='cli', help='Usuario que ejecuta')
     args = parser.parse_args()
-    calcular(args.fecha, args.usuario)
+    calcular(args.fecha, args.usuario, args.hora)
