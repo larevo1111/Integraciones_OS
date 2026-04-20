@@ -25,15 +25,17 @@ Web activa en gestion.oscomunidad.com + Android futuro (Capacitor).
 - **DNS siguen apuntando al servidor local** hasta que Santi confirme que el VPS funciona bien
 - Probar VPS directo: `http://94.72.115.156:9300`
 
-## Credenciales BD (3 pools en server.js)
+## Credenciales BD (3 pools centralizados)
 
-| Pool | BD | Usuario | Pass |
+**Desde 2026-04-20**: los 3 pools se leen via `lib/db_conn.js` desde `integracion_conexionesbd.env` en la raíz del repo. Nada hardcoded.
+
+| Pool | BD | Servidor | Usuario |
 |---|---|---|---|
-| poolComunidad | `u768061575_os_comunidad` | `u768061575_ssierra047` | `Epist2487.` |
-| poolGestion | `u768061575_os_gestion` | `u768061575_os_gestion` | `Epist2487.` |
-| poolIntegracion | `u768061575_os_integracion` | `u768061575_osserver` | `Epist2487.` |
+| `db.comunidad` | `u768061575_os_comunidad` | Hostinger (sigue ahí) | `u768061575_ssierra047` |
+| `db.gestion`   | `os_gestion` | **VPS Contabo** | `os_gestion` |
+| `db.integracion` | `os_integracion` | **VPS Contabo** | `os_integracion` |
 
-Hostinger NO permite compartir usuario MySQL entre BDs — cada BD tiene su propio usuario.
+Pool `comunidad` usa SSH tunnel a Hostinger (puerto 65002, key `sos_erp`). Pools `gestion` e `integracion` usan SSH tunnel al VPS (puerto 22, key `id_ed25519`, user `osserver`). Timezone nativo del MariaDB VPS = `-05:00`.
 
 ## Tablas en `u768061575_os_gestion`
 

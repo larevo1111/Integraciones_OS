@@ -117,16 +117,23 @@ journalctl -u os-gestion -f
 
 ## Bases de datos (MariaDB local VPS)
 
-| BD | Tablas | Tamaño | Notas |
+| BD | Tablas | Tamaño | Rol |
 |---|---|---|---|
-| `os_inventario` | 9 | ~1.2 MB | Migrada 2026-04-10 — datos del inventario físico |
-| `effi_data` | 44 | ~64 MB | Migrada 2026-04-10 — snapshot del pipeline |
+| **`os_integracion`** | 54 | ~66 MB | **PRODUCCIÓN** desde 2026-04-20 — fuente de verdad del pipeline Effi |
+| **`os_gestion`** | 20 | ~1 MB | **PRODUCCIÓN** desde 2026-04-20 — Sistema Gestión OS (tareas, jornadas) |
+| `os_inventario` | 9 | ~1.2 MB | Dev/dup 2026-04-10 (producción sigue en servidor local) |
+| `effi_data` | 44 | ~64 MB | Dev/dup 2026-04-10 (staging real en servidor local) |
+| `espocrm` | 140 | ~14 MB | Dev (Docker EspoCRM) |
+| `sos_erp`, `sos_master_erp`, `wordpress` | — | — | Legacy / WordPress |
 
-**Credenciales MariaDB:**
-- Usuario: `osadmin` / clave: ver `.agent/.servers.env`
-- Acceso: `mysql -u osadmin -p effi_data`
+**Timezone MariaDB**: `default-time-zone = "-05:00"` en `/etc/mysql/mariadb.conf.d/50-server.cnf`. `NOW()` devuelve hora Colombia nativo.
 
-⚠️ **`effi_data` no se actualiza automáticamente** — el pipeline corre en el servidor local. Si se necesita actualizar: `mysqldump effi_data | ssh root@94.72.115.156 'mysql -u osadmin -p effi_data'`
+**Usuarios MySQL (creados 2026-04-20):**
+- `os_integracion@{127.0.0.1,localhost}` — ALL PRIVILEGES en `os_integracion`
+- `os_gestion@{127.0.0.1,localhost}` — ALL PRIVILEGES en `os_gestion`
+- `osadmin@localhost` — root de administración (para `effi_data`, `os_inventario`)
+
+**Acceso desde servidor local (producción)**: SSH tunnel automático vía helpers `lib/db_conn.js` y `scripts/lib/db_conn.py`, que leen `integracion_conexionesbd.env`. Usuario SSH: `osserver` con key `~/.ssh/id_ed25519`.
 
 ---
 
