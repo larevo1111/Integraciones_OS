@@ -29,7 +29,7 @@
         <q-btn
           flat dense round icon="close" size="sm"
           class="q-ml-auto lt-md"
-          @click="drawerOpen = false"
+          @click="cerrarDrawerMobile()"
         />
       </div>
 
@@ -51,7 +51,7 @@
                 <q-item-section avatar class="sidebar-item-icon">
                   <q-icon name="check_circle_outline" />
                 </q-item-section>
-                <q-item-section class="sidebar-item-label cursor-pointer" @click.stop="$router.push('/tareas'); drawerOpen = false">
+                <q-item-section class="sidebar-item-label cursor-pointer" @click.stop="$router.push('/tareas'); cerrarDrawerMobile()">
                   Mis Tareas
                 </q-item-section>
               </template>
@@ -71,7 +71,7 @@
                     class="sidebar-project-item"
                     :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
                     :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                    @click="drawerOpen = false"
+                    @click="cerrarDrawerMobile()"
                     @mouseenter="proyectoHover = p.id"
                     @mouseleave="proyectoHover = null"
                   >
@@ -110,7 +110,7 @@
                     class="sidebar-project-item"
                     :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }"
                     :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
-                    @click="drawerOpen = false"
+                    @click="cerrarDrawerMobile()"
                     @mouseenter="etiquetaHover = e.id"
                     @mouseleave="etiquetaHover = null"
                   >
@@ -208,7 +208,7 @@
                 <q-item-section avatar class="sidebar-item-icon">
                   <q-icon name="group" />
                 </q-item-section>
-                <q-item-section class="sidebar-item-label cursor-pointer" @click.stop="$router.push('/equipo'); drawerOpen = false">
+                <q-item-section class="sidebar-item-label cursor-pointer" @click.stop="$router.push('/equipo'); cerrarDrawerMobile()">
                   Equipo
                 </q-item-section>
               </template>
@@ -228,7 +228,7 @@
                     class="sidebar-project-item"
                     :class="{ active: ruta === '/equipo' && String($route.query.proyecto_id) === String(p.id) }"
                     :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
-                    @click="drawerOpen = false"
+                    @click="cerrarDrawerMobile()"
                     @mouseenter="proyectoHover = p.id"
                     @mouseleave="proyectoHover = null"
                   >
@@ -267,7 +267,7 @@
                     class="sidebar-project-item"
                     :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }"
                     :to="{ path: '/equipo', query: { etiqueta_id: e.id } }"
-                    @click="drawerOpen = false"
+                    @click="cerrarDrawerMobile()"
                     @mouseenter="etiquetaHover = e.id"
                     @mouseleave="etiquetaHover = null"
                   >
@@ -358,7 +358,7 @@
           <q-separator class="q-my-xs q-mx-md" />
 
           <!-- ═══ JORNADAS ═══ -->
-          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/jornadas' }" :to="'/jornadas'" @click="drawerOpen = false">
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/jornadas' }" :to="'/jornadas'" @click="cerrarDrawerMobile()">
             <q-item-section avatar class="sidebar-item-icon"><q-icon name="schedule" /></q-item-section>
             <q-item-section v-if="!isMini" class="sidebar-item-label">Jornadas</q-item-section>
             <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Jornadas</q-tooltip>
@@ -367,25 +367,25 @@
           <!-- ═══ TABLAS ═══ -->
           <q-item-label v-if="!isMini" header class="sidebar-section-lbl">Tablas</q-item-label>
 
-          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/proyectos-tabla' }" to="/proyectos-tabla" @click="drawerOpen = false">
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/proyectos-tabla' }" to="/proyectos-tabla" @click="cerrarDrawerMobile()">
             <q-item-section avatar class="sidebar-item-icon"><q-icon name="folder_open" /></q-item-section>
             <q-item-section v-if="!isMini" class="sidebar-item-label">Proyectos</q-item-section>
             <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Proyectos</q-tooltip>
           </q-item>
 
-          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/dificultades' }" to="/dificultades" @click="drawerOpen = false">
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/dificultades' }" to="/dificultades" @click="cerrarDrawerMobile()">
             <q-item-section avatar class="sidebar-item-icon"><q-icon name="warning_amber" /></q-item-section>
             <q-item-section v-if="!isMini" class="sidebar-item-label">Dificultades</q-item-section>
             <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Dificultades</q-tooltip>
           </q-item>
 
-          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/compromisos' }" to="/compromisos" @click="drawerOpen = false">
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/compromisos' }" to="/compromisos" @click="cerrarDrawerMobile()">
             <q-item-section avatar class="sidebar-item-icon"><q-icon name="task_alt" /></q-item-section>
             <q-item-section v-if="!isMini" class="sidebar-item-label">Compromisos</q-item-section>
             <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Compromisos</q-tooltip>
           </q-item>
 
-          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/ideas' }" to="/ideas" @click="drawerOpen = false">
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/ideas' }" to="/ideas" @click="cerrarDrawerMobile()">
             <q-item-section avatar class="sidebar-item-icon"><q-icon name="lightbulb_outline" /></q-item-section>
             <q-item-section v-if="!isMini" class="sidebar-item-label">Ideas</q-item-section>
             <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Ideas</q-tooltip>
@@ -547,7 +547,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.7.19'
+const APP_VERSION = 'v2.7.20'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -555,6 +555,11 @@ const drawerOpen       = ref(false)
 const miniState        = ref(false)
 const isMobile         = computed(() => $q.screen.lt.md)
 const isMini           = computed(() => miniState.value && !isMobile.value)
+
+// Cierra el drawer solo en móvil (en desktop se colapsa con el botón <>)
+function cerrarDrawerMobile() {
+  if (isMobile.value) drawerOpen.value = false
+}
 
 // ─── Hover menus (mini-mode popover tipo Kommo) ───
 const hoverMenus = reactive({ mis: false, eq: false })
