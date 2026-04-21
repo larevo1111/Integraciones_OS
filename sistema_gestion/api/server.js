@@ -1298,15 +1298,15 @@ app.get('/api/gestion/op/:id_op/pdf', requireAuth, (req, res) => {
 
 // ─── DETALLES DE PRODUCCIÓN (tarea vinculada a OP) ─────────────────
 
-// Helper: lookup de unidades desde inv_rangos (local) para una lista de cod_articulo
+// Helper: lookup de unidades desde os_integracion.unidades_articulos
 async function _lookupUnidades(codigos) {
   if (!codigos?.length) return {}
-  const [rows] = await db.inventario.query(
-    `SELECT id_effi, unidad FROM inv_rangos WHERE id_effi IN (?)`,
+  const [rows] = await db.integracion.query(
+    `SELECT cod_articulo, unidad FROM unidades_articulos WHERE cod_articulo IN (?)`,
     [codigos]
   )
   const map = {}
-  for (const r of rows) map[r.id_effi] = r.unidad || ''
+  for (const r of rows) map[r.cod_articulo] = r.unidad || ''
   return map
 }
 
