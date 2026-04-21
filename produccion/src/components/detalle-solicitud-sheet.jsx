@@ -168,13 +168,13 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Necesidad</Label>
+              <Label>Necesidad para</Label>
               <Input
                 type="date"
                 value={fechaNecesidad}
                 onChange={e => setFechaNecesidad(e.target.value)}
               />
-              <p className="text-[11px] text-muted-foreground">Para cuándo lo necesita</p>
+              <p className="text-[11px] text-muted-foreground">Fecha en que se necesita</p>
             </div>
             <div className="space-y-1.5">
               <Label>Programada</Label>

@@ -69,7 +69,7 @@ export function SolicitudesPage() {
     { key: 'tipo_articulo', label: 'Tipo', visible: true, options: TIPOS },
     { key: 'cantidad', label: 'Cantidad', visible: true, numeric: true, nowrap: true },
     { key: 'estado', label: 'Estado', visible: true, options: ESTADOS },
-    { key: 'fecha_necesidad', label: 'Necesidad', visible: true, nowrap: true },
+    { key: 'fecha_necesidad', label: 'Necesidad para', visible: true, nowrap: true },
     { key: 'fecha_programada', label: 'Programada', visible: true, nowrap: true },
     { key: 'solicitado_por', label: 'Solicitante', visible: true, nowrap: true },
     { key: 'op_effi', label: 'OP Effi', visible: true, nowrap: true },
