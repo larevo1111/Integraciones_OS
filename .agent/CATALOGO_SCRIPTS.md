@@ -943,7 +943,7 @@ URL webhook configurada en `wa-bridge.service` → `WA_WEBHOOK_URL` (default: `h
 
 ### calcular_inventario_teorico.py
 - **Propósito**: Calcula inventario teórico a fecha de corte. Combina stock actual, trazabilidad post-corte y ajuste por OPs generadas
-- **Ejecución**: `python3 scripts/inventario/calcular_inventario_teorico.py --fecha 2026-03-31`
+- **Ejecución**: `python3 scripts/inventario/calcular_inventario_teorico.py --fecha 2026-03-31 [--hora HH:MM:SS]`
 - **BD lectura**: `effi_data` (zeffi_inventario, zeffi_trazabilidad, zeffi_produccion_encabezados, zeffi_cambios_estado, zeffi_materiales, zeffi_articulos_producidos)
 - **BD escritura**: `os_inventario.inv_teorico` (DELETE+INSERT) + actualiza `inv_conteos.inventario_teorico`
 - **Fórmula**: stock_teorico = stock_effi - trazabilidad_post_corte + materiales_OPs_generadas - productos_OPs_generadas
@@ -956,6 +956,31 @@ URL webhook configurada en `wa-bridge.service` → `WA_WEBHOOK_URL` (default: `h
 - **BD**: `os_inventario` (inv_conteos, inv_rangos, inv_auditorias, inv_teorico) + `effi_data` (búsqueda artículos)
 - **Auth**: JWT compartido con sistema_gestion (mismo secret)
 - **Frontend**: sirve `inventario/static/` (build Vue 3 + Vite)
+
+### generar_informe.py
+- **Propósito**: Genera informe PDF del inventario físico con WeasyPrint (6 secciones + anexo)
+- **Tipo**: utilidad
+- **Ejecución manual**:
+  ```bash
+  python3 scripts/inventario/generar_informe.py --fecha 2026-03-31
+  ```
+- **Salida**: `inventario/informes/informe_inventario_<fecha>.pdf`
+- **BD lectura**: `os_inventario` (inv_conteos, inv_observaciones)
+- **Dependencias**: WeasyPrint, pymysql
+- **También invocable desde**: endpoint GET `/api/inventario/informe?fecha=`
+
+### analisis_ia_inventario.py
+- **Propósito**: Genera análisis ejecutivo del inventario usando IA (Gemini via `/ia/simple`)
+- **Tipo**: utilidad
+- **Ejecución manual**:
+  ```bash
+  python3 scripts/inventario/analisis_ia_inventario.py --fecha 2026-03-31
+  ```
+- **Salida**: `inventario/informes/analisis_ia_<fecha>.pdf`
+- **BD lectura**: `os_inventario` (inv_conteos), `effi_data` (datos complementarios)
+- **Dependencias**: requests (llama a localhost:5100/ia/simple), WeasyPrint, pymysql
+- **También invocable desde**: endpoint GET `/api/inventario/analisis-ia?fecha=`
+- **Notas**: Recopila datos del inventario, envía prompt estructurado a Gemini, recibe análisis ejecutivo, genera PDF
 
 ### config_depuracion.json
 - **Propósito**: Reglas de exclusión para el depurador

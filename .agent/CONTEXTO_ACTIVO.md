@@ -10,10 +10,33 @@
 | ERP Frontend | [contextos/erp_frontend.md](contextos/erp_frontend.md) | Módulo Ventas completo | Normal |
 | Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ activos | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Estable — sin trabajo activo | — |
-| Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | App activa inv.oscomunidad.com, BD + scripts listos | Alta |
+| Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | Operativo — inv.oscomunidad.com, inventarios completos + parciales | Alta |
+| Producción | `produccion/` | Nuevo módulo — React + Refine + Shadcn/ui + Tailwind | En desarrollo |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
 ## Trabajo activo (2026-04-20)
+
+### Completado 2026-04-20 — Inventario parcial abril + módulo Producción
+
+**Inventario físico:**
+- Inventario completo marzo 2026: cerrado, ajustes aplicados (361+362+363), informe PDF + análisis IA con Gemini
+- Primer inventario parcial 20 abril: 28→33 artículos (con esterilizados), ajustes aplicados, cero artículos negativos en Effi
+- Inventarios parciales operativos con preselección inteligente (`/api/inventario/sugerir-articulos`)
+- Pestaña Costos con OsDataTable dark, informe PDF automático, análisis IA ejecutivo
+- Observaciones en BD (`inv_observaciones`): automáticas + manuales (error_conteo, correccion_costo, hallazgo, manual)
+- Soporte hora de corte intra-día (`--hora HH:MM:SS`)
+- Envases normales vs esterilizados (mapeo)
+
+**Timezone effi_data:**
+- Toda `effi_data` uniformizada en UTC-5: `import_all.js` convierte `zeffi_cambios_estado.f_cambio_de_estado` de UTC a COT
+
+**Costo:**
+- Migrado de `costo_promedio` a `costo_manual` en todo el sistema (inventario, resúmenes, informes)
+
+**Nuevo módulo Producción:**
+- Directorio: `produccion/`
+- Stack: React + Refine + Shadcn/ui + Tailwind (distinto al stack principal Vue+Quasar)
+- Estado: en desarrollo inicial
 
 ### Completado 2026-04-20 — BDs Hostinger marcadas deprecated
 - `u768061575_os_integracion` y `u768061575_os_gestion` en Hostinger: todas las tablas renombradas con prefijo `_deprecated_` + tabla `_DEPRECATED_README` con aviso y ruta al VPS.
@@ -121,7 +144,7 @@ MEMORY.md de Claude siempre refleja el módulo activo y su estado.
 | `nocodb_meta` | MariaDB local | Metadatos NocoDB |
 | `u768061575_os_integracion` | Hostinger | Fuente de verdad: 51 tablas (41 zeffi + 8 resumen + crm_contactos + catalogo_articulos) |
 | `u768061575_os_gestion` | Hostinger | Sistema Gestión OS |
-| `os_inventario` | MariaDB local | Inventario físico (inv_conteos, inv_rangos, inv_auditorias) |
+| `os_inventario` | MariaDB local | Inventario físico (inv_conteos, inv_rangos, inv_auditorias, inv_teorico, inv_observaciones) |
 | `u768061575_os_comunidad` | Hostinger | **ERP REAL — PROHIBICIÓN ABSOLUTA, NO TOCAR** |
 
 MariaDB corre en el **host** (systemd), NO en Docker — puerto 3306.

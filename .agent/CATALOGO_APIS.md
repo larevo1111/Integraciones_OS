@@ -312,10 +312,17 @@ def enviar_tabla_telegram(chat_id: str, titulo: str, texto: str,
 | GET | `/api/inventario/excluidos?fecha=` | Listar artículos excluidos |
 | PUT | `/api/inventario/articulos/{id}/reactivar` | Reactivar artículo excluido |
 | POST | `/api/inventario/articulos/no-matriculado` | Agregar artículo no matriculado (multipart) |
-| POST | `/api/inventario/nuevo` | Crear nuevo inventario (ejecuta depurador) |
+| POST | `/api/inventario/nuevo` | Crear nuevo inventario (acepta `tipo=parcial` + `articulos=[]` para inventarios parciales) |
 | POST | `/api/inventario/reiniciar` | Reiniciar conteos de un inventario |
 | POST | `/api/inventario/cerrar` | Cerrar inventario |
 | POST | `/api/inventario/eliminar` | Eliminar inventario completo |
+| GET | `/api/inventario/costos?fecha=` | Valorización completa del inventario (costo_manual por artículo) |
+| GET | `/api/inventario/informe?fecha=` | Genera y descarga PDF del informe del inventario (6 secciones + anexo) |
+| GET | `/api/inventario/analisis-ia?fecha=` | Genera y descarga PDF del análisis ejecutivo IA (Gemini) |
+| GET | `/api/inventario/sugerir-articulos?cantidad=N` | Preselección inteligente de artículos para inventario parcial |
+| GET | `/api/inventario/observaciones?fecha=` | Listar observaciones del inventario |
+| POST | `/api/inventario/observaciones` | Crear observación `{fecha_inventario, tipo, descripcion, detalle, usuario}` |
+| DELETE | `/api/inventario/observaciones/{obs_id}` | Eliminar observación por ID |
 
 ### BD `os_inventario`
 
@@ -324,6 +331,8 @@ def enviar_tabla_telegram(chat_id: str, titulo: str, texto: str,
 | `inv_conteos` | Conteos por artículo+bodega+fecha. Estado: pendiente/contado/verificado |
 | `inv_rangos` | Unidad, grupo (MP/PP/PT/INS/DS), rango min/max, factor_error por artículo |
 | `inv_auditorias` | Historial inmutable: conteo, edición, nota, foto, reinicio, cierre |
+| `inv_teorico` | Inventario teórico calculado a fecha de corte |
+| `inv_observaciones` | Observaciones del inventario (tipos: error_conteo, correccion_costo, hallazgo, manual) |
 
 ### Ejemplo Python
 

@@ -304,6 +304,32 @@ Catálogo de municipios de Colombia con código DANE, nombre y departamento.
 
 ---
 
+## INVENTARIO FÍSICO (BD `os_inventario`)
+
+### inv_conteos
+Conteos por artículo+bodega+fecha. Cada fila es un artículo a contar en una bodega para una fecha de inventario.
+**Campos clave**: `fecha`, `bodega`, `cod_articulo`, `descripcion`, `inventario_fisico`, `inventario_teorico`, `diferencia`, `estado` (pendiente/contado/verificado), `contado_por`, `grupo`, `unidad`.
+**Usar para**: progreso de conteo, diferencias físico vs teórico, artículos pendientes.
+
+### inv_rangos
+Unidad, grupo (MP/PP/PT/INS/DS), rango min/max, factor_error por artículo.
+**Usar para**: clasificación de artículos para inventario, rangos de tolerancia.
+
+### inv_auditorias
+Historial inmutable de todas las acciones sobre inventarios: conteo, edición, nota, foto, reinicio, cierre.
+**Usar para**: trazabilidad de quién contó qué, cuándo y qué cambios se hicieron.
+
+### inv_teorico
+Inventario teórico calculado a fecha de corte. Cada fila es un artículo con su stock teórico desglosado.
+**Usar para**: comparar stock Effi actual vs stock reconstruido a una fecha histórica.
+
+### inv_observaciones
+Observaciones asociadas a un inventario. Pueden ser automáticas (generadas por el sistema al detectar anomalías) o manuales.
+**Campos clave**: `fecha_inventario`, `tipo` (error_conteo, correccion_costo, hallazgo, manual), `descripcion`, `detalle`, `registrado_por`, `created_at`.
+**Usar para**: documentar hallazgos, correcciones de costo, errores de conteo, observaciones generales del inventario.
+
+---
+
 ## Guía rápida — qué tabla usar
 
 | Necesito saber... | Tabla recomendada |
