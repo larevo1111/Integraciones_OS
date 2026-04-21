@@ -75,29 +75,54 @@ console.log(`📅 ${data.fecha_inicio} → ${data.fecha_fin}`);
 console.log(`👤 Encargado: ${data.encargado}`);
 console.log(`📦 Materiales: ${data.materiales.length}, Producidos: ${data.articulos_producidos.length}, Otros costos: ${data.otros_costos.length}`);
 
-// Helper: buscar artículo en el autocomplete y seleccionarlo
-async function seleccionarArticulo(page, inputSelector, codArticulo) {
-  await page.locator(inputSelector).click();
-  await page.locator(inputSelector).fill(String(codArticulo));
-  await page.waitForTimeout(800);
-  // Esperar a que aparezca el dropdown de autocomplete y click en el primer resultado
-  // Effi usa jQuery UI autocomplete: los resultados van en .ui-autocomplete
-  const resultados = page.locator('.ui-autocomplete:visible li.ui-menu-item');
-  await resultados.first().waitFor({ state: 'visible', timeout: 5000 });
-  await resultados.first().click();
-  await page.waitForTimeout(500);
+// Helper: buscar artículo mediante el modal Buscar artículo (stock)
+// Usado tanto para material como para producido
+async function buscarArticulo(page, inputId, codArticulo) {
+  await page.evaluate((iid) => {
+    const input = document.querySelector('#' + iid);
+    const container = input.closest('.input-group');
+    const addon = container.querySelector('.input-group-addon');
+    addon.click();
+  }, inputId);
+  await page.waitForTimeout(1500);
+
+  // Limpiar el campo id si tiene valor anterior
+  await page.locator('#id_BAS').fill(String(codArticulo));
+  await page.waitForTimeout(300);
+
+  await page.locator('#modalBuscarArticuloStock button:has-text("Buscar")').first().click();
+  await page.waitForTimeout(2000);
+
+  const fila = page.locator('#modalBuscarArticuloStock tbody tr').first();
+  await fila.waitFor({ state: 'visible', timeout: 5000 });
+  await fila.click();
+  await page.waitForTimeout(1000);
 }
 
-// Helper: buscar encargado/tercero (usa el icono de lupa)
-async function buscarEncargado(page, inputNombreId, inputHiddenId, idBusqueda) {
-  // Escribir en el input visible
-  await page.locator(`#${inputNombreId}`).click();
-  await page.locator(`#${inputNombreId}`).fill(String(idBusqueda));
-  await page.waitForTimeout(800);
-  const resultados = page.locator('.ui-autocomplete:visible li.ui-menu-item');
-  await resultados.first().waitFor({ state: 'visible', timeout: 5000 });
-  await resultados.first().click();
-  await page.waitForTimeout(500);
+// Helper: buscar encargado/tercero (abre modal Buscar tercero y selecciona por CC/NIT)
+async function buscarTercero(page, inputNombreId, idBusqueda) {
+  // Click en el addon (lupa) hermano del input
+  await page.evaluate((nombreId) => {
+    const input = document.querySelector('#' + nombreId);
+    const container = input.closest('.input-group');
+    const addon = container.querySelector('.input-group-addon');
+    addon.click();
+  }, inputNombreId);
+  await page.waitForTimeout(1500);
+
+  // Llenar campo ID en modalBuscarTercero
+  await page.locator('#id_BT').fill(String(idBusqueda));
+  await page.waitForTimeout(300);
+
+  // Click en botón Buscar del modal
+  await page.locator('#modalBuscarTercero button:has-text("Buscar")').first().click();
+  await page.waitForTimeout(2000);
+
+  // Click en el primer resultado de la tabla
+  const fila = page.locator('#modalBuscarTercero tbody tr').first();
+  await fila.waitFor({ state: 'visible', timeout: 5000 });
+  await fila.click();
+  await page.waitForTimeout(1000);
 }
 
 (async () => {
@@ -152,12 +177,12 @@ async function buscarEncargado(page, inputNombreId, inputHiddenId, idBusqueda) {
 
     // 5. Encargado (buscar por CC)
     console.log(`🔄 Encargado: ${data.encargado}`);
-    await buscarEncargado(page, 'nombre_encargado_CR', 'encargado_CR', data.encargado);
+    await buscarTercero(page, 'nombre_encargado_CR', data.encargado);
 
     // 6. Tercero (opcional)
     if (data.tercero) {
       console.log(`🔄 Tercero: ${data.tercero}`);
-      await buscarEncargado(page, 'nombre_tercero_CR', 'tercero_CR', data.tercero);
+      await buscarTercero(page, 'nombre_tercero_CR', data.tercero);
     }
 
     // 7. Activo productivo (opcional)
@@ -171,31 +196,30 @@ async function buscarEncargado(page, inputNombreId, inputHiddenId, idBusqueda) {
       await page.waitForTimeout(500);
     }
 
-    // 8. Materiales
+    // 8. Materiales — cada iteración usa la fila de entrada (.first()) y agrega
     for (let i = 0; i < data.materiales.length; i++) {
       const m = data.materiales[i];
       console.log(`  📥 Material ${i+1}: ${m.cod_articulo} x${m.cantidad}`);
-      await seleccionarArticulo(page, '#articulo_CRM', m.cod_articulo);
-      await page.locator('#lote_CRM').fill(String(m.lote || ''));
-      await page.locator('#serie_CRM').fill(String(m.serie || ''));
-      await page.locator('#cantidad_CRM').fill(String(m.cantidad));
-      await page.locator('#costo_CRM').fill(String(m.costo || 0));
-      // Click Agregar material
+      await buscarArticulo(page, 'articulo_CRM', m.cod_articulo);
+      await page.locator('#lote_CRM').first().fill(String(m.lote || ''));
+      await page.locator('#serie_CRM').first().fill(String(m.serie || ''));
+      await page.locator('#cantidad_CRM').first().fill(String(m.cantidad));
+      await page.locator('#costo_CRM').first().fill(String(m.costo || 0));
       await page.locator('#btnAgregarMaterial').click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(800);
     }
 
-    // 9. Artículos producidos
+    // 9. Artículos producidos — misma lógica
     for (let i = 0; i < data.articulos_producidos.length; i++) {
       const p = data.articulos_producidos[i];
       console.log(`  📤 Producido ${i+1}: ${p.cod_articulo} x${p.cantidad}`);
-      await seleccionarArticulo(page, '#articulo_CRP', p.cod_articulo);
-      await page.locator('#lote_CRP').fill(String(p.lote || ''));
-      await page.locator('#serie_CRP').fill(String(p.serie || ''));
-      await page.locator('#cantidad_CRP').fill(String(p.cantidad));
-      await page.locator('#precio_CRP').fill(String(p.precio || 0));
+      await buscarArticulo(page, 'articulo_CRP', p.cod_articulo);
+      await page.locator('#lote_CRP').first().fill(String(p.lote || ''));
+      await page.locator('#serie_CRP').first().fill(String(p.serie || ''));
+      await page.locator('#cantidad_CRP').first().fill(String(p.cantidad));
+      await page.locator('#precio_CRP').first().fill(String(p.precio || 0));
       await page.locator('#btnAgregarProducido').click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(800);
     }
 
     // 10. Otros costos
@@ -209,11 +233,10 @@ async function buscarEncargado(page, inputNombreId, inputHiddenId, idBusqueda) {
         $(sel).trigger('chosen:updated');
       }, c.tipo_costo_id);
       await page.waitForTimeout(300);
-      await page.locator('#cantidad_CR').fill(String(c.cantidad));
+      await page.locator('#cantidad_CR').first().fill(String(c.cantidad));
       await page.locator('input[name="costo[]"]').first().fill(String(c.costo));
-      // Click Agregar costo — buscar el botón por texto
-      await page.locator('button:has-text("Agregar costo")').click();
-      await page.waitForTimeout(500);
+      await page.locator('button:has-text("Agregar costo")').first().click();
+      await page.waitForTimeout(800);
     }
 
     // 11. Observación
@@ -223,6 +246,26 @@ async function buscarEncargado(page, inputNombreId, inputHiddenId, idBusqueda) {
       await textarea.fill(data.observacion);
       await page.waitForTimeout(300);
     }
+
+    // 11.b Limpiar filas vacías (Effi deja una fila de entrada vacía al final)
+    const eliminadas = await page.evaluate(() => {
+      // Las filas de la tabla de materiales, producidos y costos tienen inputs vacíos
+      // Buscar filas de input cuyo campo de artículo/cantidad esté vacío
+      let count = 0;
+      // Buscar filas dentro del formulario que tengan inputs de articulo*/cantidad* vacíos
+      const nameTokens = ['articuloM[]', 'articuloP[]', 'costo_produccion[]'];
+      nameTokens.forEach(name => {
+        const inputs = document.querySelectorAll(`[name="${name}"]`);
+        inputs.forEach(inp => {
+          if (!inp.value || inp.value === '' || inp.value === '0') {
+            const row = inp.closest('tr, .filaMaterial, .filaProducido, .filaCosto, div.row');
+            if (row) { row.remove(); count++; }
+          }
+        });
+      });
+      return count;
+    });
+    if (eliminadas > 0) console.log(`🧹 Filas vacías eliminadas: ${eliminadas}`);
 
     // Screenshot pre-crear
     await page.screenshot({ path: `/exports/op_pre_crear_${Date.now()}.png` });
