@@ -44,6 +44,22 @@ function localDateCO(d = new Date()) {
   return y // en-CA ya devuelve YYYY-MM-DD
 }
 
+/**
+ * Parsea una hora HH:MM o datetime YYYY-MM-DDTHH:MM interpretándolo SIEMPRE como
+ * hora Colombia (UTC-5), sin depender del timezone del OS del servidor.
+ * Necesario porque el VPS puede estar en un timezone distinto (CEST, etc.)
+ * y `new Date("YYYY-MM-DDTHH:MM:00")` usa el timezone local del OS.
+ */
+function parseHoraCO(fechaYYYYMMDD, hora) {
+  if (!hora) return null
+  const s = String(hora).trim()
+  if (s.match(/^\d{2}:\d{2}$/)) {
+    return new Date(`${fechaYYYYMMDD}T${s}:00-05:00`)
+  }
+  // Datetime completo: si trae offset explícito lo respeta; si no, asume Colombia
+  return s.match(/[zZ]|[+-]\d{2}:?\d{2}$/) ? new Date(s) : new Date(`${s}-05:00`)
+}
+
 if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
   console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET en .env')
   process.exit(1)
@@ -2177,19 +2193,12 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
       }
     }
 
-    // hora_inicio: el frontend envía solo HH:MM — el backend construye el datetime con fecha de hoy
+    // hora_inicio: el frontend envía solo HH:MM — interpretar siempre en Colombia
     let horaInicio = ahora
     if (req.body.hora_inicio) {
-      const hi = String(req.body.hora_inicio)
-      if (hi.match(/^\d{2}:\d{2}$/)) {
-        // Solo hora (HH:MM) — construir datetime con fecha de hoy del servidor
-        horaInicio = new Date(`${hoy}T${hi}:00`)
-      } else {
-        // Datetime completo (compatibilidad) — validar que sea de hoy
-        horaInicio = new Date(hi)
-        if (localDateCO(horaInicio) !== hoy) {
-          return res.status(400).json({ error: 'La hora de inicio debe ser de hoy' })
-        }
+      horaInicio = parseHoraCO(hoy, req.body.hora_inicio) || ahora
+      if (!String(req.body.hora_inicio).match(/^\d{2}:\d{2}$/) && localDateCO(horaInicio) !== hoy) {
+        return res.status(400).json({ error: 'La hora de inicio debe ser de hoy' })
       }
     }
 
@@ -2222,13 +2231,10 @@ app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => 
     if (pausaAbierta) return res.status(409).json({ error: 'Hay una pausa activa. Reanuda antes de finalizar.' })
 
     const ahora = new Date()
-    // hora_fin: el frontend envía solo HH:MM — construir datetime con fecha de la jornada
+    // hora_fin: el frontend envía solo HH:MM — interpretar siempre en Colombia
     let horaFin = ahora
     if (req.body.hora_fin) {
-      const hf = String(req.body.hora_fin)
-      horaFin = hf.match(/^\d{2}:\d{2}$/)
-        ? new Date(`${jornada.fecha}T${hf}:00`)
-        : new Date(hf)
+      horaFin = parseHoraCO(jornada.fecha, req.body.hora_fin) || ahora
     }
 
     // Calcular última actividad de tareas para indicador de confianza
@@ -2408,14 +2414,8 @@ app.post('/api/gestion/jornadas/:id/pausas/iniciar', requireAuth, async (req, re
     const ahora = new Date()
     // Pausa retroactiva: hora_inicio y hora_fin del body → pausa completa inmediata
     // Pausa normal: hora_inicio = ahora, hora_fin = NULL (se cierra después con /reanudar)
-    // Frontend envía HH:MM — construir datetime con fecha de la jornada
-    function parseHora(val) {
-      if (!val) return null
-      const s = String(val)
-      return s.match(/^\d{2}:\d{2}$/) ? new Date(`${jornada.fecha}T${s}:00`) : new Date(s)
-    }
-    const horaInicioPausa = hiBody ? parseHora(hiBody) : ahora
-    const horaFinPausa    = hfBody ? parseHora(hfBody) : null
+    const horaInicioPausa = hiBody ? parseHoraCO(jornada.fecha, hiBody) : ahora
+    const horaFinPausa    = hfBody ? parseHoraCO(jornada.fecha, hfBody) : null
 
     const [result] = await db.gestion.query(`
       INSERT INTO g_jornada_pausas (empresa, jornada_id, hora_inicio, hora_inicio_registro, hora_fin, hora_fin_registro, observaciones, usuario_creador, usuario_ult_modificacion)
@@ -2497,14 +2497,11 @@ app.put('/api/gestion/jornadas/:id/pausas/:pausaId/reanudar', requireAuth, async
     if (pausa.hora_fin) return res.status(409).json({ error: 'La pausa ya fue cerrada' })
 
     const ahora = new Date()
-    // hora_fin: frontend envía solo HH:MM
+    // hora_fin: frontend envía solo HH:MM — interpretar en Colombia
     const [[jornadaPausa]] = await db.gestion.query('SELECT fecha FROM g_jornadas WHERE id = ?', [req.params.id])
     let horaFinPausa = ahora
     if (req.body.hora_fin) {
-      const hf = String(req.body.hora_fin)
-      horaFinPausa = hf.match(/^\d{2}:\d{2}$/)
-        ? new Date(`${jornadaPausa.fecha}T${hf}:00`)
-        : new Date(hf)
+      horaFinPausa = parseHoraCO(jornadaPausa.fecha, req.body.hora_fin) || ahora
     }
     await db.gestion.query(
       'UPDATE g_jornada_pausas SET hora_fin = ?, hora_fin_registro = ?, usuario_ult_modificacion = ? WHERE id = ?',
