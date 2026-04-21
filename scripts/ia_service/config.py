@@ -14,6 +14,7 @@ load_dotenv(os.path.join(_BASE, '.env'))
 # Helper central de BD
 sys.path.insert(0, _BASE)
 from lib import cfg_local, cfg_remota_ssh, cfg_remota_db
+from lib.db_conn import abrir_tunel
 
 _local = cfg_local()
 DB_HOST = _local['host']
@@ -22,11 +23,10 @@ DB_USER = _local['user']
 DB_PASS = _local['password']
 DB_IA   = 'ia_service_os'
 
-# Conexión a "integración" (conexión directa al puerto MySQL público,
-# misma IP que el SSH host). Si en el futuro el servidor no expone MySQL
-# directamente, cambiar a SSH tunnel via lib.remota('INTEGRACION').
-_ssh_i = cfg_remota_ssh('INTEGRACION')
+# "Integración" vive en el VPS Contabo, accesible sólo via SSH tunnel.
+# Exposición del nombre antiguo HOSTINGER_* para compatibilidad con código existente.
 _db_i  = cfg_remota_db('INTEGRACION')
+_ssh_i = cfg_remota_ssh('INTEGRACION')
 HOSTINGER_HOST = _ssh_i['host']
 HOSTINGER_PORT = 3306
 HOSTINGER_USER = _db_i['user']
@@ -45,9 +45,15 @@ def get_local_conn():
 
 
 def get_hostinger_conn():
-    """Conexión directa a integración MySQL (sin SSH tunnel)."""
+    """Conexión a `integracion` (VPS Contabo) via SSH tunnel.
+
+    Nombre histórico (`hostinger`) conservado para compat con ejecutor_sql /
+    utilidades_sql / esquema.py. En realidad apunta al VPS desde la migración
+    de 2026-04-20.
+    """
+    tunel = abrir_tunel('INTEGRACION')
     return pymysql.connect(
-        host=HOSTINGER_HOST, port=HOSTINGER_PORT,
+        host='127.0.0.1', port=tunel.local_bind_port,
         user=HOSTINGER_USER, password=HOSTINGER_PASS,
         database=HOSTINGER_DB,
         charset='utf8mb4',
