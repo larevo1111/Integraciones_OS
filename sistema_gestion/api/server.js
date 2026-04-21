@@ -1296,6 +1296,166 @@ app.get('/api/gestion/op/:id_op/pdf', requireAuth, (req, res) => {
   })
 })
 
+// ─── DETALLES DE PRODUCCIÓN (tarea vinculada a OP) ─────────────────
+
+// Helper: lookup de unidades desde inv_rangos (local) para una lista de cod_articulo
+async function _lookupUnidades(codigos) {
+  if (!codigos?.length) return {}
+  const [rows] = await db.inventario.query(
+    `SELECT id_effi, unidad FROM inv_rangos WHERE id_effi IN (?)`,
+    [codigos]
+  )
+  const map = {}
+  for (const r of rows) map[r.id_effi] = r.unidad || ''
+  return map
+}
+
+// GET /api/gestion/tareas/:id/produccion — materiales + productos + tiempos
+// Si la tarea tiene id_op y no hay filas locales, siembra desde Effi.
+app.get('/api/gestion/tareas/:id/produccion', requireAuth, async (req, res) => {
+  const tareaId = parseInt(req.params.id, 10)
+  try {
+    const [[tarea]] = await db.gestion.query(
+      `SELECT id, id_op, tiempo_alistamiento_min, tiempo_produccion_min,
+              tiempo_empaque_min, tiempo_limpieza_min
+       FROM g_tareas WHERE id = ? AND empresa = ?`,
+      [tareaId, req.empresa]
+    )
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+
+    const tiempos = {
+      alistamiento: tarea.tiempo_alistamiento_min,
+      produccion:   tarea.tiempo_produccion_min,
+      empaque:      tarea.tiempo_empaque_min,
+      limpieza:     tarea.tiempo_limpieza_min,
+    }
+
+    if (!tarea.id_op) {
+      return res.json({ ok: true, materiales: [], productos: [], tiempos, id_op: null })
+    }
+
+    // Siembra si aún no hay líneas para esta tarea
+    const [[{ n }]] = await db.gestion.query(
+      'SELECT COUNT(*) AS n FROM g_tarea_produccion_lineas WHERE tarea_id = ?',
+      [tareaId]
+    )
+
+    if (n === 0) {
+      const [mats] = await db.integracion.query(
+        `SELECT cod_material AS cod, descripcion_material AS descripcion, cantidad
+         FROM zeffi_materiales WHERE id_orden = ?`,
+        [tarea.id_op]
+      )
+      const [prods] = await db.integracion.query(
+        `SELECT cod_articulo AS cod, descripcion_articulo_producido AS descripcion, cantidad
+         FROM zeffi_articulos_producidos WHERE id_orden = ?`,
+        [tarea.id_op]
+      )
+      const toNum = v => {
+        if (v == null || v === '') return null
+        const n = Number(String(v).replace(',', '.'))
+        return Number.isFinite(n) ? n : null
+      }
+      const filas = [
+        ...mats.map(m => ['material', m.cod, m.descripcion, toNum(m.cantidad)]),
+        ...prods.map(p => ['producto', p.cod, p.descripcion, toNum(p.cantidad)]),
+      ].filter(f => f[1])  // descartar sin cod
+
+      if (filas.length) {
+        const values = filas.map(() => '(?, ?, ?, ?, ?)').join(',')
+        const params = []
+        for (const [tipo, cod, desc, cant] of filas) {
+          params.push(tareaId, tipo, cod, desc || '', cant)
+        }
+        await db.gestion.query(
+          `INSERT IGNORE INTO g_tarea_produccion_lineas
+             (tarea_id, tipo, cod_articulo, descripcion, cantidad_teorica)
+           VALUES ${values}`,
+          params
+        )
+      }
+    }
+
+    const [lineas] = await db.gestion.query(
+      `SELECT id, tipo, cod_articulo, descripcion, cantidad_teorica, cantidad_real
+       FROM g_tarea_produccion_lineas
+       WHERE tarea_id = ?
+       ORDER BY tipo, descripcion`,
+      [tareaId]
+    )
+
+    const codigos = [...new Set(lineas.map(l => l.cod_articulo))]
+    const unidades = await _lookupUnidades(codigos)
+
+    const materiales = [], productos = []
+    for (const l of lineas) {
+      const item = {
+        id: l.id,
+        cod_articulo: l.cod_articulo,
+        descripcion: l.descripcion,
+        unidad: unidades[l.cod_articulo] || '',
+        cantidad_teorica: l.cantidad_teorica == null ? null : Number(l.cantidad_teorica),
+        cantidad_real:    l.cantidad_real    == null ? null : Number(l.cantidad_real),
+      }
+      if (l.tipo === 'material') materiales.push(item)
+      else productos.push(item)
+    }
+
+    res.json({ ok: true, id_op: tarea.id_op, materiales, productos, tiempos })
+  } catch (e) {
+    console.error('[produccion GET]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// PUT /api/gestion/tareas/:id/produccion/lineas/:lineaId — actualizar cantidad_real
+app.put('/api/gestion/tareas/:id/produccion/lineas/:lineaId', requireAuth, async (req, res) => {
+  const tareaId = parseInt(req.params.id, 10)
+  const lineaId = parseInt(req.params.lineaId, 10)
+  const { cantidad_real } = req.body
+  const valor = cantidad_real === null || cantidad_real === '' ? null : Number(cantidad_real)
+  if (valor !== null && !Number.isFinite(valor)) {
+    return res.status(400).json({ error: 'cantidad_real inválida' })
+  }
+  try {
+    const [[ok]] = await db.gestion.query(
+      `SELECT id FROM g_tareas WHERE id = ? AND empresa = ?`,
+      [tareaId, req.empresa]
+    )
+    if (!ok) return res.status(404).json({ error: 'Tarea no encontrada' })
+
+    const [r] = await db.gestion.query(
+      `UPDATE g_tarea_produccion_lineas
+       SET cantidad_real = ?, usuario_ult_modificacion = ?
+       WHERE id = ? AND tarea_id = ?`,
+      [valor, req.usuario.email, lineaId, tareaId]
+    )
+    if (!r.affectedRows) return res.status(404).json({ error: 'Línea no encontrada' })
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PUT /api/gestion/tareas/:id/produccion/tiempos — actualizar los 4 tiempos
+app.put('/api/gestion/tareas/:id/produccion/tiempos', requireAuth, async (req, res) => {
+  const tareaId = parseInt(req.params.id, 10)
+  const { alistamiento, produccion, empaque, limpieza } = req.body
+  const parse = v => (v === null || v === undefined || v === '') ? null : (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : undefined)
+  const a = parse(alistamiento), p = parse(produccion), e = parse(empaque), l = parse(limpieza)
+  if ([a, p, e, l].includes(undefined)) return res.status(400).json({ error: 'Valor de tiempo inválido' })
+  try {
+    const [r] = await db.gestion.query(
+      `UPDATE g_tareas
+       SET tiempo_alistamiento_min = ?, tiempo_produccion_min = ?,
+           tiempo_empaque_min = ?, tiempo_limpieza_min = ?,
+           usuario_ult_modificacion = ?
+       WHERE id = ? AND empresa = ?`,
+      [a, p, e, l, req.usuario.email, tareaId, req.empresa]
+    )
+    if (!r.affectedRows) return res.status(404).json({ error: 'Tarea no encontrada' })
+    res.json({ ok: true, tiempos: { alistamiento: a, produccion: p, empaque: e, limpieza: l } })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // ─── REMISIONES ───────────────────────────────────────────────────
 
 // GET /api/gestion/remisiones — remisiones de venta (búsqueda)

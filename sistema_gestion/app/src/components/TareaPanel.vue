@@ -82,6 +82,10 @@
         </div>
       </div>
 
+      <!-- Detalles de producción (materiales, productos, tiempos) -->
+      <DetallesProduccion v-if="esProduccion" :tarea="tarea" />
+
+
       <!-- Remisión (solo Empaque) -->
       <div v-if="esEmpaque" class="field-row" style="align-items:flex-start">
         <span class="field-label" style="padding-top:8px">Remisión</span>
@@ -263,6 +267,7 @@ import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
 import CronoDisplay         from './CronoDisplay.vue'
 import TareaMetaChips       from './TareaMetaChips.vue'
+import DetallesProduccion   from './DetallesProduccion.vue'
 import OpSelector           from './OpSelector.vue'
 import RemisionSelector     from './RemisionSelector.vue'
 import PedidoSelector       from './PedidoSelector.vue'
