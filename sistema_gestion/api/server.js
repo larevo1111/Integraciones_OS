@@ -1334,32 +1334,51 @@ app.get('/api/gestion/tareas/:id/produccion', requireAuth, async (req, res) => {
       return res.json({ ok: true, materiales: [], productos: [], tiempos, id_op: null })
     }
 
-    // Siembra si aún no hay líneas para esta tarea
+    // Cargar lo que Effi tiene hoy para esta OP
+    const [matsEffi] = await db.integracion.query(
+      `SELECT cod_material AS cod, descripcion_material AS descripcion, cantidad
+       FROM zeffi_materiales WHERE id_orden = ?`,
+      [tarea.id_op]
+    )
+    const [prodsEffi] = await db.integracion.query(
+      `SELECT cod_articulo AS cod, descripcion_articulo_producido AS descripcion, cantidad
+       FROM zeffi_articulos_producidos WHERE id_orden = ?`,
+      [tarea.id_op]
+    )
+    const codsEffi = new Set([
+      ...matsEffi.map(m => String(m.cod)),
+      ...prodsEffi.map(p => String(p.cod)),
+    ])
+
+    // ¿Las líneas existentes corresponden a la OP actual? (re-sembrar si OP cambió)
+    const [lineasPrev] = await db.gestion.query(
+      'SELECT id, cod_articulo, cantidad_real FROM g_tarea_produccion_lineas WHERE tarea_id = ?',
+      [tareaId]
+    )
+    const desajuste = lineasPrev.length > 0 &&
+      lineasPrev.some(l => !codsEffi.has(String(l.cod_articulo)))
+    const sinReales = lineasPrev.every(l => l.cantidad_real == null)
+
+    if (desajuste && sinReales) {
+      await db.gestion.query('DELETE FROM g_tarea_produccion_lineas WHERE tarea_id = ?', [tareaId])
+    }
+
+    // Siembra si no hay líneas (primera vez o borradas por desajuste)
     const [[{ n }]] = await db.gestion.query(
       'SELECT COUNT(*) AS n FROM g_tarea_produccion_lineas WHERE tarea_id = ?',
       [tareaId]
     )
 
     if (n === 0) {
-      const [mats] = await db.integracion.query(
-        `SELECT cod_material AS cod, descripcion_material AS descripcion, cantidad
-         FROM zeffi_materiales WHERE id_orden = ?`,
-        [tarea.id_op]
-      )
-      const [prods] = await db.integracion.query(
-        `SELECT cod_articulo AS cod, descripcion_articulo_producido AS descripcion, cantidad
-         FROM zeffi_articulos_producidos WHERE id_orden = ?`,
-        [tarea.id_op]
-      )
       const toNum = v => {
         if (v == null || v === '') return null
         const n = Number(String(v).replace(',', '.'))
         return Number.isFinite(n) ? n : null
       }
       const filas = [
-        ...mats.map(m => ['material', m.cod, m.descripcion, toNum(m.cantidad)]),
-        ...prods.map(p => ['producto', p.cod, p.descripcion, toNum(p.cantidad)]),
-      ].filter(f => f[1])  // descartar sin cod
+        ...matsEffi.map(m => ['material', m.cod, m.descripcion, toNum(m.cantidad)]),
+        ...prodsEffi.map(p => ['producto', p.cod, p.descripcion, toNum(p.cantidad)]),
+      ].filter(f => f[1])
 
       if (filas.length) {
         const values = filas.map(() => '(?, ?, ?, ?, ?)').join(',')
