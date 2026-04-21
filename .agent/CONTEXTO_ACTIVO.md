@@ -15,10 +15,16 @@
 
 ## Trabajo activo (2026-04-20)
 
+### Completado 2026-04-20 — Corte DNS gestion al VPS (migración completada)
+- `gestion.oscomunidad.com` → VPS tunnel (antes: servidor local).
+- Precondición verificada: `JWT_SECRET` y `GOOGLE_CLIENT_ID` idénticos local/VPS → usuarios NO perdieron sesión.
+- Verificado con test destructivo: `systemctl stop os-gestion` en local → gestion.oscomunidad.com sigue HTTP 200.
+- `gestion-vps.oscomunidad.com` se deja activo 7 días como red de seguridad. Programado eliminar 2026-04-27.
+- Servidor local queda como **dev** (localhost:9300 para testing) y host de **servicios internos** que usan GPU/recursos locales (IA Service, Bot Telegram, Pipeline Effi, WA Bridge, EspoCRM Docker).
+
 ### Completado 2026-04-20 — Corte DNS menu + inv al VPS
 - `menu.oscomunidad.com` → VPS tunnel (antes: servidor local)
 - `inv.oscomunidad.com` → VPS tunnel (antes: servidor local)
-- Gestión se queda en `gestion.oscomunidad.com` servidor local; `gestion-vps.oscomunidad.com` (VPS) sigue como producción paralela.
 - Verificado con test destructivo: `systemctl stop os-erp-frontend.service` en local → menu.oscomunidad.com sigue HTTP 200 (confirma ruta VPS).
 - Testing local vía `http://localhost:9100`, `:9300`, `:9401` (mismas BDs del VPS vía SSH tunnel).
 

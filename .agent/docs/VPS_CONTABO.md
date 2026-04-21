@@ -206,8 +206,8 @@ Verificar: `ssh -i ~/.ssh/sos_erp -p 65002 u768061575@109.106.250.195 echo OK`
 
 | Dominio | Apunta a | Rol | Notas |
 |---|---|---|---|
-| `gestion.oscomunidad.com` | **Local** | **Producción** | Queda en local; usuarios siguen ahí |
-| `gestion-vps.oscomunidad.com` | VPS | **Producción paralela** (Santi) | Misma BD que producción local |
+| `gestion.oscomunidad.com` | **VPS** ← 2026-04-20 | **Producción en VPS** | Corte DNS ejecutado (JWT_SECRET idéntico → sesiones persistieron) |
+| `gestion-vps.oscomunidad.com` | VPS | Redundante/testing | Programado eliminar 2026-04-27 (red de seguridad 7 días) |
 | `menu.oscomunidad.com` | **VPS** ← 2026-04-20 | **Producción en VPS** | Corte DNS ejecutado |
 | `inv.oscomunidad.com` | **VPS** ← 2026-04-20 | **Producción en VPS** | Corte DNS ejecutado |
 | `crm.oscomunidad.com` | Local | **Producción** | EspoCRM Docker local — no migrado |
