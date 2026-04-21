@@ -42,7 +42,7 @@
           </div>
           <div class="col-3 text-right">
             <q-input
-              dense outlined hide-bottom-space
+              dense filled hide-bottom-space
               input-class="text-right text-weight-medium"
               :model-value="formValor(l)"
               :placeholder="fmtNum(l.cantidad_teorica)"
@@ -79,7 +79,7 @@
           </div>
           <div class="col-3 text-right">
             <q-input
-              dense outlined hide-bottom-space
+              dense filled hide-bottom-space
               input-class="text-right text-weight-medium"
               :model-value="formValor(l)"
               :placeholder="fmtNum(l.cantidad_teorica)"
@@ -108,7 +108,7 @@
       >
         <div class="col text-body2">{{ t.label }}</div>
         <q-input
-          dense outlined hide-bottom-space
+          dense filled hide-bottom-space
           style="width: 70px"
           input-class="text-right"
           :model-value="tiempos[t.key] ?? ''"
