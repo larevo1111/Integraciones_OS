@@ -38,27 +38,8 @@ const JWT_SECRET       = process.env.JWT_SECRET
 const IA_SERVICE_URL   = process.env.IA_SERVICE_URL || 'http://127.0.0.1:5100'
 const PORT             = 9300
 
-/** Fecha YYYY-MM-DD en hora Colombia (UTC-5), sin depender de la zona del server */
-function localDateCO(d = new Date()) {
-  const y = d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' })
-  return y // en-CA ya devuelve YYYY-MM-DD
-}
-
-/**
- * Parsea una hora HH:MM o datetime YYYY-MM-DDTHH:MM interpretándolo SIEMPRE como
- * hora Colombia (UTC-5), sin depender del timezone del OS del servidor.
- * Necesario porque el VPS puede estar en un timezone distinto (CEST, etc.)
- * y `new Date("YYYY-MM-DDTHH:MM:00")` usa el timezone local del OS.
- */
-function parseHoraCO(fechaYYYYMMDD, hora) {
-  if (!hora) return null
-  const s = String(hora).trim()
-  if (s.match(/^\d{2}:\d{2}$/)) {
-    return new Date(`${fechaYYYYMMDD}T${s}:00-05:00`)
-  }
-  // Datetime completo: si trae offset explícito lo respeta; si no, asume Colombia
-  return s.match(/[zZ]|[+-]\d{2}:?\d{2}$/) ? new Date(s) : new Date(`${s}-05:00`)
-}
+// Timezone: helpers centralizados en lib/timezone.js (fuente única: APP_TIMEZONE en .env)
+const { localDate: localDateCO, parseHora: parseHoraCO } = require('../../lib/timezone')
 
 if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
   console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET en .env')

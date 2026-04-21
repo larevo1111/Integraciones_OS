@@ -171,7 +171,9 @@ function EditableNumber({ value, editable, onSave }) {
   useEffect(() => { setVal(value) }, [value])
 
   const save = () => {
-    const n = parseFloat(val)
+    // Aceptar punto o coma como separador decimal
+    const normalizado = String(val).replace(',', '.')
+    const n = parseFloat(normalizado)
     if (isNaN(n) || n <= 0) { setVal(value); setEditing(false); return }
     if (n !== value) onSave(n)
     setEditing(false)
@@ -180,12 +182,16 @@ function EditableNumber({ value, editable, onSave }) {
   if (editable && editing) {
     return (
       <input
-        type="number"
-        step="0.01"
+        type="text"
+        inputMode="decimal"
         autoFocus
         value={val}
         onClick={e => e.stopPropagation()}
-        onChange={e => setVal(e.target.value)}
+        onChange={e => {
+          // Permitir solo dígitos, punto y coma
+          const v = e.target.value.replace(/[^0-9.,]/g, '')
+          setVal(v)
+        }}
         onBlur={save}
         onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setVal(value); setEditing(false) } }}
         className="w-20 bg-transparent border border-primary rounded px-2 py-0.5 text-right outline-none font-mono text-sm"

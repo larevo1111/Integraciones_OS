@@ -48,7 +48,10 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
               autoFocus
             />
           </div>
-          <div className="max-h-72 overflow-y-auto p-1">
+          <div
+            className="max-h-72 overflow-y-auto p-1"
+            onWheel={e => e.stopPropagation()}
+          >
             {filtered.length === 0 ? (
               <div className="px-2 py-6 text-center text-sm text-muted-foreground">Sin resultados</div>
             ) : filtered.map(opt => (
