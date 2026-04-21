@@ -55,6 +55,7 @@ class SolicitudCreate(BaseModel):
     tipo_articulo: Optional[str] = None
     cantidad: float
     observaciones: Optional[str] = None
+    fecha_necesidad: Optional[str] = None
     fecha_programada: Optional[str] = None
     solicitado_por: str
 
@@ -66,6 +67,7 @@ class SolicitudUpdate(BaseModel):
     cantidad: Optional[float] = None
     observaciones: Optional[str] = None
     estado: Optional[str] = None
+    fecha_necesidad: Optional[str] = None
     fecha_programada: Optional[str] = None
     op_effi: Optional[str] = None
 
@@ -125,7 +127,7 @@ def listar_solicitudes(estado: Optional[str] = None, _start: int = 0, _end: int 
 
     for r in rows:
         r['cantidad'] = float(r['cantidad']) if r['cantidad'] else 0
-        for campo in ('fecha_solicitud', 'fecha_programada', 'created_at', 'updated_at'):
+        for campo in ('fecha_solicitud', 'fecha_necesidad', 'fecha_programada', 'created_at', 'updated_at'):
             if r.get(campo):
                 r[campo] = str(r[campo])
 
@@ -140,7 +142,7 @@ def obtener_solicitud(id: int):
         raise HTTPException(404, "Solicitud no encontrada")
     r = rows[0]
     r['cantidad'] = float(r['cantidad']) if r['cantidad'] else 0
-    for campo in ('fecha_solicitud', 'fecha_programada', 'created_at', 'updated_at'):
+    for campo in ('fecha_solicitud', 'fecha_necesidad', 'fecha_programada', 'created_at', 'updated_at'):
         if r.get(campo):
             r[campo] = str(r[campo])
     return r
@@ -150,10 +152,10 @@ def obtener_solicitud(id: int):
 def crear_solicitud(data: SolicitudCreate):
     new_id = exe(DB_PROD, """
         INSERT INTO solicitudes_produccion
-            (cod_articulo, nombre_articulo, tipo_articulo, cantidad, observaciones, fecha_programada, solicitado_por, estado)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 'solicitado')
+            (cod_articulo, nombre_articulo, tipo_articulo, cantidad, observaciones, fecha_necesidad, fecha_programada, solicitado_por, estado)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'solicitado')
     """, (data.cod_articulo, data.nombre_articulo, data.tipo_articulo, data.cantidad,
-          data.observaciones, data.fecha_programada, data.solicitado_por))
+          data.observaciones, data.fecha_necesidad, data.fecha_programada, data.solicitado_por))
     return obtener_solicitud(new_id)
 
 

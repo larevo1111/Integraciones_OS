@@ -3,7 +3,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { OsDataTable } from "@/components/os-data-table"
-import { NuevaSolicitudSheet } from "@/components/nueva-solicitud-sheet"
+import { DetalleSolicitudSheet } from "@/components/detalle-solicitud-sheet"
 import { api } from "@/lib/api"
 
 const ESTADOS = [
@@ -14,8 +14,6 @@ const ESTADOS = [
   { value: "validado", label: "Validado" },
   { value: "cancelado", label: "Cancelado" },
 ]
-
-const ESTADO_LABEL = Object.fromEntries(ESTADOS.map(e => [e.value, e.label]))
 
 const TIPOS = [
   { value: "PT", label: "Producto Terminado" },
@@ -28,7 +26,8 @@ const TIPOS = [
 export function SolicitudesPage() {
   const [solicitudes, setSolicitudes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [detalleOpen, setDetalleOpen] = useState(false)
+  const [solicitudSel, setSolicitudSel] = useState(null)
   const [articulos, setArticulos] = useState([])
 
   const cargar = useCallback(async () => {
@@ -54,18 +53,14 @@ export function SolicitudesPage() {
 
   useEffect(() => { cargar(); cargarArticulos() }, [cargar, cargarArticulos])
 
-  const actualizar = async (id, cambios) => {
-    try {
-      await api.patch(`/api/solicitudes/${id}`, cambios)
-      await cargar()
-    } catch (e) { alert('Error: ' + e.message) }
-  }
-
   const eliminar = async (id) => {
     if (!confirm('¿Eliminar esta solicitud?')) return
     await api.del(`/api/solicitudes/${id}`)
     await cargar()
   }
+
+  const abrirNueva = () => { setSolicitudSel(null); setDetalleOpen(true) }
+  const abrirDetalle = (row) => { setSolicitudSel(row); setDetalleOpen(true) }
 
   const columns = [
     { key: 'id', label: 'ID', visible: true, nowrap: true, numeric: true },
@@ -74,6 +69,7 @@ export function SolicitudesPage() {
     { key: 'tipo_articulo', label: 'Tipo', visible: true, options: TIPOS },
     { key: 'cantidad', label: 'Cantidad', visible: true, numeric: true, nowrap: true },
     { key: 'estado', label: 'Estado', visible: true, options: ESTADOS },
+    { key: 'fecha_necesidad', label: 'Necesidad', visible: true, nowrap: true },
     { key: 'fecha_programada', label: 'Programada', visible: true, nowrap: true },
     { key: 'solicitado_por', label: 'Solicitante', visible: true, nowrap: true },
     { key: 'op_effi', label: 'OP Effi', visible: true, nowrap: true },
@@ -84,34 +80,19 @@ export function SolicitudesPage() {
 
   const renderCell = (row, col, value) => {
     if (col.key === 'estado') {
-      return (
-        <select
-          value={value}
-          onClick={e => e.stopPropagation()}
-          onChange={e => actualizar(row.id, { estado: e.target.value })}
-          className="bg-transparent outline-none cursor-pointer"
-        >
-          {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-        </select>
-      )
+      const label = ESTADOS.find(e => e.value === value)?.label || value
+      return <Badge variant={value}>{label}</Badge>
     }
     if (col.key === 'tipo_articulo') {
       return value ? <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{value}</span> : '—'
     }
     if (col.key === 'cantidad') {
-      const editable = row.estado === 'solicitado'
-      return <EditableNumber value={value} editable={editable} onSave={v => actualizar(row.id, { cantidad: v })} />
+      return <span className="font-mono">{value}</span>
     }
-    if (col.key === 'fecha_programada') {
-      return (
-        <input
-          type="date"
-          value={value || ''}
-          onClick={e => e.stopPropagation()}
-          onChange={e => actualizar(row.id, { fecha_programada: e.target.value || null })}
-          className="bg-transparent outline-none cursor-pointer hover:bg-accent/50 rounded px-1 -mx-1 text-sm text-muted-foreground"
-        />
-      )
+    if (col.key === 'fecha_necesidad' || col.key === 'fecha_programada') {
+      return value ? (
+        <span className="text-muted-foreground">{formatFecha(value)}</span>
+      ) : <span className="text-muted-foreground/40">—</span>
     }
     if (col.key === 'fecha_solicitud') {
       return value ? value.slice(0, 16) : '—'
@@ -129,7 +110,7 @@ export function SolicitudesPage() {
         </button>
       )
     }
-    return null // default
+    return null
   }
 
   return (
@@ -138,10 +119,10 @@ export function SolicitudesPage() {
         <div>
           <h1 className="text-2xl font-semibold">Solicitudes de Producción</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Programa qué producir y seguimiento hasta validación
+            Click en una fila para ver o editar el detalle
           </p>
         </div>
-        <Button onClick={() => setDrawerOpen(true)} className="cursor-pointer">
+        <Button onClick={abrirNueva} className="cursor-pointer">
           <Plus className="h-4 w-4" />
           Nueva solicitud
         </Button>
@@ -152,56 +133,24 @@ export function SolicitudesPage() {
         columns={columns}
         loading={loading}
         title="Solicitudes"
+        onRowClick={abrirDetalle}
         renderCell={renderCell}
       />
 
-      <NuevaSolicitudSheet
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+      <DetalleSolicitudSheet
+        open={detalleOpen}
+        onOpenChange={setDetalleOpen}
+        solicitud={solicitudSel}
         articulos={articulos}
-        onCreated={cargar}
+        onSaved={cargar}
       />
     </div>
   )
 }
 
-function EditableNumber({ value, editable, onSave }) {
-  const [editing, setEditing] = useState(false)
-  const [val, setVal] = useState(value)
-  useEffect(() => { setVal(value) }, [value])
-
-  const save = () => {
-    // Aceptar punto o coma como separador decimal
-    const normalizado = String(val).replace(',', '.')
-    const n = parseFloat(normalizado)
-    if (isNaN(n) || n <= 0) { setVal(value); setEditing(false); return }
-    if (n !== value) onSave(n)
-    setEditing(false)
-  }
-
-  if (editable && editing) {
-    return (
-      <input
-        type="text"
-        inputMode="decimal"
-        autoFocus
-        value={val}
-        onClick={e => e.stopPropagation()}
-        onChange={e => {
-          // Permitir solo dígitos, punto y coma
-          const v = e.target.value.replace(/[^0-9.,]/g, '')
-          setVal(v)
-        }}
-        onBlur={save}
-        onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setVal(value); setEditing(false) } }}
-        className="w-20 bg-transparent border border-primary rounded px-2 py-0.5 text-right outline-none font-mono text-sm"
-      />
-    )
-  }
-  return (
-    <span
-      onClick={e => { if (editable) { e.stopPropagation(); setEditing(true) } }}
-      className={editable ? "cursor-pointer hover:bg-accent/50 px-2 py-0.5 -mx-2 rounded font-mono" : "font-mono"}
-    >{value}</span>
-  )
+function formatFecha(iso) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  if (!d) return iso
+  return `${d}/${m}/${y}`
 }
