@@ -47,6 +47,19 @@ def exe(db, sql, params=None):
         conn.close()
 
 
+# ── Sugerencia de receta ───────────────────────────────────
+
+@app.get("/api/produccion/sugerir-receta")
+def api_sugerir_receta(cod: str, cantidad: float, n_ops: int = 10):
+    """Sugiere receta para producir 'cantidad' unidades del artículo 'cod' basándose en últimas N OPs."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("sugerir_receta",
+        os.path.join(os.path.dirname(__file__), 'sugerir_receta.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.sugerir_receta(cod, cantidad, n_ops)
+
+
 # ── Modelos ────────────────────────────────────────────────
 
 class SolicitudCreate(BaseModel):

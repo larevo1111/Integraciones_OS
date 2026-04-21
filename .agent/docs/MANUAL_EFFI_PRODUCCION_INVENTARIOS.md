@@ -247,6 +247,48 @@ un costo aparte "ENVASADO MIEL APICA (INCLUYE F)" x 241 unidades.
 4. Si hay dos productos producidos en OPs historicas, incluir ambos (co-productos).
 5. Revisar si hay desperdicio registrado, incluirlo proporcionalmente.
 
+### Sugerencia automatica de receta (`scripts/produccion/sugerir_receta.py`)
+
+Modulo Python que analiza las ultimas N OPs de un articulo y sugiere la receta para producir
+una cantidad solicitada. Sin IA — usa estadistica clasica (mediana + MAD para outliers).
+
+**Endpoint API**: `GET /api/produccion/sugerir-receta?cod=X&cantidad=N&n_ops=10`
+
+**Algoritmo**:
+1. Trae las ultimas N OPs vigentes donde el articulo aparece como producido.
+2. Excluye OPs **mixtas** (con co-productos no-desperdicio) si hay >=3 OPs no-mixtas disponibles.
+3. Para cada material, calcula:
+   - Coeficiente de variacion (CV) de cantidades absolutas
+   - CV de ratios (material / producido)
+4. **Detecta patron**:
+   - `lote_fijo`: CV abs < 0.10 y CV producido < 0.20 → cantidades son ~iguales
+   - `escalable`: CV ratios bajo → escala lineal con la cantidad
+5. **Detecta outliers** con MAD (Median Absolute Deviation, threshold 3x):
+   - Materiales con valores fuera de 3 MAD → OP marcada como outlier
+6. **Filtra materiales raros**: si aparecen en menos del 50% de las OPs, los descarta.
+7. **Calcula receta sugerida**:
+   - Lote fijo: `n_lotes = ceil(cantidad / lote_estandar)`, materiales = mediana absoluta × n_lotes
+   - Escalable: materiales = mediana de ratios × cantidad
+8. **Asigna confianza**:
+   - alta: ≥4 OPs limpias y CV ratios < 0.15
+   - media: ≥3 OPs limpias y CV ratios < 0.30
+   - baja: menos OPs o CV alto
+
+**Pruebas masivas (`scripts/produccion/probar_sugerencias.py`)**:
+20 articulos con ≥4 OPs probados, comparando sugerencia contra mediana de las OPs limpias:
+
+| Resultado | Cuenta | Casos |
+|---|---|---|
+| Perfecto (avg <5%, max <15%) | 15/20 | Cobertura 73%, Nibs, Crema Mani 1kg, Tableta Macadamia, Chocolate Mesa, etc |
+| Bueno (avg <15%, max <30%) | 1/20 | Miel 640g (max 19% por OPs con miel cruda + filtrada combinada) |
+| Aceptable (avg <30%) | 3/20 | Propoleo 265g, Chocolate Granulado, Tableta Almendra (recetas variables) |
+| Malo (avg ≥30%) | 1/20 | Crema Mani 500g — TODAS sus OPs son mixtas de varios formatos |
+
+**Limitaciones detectadas**:
+- Productos cuyas OPs son SIEMPRE mixtas (envasado multi-formato) no se pueden sugerir bien.
+  El sistema marca confianza baja y debe pedirse confirmacion manual.
+- Productos con menos de 3 OPs historicas → sin_historia, no sugerir.
+
 
 
 ### 3.1. Encabezados — `zeffi_produccion_encabezados`
