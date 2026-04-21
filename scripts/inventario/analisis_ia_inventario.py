@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Genera análisis ejecutivo del inventario usando IA."""
-import os, json, argparse, requests
+import os, sys, json, argparse, requests
 import pymysql
 from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_INV = dict(host='localhost', user='osadmin', password='Epist2487.', database='os_inventario',
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib import cfg_local
+DB_INV  = dict(**cfg_local(), database='os_inventario',
               cursorclass=pymysql.cursors.DictCursor)
-DB_EFFI = dict(host='localhost', user='osadmin', password='Epist2487.', database='effi_data',
+DB_EFFI = dict(**cfg_local(), database='effi_data',
                cursorclass=pymysql.cursors.DictCursor)
 IA_URL = 'http://localhost:5100/ia/simple'
 
