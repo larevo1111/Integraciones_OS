@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router"
 import { Layout } from "@/components/layout"
+import "@/lib/theme"  // inicializa tema
 import { SolicitudesPage } from "@/pages/solicitudes"
 import { DashboardPage } from "@/pages/dashboard"
 import { PlaceholderPage } from "@/pages/placeholder"

@@ -114,16 +114,16 @@ export function SolicitudesPage() {
   }
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-5 max-w-[1400px] mx-auto">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-semibold">Solicitudes de Producción</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-[16px] font-semibold">Solicitudes de Producción</h1>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
             Click en una fila para ver o editar el detalle
           </p>
         </div>
-        <Button onClick={abrirNueva} className="cursor-pointer">
-          <Plus className="h-4 w-4" />
+        <Button onClick={abrirNueva}>
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
           Nueva solicitud
         </Button>
       </div>

@@ -271,12 +271,12 @@ export function OsDataTable({
   const toggleColVisible = (key) => setLocalColumns(cols => cols.map(c => c.key === key ? { ...c, visible: c.visible === false } : c))
 
   return (
-    <div className="flex flex-col rounded-lg border bg-card overflow-visible relative">
+    <div className="flex flex-col rounded-md border bg-card overflow-visible relative">
       {/* TOOLBAR */}
-      <div ref={toolbarRef} className="flex items-center justify-between h-11 px-3.5 border-b bg-secondary/20">
+      <div ref={toolbarRef} className="flex items-center justify-between h-9 px-3 border-b border-border">
         <div className="flex items-center gap-2">
-          {title && <span className="text-sm font-semibold">{title}</span>}
-          {!loading && <span className="text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{filteredRows.length}</span>}
+          {title && <span className="text-[12px] font-medium text-foreground">{title}</span>}
+          {!loading && <span className="text-[11px] font-normal text-muted-foreground">{filteredRows.length}</span>}
           {activeFilterCount > 0 && (
             <button
               onClick={clearAllFilters}
@@ -300,9 +300,9 @@ export function OsDataTable({
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowFields(v => !v); setShowExport(false) }}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border bg-transparent text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" /> Campos
+              <SlidersHorizontal className="h-3 w-3" strokeWidth={2} /> Campos
             </button>
             {showFields && (
               <div onClick={e => e.stopPropagation()} className="absolute right-0 top-full mt-1.5 z-50 bg-card border border-border rounded-lg shadow-xl min-w-[280px] py-2">
@@ -333,9 +333,9 @@ export function OsDataTable({
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowExport(v => !v); setShowFields(false) }}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border bg-transparent text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
             >
-              <Download className="h-3.5 w-3.5" /> Exportar
+              <Download className="h-3 w-3" strokeWidth={2} /> Exportar
             </button>
             {showExport && (
               <div onClick={e => e.stopPropagation()} className="absolute right-0 top-full mt-1.5 z-50 bg-card border border-border rounded-lg shadow-xl min-w-[220px] py-2">
@@ -361,11 +361,11 @@ export function OsDataTable({
                   key={col.key}
                   onClick={(e) => openColPopup(col.key, e)}
                   className={cn(
-                    "text-left px-3 h-9 text-[11px] font-semibold uppercase tracking-wider bg-background border-b border-border cursor-pointer select-none whitespace-nowrap sticky top-0 z-10 transition-colors",
+                    "text-left px-3 h-8 text-[11px] font-medium bg-card border-b border-border cursor-pointer select-none whitespace-nowrap sticky top-0 z-10 transition-colors",
                     hasFilter(col.key) ? "text-primary" : "text-muted-foreground",
                     sortKey === col.key && "text-foreground",
-                    columnAggregates[col.key] && "border-b-emerald-500",
-                    colPopup === col.key && "bg-primary/10 text-primary",
+                    columnAggregates[col.key] && "border-b-emerald-500/60",
+                    colPopup === col.key && "bg-accent text-foreground",
                     "hover:text-foreground"
                   )}
                 >
@@ -411,13 +411,13 @@ export function OsDataTable({
                   <tr
                     key={row.id ?? idx}
                     onClick={() => onRowClick?.(row)}
-                    className={cn("border-b border-border/40 hover:bg-accent/30 transition-colors group", onRowClick && "cursor-pointer")}
+                    className={cn("border-b border-border/50 hover:bg-accent/50 transition-colors group", onRowClick && "cursor-pointer")}
                   >
                     {visibleColumns.map(col => {
                       const value = row[col.key]
                       const custom = renderCell?.(row, col, value)
                       return (
-                        <td key={col.key} className={cn("px-3 py-2 align-middle", col.nowrap && "whitespace-nowrap")}>
+                        <td key={col.key} className={cn("px-3 h-9 align-middle text-[13px]", col.nowrap && "whitespace-nowrap")}>
                           {custom !== undefined && custom !== null ? custom : formatCell(value, col.key)}
                         </td>
                       )
@@ -432,9 +432,9 @@ export function OsDataTable({
 
       {/* FOOTER */}
       {!loading && sortedRows.length > 0 && (
-        <div className="px-3.5 py-2 text-xs text-muted-foreground border-t">
+        <div className="px-3 h-7 flex items-center text-[11px] text-muted-foreground border-t border-border">
           {sortedRows.length} filas
-          {activeFilterCount > 0 && <span> · {rows.length - sortedRows.length} filtradas</span>}
+          {activeFilterCount > 0 && <span className="ml-1"> · {rows.length - sortedRows.length} filtradas</span>}
         </div>
       )}
 

@@ -1,36 +1,102 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@theme {
-  --color-background: #0a0a0b;
-  --color-foreground: #fafafa;
-  --color-card: #131317;
-  --color-card-foreground: #fafafa;
+/* ─── Tema dark (default) — Linear-style ─── */
+:root {
+  --color-background: #08090a;
+  --color-foreground: #f7f8f8;
+  --color-card: #101113;
+  --color-card-foreground: #f7f8f8;
   --color-primary: #22c55e;
   --color-primary-foreground: #050505;
-  --color-secondary: #1d1d21;
-  --color-secondary-foreground: #fafafa;
-  --color-muted: #1d1d21;
-  --color-muted-foreground: #a1a1aa;
-  --color-accent: #222226;
-  --color-accent-foreground: #fafafa;
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #fafafa;
-  --color-border: #2a2a2e;
-  --color-input: #2a2a2e;
-  --color-ring: #22c55e;
-  --color-sidebar: #0f0f12;
-  --radius: 0.5rem;
+  --color-secondary: #1a1b1e;
+  --color-secondary-foreground: #f7f8f8;
+  --color-muted: #17181a;
+  --color-muted-foreground: #8a8f98;
+  --color-accent: #1c1d21;
+  --color-accent-foreground: #f7f8f8;
+  --color-destructive: #eb5757;
+  --color-destructive-foreground: #f7f8f8;
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-input: rgba(255, 255, 255, 0.09);
+  --color-ring: rgba(94, 106, 210, 0.35);
+  --color-sidebar: #0c0d0f;
+}
+
+/* ─── Tema light — Linear-style claro ─── */
+.light {
+  --color-background: #ffffff;
+  --color-foreground: #0f0f12;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f0f12;
+  --color-primary: #15803d;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f5f5f7;
+  --color-secondary-foreground: #0f0f12;
+  --color-muted: #f5f5f7;
+  --color-muted-foreground: #6b6f76;
+  --color-accent: #f3f3f5;
+  --color-accent-foreground: #0f0f12;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-input: rgba(0, 0, 0, 0.10);
+  --color-ring: rgba(94, 106, 210, 0.45);
+  --color-sidebar: #fafafa;
+}
+
+@theme inline {
+  --color-background: var(--color-background);
+  --color-foreground: var(--color-foreground);
+  --color-card: var(--color-card);
+  --color-card-foreground: var(--color-card-foreground);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-foreground: var(--color-destructive-foreground);
+  --color-border: var(--color-border);
+  --color-input: var(--color-input);
+  --color-ring: var(--color-ring);
+  --color-sidebar: var(--color-sidebar);
+  --radius: 6px;
+}
+
+html, body, #root {
+  height: 100%;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
   background: var(--color-background);
   color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
 }
 
-/* Scrollbar dark */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Scrollbar dark linear-style */
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.35);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+h1, h2, h3 { letter-spacing: -0.02em; }
+
+*:focus { outline: none; }
