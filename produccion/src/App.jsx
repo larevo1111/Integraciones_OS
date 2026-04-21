@@ -1,37 +1,23 @@
-import { Refine } from "@refinedev/core"
-import routerProvider from "@refinedev/react-router"
-import dataProvider from "@refinedev/simple-rest"
-import { BrowserRouter, Routes, Route, Outlet } from "react-router"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router"
 import { Layout } from "@/components/layout"
+import { SolicitudesPage } from "@/pages/solicitudes"
 import { DashboardPage } from "@/pages/dashboard"
-
-const API_URL = window.location.origin
+import { PlaceholderPage } from "@/pages/placeholder"
+import { Calendar, BookOpen, Settings } from "lucide-react"
 
 function App() {
   return (
     <BrowserRouter>
-      <Refine
-        routerProvider={routerProvider}
-        dataProvider={dataProvider(API_URL + "/api")}
-        resources={[
-          {
-            name: "produccion",
-            list: "/produccion",
-            meta: { label: "Producción" },
-          },
-        ]}
-        options={{
-          syncWithLocation: true,
-          disableTelemetry: true,
-        }}
-      >
+      <Layout>
         <Routes>
-          <Route element={<Layout><Outlet /></Layout>}>
-            <Route index element={<DashboardPage />} />
-            <Route path="/produccion" element={<DashboardPage />} />
-          </Route>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/solicitudes" element={<SolicitudesPage />} />
+          <Route path="/calendario" element={<PlaceholderPage title="Calendario" icon={Calendar} descripcion="Vista mensual de solicitudes programadas (próximamente)" />} />
+          <Route path="/recetas" element={<PlaceholderPage title="Recetas" icon={BookOpen} descripcion="Gestión de recetas por producto (próximamente)" />} />
+          <Route path="/config" element={<PlaceholderPage title="Configuración" icon={Settings} descripcion="Parámetros del módulo (próximamente)" />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </Refine>
+      </Layout>
     </BrowserRouter>
   )
 }

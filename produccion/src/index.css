@@ -1,23 +1,25 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @theme {
-  --color-background: #09090b;
+  --color-background: #0a0a0b;
   --color-foreground: #fafafa;
-  --color-card: #09090b;
+  --color-card: #131317;
   --color-card-foreground: #fafafa;
   --color-primary: #22c55e;
-  --color-primary-foreground: #09090b;
-  --color-secondary: #27272a;
+  --color-primary-foreground: #050505;
+  --color-secondary: #1d1d21;
   --color-secondary-foreground: #fafafa;
-  --color-muted: #27272a;
+  --color-muted: #1d1d21;
   --color-muted-foreground: #a1a1aa;
-  --color-accent: #27272a;
+  --color-accent: #222226;
   --color-accent-foreground: #fafafa;
   --color-destructive: #ef4444;
   --color-destructive-foreground: #fafafa;
-  --color-border: #27272a;
-  --color-input: #27272a;
+  --color-border: #2a2a2e;
+  --color-input: #2a2a2e;
   --color-ring: #22c55e;
+  --color-sidebar: #0f0f12;
   --radius: 0.5rem;
 }
 
@@ -26,3 +28,9 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
 }
+
+/* Scrollbar dark */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
