@@ -265,4 +265,15 @@ function guardarTiempos() {
 }
 .linea { border-bottom: 1px solid var(--border-subtle); }
 .linea:last-child { border-bottom: none; }
+
+/* Forzar contraste de q-input en dark mode del proyecto (no usa body--dark de Quasar) */
+:deep(.q-field--filled .q-field__control) {
+  background: var(--bg-row-hover) !important;
+}
+:deep(.q-field--filled .q-field__control:before) { border-bottom-color: var(--border-default) !important; }
+:deep(.q-field__native),
+:deep(.q-field__input) {
+  color: var(--text-primary) !important;
+}
+:deep(.q-placeholder::placeholder) { color: var(--text-tertiary) !important; opacity: 1; }
 </style>
