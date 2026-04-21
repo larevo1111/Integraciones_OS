@@ -50,13 +50,18 @@ def exe(db, sql, params=None):
 # ── Sugerencia de receta ───────────────────────────────────
 
 @app.get("/api/produccion/sugerir-receta")
-def api_sugerir_receta(cod: str, cantidad: float, n_ops: int = 10):
-    """Sugiere receta para producir 'cantidad' unidades del artículo 'cod' basándose en últimas N OPs."""
+def api_sugerir_receta(cod: str, cantidad: float, n_ops: int = 10, iterativo: bool = True):
+    """Sugiere receta para producir 'cantidad' unidades del artículo 'cod'.
+    Si iterativo=True (default), intenta con 5, 10, 15, 20 OPs hasta encontrar consistencia.
+    Si iterativo=False, usa exactamente n_ops.
+    """
     import importlib.util
     spec = importlib.util.spec_from_file_location("sugerir_receta",
         os.path.join(os.path.dirname(__file__), 'sugerir_receta.py'))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    if iterativo:
+        return mod.sugerir_iterativo(cod, cantidad)
     return mod.sugerir_receta(cod, cantidad, n_ops)
 
 

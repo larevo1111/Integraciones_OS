@@ -377,13 +377,73 @@ def sugerir_receta(cod_articulo: str, cantidad: float, n_ops: int = 10) -> dict:
     }
 
 
+def sugerir_iterativo(cod_articulo: str, cantidad: float,
+                       ventanas: list = None,
+                       min_ops_consistentes: int = 3,
+                       cv_objetivo: float = 0.15) -> dict:
+    """
+    Estrategia iterativa: empezar con 5 OPs, ampliar de a 5 si no es concluyente.
+    Devuelve la primera ventana que cumpla los criterios o la mejor encontrada.
+
+    Criterios "concluyente":
+    - >= min_ops_consistentes OPs limpias (no outliers, no incompletas)
+    - CV de ratios < cv_objetivo (consistencia)
+    - Confianza alta o media
+    """
+    if ventanas is None:
+        ventanas = [5, 10, 15, 20]
+
+    mejor = None
+    historial = []
+    for n in ventanas:
+        s = sugerir_receta(cod_articulo, cantidad, n_ops=n)
+        ops_limpias = (s.get('ops_efectivas') or 0) - len(s.get('ops_outlier_descartadas') or [])
+        cv = s.get('cv_ratios', 1.0)
+        es_concluyente = (
+            ops_limpias >= min_ops_consistentes and
+            cv < cv_objetivo and
+            s.get('confianza') in ('alta', 'media') and
+            s.get('patron') not in ('sin_historia',)
+        )
+        historial.append({
+            'ventana': n, 'ops_limpias': ops_limpias, 'cv': cv,
+            'confianza': s.get('confianza'), 'patron': s.get('patron'),
+            'concluyente': es_concluyente,
+        })
+        if es_concluyente:
+            s['estrategia'] = {
+                'ventana_final': n,
+                'iteraciones': len(historial),
+                'historial': historial,
+                'estado': 'concluyente',
+            }
+            return s
+        # Guardar la mejor opción por si nunca es concluyente
+        if mejor is None or ops_limpias > (mejor.get('estrategia') or {}).get('ops_limpias_max', 0):
+            mejor = s
+            mejor['estrategia'] = {'ops_limpias_max': ops_limpias}
+
+    # No concluyente: marcar
+    mejor['estrategia'] = {
+        'ventana_final': ventanas[-1],
+        'iteraciones': len(historial),
+        'historial': historial,
+        'estado': 'no_concluyente',
+        'mensaje': f'Después de {len(historial)} iteraciones (hasta {ventanas[-1]} OPs), no se encontró un patrón consistente. Recomendado: revisión manual o consulta a IA.',
+    }
+    return mejor
+
+
 if __name__ == '__main__':
     import json
     if len(sys.argv) < 3:
-        print('Uso: python3 sugerir_receta.py <cod_articulo> <cantidad> [n_ops]')
+        print('Uso: python3 sugerir_receta.py <cod_articulo> <cantidad> [--iter]')
         sys.exit(1)
     cod = sys.argv[1]
     cant = float(sys.argv[2])
-    n_ops = int(sys.argv[3]) if len(sys.argv) > 3 else 10
-    resultado = sugerir_receta(cod, cant, n_ops)
+    if '--iter' in sys.argv:
+        resultado = sugerir_iterativo(cod, cant)
+    else:
+        n_ops = int(sys.argv[3]) if len(sys.argv) > 3 else 10
+        resultado = sugerir_receta(cod, cant, n_ops)
     print(json.dumps(resultado, indent=2, default=str, ensure_ascii=False))
