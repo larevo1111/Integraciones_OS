@@ -198,6 +198,57 @@ Ejemplo — OP 2088 (Nibs de cacao):
 Las OPs en Effi representan procesos de transformacion: se consumen materias primas + insumos
 y se producen articulos terminados. Los datos se distribuyen en **5 tablas**:
 
+### Logica de negocio — como se programa una OP en OS
+
+**Flujo real en la empresa**: para programar produccion de un articulo, se busca una OP HISTORICA
+del mismo articulo y se **replica** la receta. Esto implica que existen "plantillas" de receta
+embebidas en las OPs pasadas.
+
+**Verificado empiricamente (2026-04-21) con 5 productos recurrentes**:
+
+| Producto | Cod | Patron | Detalle |
+|---|---|---|---|
+| Cobertura 73% | 319 | **Lote fijo 4kg** | 7 materiales en cantidades identicas en 5 de 5 OPs 2026. Siempre 4kg, M.O. 2.35h |
+| Tableta 73% Macadamia | 482 | **Lote fijo 25-30 uds** | 1.05kg cobertura + 0.45kg macadamia produce entre 25-30 tabletas (rinde varia) |
+| Tableta 73% Almendra | 483 | **Lote fijo similar** | 0.95kg cobertura + 0.41kg almendras → ~16 unidades |
+| Nibs 100g | 317 | **Escalable por unidad** | 0.1kg nibs + 1 bolsa + 2 etiquetas por unidad producida (ratio exacto en 6 OPs) |
+| Miel 640g | 15 | **Escalable por unidad** | 0.64kg miel + 1 envase + 2 etiquetas por unidad (ratio exacto en 4 OPs) |
+| Chocolate Mesa Moldeado 93 | Co-producto | **OP produce 93 + 73 simultaneamente** | 8kg nibs rinde 4kg moldeado + 4kg bloque 24H |
+
+**Dos grandes patrones de receta**:
+
+1. **Lote fijo**: cantidades de materiales son FIJAS. Producir mas = mas lotes, no mas insumos por lote.
+   - Cobertura 73%: siempre 4kg con 2.30+0.70+0.40+0.35+0.12+0.01+0.64 kg de materiales
+   - Tabletas CPM: lote estandar de ~25-30 tabletas con materiales fijos
+   - M.O. (horas) es tambien fija por lote
+
+2. **Escalable por unidad**: cantidad de materiales = cantidad producida x ratio fijo.
+   - Nibs, etiquetas, envases, tapas: 1:1 con unidades producidas
+   - Miel x 640g: 0.64 kg miel por unidad
+
+**Co-productos y desperdicios registrados**:
+Algunas OPs tienen multiples productos principales (ej: Moldeado + Bloque 24H juntos).
+Otras incluyen articulos tipo "DESPERDICO - ..." como producto secundario para balancear
+el consumo vs la produccion real (ej: 0.80kg desperdicio al producir 16 tabletas).
+
+**OPs mixtas (empacado)**:
+Algunas OPs procesan multiples formatos en un solo proceso. Ejemplo OP 2077 (mar-26) produjo
+Miel 150g + 275g + 640g + 1000g simultaneamente desde los formatos "SIN ETIQUETAR" usando
+un costo aparte "ENVASADO MIEL APICA (INCLUYE F)" x 241 unidades.
+
+**Implicaciones para programar OPs via script** (`import_orden_produccion.js`):
+
+1. Para replicar: buscar la ultima OP del articulo donde ese articulo sea el UNICO producto
+   (o donde este presente) y copiar materiales exactos.
+2. Para escalar: identificar si es lote fijo o escalable:
+   - Si cantidad producida varia pero materiales son identicos entre OPs → lote fijo
+   - Si cantidad producida y materiales escalan proporcionalmente → escalable
+3. Siempre agregar M.O. (costo de produccion) — en OS siempre "M.O. HORA ORIGEN SILVESTRE" a $7000/h
+4. Si hay dos productos producidos en OPs historicas, incluir ambos (co-productos).
+5. Revisar si hay desperdicio registrado, incluirlo proporcionalmente.
+
+
+
 ### 3.1. Encabezados — `zeffi_produccion_encabezados`
 
 **Total**: 2,088 OPs (1,104 vigentes, 984 anuladas)

@@ -11,7 +11,7 @@
 | Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ activos | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Estable — sin trabajo activo | — |
 | Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | Operativo — inv.oscomunidad.com, inventarios completos + parciales | Alta |
-| Producción | `produccion/` | Nuevo módulo — React + Refine + Shadcn/ui + Tailwind | En desarrollo |
+| Producción | `produccion/` + `scripts/produccion/api.py:9600` | React + Shadcn/ui + Tailwind (style Linear), BD `os_produccion` | Operativo — solicitudes → OPs Effi via Playwright |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
 ## Trabajo activo (2026-04-20)
@@ -33,10 +33,17 @@
 **Costo:**
 - Migrado de `costo_promedio` a `costo_manual` en todo el sistema (inventario, resúmenes, informes)
 
-**Nuevo módulo Producción:**
-- Directorio: `produccion/`
-- Stack: React + Refine + Shadcn/ui + Tailwind (distinto al stack principal Vue+Quasar)
-- Estado: en desarrollo inicial
+**Módulo Producción (2026-04-21):**
+- Directorio: `produccion/` — stack React + Shadcn/ui + Tailwind v4 (style Linear.app)
+- API: FastAPI `scripts/produccion/api.py` puerto 9600 (systemd `os-produccion-api`)
+- BD: `os_produccion.solicitudes_produccion` (estados: solicitado/programado/en_produccion/producido/validado/cancelado)
+- Estado: **operativo** — Jenifer programa solicitudes, Santi las convierte en OPs de Effi
+- Tabla OsDataTable portada a React (filtros, subtotales, exportar, modo claro/oscuro)
+- Panel detalle lateral al click en fila (sheet drawer)
+- Scripts Playwright Effi (creados 2026-04-21):
+  - `scripts/import_orden_produccion.js` — crea OPs en Effi desde JSON (probado con OP 2182)
+  - `scripts/anular_orden_produccion.js` — anula OPs por ID
+- **Logica recetas verificada**: productos se dividen en "lote fijo" (cobertura 73%, tabletas) vs "escalable por unidad" (nibs 100g, miel 640g). Doc en `MANUAL_EFFI_PRODUCCION_INVENTARIOS.md §3`.
 
 ### Completado 2026-04-20 — BDs Hostinger marcadas deprecated
 - `u768061575_os_integracion` y `u768061575_os_gestion` en Hostinger: todas las tablas renombradas con prefijo `_deprecated_` + tabla `_DEPRECATED_README` con aviso y ruta al VPS.

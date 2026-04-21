@@ -442,6 +442,35 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Dependencias**: `session.js`, archivo XLSX con formato plantilla Effi
 - **Plantilla de referencia**: `plantilla_importacion_ajuste_inventario.xlsx` (raíz del repo)
 
+### import_orden_produccion.js
+- **Propósito**: Crear órdenes de producción en Effi via Playwright desde un JSON
+- **Tipo**: Playwright action (escritura en Effi)
+- **Ejecución manual**:
+  ```
+  node scripts/import_orden_produccion.js /tmp/op.json
+  ```
+- **Formato JSON**:
+  ```json
+  {
+    "sucursal_id": 1, "bodega_id": 1,
+    "fecha_inicio": "2026-04-21", "fecha_fin": "2026-04-21",
+    "encargado": "74084937",
+    "observacion": "LOTE xxx",
+    "materiales": [{"cod_articulo":"319","cantidad":0.95,"costo":43432}],
+    "articulos_producidos": [{"cod_articulo":"483","cantidad":16,"precio":5200}],
+    "otros_costos": [{"tipo_costo_id":1,"cantidad":1,"costo":5000}]
+  }
+  ```
+- **Flujo**: click Crear → sucursal/bodega via Chosen → fechas → modal buscar encargado (modalBuscarTercero) → loop materiales (modalBuscarArticuloStock + cantidad/costo + btnAgregarMaterial) → loop producidos → loop otros costos → observación → limpiar filas vacías → Crear
+- **Probado**: OP 2182 creada exitosamente (2026-04-21)
+- **Dependencias**: `session.js`
+
+### anular_orden_produccion.js
+- **Propósito**: Anular OP existente por ID
+- **Ejecución manual**: `node scripts/anular_orden_produccion.js <id_orden> [observacion]`
+- **Dependencias**: `session.js`
+- **Notas**: flujo probable (buscar fila, menú acciones, Anular, confirmar con observación). Necesita primera prueba en vivo para validar selectores.
+
 ---
 
 ## 2. Infraestructura / Utilidades
