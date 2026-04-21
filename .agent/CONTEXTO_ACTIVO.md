@@ -15,6 +15,12 @@
 
 ## Trabajo activo (2026-04-20)
 
+### Completado 2026-04-20 — BDs Hostinger marcadas deprecated
+- `u768061575_os_integracion` y `u768061575_os_gestion` en Hostinger: todas las tablas renombradas con prefijo `_deprecated_` + tabla `_DEPRECATED_README` con aviso y ruta al VPS.
+- Motivo: prevenir que futuros agentes (Claude Code / Antigravity / scripts) consulten datos muertos. Si alguien hace `SELECT ... FROM zeffi_facturas_venta_encabezados` apuntando a Hostinger → error "table not found" (fail-fast).
+- `u768061575_os_comunidad` intacta (ERP real Effi, prohibido tocar).
+- PWA Service Worker: confirmado que `skipWaiting: true` + `clientsClaim: true` ya están en `quasar.config.js` y el `sw.js` compilado incluye `self.skipWaiting()` + `e.clientsClaim()` + `cleanupOutdatedCaches()`. Las PWAs se actualizan automáticamente al próximo abrir.
+
 ### Completado 2026-04-20 — Corte DNS gestion al VPS (migración completada)
 - `gestion.oscomunidad.com` → VPS tunnel (antes: servidor local).
 - Precondición verificada: `JWT_SECRET` y `GOOGLE_CLIENT_ID` idénticos local/VPS → usuarios NO perdieron sesión.
