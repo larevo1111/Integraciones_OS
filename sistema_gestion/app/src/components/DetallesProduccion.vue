@@ -104,9 +104,9 @@
       <div class="text-caption text-grey q-mb-xs">Tiempos de la actividad</div>
       <div
         v-for="t in TIEMPOS_DEF" :key="t.key"
-        class="row items-center q-py-xs"
+        class="row items-center dp-tiempo-fila"
       >
-        <div class="col text-body2">{{ t.label }}</div>
+        <div class="col dp-tiempo-lbl">{{ t.label }}</div>
         <q-input
           dense filled hide-bottom-space
           style="width: 70px"
@@ -117,13 +117,13 @@
           @update:model-value="v => tiempos[t.key] = parseInt(v) || null"
           @blur="guardarTiempos"
         />
-        <span class="text-caption text-grey q-ml-xs" style="width:30px">min</span>
+        <span class="text-caption text-grey q-ml-xs" style="width:26px">min</span>
       </div>
       <q-separator class="q-my-xs" />
-      <div class="row items-center q-py-xs">
-        <div class="col text-body2 text-weight-medium">Total</div>
+      <div class="row items-center dp-tiempo-fila">
+        <div class="col dp-tiempo-lbl text-weight-medium">Total</div>
         <div style="width:70px" class="text-right text-weight-medium">{{ totalTiempos }}</div>
-        <span class="text-caption text-grey q-ml-xs" style="width:30px">min</span>
+        <span class="text-caption text-grey q-ml-xs" style="width:26px">min</span>
       </div>
     </div>
   </q-expansion-item>
@@ -258,13 +258,22 @@ function guardarTiempos() {
   font-size: 12px;
 }
 .dp-nombre {
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.3;
   word-break: break-word;
   color: var(--text-primary);
 }
 .linea { border-bottom: 1px solid var(--border-subtle); }
 .linea:last-child { border-bottom: none; }
+
+.dp-tiempo-fila { padding: 2px 0; }
+.dp-tiempo-lbl  { font-size: 11px; color: var(--text-primary); }
+/* Inputs de tiempo aún más compactos */
+.dp-tiempo-fila :deep(.q-field--dense .q-field__control),
+.dp-tiempo-fila :deep(.q-field--dense .q-field__native) {
+  min-height: 26px !important;
+  height: 26px !important;
+}
 
 /* Forzar contraste de q-input en dark mode del proyecto (no usa body--dark de Quasar) */
 :deep(.q-field--filled .q-field__control) {
