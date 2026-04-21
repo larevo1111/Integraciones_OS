@@ -509,6 +509,10 @@
             <span class="material-icons" :class="{ spin: generandoInforme }" style="font-size:15px">picture_as_pdf</span>
             {{ generandoInforme ? 'Generando...' : 'Informe PDF' }}
           </button>
+          <button class="ges-action-btn ges-action-btn-ia" :disabled="generandoAnalisis" @click="descargarAnalisisIA">
+            <span class="material-icons" :class="{ spin: generandoAnalisis }" style="font-size:15px">psychology</span>
+            {{ generandoAnalisis ? 'Analizando...' : 'Análisis IA' }}
+          </button>
         </div>
 
         <!-- OBSERVACIONES -->
@@ -1299,6 +1303,7 @@ const gesAnalizando = ref(false)
 const gesProgreso = ref(0)
 const gesTotal = ref(0)
 const generandoInforme = ref(false)
+const generandoAnalisis = ref(false)
 const gesDetalleVisible = ref(false)
 const gesDetalleData = ref(null)
 const gesGruposExpandidos = ref({})
@@ -1759,24 +1764,26 @@ async function eliminarObservacion(id) {
   await cargarObservaciones()
 }
 
-async function descargarInforme() {
-  generandoInforme.value = true
+async function descargarPDF(endpoint, filename, refLoading) {
+  refLoading.value = true
   try {
-    const resp = await fetch(`${API}/api/inventario/informe?fecha=${FECHA.value}`)
-    if (!resp.ok) throw new Error('Error generando informe')
+    const resp = await fetch(`${API}${endpoint}?fecha=${FECHA.value}`)
+    if (!resp.ok) throw new Error('Error generando documento')
     const blob = await resp.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Informe_Inventario_OS_${FECHA.value}.pdf`
+    a.download = filename.replace('{fecha}', FECHA.value)
     a.click()
     URL.revokeObjectURL(url)
   } catch (e) {
-    alert('Error generando informe: ' + e.message)
+    alert('Error: ' + e.message)
   } finally {
-    generandoInforme.value = false
+    refLoading.value = false
   }
 }
+function descargarInforme() { descargarPDF('/api/inventario/informe', 'Informe_Inventario_OS_{fecha}.pdf', generandoInforme) }
+function descargarAnalisisIA() { descargarPDF('/api/inventario/analisis-ia', 'Analisis_IA_Inventario_{fecha}.pdf', generandoAnalisis) }
 
 async function cargarGestion() {
   await cargarGesDashboard()
@@ -2669,6 +2676,8 @@ onUnmounted(() => clearInterval(clockInterval))
 .ges-action-btn { display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.25); border-radius: 4px; color: #c084fc; font-size: 12px; font-weight: 500; cursor: pointer; }
 .ges-action-btn:hover { background: rgba(168,85,247,0.18); }
 .ges-action-btn:disabled { opacity: 0.5; cursor: wait; }
+.ges-action-btn-ia { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.25); color: #60a5fa; }
+.ges-action-btn-ia:hover { background: rgba(59,130,246,0.18); }
 
 .ges-table { table-layout: fixed; }
 .ges-row { cursor: pointer; }

@@ -1061,6 +1061,22 @@ def registrar_observacion(fecha, tipo, descripcion, detalle=None, usuario='siste
     """, (fecha, tipo, descripcion, detalle, usuario))
 
 
+@app.get("/api/inventario/analisis-ia")
+def generar_analisis_ia(fecha: str):
+    """Genera análisis ejecutivo IA del inventario y descarga PDF."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("analisis_ia",
+        os.path.join(os.path.dirname(__file__), 'analisis_ia_inventario.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    try:
+        output_path, _ = mod.generar_analisis(fecha)
+    except Exception as e:
+        raise HTTPException(500, f'Error generando análisis IA: {e}')
+    return FileResponse(output_path, media_type='application/pdf',
+                        filename=f'Analisis_IA_Inventario_{fecha}.pdf')
+
+
 @app.get("/api/inventario/informe")
 def generar_informe(fecha: str):
     """Genera y descarga el informe PDF del inventario."""
