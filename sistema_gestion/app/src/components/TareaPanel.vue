@@ -65,25 +65,12 @@
         @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
       />
 
-      <div v-if="esProduccion" class="field-row" style="align-items:flex-start">
-        <span class="field-label" style="padding-top:8px">OP Effi</span>
-        <div style="flex:1;min-width:0">
-          <OpSelector :modelValue="tarea.id_op || ''" @update:modelValue="val => { actualizar('id_op', val); cargarDetalleOp(val) }" />
-        </div>
-      </div>
-
-      <!-- Detalle OP expandido -->
-      <div v-if="esProduccion && detalleOp" class="op-detail-card">
-        <p class="op-detail-titulo">OP {{ detalleOp.id_orden }} — {{ detalleOp.articulos }}</p>
-        <div class="op-detail-meta">
-          <span class="op-detail-badge" :class="detalleOp.estado?.toLowerCase().replace(' ','-')">{{ detalleOp.estado }}</span>
-          <span v-if="detalleOp.fecha_final" class="op-detail-fecha">Vence: {{ formatFechaOp(detalleOp.fecha_final) }}</span>
-          <span v-if="detalleOp.nombre_encargado" class="op-detail-encargado">· {{ detalleOp.nombre_encargado }}</span>
-        </div>
-      </div>
-
-      <!-- Detalles de producción (materiales, productos, tiempos) -->
-      <DetallesProduccion v-if="esProduccion" :tarea="tarea" />
+      <!-- Detalles de producción: OP + materiales + productos + tiempos -->
+      <DetallesProduccion
+        v-if="esProduccion"
+        :tarea="tarea"
+        @actualizar-id-op="val => actualizar('id_op', val)"
+      />
 
 
       <!-- Remisión (solo Empaque) -->
@@ -268,7 +255,6 @@ import Cronometro           from './Cronometro.vue'
 import CronoDisplay         from './CronoDisplay.vue'
 import TareaMetaChips       from './TareaMetaChips.vue'
 import DetallesProduccion   from './DetallesProduccion.vue'
-import OpSelector           from './OpSelector.vue'
 import RemisionSelector     from './RemisionSelector.vue'
 import PedidoSelector       from './PedidoSelector.vue'
 import ToastUndo            from './ToastUndo.vue'
@@ -362,24 +348,6 @@ const esEmpaque = computed(() => {
   const cat = props.categorias.find(c => c.id === props.tarea.categoria_id)
   return cat?.es_empaque || false
 })
-
-// Detalle OP
-const detalleOp = ref(null)
-
-async function cargarDetalleOp(idOp) {
-  if (!idOp) { detalleOp.value = null; return }
-  try {
-    const data = await api(`/api/gestion/op/${encodeURIComponent(idOp)}`)
-    detalleOp.value = data.op || null
-  } catch { detalleOp.value = null }
-}
-
-function formatFechaOp(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
-}
-
-watch(() => props.tarea?.id_op, idOp => cargarDetalleOp(idOp), { immediate: true })
 
 // Toast deshacer
 const toastRef = ref(null)
