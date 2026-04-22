@@ -39,9 +39,9 @@ const textoBadge = (a) => {
 }
 
 const COLUMNS = [
-  { key: 'id_effi',   label: 'Cód' },
+  { key: 'id_effi',   label: 'ID' },
   { key: 'nombre',    label: 'Artículo' },
-  { key: 'categoria', label: 'Tipo' },
+  { key: 'categoria', label: 'Categ' },
 ]
 
 export function TablaConteo({ articulos, cargando, conteoBloqueado, onChange, onAccionFila }) {

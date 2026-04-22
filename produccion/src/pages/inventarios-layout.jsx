@@ -21,7 +21,7 @@ const FILTROS_BASE = [
   { key: 'todos',     label: 'Todos' },
   { key: 'pendiente', label: 'Pendientes' },
   { key: 'contado',   label: 'Contados' },
-  { key: 'diferencia',label: 'Con dif.' },
+  { key: 'diferencia',label: 'Diferencias' },
 ]
 
 const PERMISO_DEFAULT = {
@@ -57,15 +57,47 @@ export function InventariosLayoutPage() {
   const articuloFotoRef = useRef(null)  // qué artículo recibirá la foto pendiente
   const [mostrarAgregar, setMostrarAgregar] = useState(false)
 
-  // Reloj
+  // Reloj — formato Vue: "Mié 22 Abr 2026 · 17:11:21"
   const [horaActual, setHoraActual] = useState('')
   useEffect(() => {
-    const t = setInterval(() => {
+    const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const upd = () => {
       const d = new Date()
-      setHoraActual(d.toTimeString().slice(0, 8))
-    }, 1000)
+      const h = String(d.getHours()).padStart(2, '0')
+      const m = String(d.getMinutes()).padStart(2, '0')
+      const s = String(d.getSeconds()).padStart(2, '0')
+      setHoraActual(`${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()} · ${h}:${m}:${s}`)
+    }
+    upd()
+    const t = setInterval(upd, 1000)
     return () => clearInterval(t)
   }, [])
+
+  // Aside abierto/cerrado (panelAbierto del Vue)
+  const [panelAbierto, setPanelAbierto] = useState(true)
+
+  // Sync Effi state
+  const [syncEstado, setSyncEstado] = useState('idle')
+  const lanzarSync = async () => {
+    if (syncEstado !== 'idle') return
+    setSyncEstado('exportando')
+    try {
+      await api.post('/api/inventario/sync-effi/start', { fecha_inventario: fecha, usuario: auth.usuario?.email || '' })
+      // Polling simple: hasta que el estado vuelva a idle
+      const poll = setInterval(async () => {
+        try {
+          const s = await api.get('/api/inventario/sync-effi/estado')
+          setSyncEstado(s.estado || 'idle')
+          if (!s.estado || s.estado === 'idle' || s.estado === 'ok' || s.estado === 'error') {
+            clearInterval(poll); setSyncEstado('idle'); cargarArticulos()
+          }
+        } catch (_) { clearInterval(poll); setSyncEstado('idle') }
+      }, 2000)
+    } catch (e) {
+      alert('Error sync: ' + e.message); setSyncEstado('idle')
+    }
+  }
 
   const puede = (accion) => PERMISO_DEFAULT[accion] !== false  // TODO: integrar con políticas
 
@@ -135,6 +167,13 @@ export function InventariosLayoutPage() {
 
   const cambiarFecha = (nueva) => navigate(`/inventarios/${nueva}`)
 
+  const MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+  const fmtFechaCorta = (yyyymmdd) => {
+    if (!yyyymmdd) return ''
+    const [y, m, d] = yyyymmdd.split('-')
+    return `${parseInt(d, 10)} ${MESES_CORTOS[parseInt(m, 10) - 1]} ${y}`
+  }
+
   const calcularTeorico = async () => {
     if (calculandoTeorico) return
     setCalculandoTeorico(true)
@@ -189,9 +228,9 @@ export function InventariosLayoutPage() {
   }, [fecha])
 
   return (
-    <div className="inv-app panel-open inv-react-root">
+    <div className={`inv-app inv-react-root ${panelAbierto ? 'panel-open' : ''}`}>
       {/* SIDE PANEL */}
-      <aside className="inv-panel open">
+      <aside className={`inv-panel ${panelAbierto ? 'open' : ''}`}>
         <div className="inv-panel-header">
           <span className="inv-panel-title">Inventarios</span>
           {puede('nuevo_inventario') && (
@@ -199,12 +238,15 @@ export function InventariosLayoutPage() {
               <span className="material-icons" style={{ fontSize: 14 }}>add</span>
             </button>
           )}
+          <button className="inv-panel-add" onClick={() => setPanelAbierto(false)} title="Colapsar panel" style={{ marginLeft: 4 }}>
+            <span className="material-icons" style={{ fontSize: 14 }}>chevron_left</span>
+          </button>
         </div>
         <div className="inv-panel-list">
           {fechas.map(f => (
             <div key={f.fecha_inventario} className={`inv-panel-item ${fecha === f.fecha_inventario ? 'active' : ''}`}>
               <div className="inv-panel-item-main" onClick={() => cambiarFecha(f.fecha_inventario)}>
-                <div className="inv-panel-item-fecha">{f.fecha_inventario}</div>
+                <div className="inv-panel-item-fecha">{fmtFechaCorta(f.fecha_inventario)}</div>
                 <div className="inv-panel-item-stats">
                   <span>{f.inventariables} artículos</span>
                   <span className="inv-panel-item-pct">{f.contados}/{f.inventariables}</span>
@@ -268,7 +310,12 @@ export function InventariosLayoutPage() {
         {/* HEADER */}
         <div className="inv-header">
           <div className="inv-header-left">
-            <div className="inv-avatar">{auth.usuario?.nombre?.slice(0, 2).toUpperCase() || '?'}</div>
+            {!panelAbierto && (
+              <button className="inv-panel-toggle" onClick={() => setPanelAbierto(true)} title="Inventarios">
+                <span className="material-icons" style={{ fontSize: 18 }}>menu</span>
+              </button>
+            )}
+            <div className="inv-avatar">{(auth.usuario?.nombre || '?').charAt(0).toUpperCase()}</div>
             <div className="inv-user-info">
               <span className="inv-user-name">{auth.usuario?.nombre}</span>
               <span className="inv-title">
@@ -310,6 +357,19 @@ export function InventariosLayoutPage() {
               placeholder="Buscar por nombre o código..."
             />
           </div>
+          <button
+            className={`inv-btn-sync ${syncEstado === 'exportando' || syncEstado === 'importando' ? 'syncing' : ''}`}
+            disabled={syncEstado === 'exportando' || syncEstado === 'importando'}
+            onClick={lanzarSync}
+            title="Actualizar catálogo de artículos desde Effi"
+          >
+            <span className={`material-icons ${syncEstado === 'exportando' || syncEstado === 'importando' ? 'spin' : ''}`} style={{ fontSize: 16 }}>sync</span>
+            <span>{syncEstado === 'exportando' ? 'Exportando…' : syncEstado === 'importando' ? 'Importando…' : 'Sync Effi'}</span>
+          </button>
+          <button className="inv-btn-scan" title="Escanear código de barras (próximamente)">
+            <span className="material-icons" style={{ fontSize: 16 }}>qr_code_scanner</span>
+            Escanear
+          </button>
         </div>
 
         {/* TABS */}

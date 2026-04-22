@@ -42,12 +42,19 @@ export function VistaCostos({ fecha }) {
 
   return (
     <div className="costos-container">
-      <div className="inv-toolbar" style={{ marginTop: 8 }}>
-        <div className="inv-search-box">
-          <span className="material-icons inv-search-icon">search</span>
-          <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-                 className="inv-search-input" type="text"
-                 placeholder="Filtrar por nombre o código..." />
+      {/* Header al estilo OsDataTable del Vue: título + contador + filtro */}
+      <div className="costos-header">
+        <div className="costos-titulo">
+          <span style={{ fontWeight: 600 }}>Valorización de Inventario</span>
+          <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontSize: 12 }}>{filtradas.length}</span>
+        </div>
+        <div style={{ marginLeft: 16, flex: 1, maxWidth: 360 }}>
+          <div className="inv-search-box" style={{ width: '100%' }}>
+            <span className="material-icons inv-search-icon">search</span>
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
+                   className="inv-search-input" type="text"
+                   placeholder="Filtrar por nombre o código..." />
+          </div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, alignItems: 'center' }}>
           <span><strong style={{ color: 'var(--text-tertiary)' }}>Val. Teórico:</strong> {fmtMoney(totales.val_teorico)}</span>
@@ -70,12 +77,12 @@ export function VistaCostos({ fecha }) {
                 <th>Categoría</th>
                 <th>Tipo</th>
                 <th style={{ textAlign: 'right' }}>Costo Unit.</th>
-                <th style={{ textAlign: 'right' }}>Teórico</th>
-                <th style={{ textAlign: 'right' }}>Físico</th>
-                <th style={{ textAlign: 'right' }}>Dif.</th>
+                <th style={{ textAlign: 'right' }}>Cant. Teórica</th>
+                <th style={{ textAlign: 'right' }}>Cant. Física</th>
+                <th style={{ textAlign: 'right' }}>Diferencia</th>
                 <th style={{ textAlign: 'right' }}>Val. Teórico</th>
                 <th style={{ textAlign: 'right' }}>Val. Físico</th>
-                <th style={{ textAlign: 'right' }}>Impacto</th>
+                <th style={{ textAlign: 'right' }}>Impacto $</th>
               </tr>
             </thead>
             <tbody>
