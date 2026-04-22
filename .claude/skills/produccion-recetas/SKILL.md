@@ -143,18 +143,28 @@ Aplicá los porcentajes al pedido. **La suma de materiales debe igualar el peso 
 
 Validados por la metodología arriba en múltiples OPs:
 
-| Tableta | % cobertura | % inclusión | OPs ref. |
-|---|---|---|---|
-| **Chocolate puro** | 100% (50g) | — | 2033, 2065 |
-| **Macadamia** | 70% (35g) | 30% macadamia (15g) | 2064, 2174 |
-| **Maní** | 70% (35g) | 30% maní (15g) | 2063 |
-| **Almendra** | 70% (35g) | 30% almendra (15g) | 2062 |
-| **Nibs** | 80% (40g) | 20% nibs (10g) | 2162 |
+| Tableta | Cobertura | Inclusión | Por unidad (50g) | OPs ref. |
+|---|---|---|---|---|
+| **Chocolate puro** | 100% | — | 50g cobertura | 2033, 2065 |
+| **Macadamia** | 70% | 30% macadamia | 35g cob + 15g mac | 2064, 2174 |
+| **Maní** | 70% | 30% maní | 35g cob + 15g maní | 2063 |
+| **Almendra** | 70% | 30% almendra | 35g cob + 15g alm | 2062 |
+| **Nibs** | 80% | 20% nibs | 40g cob + 10g nibs | 2162 |
 
 **Regla resumen**:
-- Frutos secos (maní, macadamia, almendra) = **30% inclusión / 70% cobertura**
-- Nibs = **20% inclusión / 80% cobertura**
-- Chocolate puro = **100% cobertura**
+- Frutos secos (maní, macadamia, almendra) = **30% inclusión / 70% cobertura** = **15g + 35g por tableta**
+- Nibs = **20% inclusión / 80% cobertura** = **10g + 40g por tableta**
+- Chocolate puro = **100% cobertura** = **50g por tableta**
+
+**Cálculo rápido para un pedido**:
+```
+inclusión_total (kg) = (N_tabletas_frutosecos × 0.015) + (N_tabletas_nibs × 0.010)
+cobertura_total (kg) = N_total × 0.050  −  inclusión_total
+```
+
+Ejemplo: 50 puro + 30 mac + 30 mani + 11 alm + 15 nibs (= 136 tabletas)
+- Inclusión = (30+30+11) × 0.015 + 15 × 0.010 = 1.065 + 0.150 = **1.215 kg**
+- Cobertura = 136 × 0.050 − 1.215 = 6.800 − 1.215 = **5.585 kg**
 
 ---
 
@@ -241,7 +251,7 @@ Las 3 OPs correctas en Effi (después de corregir bugs previos). Referencia can�
 |---|---|
 | Materiales | 7.9 kg cod **319** @ $43,432 + 0.6 kg cod **485** @ $50,000 |
 | Producto | 8.5 kg cod **581** @ $43,432 |
-| Otros costos | 2h mano de obra (tipo 1) @ $7,000 |
+| Otros costos | 2h mano de obra @ $7,000 (puesto con `tipo_costo_id=1` por error — debió ser **13** = M.O. HORA) |
 | Costo materiales | $373,113 |
 | Observación | "Cobertura templada para tabletas — método siembra" |
 
@@ -275,7 +285,6 @@ Las 3 OPs correctas en Effi (después de corregir bugs previos). Referencia can�
    node scripts/import_orden_produccion.js /tmp/ops_produccion/op3_tabletas_empacadas.json
    ```
 4. **Estado final**: Generada. Deivy/Jenifer las pasan a Procesada y Validada manualmente desde Effi. **NO automatizar esos pasos**.
-5. **Lote y serie**: dejar `"lote":""` y `"serie":""` vacíos — Effi auto-asigna del stock disponible al procesar. Si Santi quiere un número específico, lo edita en Effi.
 
 ### Formato del JSON
 
@@ -304,6 +313,78 @@ Las 3 OPs correctas en Effi (después de corregir bugs previos). Referencia can�
 - Deivy Andres Gonzalez Gutierrez — CC `74084937`
 - Laura — CC `1017206760`
 - Jenifer Alexandra Cano Garcia — NIT `1128457413`
+
+### Convención de observaciones
+
+La observación es texto libre que aparece en la lista de OPs. **Debe ser auto-descriptiva** para que Deivy/Jenifer entiendan el contexto sin abrir el detalle.
+
+**Formato sugerido**:
+- **OP de cobertura templada**: `"Cobertura templada para tabletas — método siembra"`
+- **OP de tabletas sin empacar**: `"Tabletas 73% sin empacar — N puro + N mac + N mani + N alm + N nibs"` (desglose por sabor)
+- **OP de tabletas empacadas**: `"Empacado tabletas 73% — TOTAL unid (N puro + N mac + ...)"`
+- **OP de envasado / mezcla**: `"Envasado [producto] — N unidades de [presentación]"`
+
+Reglas:
+- Sin emojis (Effi no los renderiza bien en algunas vistas).
+- Máximo ~150 caracteres (Effi trunca en la lista).
+- Idioma: español, en minúsculas excepto siglas/nombres propios.
+- Si la OP es parte de una cadena (ej: 3 OPs ligadas), mencionarlo opcionalmente: `"... — paso 2/3 de cadena tabletas 22-abr"`.
+
+### Lotes y series — regla clara
+
+Effi asigna automáticamente lote y serie del stock disponible **al pasar la OP a Procesada**. Por eso:
+
+| Escenario | Qué poner en JSON |
+|---|---|
+| Caso normal (95% de las veces) | `"lote": ""` y `"serie": ""` — Effi elige del FIFO del stock |
+| Santi pide un lote específico (ej: usar lote 2150 que está por vencer) | `"lote": "2150"` y `"serie": ""` |
+| Producto serializado (raro en OS) | `"serie": "ABC123"` |
+
+**Importante**: NO inventar números de lote. Si dudás, dejar vacío. Santi o Jenifer lo editan después en Effi si hace falta.
+
+### Otros costos — mano de obra y procesos
+
+Las OPs llevan "otros costos" (mano de obra, transporte, procesos puntuales). El catálogo de tipos vive en `zeffi_costos_produccion`. **El costo unitario NO está en el catálogo** — viene de la práctica histórica del equipo (verificar contra OPs reales en `zeffi_otros_costos`).
+
+#### Tipos de costo más usados (validados contra histórico)
+
+| `tipo_costo_id` | Nombre | Unidad | Costo histórico | Veces usado |
+|---|---|---|---|---|
+| **13** | **M.O. HORA ORIGEN SILVESTRE** | hora | **$7,000** | **690** ← el más común |
+| 14 | TOSTADO Y DESCASCARILLADO ARBOL DE CACAO | kg | $4,800 | 10 |
+| 15 | TRANSPORTE BUCARAMANGA X KILO | kg | $2,200 | 11 |
+| 8 | ENVASADO MIEL APICA (INCLUYE FILTRADO) | unidad | $500-$679 | 8 |
+| 7 | OBTENCIÓN NIBS DE CACAO X KG INTAL | kg | $4,845 | 5 |
+| 9 | LICOR DE CACAO INTAL (incluye tostión y descascarillado) | kg | $13,695 | 1 |
+| 6 | REFINADO Y ENMOLDADO HECTOR BAKAU | kg | $15,000 | 1 |
+
+⚠️ **NO confundir** `id=1` (REFINADO CACAO 24H CHOCOFRUTS) con `id=13` (M.O. HORA). Para producción de tabletas y procesos generales **siempre usar id=13** — es el que corresponde a mano de obra. Las OPs 2191/2194/2195 quedaron con id=1 por error (monto correcto pero categoría mal); en futuras OPs usar id=13.
+
+#### Cómo calcular `cantidad` (horas) — para mano de obra
+
+| Tipo de OP | Horas típicas |
+|---|---|
+| Cobertura templada (siembra, hasta 10 kg) | 2 h |
+| Tabletas sin empacar (hasta 136 unid) | 1 h |
+| Empacado tabletas (136 unid) | 4.5 h |
+
+Si el volumen cambia mucho, escalá proporcional. Si dudás, preguntá.
+
+#### Queries útiles
+
+```sql
+-- Catálogo completo de tipos de costo
+SELECT id, nombre FROM zeffi_costos_produccion WHERE vigencia='Vigente' ORDER BY CAST(id AS UNSIGNED);
+
+-- Costo histórico real por tipo (lo que el equipo escribe en OPs)
+SELECT costo_de_produccion,
+       SUBSTRING_INDEX(GROUP_CONCAT(DISTINCT costo_ud ORDER BY costo_ud DESC SEPARATOR '|'), '|', 5) AS costos_distintos,
+       COUNT(*) AS veces
+FROM zeffi_otros_costos
+WHERE vigencia='Orden vigente'
+GROUP BY costo_de_produccion
+ORDER BY veces DESC LIMIT 15;
+```
 
 ---
 
