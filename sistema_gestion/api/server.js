@@ -1472,6 +1472,59 @@ app.put('/api/gestion/tareas/:id/produccion/tiempos', requireAuth, async (req, r
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// POST /api/gestion/tareas/:id/produccion/procesar — marca OP vinculada como "Procesada"
+// Permiso: usuario es responsable de la tarea, O su nivel > nivel del responsable.
+app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req, res) => {
+  const tareaId = parseInt(req.params.id, 10)
+  try {
+    const [[tarea]] = await db.gestion.query(
+      `SELECT t.id, t.id_op, t.responsable,
+              GROUP_CONCAT(tr.email) AS responsables_csv
+       FROM g_tareas t
+       LEFT JOIN g_tareas_responsables tr ON tr.tarea_id = t.id
+       WHERE t.id = ? AND t.empresa = ?
+       GROUP BY t.id`,
+      [tareaId, req.empresa]
+    )
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tarea.id_op) return res.status(400).json({ error: 'La tarea no tiene OP vinculada' })
+
+    const responsables = (tarea.responsables_csv || '').split(',').filter(Boolean)
+    if (!responsables.length && tarea.responsable) responsables.push(tarea.responsable)
+
+    const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+    const esResponsable = responsables.includes(req.usuario.email)
+    const nivelMax = responsables.reduce((m, e) => Math.max(m, nivelCache[e] || 1), 0)
+    if (!esResponsable && miNivel <= nivelMax) {
+      return res.status(403).json({ error: 'No tenés permisos para procesar esta OP (no sos responsable y tu nivel no supera al del responsable)' })
+    }
+
+    // Nombre del reportador (usuario que hace click)
+    const [[me]] = await db.comunidad.query(
+      'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?',
+      [req.usuario.email]
+    )
+    const nombreReportador = me?.nombre || req.usuario.email
+    const observacion = `Reportó: ${nombreReportador} (OS Gestión)`
+
+    // Ejecutar script Playwright
+    const scriptPath = path.join(__dirname, '../../scripts/cambiar_estado_orden_produccion.js')
+    const resultado = await new Promise((resolve, reject) => {
+      execFile('node', [scriptPath, String(tarea.id_op), 'Procesada', observacion], {
+        timeout: 90000, cwd: path.dirname(scriptPath)
+      }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr || err.message))
+        resolve(stdout)
+      })
+    })
+
+    res.json({ ok: true, id_op: tarea.id_op, estado: 'Procesada', observacion, log: resultado.slice(-500) })
+  } catch (e) {
+    console.error('[procesar OP]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ─── REMISIONES ───────────────────────────────────────────────────
 
 // GET /api/gestion/remisiones — remisiones de venta (búsqueda)

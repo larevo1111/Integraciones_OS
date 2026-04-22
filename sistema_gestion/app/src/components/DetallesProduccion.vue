@@ -13,8 +13,14 @@
         :modelValue="tarea.id_op || ''"
         @update:modelValue="onChangeOp"
       />
-      <div v-if="tarea.id_op && detalleOp" class="op-box q-pa-sm rounded-borders text-body2">
-        OP-{{ detalleOp.id_orden }} · {{ detalleOp.articulos }}
+      <div v-if="tarea.id_op && detalleOp" class="op-box q-pa-sm rounded-borders">
+        <div class="row items-center q-gutter-xs">
+          <div class="col text-body2">OP-{{ detalleOp.id_orden }} · {{ detalleOp.articulos }}</div>
+          <q-badge v-if="detalleOp.estado" :class="estadoBadgeClass" :label="detalleOp.estado" />
+        </div>
+        <div v-if="tarea.id_op_original" class="text-caption text-grey q-mt-xs">
+          OP orig: {{ tarea.id_op_original }}
+        </div>
       </div>
     </div>
 
@@ -126,19 +132,49 @@
         <span class="text-caption text-grey q-ml-xs" style="width:26px">min</span>
       </div>
     </div>
+
+    <!-- Acciones sobre la OP -->
+    <div v-if="tarea.id_op && detalleOp" class="q-pa-sm q-gutter-sm row">
+      <q-btn
+        v-if="puedeProcesar"
+        dense
+        color="warning"
+        text-color="black"
+        icon="check_circle_outline"
+        label="Marcar Procesada"
+        :loading="procesando"
+        :disable="detalleOp.estado === 'Procesada' || detalleOp.estado === 'Validado'"
+        @click="marcarProcesada"
+      />
+      <q-btn
+        v-if="puedeValidar"
+        dense
+        color="positive"
+        icon="verified"
+        label="Validar"
+        :loading="validando"
+        :disable="detalleOp.estado === 'Validado'"
+        @click="validarOp"
+      />
+    </div>
   </q-expansion-item>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { useQuasar } from 'quasar'
 import { api } from 'src/services/api'
 import { parseDecimal, fmtNum } from 'src/services/numero'
+import { useAuthStore } from 'src/stores/authStore'
 import OpSelector from './OpSelector.vue'
+
+const $q = useQuasar()
+const auth = useAuthStore()
 
 const props = defineProps({
   tarea: { type: Object, required: true }
 })
-const emit = defineEmits(['actualizar-id-op'])
+const emit = defineEmits(['actualizar-id-op', 'actualizada'])
 
 const TIEMPOS_DEF = [
   { key: 'alistamiento', label: 'Alistamiento' },
@@ -154,6 +190,27 @@ const productos  = ref([])
 const detalleOp  = ref(null)
 const tiempos    = reactive({ alistamiento: null, produccion: null, empaque: null, limpieza: null })
 const borrador   = reactive({})
+const procesando = ref(false)
+const validando  = ref(false)
+
+const miNivel = computed(() => auth.usuario?.nivel || 1)
+const esResponsable = computed(() => {
+  const r = props.tarea?.responsables || (props.tarea?.responsable ? [props.tarea.responsable] : [])
+  return r.includes(auth.usuario?.email)
+})
+const puedeProcesar = computed(() => {
+  // Responsable o nivel > responsable (simplificado: si es nivel alto, puede)
+  return esResponsable.value || miNivel.value >= 5
+})
+const puedeValidar = computed(() => miNivel.value >= 5)
+
+const estadoBadgeClass = computed(() => {
+  const e = (detalleOp.value?.estado || '').toLowerCase()
+  if (e === 'validado')  return 'bg-positive text-white'
+  if (e === 'procesada') return 'bg-warning text-black'
+  if (e === 'anulada')   return 'bg-grey-7 text-white'
+  return 'bg-grey-5 text-black'  // Generada o desconocido
+})
 
 async function cargar() {
   if (!props.tarea?.id || !props.tarea.id_op) {
@@ -248,6 +305,28 @@ function guardarTiempos() {
       })
     } catch (e) { console.error('[guardarTiempos]', e) }
   }, 300)
+}
+
+async function marcarProcesada() {
+  $q.dialog({
+    title: 'Marcar OP como procesada',
+    message: `Esto cambiará el estado de la OP ${props.tarea.id_op} a "Procesada" en Effi. El cambio puede tardar ~30-60 segundos.`,
+    cancel: true, persistent: false
+  }).onOk(async () => {
+    procesando.value = true
+    try {
+      const r = await api(`/api/gestion/tareas/${props.tarea.id}/produccion/procesar`, { method: 'POST' })
+      $q.notify({ type: 'positive', message: `OP ${r.id_op} → Procesada`, position: 'top' })
+      await cargar()
+      emit('actualizada')
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e.message || 'Error al procesar OP', position: 'top', timeout: 6000 })
+    } finally { procesando.value = false }
+  })
+}
+
+async function validarOp() {
+  $q.notify({ type: 'info', message: 'Función "Validar" — pendiente de implementar (requiere captura de ID nueva OP)', position: 'top' })
 }
 </script>
 
