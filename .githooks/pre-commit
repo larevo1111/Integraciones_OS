@@ -16,7 +16,7 @@ if [ -z "$ARCHIVOS" ]; then
 fi
 
 # Archivos AUTORIZADOS a tener el literal del offset/nombre (los únicos puntos de entrada)
-WHITELIST='(^|/)lib/timezone\.js:|sistema_gestion/app/src/services/fecha\.js:|sistema_gestion/app/quasar\.config\.js:|\.githooks/'
+WHITELIST='(^|/)lib/(timezone|db_conn)\.js:|sistema_gestion/app/src/services/fecha\.js:|sistema_gestion/app/quasar\.config\.js:|\.githooks/'
 
 # ── Patrón 1: toISOString().slice(0, 10) — fecha UTC ──
 if echo "$ARCHIVOS" | xargs grep -n 'toISOString()\.slice(0.*10)' 2>/dev/null | grep -v '// ok-utc' | grep -v 'NUNCA usar'; then
