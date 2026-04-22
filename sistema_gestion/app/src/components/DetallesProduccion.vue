@@ -133,22 +133,21 @@
       </div>
     </div>
 
-    <!-- Acciones sobre la OP -->
-    <div v-if="tarea.id_op && detalleOp" class="q-pa-sm q-gutter-sm row">
+    <!-- Acciones sobre la OP (sutiles) -->
+    <div v-if="tarea.id_op && detalleOp" class="q-px-sm q-pb-sm row q-gutter-xs">
       <q-btn
         v-if="puedeProcesar"
-        dense
+        flat dense no-caps size="sm"
         color="warning"
-        text-color="black"
         icon="check_circle_outline"
-        label="Marcar Procesada"
+        label="Procesar"
         :loading="procesando"
         :disable="detalleOp.estado === 'Procesada' || detalleOp.estado === 'Validado'"
         @click="marcarProcesada"
       />
       <q-btn
         v-if="puedeValidar"
-        dense
+        flat dense no-caps size="sm"
         color="positive"
         icon="verified"
         label="Validar"
