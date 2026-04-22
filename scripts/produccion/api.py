@@ -49,20 +49,213 @@ def exe(db, sql, params=None):
 
 # ── Sugerencia de receta ───────────────────────────────────
 
-@app.get("/api/produccion/sugerir-receta")
-def api_sugerir_receta(cod: str, cantidad: float, n_ops: int = 10, iterativo: bool = True):
-    """Sugiere receta para producir 'cantidad' unidades del artículo 'cod'.
-    Si iterativo=True (default), intenta con 5, 10, 15, 20 OPs hasta encontrar consistencia.
-    Si iterativo=False, usa exactamente n_ops.
-    """
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("sugerir_receta",
-        os.path.join(os.path.dirname(__file__), 'sugerir_receta.py'))
-    mod = importlib.util.module_from_spec(spec)
+import importlib.util as _ilu
+def _cargar_modulo(nombre, archivo):
+    spec = _ilu.spec_from_file_location(nombre,
+        os.path.join(os.path.dirname(__file__), archivo))
+    mod = _ilu.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    return mod
+
+
+@app.get("/api/produccion/sugerir-receta")
+def api_sugerir_receta(cod: str, cantidad: float, n_ops: int = 10,
+                        iterativo: bool = True, fallback_agente: bool = True):
+    """Sugiere receta para producir 'cantidad' unidades del artículo 'cod'.
+    Si iterativo=True (default), intenta con 5/10/15/20 OPs con thresholds 3/5/7/9.
+    Si las 4 ventanas fallan y fallback_agente=True, invoca al agente IA (Claude Code).
+    """
+    mod = _cargar_modulo("sugerir_receta", "sugerir_receta.py")
     if iterativo:
-        return mod.sugerir_iterativo(cod, cantidad)
+        return mod.sugerir_iterativo(cod, cantidad, fallback_agente=fallback_agente)
     return mod.sugerir_receta(cod, cantidad, n_ops)
+
+
+# ── Compatibilidad y grupos de OP ─────────────────────────
+
+class CompatRequest(BaseModel):
+    cods: list[str]
+
+
+@app.post("/api/produccion/compatibilidad")
+def api_compatibilidad(req: CompatRequest):
+    """Evalúa si una lista de productos puede programarse en una sola OP.
+    Devuelve {compatible, mp_granel_comun, productos[], razon}."""
+    mod = _cargar_modulo("grupo_helper", "grupo_helper.py")
+    return mod.evaluar_compatibilidad(req.cods)
+
+
+class GrupoCreate(BaseModel):
+    solicitudes_ids: list[int]
+    creado_por: str
+    observaciones: Optional[str] = None
+    fecha_programada: Optional[str] = None
+
+
+@app.post("/api/produccion/grupos")
+def api_crear_grupo(data: GrupoCreate):
+    """Crea un grupo de OP con varias solicitudes.
+    Valida compatibilidad antes de crear. Devuelve el grupo creado."""
+    if not data.solicitudes_ids:
+        raise HTTPException(400, "Debe incluir al menos 1 solicitud")
+
+    # 1) Cargar solicitudes y verificar que existen + están en estado 'solicitado'
+    placeholders = ','.join(['%s'] * len(data.solicitudes_ids))
+    sols = q(DB_PROD, f"""
+        SELECT id, cod_articulo, nombre_articulo, cantidad, estado, op_grupo_id
+        FROM solicitudes_produccion WHERE id IN ({placeholders})
+    """, tuple(data.solicitudes_ids))
+
+    if len(sols) != len(data.solicitudes_ids):
+        raise HTTPException(404, f"Algunas solicitudes no existen")
+
+    for s in sols:
+        if s['estado'] != 'solicitado':
+            raise HTTPException(400, f"Solicitud {s['id']} está en estado '{s['estado']}', no se puede agrupar")
+        if s['op_grupo_id']:
+            raise HTTPException(400, f"Solicitud {s['id']} ya pertenece al grupo {s['op_grupo_id']}")
+
+    # 2) Validar compatibilidad
+    cods = [s['cod_articulo'] for s in sols]
+    mod = _cargar_modulo("grupo_helper", "grupo_helper.py")
+    compat = mod.evaluar_compatibilidad(cods)
+    if not compat['compatible']:
+        raise HTTPException(400, f"Productos no compatibles: {compat['razon']}")
+
+    # 3) Crear grupo
+    grupo_id = exe(DB_PROD, """
+        INSERT INTO op_grupos (creado_por, observaciones, fecha_programada, mp_granel_principal)
+        VALUES (%s, %s, %s, %s)
+    """, (data.creado_por, data.observaciones, data.fecha_programada, compat['mp_granel_comun']))
+
+    # 4) Asociar solicitudes al grupo
+    exe(DB_PROD, f"""
+        UPDATE solicitudes_produccion SET op_grupo_id = %s
+        WHERE id IN ({placeholders})
+    """, tuple([grupo_id] + data.solicitudes_ids))
+
+    # 5) Devolver el grupo con sus solicitudes
+    return api_obtener_grupo(grupo_id)
+
+
+@app.get("/api/produccion/grupos/{id}")
+def api_obtener_grupo(id: int):
+    rows = q(DB_PROD, "SELECT * FROM op_grupos WHERE id = %s", (id,))
+    if not rows:
+        raise HTTPException(404, "Grupo no encontrado")
+    g = rows[0]
+    g['fecha_creacion'] = str(g['fecha_creacion']) if g.get('fecha_creacion') else None
+    g['fecha_programada'] = str(g['fecha_programada']) if g.get('fecha_programada') else None
+    g['solicitudes'] = q(DB_PROD, """
+        SELECT id, cod_articulo, nombre_articulo, cantidad, estado
+        FROM solicitudes_produccion WHERE op_grupo_id = %s
+    """, (id,))
+    for s in g['solicitudes']:
+        s['cantidad'] = float(s['cantidad']) if s['cantidad'] else 0
+    return g
+
+
+@app.get("/api/produccion/grupos")
+def api_listar_grupos(estado: Optional[str] = None):
+    sql = "SELECT * FROM op_grupos WHERE 1=1"
+    params = []
+    if estado:
+        sql += " AND estado = %s"
+        params.append(estado)
+    sql += " ORDER BY fecha_creacion DESC LIMIT 200"
+    rows = q(DB_PROD, sql, params)
+    for r in rows:
+        r['fecha_creacion'] = str(r['fecha_creacion']) if r.get('fecha_creacion') else None
+        r['fecha_programada'] = str(r['fecha_programada']) if r.get('fecha_programada') else None
+    return rows
+
+
+@app.delete("/api/produccion/grupos/{id}")
+def api_eliminar_grupo(id: int):
+    """Elimina un grupo y libera las solicitudes asociadas (vuelven a estado 'solicitado'
+    sin op_grupo_id). Solo si el grupo está en 'borrador'."""
+    rows = q(DB_PROD, "SELECT estado FROM op_grupos WHERE id = %s", (id,))
+    if not rows:
+        raise HTTPException(404, "Grupo no encontrado")
+    if rows[0]['estado'] != 'borrador':
+        raise HTTPException(400, f"Solo se pueden eliminar grupos en borrador (este: {rows[0]['estado']})")
+    exe(DB_PROD, "UPDATE solicitudes_produccion SET op_grupo_id = NULL WHERE op_grupo_id = %s", (id,))
+    exe(DB_PROD, "DELETE FROM op_grupos WHERE id = %s", (id,))
+    return {"ok": True}
+
+
+@app.post("/api/produccion/grupos/{id}/sugerir-receta")
+def api_sugerir_receta_grupo(id: int):
+    """Sugiere receta combinada para un grupo: suma materiales granel + envases/etiquetas
+    específicos por formato. Internamente llama sugerir_iterativo para cada solicitud."""
+    grupo = api_obtener_grupo(id)
+    sols = grupo.get('solicitudes', [])
+    if not sols:
+        raise HTTPException(400, "El grupo no tiene solicitudes")
+
+    mod = _cargar_modulo("sugerir_receta", "sugerir_receta.py")
+
+    # Obtener receta individual de cada solicitud
+    recetas_ind = []
+    for s in sols:
+        r = mod.sugerir_iterativo(s['cod_articulo'], float(s['cantidad']))
+        recetas_ind.append({
+            'solicitud_id': s['id'],
+            'cod_articulo': s['cod_articulo'],
+            'cantidad': float(s['cantidad']),
+            'receta': r,
+        })
+
+    # Combinar materiales: sumar por cod_material
+    materiales_combinados = {}
+    costos_combinados = {}
+    for ri in recetas_ind:
+        for mat in ri['receta'].get('materiales', []):
+            cod = mat['cod']
+            if cod not in materiales_combinados:
+                materiales_combinados[cod] = {'cod': cod, 'desc': mat.get('desc', mat.get('nombre', '')),
+                                                'cantidad': 0, 'fuentes': []}
+            materiales_combinados[cod]['cantidad'] += float(mat.get('cantidad', 0))
+            materiales_combinados[cod]['fuentes'].append({
+                'solicitud_id': ri['solicitud_id'],
+                'cod_articulo': ri['cod_articulo'],
+                'aporta': float(mat.get('cantidad', 0)),
+            })
+        for c in ri['receta'].get('costos', []):
+            key = c.get('cp', c.get('nombre', ''))
+            if key not in costos_combinados:
+                costos_combinados[key] = {'cp': key, 'cantidad': 0, 'costo_ud': c.get('costo_ud', 0)}
+            costos_combinados[key]['cantidad'] += float(c.get('cantidad', 0))
+
+    return {
+        'grupo_id': id,
+        'mp_granel_principal': grupo.get('mp_granel_principal'),
+        'solicitudes': sols,
+        'recetas_individuales': recetas_ind,
+        'materiales_combinados': sorted(materiales_combinados.values(), key=lambda x: -x['cantidad']),
+        'costos_combinados': list(costos_combinados.values()),
+    }
+
+
+# ── Logs de producción (lectura) ───────────────────────────
+
+@app.get("/api/produccion/logs")
+def api_logs(limit: int = 100, evento: Optional[str] = None, cod: Optional[str] = None):
+    sql = "SELECT * FROM produccion_logs WHERE 1=1"
+    params = []
+    if evento:
+        sql += " AND evento = %s"
+        params.append(evento)
+    if cod:
+        sql += " AND cod_articulo = %s"
+        params.append(cod)
+    sql += " ORDER BY id DESC LIMIT %s"
+    params.append(limit)
+    rows = q(DB_PROD, sql, params)
+    for r in rows:
+        r['ts'] = str(r['ts']) if r.get('ts') else None
+        if r.get('cantidad'): r['cantidad'] = float(r['cantidad'])
+    return rows
 
 
 # ── Modelos ────────────────────────────────────────────────

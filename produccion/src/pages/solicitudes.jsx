@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { Plus, Trash2, Layers, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { OsDataTable } from "@/components/os-data-table"
 import { DetalleSolicitudSheet } from "@/components/detalle-solicitud-sheet"
+import { ProgramarGrupoDialog } from "@/components/programar-grupo-dialog"
 import { api } from "@/lib/api"
 
 const ESTADOS = [
@@ -29,6 +30,13 @@ export function SolicitudesPage() {
   const [detalleOpen, setDetalleOpen] = useState(false)
   const [solicitudSel, setSolicitudSel] = useState(null)
   const [articulos, setArticulos] = useState([])
+  const [selectedIds, setSelectedIds] = useState([])
+  const [grupoDialogOpen, setGrupoDialogOpen] = useState(false)
+
+  const seleccionadas = useMemo(
+    () => solicitudes.filter(s => selectedIds.includes(s.id)),
+    [solicitudes, selectedIds]
+  )
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -119,7 +127,7 @@ export function SolicitudesPage() {
         <div>
           <h1 className="text-[16px] font-semibold">Solicitudes de Producción</h1>
           <p className="text-[12px] text-muted-foreground mt-0.5">
-            Click en una fila para ver o editar el detalle
+            Selecciona varias para programarlas en una sola OP, o click en una fila para ver el detalle
           </p>
         </div>
         <Button onClick={abrirNueva}>
@@ -128,6 +136,22 @@ export function SolicitudesPage() {
         </Button>
       </div>
 
+      {/* Barra de selección múltiple */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-lg bg-primary/10 border border-primary/30">
+          <div className="flex items-center gap-2 text-[13px]">
+            <span className="font-medium">{selectedIds.length} solicitud{selectedIds.length === 1 ? '' : 'es'} seleccionada{selectedIds.length === 1 ? '' : 's'}</span>
+            <button onClick={() => setSelectedIds([])} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <Button onClick={() => setGrupoDialogOpen(true)} disabled={selectedIds.length < 2}>
+            <Layers className="h-3.5 w-3.5" />
+            Programar juntas
+          </Button>
+        </div>
+      )}
+
       <OsDataTable
         rows={solicitudes}
         columns={columns}
@@ -135,6 +159,9 @@ export function SolicitudesPage() {
         title="Solicitudes"
         onRowClick={abrirDetalle}
         renderCell={renderCell}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
       />
 
       <DetalleSolicitudSheet
@@ -143,6 +170,13 @@ export function SolicitudesPage() {
         solicitud={solicitudSel}
         articulos={articulos}
         onSaved={cargar}
+      />
+
+      <ProgramarGrupoDialog
+        open={grupoDialogOpen}
+        onOpenChange={setGrupoDialogOpen}
+        solicitudes={seleccionadas}
+        onCreated={async () => { setSelectedIds([]); await cargar() }}
       />
     </div>
   )

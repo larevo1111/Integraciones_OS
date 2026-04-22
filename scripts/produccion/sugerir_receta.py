@@ -377,61 +377,175 @@ def sugerir_receta(cod_articulo: str, cantidad: float, n_ops: int = 10) -> dict:
     }
 
 
+# ─── Thresholds DINÁMICOS por ventana ────────────────────────────────────
+# A más ventana, más relaxed el % pero más alto el absoluto requerido.
+# Lógica de Santi: con 5 OPs necesitas 3 que coincidan; con 10 → 5; con 15 → 7; con 20 → 9
+THRESHOLDS_OPS = {5: 3, 10: 5, 15: 7, 20: 9}
+
+
 def sugerir_iterativo(cod_articulo: str, cantidad: float,
                        ventanas: list = None,
-                       min_ops_consistentes: int = 3,
-                       cv_objetivo: float = 0.15) -> dict:
+                       cv_objetivo: float = 0.15,
+                       fallback_agente: bool = True) -> dict:
     """
-    Estrategia iterativa: empezar con 5 OPs, ampliar de a 5 si no es concluyente.
-    Devuelve la primera ventana que cumpla los criterios o la mejor encontrada.
+    Estrategia iterativa con thresholds CRECIENTES por ventana:
+      - 5 OPs → mínimo 3 consistentes (60%)
+      - 10 OPs → mínimo 5 consistentes (50%)
+      - 15 OPs → mínimo 7 consistentes (47%)
+      - 20 OPs → mínimo 9 consistentes (45%)
+
+    Devuelve la primera ventana que cumpla los criterios.
+    Si ninguna cumple y fallback_agente=True, invoca al agente IA (Claude Code).
 
     Criterios "concluyente":
-    - >= min_ops_consistentes OPs limpias (no outliers, no incompletas)
+    - OPs limpias >= threshold[ventana]
     - CV de ratios < cv_objetivo (consistencia)
     - Confianza alta o media
     """
+    # Logger (best-effort, no romper si no carga)
+    try:
+        from logger import log, cronometro
+        _has_logger = True
+    except Exception:
+        _has_logger = False
+        def log(*a, **k): pass
+        class _C:
+            def __enter__(self): import time; self.t0 = __import__('time').time(); return self
+            def __exit__(self, *a): self.ms = int((__import__('time').time() - self.t0) * 1000)
+        def cronometro(): return _C()
+
     if ventanas is None:
         ventanas = [5, 10, 15, 20]
 
+    log("sugerir_inicio", cod=cod_articulo, cantidad=cantidad,
+        detalle={'ventanas': ventanas, 'cv_objetivo': cv_objetivo})
+
     mejor = None
     historial = []
-    for n in ventanas:
-        s = sugerir_receta(cod_articulo, cantidad, n_ops=n)
-        ops_limpias = (s.get('ops_efectivas') or 0) - len(s.get('ops_outlier_descartadas') or [])
-        cv = s.get('cv_ratios', 1.0)
-        es_concluyente = (
-            ops_limpias >= min_ops_consistentes and
-            cv < cv_objetivo and
-            s.get('confianza') in ('alta', 'media') and
-            s.get('patron') not in ('sin_historia',)
-        )
-        historial.append({
-            'ventana': n, 'ops_limpias': ops_limpias, 'cv': cv,
-            'confianza': s.get('confianza'), 'patron': s.get('patron'),
-            'concluyente': es_concluyente,
-        })
-        if es_concluyente:
-            s['estrategia'] = {
-                'ventana_final': n,
-                'iteraciones': len(historial),
-                'historial': historial,
-                'estado': 'concluyente',
+    with cronometro() as cron_total:
+        for n in ventanas:
+            min_consistentes = THRESHOLDS_OPS.get(n, max(3, n // 2))
+            with cronometro() as cron_iter:
+                s = sugerir_receta(cod_articulo, cantidad, n_ops=n)
+            ops_limpias = (s.get('ops_efectivas') or 0) - len(s.get('ops_outlier_descartadas') or [])
+            cv = s.get('cv_ratios', 1.0)
+            es_concluyente = (
+                ops_limpias >= min_consistentes and
+                cv < cv_objetivo and
+                s.get('confianza') in ('alta', 'media') and
+                s.get('patron') not in ('sin_historia',)
+            )
+            iter_info = {
+                'ventana': n, 'min_consistentes': min_consistentes,
+                'ops_limpias': ops_limpias, 'cv': round(cv, 4),
+                'confianza': s.get('confianza'), 'patron': s.get('patron'),
+                'concluyente': es_concluyente, 'duracion_ms': cron_iter.ms,
             }
-            return s
-        # Guardar la mejor opción por si nunca es concluyente
-        if mejor is None or ops_limpias > (mejor.get('estrategia') or {}).get('ops_limpias_max', 0):
-            mejor = s
-            mejor['estrategia'] = {'ops_limpias_max': ops_limpias}
+            historial.append(iter_info)
+            log("sugerir_iteracion", cod=cod_articulo, cantidad=cantidad,
+                ventana=n, estado=s.get('patron'), confianza=s.get('confianza'),
+                duracion_ms=cron_iter.ms, detalle=iter_info)
 
-    # No concluyente: marcar
+            if es_concluyente:
+                s['estrategia'] = {
+                    'ventana_final': n, 'min_consistentes_requerido': min_consistentes,
+                    'iteraciones': len(historial), 'historial': historial,
+                    'estado': 'concluyente', 'fuente': 'algoritmo_estadistico',
+                    'duracion_total_ms': cron_total.ms,
+                }
+                log("sugerir_fin", cod=cod_articulo, cantidad=cantidad,
+                    ventana=n, agente='algoritmo', estado='concluyente',
+                    confianza=s.get('confianza'), duracion_ms=cron_total.ms)
+                return s
+            # Guardar la mejor opción por si nunca es concluyente
+            if mejor is None or ops_limpias > (mejor.get('estrategia') or {}).get('ops_limpias_max', 0):
+                mejor = s
+                mejor['estrategia'] = {'ops_limpias_max': ops_limpias}
+
+    # No concluyente con algoritmo → invocar al agente IA si está habilitado
+    if fallback_agente:
+        log("agente_invocacion", cod=cod_articulo, cantidad=cantidad,
+            detalle={'razon': 'algoritmo_no_concluyente', 'ventanas_probadas': len(historial)})
+        with cronometro() as cron_ag:
+            agente_result = _invocar_agente_ia(cod_articulo, cantidad, historial,
+                                                ops_disponibles=mejor.get('ops_referencia', []))
+        log("agente_respuesta", cod=cod_articulo, cantidad=cantidad,
+            agente=agente_result.get('agente_usado', '?'),
+            estado=agente_result.get('estado'),
+            confianza=agente_result.get('confianza'),
+            duracion_ms=cron_ag.ms,
+            detalle={'fuente': 'agente_ia'})
+        if agente_result.get('estado') in ('sugerencia', 'no_concluyente'):
+            agente_result['estrategia'] = {
+                'iteraciones': len(historial), 'historial': historial,
+                'estado': agente_result['estado'],
+                'fuente': 'agente_ia',
+                'agente_usado': agente_result.get('agente_usado'),
+                'duracion_total_ms': cron_total.ms + cron_ag.ms,
+            }
+            return agente_result
+
+    # No concluyente y sin agente
     mejor['estrategia'] = {
-        'ventana_final': ventanas[-1],
-        'iteraciones': len(historial),
-        'historial': historial,
-        'estado': 'no_concluyente',
-        'mensaje': f'Después de {len(historial)} iteraciones (hasta {ventanas[-1]} OPs), no se encontró un patrón consistente. Recomendado: revisión manual o consulta a IA.',
+        'ventana_final': ventanas[-1], 'iteraciones': len(historial),
+        'historial': historial, 'estado': 'no_concluyente',
+        'fuente': 'algoritmo_estadistico',
+        'duracion_total_ms': cron_total.ms,
+        'mensaje': f'Después de {len(historial)} iteraciones (hasta {ventanas[-1]} OPs), '
+                   f'no se encontró un patrón consistente.',
     }
+    log("sugerir_fin", cod=cod_articulo, cantidad=cantidad,
+        agente='algoritmo', estado='no_concluyente', duracion_ms=cron_total.ms)
     return mejor
+
+
+def _invocar_agente_ia(cod_articulo: str, cantidad: float,
+                        historial: list, ops_disponibles: list = None) -> dict:
+    """Invoca el agente IA (Claude Code) cuando el algoritmo no concluye.
+    Si Claude falla, prueba opencode/big-pickle como fallback.
+    Devuelve dict con 'estado', 'materiales', 'costos', etc. + 'agente_usado'.
+    """
+    import json
+    import subprocess
+
+    AGENTES = [
+        ('claude_code', '/home/osserver/Proyectos_Antigravity/sa_produccion/scripts/agente_claude.sh'),
+        ('opencode_pickle', '/home/osserver/Proyectos_Antigravity/sa_produccion/scripts/agente.sh'),
+    ]
+
+    payload = json.dumps({
+        'cod_articulo': cod_articulo,
+        'cantidad_solicitada': cantidad,
+        'historial': historial,
+        'ops_disponibles': ops_disponibles or [],
+    }, ensure_ascii=False)
+
+    for nombre, sh in AGENTES:
+        if not os.path.exists(sh):
+            continue
+        try:
+            r = subprocess.run([sh, payload], capture_output=True, text=True, timeout=600)
+            txt = r.stdout.strip()
+            if not txt:
+                continue
+            # Extraer primer { ... }
+            import re
+            m = re.search(r'\{[\s\S]+\}', txt)
+            if not m:
+                continue
+            try:
+                out = json.loads(m.group())
+                out['agente_usado'] = nombre
+                return out
+            except json.JSONDecodeError:
+                continue
+        except subprocess.TimeoutExpired:
+            continue
+        except Exception:
+            continue
+
+    return {'estado': 'no_concluyente', 'agente_usado': 'ninguno_disponible',
+            'razon': 'Ningún agente IA respondió correctamente'}
 
 
 if __name__ == '__main__':

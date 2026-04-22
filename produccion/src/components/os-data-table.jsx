@@ -27,6 +27,10 @@ export function OsDataTable({
   title = '',
   onRowClick,
   renderCell,  // función: (row, col, value) => ReactNode | null (null = usar default)
+  selectable = false,        // si true, renderiza columna de checkbox al inicio
+  selectedIds = [],          // ids seleccionados (controlado externamente)
+  onSelectionChange,         // (newSelectedIds) => void
+  rowIdKey = 'id',           // clave del id por fila (default 'id')
 }) {
   const [localColumns, setLocalColumns] = useState([])
   useEffect(() => { setLocalColumns(columns.map(c => ({ ...c }))) }, [columns])
@@ -356,6 +360,20 @@ export function OsDataTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
+              {selectable && (
+                <th className="px-3 h-8 bg-card border-b border-border sticky top-0 z-10 w-8">
+                  <input
+                    type="checkbox"
+                    className="cursor-pointer accent-primary"
+                    checked={sortedRows.length > 0 && sortedRows.every(r => selectedIds.includes(r[rowIdKey]))}
+                    onChange={(e) => {
+                      if (!onSelectionChange) return
+                      const ids = sortedRows.map(r => r[rowIdKey])
+                      onSelectionChange(e.target.checked ? Array.from(new Set([...selectedIds, ...ids])) : selectedIds.filter(id => !ids.includes(id)))
+                    }}
+                  />
+                </th>
+              )}
               {visibleColumns.map(col => (
                 <th
                   key={col.key}
@@ -383,7 +401,7 @@ export function OsDataTable({
           <tbody>
             {loading ? (
               [...Array(8)].map((_, i) => (
-                <tr key={i}><td colSpan={visibleColumns.length} className="p-3"><div className="h-3.5 rounded bg-muted/50 animate-pulse" /></td></tr>
+                <tr key={i}><td colSpan={visibleColumns.length + (selectable ? 1 : 0)} className="p-3"><div className="h-3.5 rounded bg-muted/50 animate-pulse" /></td></tr>
               ))
             ) : (
               <>
@@ -402,17 +420,38 @@ export function OsDataTable({
                   </tr>
                 )}
                 {sortedRows.length === 0 ? (
-                  <tr><td colSpan={visibleColumns.length} className="py-12 text-center">
+                  <tr><td colSpan={visibleColumns.length + (selectable ? 1 : 0)} className="py-12 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground text-sm">
                       <Inbox className="h-6 w-6" /> Sin resultados
                     </div>
                   </td></tr>
-                ) : sortedRows.map((row, idx) => (
+                ) : sortedRows.map((row, idx) => {
+                  const rowId = row[rowIdKey]
+                  const isSelected = selectable && selectedIds.includes(rowId)
+                  return (
                   <tr
-                    key={row.id ?? idx}
+                    key={rowId ?? idx}
                     onClick={() => onRowClick?.(row)}
-                    className={cn("border-b border-border/50 hover:bg-accent/50 transition-colors group", onRowClick && "cursor-pointer")}
+                    className={cn(
+                      "border-b border-border/50 hover:bg-accent/50 transition-colors group",
+                      onRowClick && "cursor-pointer",
+                      isSelected && "bg-primary/10"
+                    )}
                   >
+                    {selectable && (
+                      <td className="px-3 align-middle w-8" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="cursor-pointer accent-primary"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (!onSelectionChange) return
+                            if (e.target.checked) onSelectionChange([...selectedIds, rowId])
+                            else onSelectionChange(selectedIds.filter(id => id !== rowId))
+                          }}
+                        />
+                      </td>
+                    )}
                     {visibleColumns.map(col => {
                       const value = row[col.key]
                       const custom = renderCell?.(row, col, value)
@@ -423,7 +462,7 @@ export function OsDataTable({
                       )
                     })}
                   </tr>
-                ))}
+                )})}
               </>
             )}
           </tbody>
