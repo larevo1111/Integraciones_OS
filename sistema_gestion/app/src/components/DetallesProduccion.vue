@@ -325,7 +325,25 @@ async function marcarProcesada() {
 }
 
 async function validarOp() {
-  $q.notify({ type: 'info', message: 'Función "Validar" — pendiente de implementar (requiere captura de ID nueva OP)', position: 'top' })
+  $q.dialog({
+    title: 'Validar OP',
+    message: `Esto anulará la OP ${props.tarea.id_op}, creará una nueva con los valores reales reportados y la marcará como "Validado". Demora ~2-3 minutos. ¿Continuar?`,
+    cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true
+  }).onOk(async () => {
+    validando.value = true
+    $q.notify({ type: 'info', message: 'Validando OP… puede tardar 2-3 min.', position: 'top', timeout: 0, group: 'validar-prog' })
+    try {
+      const r = await api(`/api/gestion/tareas/${props.tarea.id}/produccion/validar`, { method: 'POST' })
+      $q.notify({ type: 'positive', message: `OP ${r.id_op_anterior} → anulada · OP ${r.id_op_nueva} → Validado`, position: 'top', timeout: 6000 })
+      emit('actualizada')
+      await cargar()
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e.message || 'Error al validar OP', position: 'top', timeout: 8000 })
+    } finally {
+      $q.notify({ group: 'validar-prog', message: '', timeout: 1 })
+      validando.value = false
+    }
+  })
 }
 </script>
 

@@ -1534,6 +1534,158 @@ app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req,
   }
 })
 
+// POST /api/gestion/tareas/:id/produccion/validar — solo nivel >= 5
+// Flujo: anular OP original → crear OP nueva con cantidades reales → cambiar
+// estado a "Validado" → guardar id_op_original en g_tareas.
+// Retorna { id_op_anterior, id_op_nueva }. Demora 2-3 min (3 scripts Playwright).
+app.post('/api/gestion/tareas/:id/produccion/validar', requireAuth, async (req, res) => {
+  const tareaId = parseInt(req.params.id, 10)
+  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+  if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })
+
+  try {
+    const [[tarea]] = await db.gestion.query(
+      `SELECT id, id_op, responsable FROM g_tareas WHERE id = ? AND empresa = ?`,
+      [tareaId, req.empresa]
+    )
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tarea.id_op) return res.status(400).json({ error: 'La tarea no tiene OP vinculada' })
+
+    const idOpOriginal = String(tarea.id_op)
+
+    // 1. Datos de la OP original (metadata)
+    const [[op]] = await db.integracion.query(
+      `SELECT sucursal, bodega, id_encargado, id_tercero, activo_productivo,
+              fecha_inicial, fecha_final, observacion
+       FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1`,
+      [idOpOriginal]
+    )
+    if (!op) return res.status(400).json({ error: `OP ${idOpOriginal} no encontrada en staging` })
+
+    // 2. Líneas con cantidades reales
+    const [lineas] = await db.gestion.query(
+      `SELECT tipo, cod_articulo, descripcion, cantidad_teorica, cantidad_real
+       FROM g_tarea_produccion_lineas WHERE tarea_id = ?`,
+      [tareaId]
+    )
+    if (!lineas.length) return res.status(400).json({ error: 'No hay líneas de producción registradas para esta tarea' })
+
+    // 3. Costos originales por cod_articulo (para mantener)
+    const [matsCostos] = await db.integracion.query(
+      `SELECT cod_material AS cod, costo_ud FROM zeffi_materiales WHERE id_orden = ?`,
+      [idOpOriginal]
+    )
+    const [prodPrecios] = await db.integracion.query(
+      `SELECT cod_articulo AS cod, precio_minimo_ud FROM zeffi_articulos_producidos WHERE id_orden = ?`,
+      [idOpOriginal]
+    )
+    const costoPorCod   = Object.fromEntries(matsCostos.map(m => [String(m.cod), Number(String(m.costo_ud || '').replace(',', '.')) || 0]))
+    const precioPorCod  = Object.fromEntries(prodPrecios.map(p => [String(p.cod), Number(String(p.precio_minimo_ud || '').replace(',', '.')) || 0]))
+
+    // 4. Datos del validador + reportador (para observación)
+    const [[me]] = await db.comunidad.query(
+      'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?', [req.usuario.email]
+    )
+    const [[resp]] = tarea.responsable ? await db.comunidad.query(
+      'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?', [tarea.responsable]
+    ) : [[]]
+    const nombreValidador  = me?.nombre || req.usuario.email
+    const nombreReportador = resp?.nombre || tarea.responsable || '?'
+    const obsOriginal      = (op.observacion || '').replace(/\s+/g, ' ').trim()
+    const observacion      = `Validación OS · Reportó: ${nombreReportador} · Validó: ${nombreValidador}${obsOriginal ? ' · Obs OP orig: ' + obsOriginal.slice(0, 200) : ''}`
+
+    // 5. Construir JSON para import_orden_produccion.js
+    // Mapeo simple: sucursal "Principal" → 1, bodega "Principal" → 1. (Si hay otros, agregar aquí.)
+    const sucursalIdMap = { 'Principal': 1 }
+    const bodegaIdMap   = { 'Principal': 1 }
+    const sucursal_id = sucursalIdMap[op.sucursal] || 1
+    const bodega_id   = bodegaIdMap[op.bodega] || 1
+    const encargadoCC = String(op.id_encargado || '').replace(/^CC:\s*/, '').trim()
+    const terceroCC   = op.id_tercero ? String(op.id_tercero).replace(/^CC:\s*/, '').trim() : ''
+    const fechaInicio = String(op.fecha_inicial || '').slice(0, 10)
+    const fechaFin    = String(op.fecha_final   || '').slice(0, 10)
+
+    const jsonOp = {
+      sucursal_id, bodega_id,
+      fecha_inicio: fechaInicio, fecha_fin: fechaFin,
+      encargado: encargadoCC,
+      tercero: terceroCC,
+      activo_productivo_id: null,
+      observacion,
+      materiales: lineas.filter(l => l.tipo === 'material').map(l => ({
+        cod_articulo: l.cod_articulo,
+        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
+        costo: costoPorCod[l.cod_articulo] || 0,
+        lote: '', serie: '',
+      })),
+      articulos_producidos: lineas.filter(l => l.tipo === 'producto').map(l => ({
+        cod_articulo: l.cod_articulo,
+        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
+        precio: precioPorCod[l.cod_articulo] || 0,
+        lote: '', serie: '',
+      })),
+      otros_costos: [],
+    }
+
+    const jsonPath = `/tmp/op_validacion_${tareaId}_${Date.now()}.json`
+    fs.writeFileSync(jsonPath, JSON.stringify(jsonOp, null, 2))
+
+    // 6. Ejecutar 3 scripts secuencialmente
+    const scripts = path.join(__dirname, '../../scripts')
+    function ejecutar(args, timeoutMs) {
+      return new Promise((resolve, reject) => {
+        execFile('node', args, { timeout: timeoutMs, cwd: scripts }, (err, stdout, stderr) => {
+          if (err) return reject(new Error((stderr || err.message).slice(-800)))
+          resolve(stdout || '')
+        })
+      })
+    }
+
+    console.log(`[validar] tarea ${tareaId} — anular OP ${idOpOriginal}`)
+    await ejecutar([path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion], 120000)
+
+    console.log(`[validar] tarea ${tareaId} — crear OP nueva con reales`)
+    const stdoutCrear = await ejecutar([path.join(scripts, 'import_orden_produccion.js'), jsonPath], 180000)
+    const matchId = stdoutCrear.match(/OP_CREADA:(\d+)/)
+    if (!matchId) {
+      throw new Error('No se pudo capturar el ID de la nueva OP. Revisar logs.')
+    }
+    const idOpNueva = matchId[1]
+    console.log(`[validar] tarea ${tareaId} — OP nueva: ${idOpNueva}`)
+
+    await ejecutar([path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion], 90000)
+
+    // 7. Actualizar g_tareas
+    await db.gestion.query(
+      `UPDATE g_tareas SET id_op = ?, id_op_original = ?, usuario_ult_modificacion = ? WHERE id = ?`,
+      [idOpNueva, idOpOriginal, req.usuario.email, tareaId]
+    )
+
+    // 8. Reflejar en staging: nueva OP debe aparecer como Validado; vieja como Anulada.
+    try {
+      await db.integracion.query(
+        `UPDATE zeffi_produccion_encabezados SET estado = 'Anulada', vigencia = 'Anulada' WHERE id_orden = ?`,
+        [idOpOriginal]
+      )
+      // La nueva OP aún no está en staging (sync vía pipeline). Crearla mínima para que el UI la encuentre.
+      await db.integracion.query(
+        `INSERT IGNORE INTO zeffi_produccion_encabezados
+           (id_orden, sucursal, bodega, id_encargado, fecha_inicial, fecha_final, observacion, estado, vigencia)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Validado', 'Vigente')`,
+        [idOpNueva, op.sucursal, op.bodega, op.id_encargado, op.fecha_inicial, op.fecha_final, observacion]
+      )
+    } catch (e) { console.warn('[validar] staging no actualizable:', e.message) }
+
+    // Limpieza
+    try { fs.unlinkSync(jsonPath) } catch (_) {}
+
+    res.json({ ok: true, id_op_anterior: idOpOriginal, id_op_nueva: idOpNueva, observacion })
+  } catch (e) {
+    console.error('[validar]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ─── REMISIONES ───────────────────────────────────────────────────
 
 // GET /api/gestion/remisiones — remisiones de venta (búsqueda)
