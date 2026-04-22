@@ -1,3 +1,4 @@
+const { localDate } = require('./lib/timezone')
 const { getPage }     = require('./session');
 const { contarFilas } = require('./utils');
 const path  = require('path');
@@ -7,7 +8,7 @@ const http  = require('http');
 
 const EXPORT_DIR = '/exports/facturas_venta';
 const EFFI_URL   = 'https://effi.com.co/app/factura_v?vigente=1';
-const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+const fecha      = localDate();
 
 function downloadFile(url, cookieHeader, destPath) {
   return new Promise((resolve, reject) => {

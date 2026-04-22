@@ -11,11 +11,12 @@
  * El archivo debe existir antes de llamar este script.
  */
 
+const { localDate } = require('./lib/timezone')
 const { getPage } = require('./session');
 const path        = require('path');
 const fs          = require('fs');
 
-const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+const HOY = localDate();
 
 // Ruta del XLSX: argumento o por defecto /tmp/import_clientes_effi_<hoy>.xlsx
 const xlsxPath = process.argv[2]

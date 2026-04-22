@@ -38,13 +38,14 @@
  *   18 - FERIA CAMPESINA SAN CARLOS
  */
 
+const { localDate, TZ_NAME } = require('./lib/timezone')
 const { getPage } = require('./session');
 const path = require('path');
 const fs   = require('fs');
 
 const EFFI_URL = 'https://effi.com.co/app/ajuste_inventario';
-const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
-const AHORA = new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+const HOY = localDate();
+const AHORA = new Date().toLocaleString('es-CO', { timeZone: TZ_NAME });
 
 // ── Parámetros ──────────────────────────────────────────────────────────────
 

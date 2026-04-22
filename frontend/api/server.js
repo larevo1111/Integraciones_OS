@@ -8,10 +8,8 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// ── HELPER: fecha Colombia YYYY-MM-DD ────────────────
-function localDateCO() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' })
-}
+// ── HELPER: fecha en timezone configurado (lib/timezone.js, APP_TIMEZONE en .env) ─
+const { localDate: localDateCO } = require('../../lib/timezone')
 
 // ── HELPER: aplicar filtros WHERE ─────────────────────
 function buildWhere(filters) {

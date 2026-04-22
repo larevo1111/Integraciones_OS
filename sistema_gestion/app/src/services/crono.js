@@ -14,11 +14,10 @@
  *   - Cuando crono_inicio NO es null, el valor real se calcula en vivo: acumulado + (NOW - crono_inicio)
  */
 
-function parseInicio(str) {
-  if (!str) return null
-  if (str.includes('Z') || str.includes('+') || str.includes('-', 10)) return new Date(str)
-  return new Date(str.replace(' ', 'T') + '-05:00')
-}
+import { parseBackendDate } from './fecha'
+
+// parseInicio: wrapper hacia el helper central (timezone desde .env vía quasar.config.js)
+const parseInicio = parseBackendDate
 
 /** Formato único: HH:MM:SS — usado en TODA la app. */
 export function formatHHMMSS(seg) {

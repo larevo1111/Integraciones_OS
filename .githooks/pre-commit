@@ -1,39 +1,71 @@
 #!/bin/bash
-# Pre-commit hook: bloquea patrones de timezone prohibidos
-# Solo revisa archivos staged (.js, .vue, .ts) — ignora builds y node_modules
+# Pre-commit hook: bloquea patrones prohibidos de timezone y fechas.
+# Revisa archivos staged (.js, .vue, .ts). Ignora builds y node_modules.
+#
+# REGLA BASE: toda operación de timezone debe pasar por lib/timezone.js
+# (Node) o src/services/fecha.js (Vue). Cualquier "-05:00" o "America/Bogota"
+# hardcoded fuera de esos archivos → commit rechazado.
 
 ERRORES=0
 
 # Archivos staged que son código fuente (no builds)
-ARCHIVOS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(js|vue|ts)$' | grep -v 'node_modules\|dist/\|public/assets/')
+ARCHIVOS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(js|vue|ts)$' | grep -v 'node_modules\|dist/\|public/assets/\|sistema_gestion/api/public/')
 
 if [ -z "$ARCHIVOS" ]; then
   exit 0
 fi
 
-# Patrón 1: toISOString().slice(0, 10) — extrae fecha UTC
+# Archivos AUTORIZADOS a tener el literal del offset/nombre (los únicos puntos de entrada)
+WHITELIST='(^|/)lib/timezone\.js:|sistema_gestion/app/src/services/fecha\.js:|sistema_gestion/app/quasar\.config\.js:|\.githooks/'
+
+# ── Patrón 1: toISOString().slice(0, 10) — fecha UTC ──
 if echo "$ARCHIVOS" | xargs grep -n 'toISOString()\.slice(0.*10)' 2>/dev/null | grep -v '// ok-utc' | grep -v 'NUNCA usar'; then
   echo ""
-  echo "❌ BLOQUEADO: toISOString().slice(0,10) detectado"
-  echo "   Esto devuelve fecha UTC — después de 7pm Colombia da el día siguiente."
-  echo "   Usar: hoyLocal() (frontend) o localDateCO() (backend)"
-  echo "   Si es intencional, agregar '// ok-utc' al final de la línea."
+  echo "❌ BLOQUEADO: toISOString().slice(0,10) detectado (fecha UTC, no Colombia)"
+  echo "   Usar: hoyLocal() (frontend) o localDate() de lib/timezone (backend)"
   echo ""
   ERRORES=1
 fi
 
-# Patrón 2: CURDATE() en queries (Hostinger = UTC)
+# ── Patrón 2: CURDATE() en queries SQL ──
 if echo "$ARCHIVOS" | xargs grep -n 'CURDATE()' 2>/dev/null | grep -v '// ok-utc'; then
   echo ""
-  echo "❌ BLOQUEADO: CURDATE() detectado en query SQL"
-  echo "   Hostinger MySQL = UTC. CURDATE() da fecha UTC, no Colombia."
-  echo "   Calcular la fecha en Node.js con localDateCO() y pasar como parámetro."
+  echo "❌ BLOQUEADO: CURDATE() en query SQL"
+  echo "   Calcular la fecha con localDate() de lib/timezone y pasar como parámetro."
+  echo ""
+  ERRORES=1
+fi
+
+# ── Patrón 3: offset "-05:00" o "America/Bogota" hardcoded fuera de la whitelist ──
+HARDCODE=$(echo "$ARCHIVOS" | xargs grep -nE "['\"]-05:00['\"]|['\"]America/Bogota['\"]" 2>/dev/null | grep -vE "$WHITELIST")
+if [ -n "$HARDCODE" ]; then
+  echo ""
+  echo "❌ BLOQUEADO: offset o nombre de timezone hardcoded"
+  echo "$HARDCODE"
+  echo ""
+  echo "   Usar: require('<ruta>/lib/timezone') (Node) o import de services/fecha (Vue)."
+  echo "   El valor vive solo en integracion_conexionesbd.env (APP_TIMEZONE)."
+  echo "   Archivos autorizados: lib/timezone.js, services/fecha.js, quasar.config.js"
+  echo ""
+  ERRORES=1
+fi
+
+# ── Patrón 4: new Date(`...T...`) sin offset (causó el bug del 21-abr) ──
+TPL_DATE=$(echo "$ARCHIVOS" | xargs grep -nE 'new Date\(`[^`]*T[^`]*`\)' 2>/dev/null | grep -vE '[zZ]`|[+-][0-9]{2}:?[0-9]{2}`' | grep -vE "$WHITELIST")
+if [ -n "$TPL_DATE" ]; then
+  echo ""
+  echo "❌ BLOQUEADO: new Date(\`...T...\`) sin offset explícito"
+  echo "$TPL_DATE"
+  echo ""
+  echo "   Ese patrón depende del timezone del OS (en VPS ≠ Colombia = bug)."
+  echo "   Usar: parseHora(fecha, hora) de lib/timezone o parseBackendDate() de services/fecha."
   echo ""
   ERRORES=1
 fi
 
 if [ "$ERRORES" -ne 0 ]; then
-  echo "Commit rechazado. Corrige los patrones de timezone antes de commitear."
+  echo "Commit rechazado. Corregí los patrones antes de commitear."
+  echo "Regla general: timezone SOLO vía lib/timezone.js (Node) o src/services/fecha.js (Vue)."
   exit 1
 fi
 

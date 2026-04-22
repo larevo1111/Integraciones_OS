@@ -1,3 +1,4 @@
+const { localDate } = require('./lib/timezone')
 const { getPage }     = require('./session');
 const { contarFilas } = require('./utils');
 
@@ -9,7 +10,7 @@ const reportes = [
 ];
 
 (async () => {
-  const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  const fecha = localDate();
 
   for (const reporte of reportes) {
     const { browser, page } = await getPage();

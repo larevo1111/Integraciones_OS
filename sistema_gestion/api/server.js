@@ -39,7 +39,7 @@ const IA_SERVICE_URL   = process.env.IA_SERVICE_URL || 'http://127.0.0.1:5100'
 const PORT             = 9300
 
 // Timezone: helpers centralizados en lib/timezone.js (fuente única: APP_TIMEZONE en .env)
-const { localDate: localDateCO, parseHora: parseHoraCO } = require('../../lib/timezone')
+const { localDate: localDateCO, parseHora: parseHoraCO, TZ_NAME } = require('../../lib/timezone')
 
 if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
   console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET en .env')
@@ -2755,7 +2755,7 @@ app.post('/api/gestion/upload', upload.single('file'), (req, res) => {
 
   // Timestamp Colombia
   const now = new Date()
-  const ts  = now.toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).replace(/[- :]/g, '').slice(0, 15)
+  const ts  = now.toLocaleString('sv-SE', { timeZone: TZ_NAME }).replace(/[- :]/g, '').slice(0, 15)
   const stamp = ts.slice(0, 8) + '-' + ts.slice(8)
   const hash  = crypto.randomBytes(3).toString('hex')
   const ext   = path.extname(req.file.originalname).toLowerCase() || '.jpg'

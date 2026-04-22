@@ -1,3 +1,4 @@
+const { localDate } = require('./lib/timezone')
 const { getPage }     = require('./session');
 const { contarFilas } = require('./utils');
 const path = require('path');
@@ -18,7 +19,7 @@ const EFFI_URL   = 'https://effi.com.co/app/bodega';
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForSelector('text=Exportar a excel', { timeout: 15000 });
 
-    const filePath = path.join(EXPORT_DIR, `bodegas_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })}.xlsx`);
+    const filePath = path.join(EXPORT_DIR, `bodegas_${localDate()}.xlsx`);
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),

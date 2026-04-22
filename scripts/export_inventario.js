@@ -5,6 +5,7 @@
  * Ruta de salida: /exports/inventario/inventario_YYYY-MM-DD.xlsx
  */
 
+const { localDate } = require('./lib/timezone')
 const { chromium }    = require('playwright');
 const { contarFilas } = require('./utils');
 const path = require('path');
@@ -35,7 +36,7 @@ const EFFI_URL     = 'https://effi.com.co/app/articulo';
   const context = await browser.newContext({ storageState: sessionData });
   const page = await context.newPage();
 
-  const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  const fecha = localDate();
   const rutaDestino = path.join(EXPORT_DIR, `inventario_${fecha}.xlsx`);
 
   console.log('� Navegando a Inventario...');

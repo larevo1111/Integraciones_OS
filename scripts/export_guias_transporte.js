@@ -1,3 +1,4 @@
+const { localDate } = require('./lib/timezone')
 const { getPage }     = require('./session');
 const { contarFilas } = require('./utils');
 const path = require('path');
@@ -7,7 +8,7 @@ const http  = require('http');
 
 const EXPORT_DIR = '/exports/guias_transporte';
 const EFFI_URL   = 'https://effi.com.co/app/guia_transporte?sucursal=1';
-const fecha      = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+const fecha      = localDate();
 
 (async () => {
   if (!fs.existsSync(EXPORT_DIR)) {

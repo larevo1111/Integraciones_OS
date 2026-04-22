@@ -1,3 +1,4 @@
+const { localDate } = require('./lib/timezone')
 const { getPage }     = require('./session');
 const { contarFilas } = require('./utils');
 
@@ -13,7 +14,7 @@ const { contarFilas } = require('./utils');
       page.click('text=Exportar a excel')
     ]);
 
-    const filePath = `/exports/tipos_marketing/tipos_marketing_${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })}.xlsx`;
+    const filePath = `/exports/tipos_marketing/tipos_marketing_${localDate()}.xlsx`;
     await download.saveAs(filePath);
     console.log(`✅ Exportado: ${filePath} (${contarFilas(filePath)} filas)`);
 
