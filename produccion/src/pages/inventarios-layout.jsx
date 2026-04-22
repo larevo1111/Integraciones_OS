@@ -14,6 +14,8 @@ import { NotaModal } from "@/components/inventario/nota-modal"
 import { FotoVerModal } from "@/components/inventario/foto-ver-modal"
 import { AsignarModal } from "@/components/inventario/asignar-modal"
 import { AgregarModal } from "@/components/inventario/agregar-modal"
+import { VistaGestion } from "@/components/inventario/vista-gestion"
+import { VistaCostos } from "@/components/inventario/vista-costos"
 
 const FILTROS_BASE = [
   { key: 'todos',     label: 'Todos' },
@@ -371,17 +373,9 @@ export function InventariosLayoutPage() {
           </>
         )}
 
-        {vistaActiva === 'gestion' && (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            Vista Gestión — pendiente de migrar
-          </div>
-        )}
+        {vistaActiva === 'gestion' && <VistaGestion fecha={fecha} />}
 
-        {vistaActiva === 'costos' && (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-tertiary)' }}>
-            Vista Costos — pendiente de migrar
-          </div>
-        )}
+        {vistaActiva === 'costos' && <VistaCostos fecha={fecha} />}
       </div>
 
       {/* MODALES */}
