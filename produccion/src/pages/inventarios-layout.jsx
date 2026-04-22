@@ -9,6 +9,7 @@ import { api } from "@/lib/api"
 import { auth } from "@/lib/auth"
 import { NuevoInventarioModal } from "@/components/inventario/nuevo-inventario-modal"
 import { TablaConteo } from "@/components/inventario/tabla-conteo"
+import { ConfirmModal } from "@/components/inventario/confirm-modal"
 
 const FILTROS_BASE = [
   { key: 'todos',     label: 'Todos' },
@@ -42,6 +43,8 @@ export function InventariosLayoutPage() {
   const [mostrarNuevoInv, setMostrarNuevoInv] = useState(false)
   const [calculandoTeorico, setCalculandoTeorico] = useState(false)
   const [estadoTeorico, setEstadoTeorico] = useState(null)
+  // Modales aside
+  const [modalAbierto, setModalAbierto] = useState(null)  // 'cerrar-conteo' | 'reabrir-conteo' | 'cerrar-inv' | 'reiniciar' | 'eliminar' | null
 
   // Reloj
   const [horaActual, setHoraActual] = useState('')
@@ -133,6 +136,41 @@ export function InventariosLayoutPage() {
     finally { setCalculandoTeorico(false) }
   }
 
+  const recargarTodo = async () => {
+    if (!fecha) return
+    try {
+      const ec = await api.get(`/api/inventario/estado-cierre?fecha=${fecha}`)
+      setEstadoCierre(ec)
+    } catch (_) {}
+    await cargarArticulos()
+  }
+
+  const ejecutarAccion = async (accion) => {
+    const usuario = auth.usuario?.email || ''
+    const endpoints = {
+      'cerrar-conteo':   '/api/inventario/cerrar-conteo',
+      'reabrir-conteo':  '/api/inventario/reabrir-conteo',
+      'cerrar-inv':      '/api/inventario/cerrar-inventario',
+      'reiniciar':       '/api/inventario/reiniciar',
+      'eliminar':        '/api/inventario/eliminar',
+    }
+    try {
+      await api.post(endpoints[accion], { fecha_inventario: fecha, usuario })
+      setModalAbierto(null)
+      if (accion === 'eliminar') {
+        // Recargar lista de fechas y cambiar a otra
+        const data = await api.get('/api/inventario/fechas')
+        setFechas(data)
+        if (data.length) cambiarFecha(data[0].fecha_inventario)
+        else { setArticulos([]); setResumen({}) }
+      } else {
+        await recargarTodo()
+      }
+    } catch (e) {
+      alert('Error: ' + (e.message || 'No se pudo ejecutar la acción'))
+    }
+  }
+
   const fechaDisplay = useMemo(() => {
     if (!fecha) return ''
     const [y, m, d] = fecha.split('-')
@@ -167,8 +205,43 @@ export function InventariosLayoutPage() {
                     <button className={`inv-panel-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
                             disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
                             onClick={(e) => { e.stopPropagation(); calcularTeorico() }}
-                            title="Calcular inventario teórico">
+                            title={estadoTeorico?.calculado ? `Recalcular teórico (${estadoTeorico.calculado_en || ''})` : 'Calcular inventario teórico'}>
                       <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 13 }}>analytics</span>
+                    </button>
+                  )}
+                  {puede('cerrar_conteo') && !estadoCierre.conteo_cerrado && (
+                    <button className="inv-panel-action"
+                            onClick={(e) => { e.stopPropagation(); setModalAbierto('cerrar-conteo') }}
+                            title="Cerrar conteo físico">
+                      <span className="material-icons" style={{ fontSize: 13 }}>lock</span>
+                    </button>
+                  )}
+                  {puede('reabrir_conteo') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
+                    <button className="inv-panel-action"
+                            onClick={(e) => { e.stopPropagation(); setModalAbierto('reabrir-conteo') }}
+                            title="Reabrir conteo físico">
+                      <span className="material-icons" style={{ fontSize: 13 }}>lock_open</span>
+                    </button>
+                  )}
+                  {puede('cerrar_inventario') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
+                    <button className="inv-panel-action inv-panel-action-warn"
+                            onClick={(e) => { e.stopPropagation(); setModalAbierto('cerrar-inv') }}
+                            title="Cerrar inventario completo">
+                      <span className="material-icons" style={{ fontSize: 13 }}>verified</span>
+                    </button>
+                  )}
+                  {puede('reiniciar_inventario') && !estadoCierre.conteo_cerrado && (
+                    <button className="inv-panel-action inv-panel-action-danger"
+                            onClick={(e) => { e.stopPropagation(); setModalAbierto('reiniciar') }}
+                            title="Reiniciar conteos (borra TODO — solo Admin)">
+                      <span className="material-icons" style={{ fontSize: 13 }}>restart_alt</span>
+                    </button>
+                  )}
+                  {puede('eliminar_inventario') && !estadoCierre.inventario_cerrado && (
+                    <button className="inv-panel-action inv-panel-action-danger"
+                            onClick={(e) => { e.stopPropagation(); setModalAbierto('eliminar') }}
+                            title="Eliminar inventario">
+                      <span className="material-icons" style={{ fontSize: 13 }}>delete_outline</span>
                     </button>
                   )}
                 </div>
@@ -299,6 +372,65 @@ export function InventariosLayoutPage() {
         open={mostrarNuevoInv}
         onOpenChange={setMostrarNuevoInv}
         onCreated={(nueva) => { cargarFechas(); if (nueva) cambiarFecha(nueva) }}
+      />
+
+      <ConfirmModal
+        open={modalAbierto === 'cerrar-conteo'}
+        onClose={() => setModalAbierto(null)}
+        onConfirm={() => ejecutarAccion('cerrar-conteo')}
+        titulo="Cerrar conteo físico"
+        icono="lock"
+        variante="default"
+        mensaje="Una vez cerrado el conteo no se podrán modificar los conteos físicos."
+        mensajeSecundario="Podés reabrir el conteo después si fuera necesario."
+        textoConfirmar="Cerrar conteo"
+      />
+
+      <ConfirmModal
+        open={modalAbierto === 'reabrir-conteo'}
+        onClose={() => setModalAbierto(null)}
+        onConfirm={() => ejecutarAccion('reabrir-conteo')}
+        titulo="Reabrir conteo físico"
+        icono="lock_open"
+        variante="default"
+        mensaje="Se permitirá editar conteos físicos nuevamente."
+        textoConfirmar="Reabrir conteo"
+      />
+
+      <ConfirmModal
+        open={modalAbierto === 'cerrar-inv'}
+        onClose={() => setModalAbierto(null)}
+        onConfirm={() => ejecutarAccion('cerrar-inv')}
+        titulo="Cerrar inventario completo"
+        icono="verified"
+        variante="warn"
+        mensaje="Esta acción es irreversible: el inventario quedará cerrado definitivamente."
+        mensajeSecundario="Ya no se podrá modificar ningún dato: ni conteos, ni gestión de inconsistencias, ni resoluciones, ni ajustes. Solo se podrá ver el informe final."
+        textoConfirmar="Cerrar inventario completo"
+      />
+
+      <ConfirmModal
+        open={modalAbierto === 'reiniciar'}
+        onClose={() => setModalAbierto(null)}
+        onConfirm={() => ejecutarAccion('reiniciar')}
+        titulo="Reiniciar conteos"
+        icono="restart_alt"
+        variante="danger"
+        mensaje={`Se borrarán TODOS los conteos del inventario ${fechaDisplay}. Las notas y fotos también se perderán. Esta acción es irreversible.`}
+        mensajeSecundario="Para confirmar, escribí REINICIAR en el campo de abajo."
+        requiredText="REINICIAR"
+        textoConfirmar="Reiniciar conteos"
+      />
+
+      <ConfirmModal
+        open={modalAbierto === 'eliminar'}
+        onClose={() => setModalAbierto(null)}
+        onConfirm={() => ejecutarAccion('eliminar')}
+        titulo="Eliminar inventario"
+        icono="delete_forever"
+        variante="danger"
+        mensaje={`Se eliminarán TODOS los registros del inventario ${fechaDisplay}, incluyendo conteos, notas y fotos. Esta acción es irreversible.`}
+        textoConfirmar="Eliminar inventario"
       />
     </div>
   )
