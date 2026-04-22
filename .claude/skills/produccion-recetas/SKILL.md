@@ -76,6 +76,49 @@ ORDER BY CAST(cod_articulo AS UNSIGNED);
 
 ---
 
+## 1.bis Heurística de sentido común — el nombre del producto dice la receta
+
+**Antes de hacer ninguna query, leé el nombre**. En OS los nombres de productos envasados incluyen el peso/volumen en gramos o ml. Ese número **es la cantidad del material principal por unidad**.
+
+### Ejemplos directos
+
+| Nombre del producto | Peso en nombre | Material principal por unidad |
+|---|---|---|
+| Miel Os Vidrio **640 grs** | 640 g | **0.640 kg** de miel x kilo |
+| Miel Os Vidrio **1000 grs** | 1000 g | **1.000 kg** de miel x kilo |
+| Miel Os Vidrio **150 grs** | 150 g | **0.150 kg** de miel x kilo |
+| Tableta Chocolate 73% **x 50grs** | 50 g | **0.050 kg** de cobertura (puro) — o cobertura + inclusión según mezcla §3 |
+| CHOCOMIEL OS **250cc** | 250 ml | ≈ 0.250 kg / L de chocomiel granel |
+| MIEL APICA X **180 GR** | 180 g | 0.180 kg de miel apica granel |
+
+### Cómo aplicarlo
+
+1. **Leé el nombre del producto** y extraé el número con su unidad (`g`, `grs`, `gramos`, `kg`, `kilo`, `cc`, `ml`).
+2. Convertí a **kg** (o L, si es líquido).
+3. Esa es la cantidad por unidad del **material principal**.
+4. **Para descubrir CUÁL material principal**: mirá las OPs históricas del producto y agrupá por `cod_material`. El más usado es el material principal. Suele ser obvio por el nombre (`Miel ...` → busca un material `MIEL ... x KILO`; `Cobertura ...` → `COBERTURA ... x KILO`).
+5. Para los **insumos secundarios** (envases, etiquetas, cajas) → consultá OPs históricas, son 1:1 por unidad producida.
+
+### Por qué esta heurística importa
+
+`sugerir_receta.py` actualmente descarta OPs con co-productos (mixtas). Pero las mieles, chocolates, etc. casi SIEMPRE se producen mezcladas en una sola OP (por eficiencia). Resultado: el script encuentra 1 OP "pura" y sugiere mal.
+
+**Con la heurística del nombre no necesitás "OPs puras"**:
+- 640 grs → siempre 0.640 kg de miel granel, no importa con qué se mezcló
+- Las OPs mixtas SIRVEN para confirmar (verificá que la suma de pesos cuadre con la miel total usada)
+
+### Regla 3 de 5 (validación)
+
+Aún con la heurística, validá tomando **5 OPs vigentes** del producto. Si **3 o más** confirman el ratio (peso del nombre = kg de material principal por unidad), está confirmado. Si menos → sospechar y preguntar.
+
+```sql
+-- Validar 1:1 contra histórico de un producto
+-- Para cada OP, calcular: kg_miel_total / suma(peso_de_nombres × cantidad_producida)
+-- Debería dar ~1.00 si la heurística aplica
+```
+
+---
+
 ## 2. Cantidades — metodología de 5 pasos
 
 ### Paso 1 — Identificar la versión MÁS BÁSICA del producto
