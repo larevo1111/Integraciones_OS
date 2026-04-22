@@ -1,11 +1,18 @@
 /**
  * VistaGestion — Tab "Gestión" del inventario.
- * Sub-tabs: Dashboard (KPIs + lista artículos por diferencia), Auditoría OPs (placeholder).
+ * Sub-tabs: Dashboard (KPIs + filtros + observaciones + tabla artículos) + Auditoría OPs (placeholder).
  *
  * Endpoints:
  *  - GET  /api/inventario/gestion/dashboard?fecha=
  *  - POST /api/inventario/gestion/calcular  (si dashboard.vacio)
  *  - GET  /api/inventario/gestion?fecha=&severidad=&estado=&grupo=
+ *  - POST /api/inventario/gestion/analizar  (lanza análisis async)
+ *  - GET  /api/inventario/gestion/analisis-estado  (polling)
+ *  - GET  /api/inventario/observaciones?fecha=
+ *  - POST /api/inventario/observaciones
+ *  - DELETE /api/inventario/observaciones/{id}
+ *  - GET  /api/inventario/informes/inventario.pdf?fecha=
+ *  - GET  /api/inventario/informes/analisis-ia.pdf?fecha=
  */
 import { useEffect, useState } from "react"
 import { api } from "@/lib/api"
@@ -16,6 +23,13 @@ const fmtMoney = (n) => {
   return Math.round(n).toLocaleString('es-CO')
 }
 
+const TIPOS_OBS = [
+  { val: 'manual',           label: 'Nota' },
+  { val: 'hallazgo',         label: 'Hallazgo' },
+  { val: 'error_conteo',     label: 'Error conteo' },
+  { val: 'correccion_costo', label: 'Corrección costo' },
+]
+
 export function VistaGestion({ fecha }) {
   const [subtab, setSubtab] = useState('dashboard')
   const [dash, setDash] = useState(null)
@@ -24,6 +38,17 @@ export function VistaGestion({ fecha }) {
   const [filtroEstado, setFiltroEstado] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [calculando, setCalculando] = useState(false)
+  // Análisis IA
+  const [analizando, setAnalizando] = useState(false)
+  const [progAct, setProgAct] = useState({ progreso: 0, total: 0 })
+  // Informes
+  const [generandoInforme, setGenerandoInforme] = useState(false)
+  const [generandoIA, setGenerandoIA] = useState(false)
+  // Observaciones
+  const [observaciones, setObservaciones] = useState([])
+  const [obsExpanded, setObsExpanded] = useState(false)
+  const [nuevaObsTipo, setNuevaObsTipo] = useState('manual')
+  const [nuevaObsTexto, setNuevaObsTexto] = useState('')
 
   // Cargar dashboard al abrir
   const cargarDashboard = async () => {
@@ -53,8 +78,75 @@ export function VistaGestion({ fecha }) {
     } catch (e) { console.error(e); setArticulos([]) }
   }
 
-  useEffect(() => { cargarDashboard() }, [fecha])
+  const cargarObservaciones = async () => {
+    if (!fecha) return
+    try {
+      const data = await api.get(`/api/inventario/observaciones?fecha=${fecha}`)
+      setObservaciones(Array.isArray(data) ? data : [])
+    } catch (e) { console.error(e); setObservaciones([]) }
+  }
+
+  useEffect(() => { cargarDashboard(); cargarObservaciones() }, [fecha])
   useEffect(() => { cargarArticulos() }, [fecha, filtroSev, filtroEstado])
+
+  // ── Análisis IA — lanza POST y hace polling ──
+  const lanzarAnalisis = async () => {
+    if (analizando || !fecha) return
+    setAnalizando(true)
+    try {
+      await api.post('/api/inventario/gestion/analizar', { fecha_inventario: fecha, usuario: auth.usuario?.email || '' })
+      const poll = setInterval(async () => {
+        try {
+          const s = await api.get('/api/inventario/gestion/analisis-estado')
+          setProgAct({ progreso: s.progreso || 0, total: s.total || 0 })
+          if (s.estado === 'ok' || s.estado === 'error') {
+            clearInterval(poll); setAnalizando(false)
+            await Promise.all([cargarDashboard(), cargarArticulos()])
+          }
+        } catch (_) { clearInterval(poll); setAnalizando(false) }
+      }, 2000)
+    } catch (e) { alert('Error: ' + e.message); setAnalizando(false) }
+  }
+
+  // ── Descargar PDFs ──
+  const descargarInforme = async () => {
+    if (generandoInforme || !fecha) return
+    setGenerandoInforme(true)
+    try {
+      window.open(`/api/inventario/informes/inventario.pdf?fecha=${fecha}`, '_blank')
+    } catch (e) { alert('Error: ' + e.message) }
+    finally { setTimeout(() => setGenerandoInforme(false), 1000) }
+  }
+  const descargarAnalisisIA = async () => {
+    if (generandoIA || !fecha) return
+    setGenerandoIA(true)
+    try {
+      window.open(`/api/inventario/informes/analisis-ia.pdf?fecha=${fecha}`, '_blank')
+    } catch (e) { alert('Error: ' + e.message) }
+    finally { setTimeout(() => setGenerandoIA(false), 1000) }
+  }
+
+  // ── Observaciones ──
+  const agregarObservacion = async (e) => {
+    e.preventDefault()
+    if (!nuevaObsTexto.trim()) return
+    try {
+      await api.post('/api/inventario/observaciones', {
+        fecha_inventario: fecha,
+        tipo: nuevaObsTipo,
+        descripcion: nuevaObsTexto.trim(),
+        usuario: auth.usuario?.email || '',
+      })
+      setNuevaObsTexto('')
+      cargarObservaciones()
+    } catch (er) { alert('Error: ' + er.message) }
+  }
+  const eliminarObservacion = async (id) => {
+    try {
+      await api.delete(`/api/inventario/observaciones/${id}`)
+      cargarObservaciones()
+    } catch (er) { alert('Error: ' + er.message) }
+  }
 
   if (!fecha) return null
 
@@ -122,18 +214,89 @@ export function VistaGestion({ fecha }) {
                 </div>
               </div>
 
-              {/* Filtros estado */}
+              {/* Filtros con labels */}
               <div className="inv-filters-row" style={{ marginTop: 12 }}>
+                <span className="inv-bodegas-label">Severidad</span>
+                <button className={`inv-pill ${!filtroSev ? 'active' : ''}`}
+                        onClick={() => setFiltroSev(null)}>Todas</button>
+                <button className={`inv-pill ges-pill-critica ${filtroSev === 'critica' ? 'active' : ''}`}
+                        onClick={() => setFiltroSev(filtroSev === 'critica' ? null : 'critica')}>Críticas</button>
+                <button className={`inv-pill ges-pill-significativa ${filtroSev === 'significativa' ? 'active' : ''}`}
+                        onClick={() => setFiltroSev(filtroSev === 'significativa' ? null : 'significativa')}>Significativas</button>
+                <button className={`inv-pill ges-pill-menor ${filtroSev === 'menor' ? 'active' : ''}`}
+                        onClick={() => setFiltroSev(filtroSev === 'menor' ? null : 'menor')}>Menores</button>
+
+                <span className="inv-separator" />
+
+                <span className="inv-bodegas-label">Estado</span>
                 <button className={`inv-pill ${!filtroEstado ? 'active' : ''}`}
                         onClick={() => setFiltroEstado(null)}>Todos</button>
-                {['pendiente', 'analizado', 'justificada', 'requiere_ajuste'].map(e => (
-                  <button key={e} className={`inv-pill ${filtroEstado === e ? 'active' : ''}`}
-                          onClick={() => setFiltroEstado(filtroEstado === e ? null : e)}>
-                    {e === 'pendiente' ? 'Pendientes'
-                      : e === 'analizado' ? 'Analizados'
-                      : e === 'justificada' ? 'Justificadas' : 'Req. ajuste'}
-                  </button>
+                {[
+                  { v: 'pendiente',       l: 'Pendientes' },
+                  { v: 'analizado',       l: 'Analizados' },
+                  { v: 'justificada',     l: 'Justificadas' },
+                  { v: 'requiere_ajuste', l: 'Req. ajuste' },
+                ].map(({ v, l }) => (
+                  <button key={v} className={`inv-pill ${filtroEstado === v ? 'active' : ''}`}
+                          onClick={() => setFiltroEstado(filtroEstado === v ? null : v)}>{l}</button>
                 ))}
+              </div>
+
+              {/* Barra acciones */}
+              <div className="ges-actions-bar">
+                <button className="ges-action-btn" disabled={analizando} onClick={lanzarAnalisis}>
+                  <span className={`material-icons ${analizando ? 'spin' : ''}`} style={{ fontSize: 15 }}>psychology</span>
+                  {analizando ? `Analizando ${progAct.progreso}/${progAct.total}…` : 'Analizar inconsistencias'}
+                </button>
+                <span className="ges-accion-info">{articulos.length} artículos</span>
+                <button className="ges-action-btn-sec" disabled>Expandir todos</button>
+                <button className="ges-action-btn-sec" disabled>Colapsar todos</button>
+                <button className="ges-action-btn" disabled={generandoInforme} onClick={descargarInforme} style={{ marginLeft: 'auto' }}>
+                  <span className={`material-icons ${generandoInforme ? 'spin' : ''}`} style={{ fontSize: 15 }}>picture_as_pdf</span>
+                  {generandoInforme ? 'Generando…' : 'Informe PDF'}
+                </button>
+                <button className="ges-action-btn ges-action-btn-ia" disabled={generandoIA} onClick={descargarAnalisisIA}>
+                  <span className={`material-icons ${generandoIA ? 'spin' : ''}`} style={{ fontSize: 15 }}>psychology</span>
+                  {generandoIA ? 'Analizando…' : 'Análisis IA'}
+                </button>
+              </div>
+
+              {/* Observaciones */}
+              <div className="ges-observaciones">
+                <div className="ges-obs-header" onClick={() => setObsExpanded(v => !v)} style={{ cursor: 'pointer' }}>
+                  <span className={`material-icons ges-chevron ${obsExpanded ? 'expandido' : ''}`}>chevron_right</span>
+                  <span style={{ fontWeight: 600, fontSize: 12 }}>Observaciones del inventario</span>
+                  {observaciones.length > 0 && <span className="ges-subtab-badge">{observaciones.length}</span>}
+                </div>
+                {obsExpanded && (
+                  <div className="ges-obs-body">
+                    {observaciones.map(obs => (
+                      <div key={obs.id} className="ges-obs-item">
+                        <span className={`ges-obs-tipo obs-${obs.tipo}`}>
+                          {TIPOS_OBS.find(t => t.val === obs.tipo)?.label || obs.tipo}
+                        </span>
+                        <span className="ges-obs-texto">{obs.descripcion}</span>
+                        <span className="ges-obs-fecha">{obs.registrado_por} · {obs.created_at?.slice(0, 10)}</span>
+                        <button className="ges-obs-del" onClick={(e) => { e.stopPropagation(); eliminarObservacion(obs.id) }} title="Eliminar">
+                          <span className="material-icons" style={{ fontSize: 12 }}>close</span>
+                        </button>
+                      </div>
+                    ))}
+                    {!observaciones.length && (
+                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', padding: '6px 0' }}>Sin observaciones</div>
+                    )}
+                    <form className="ges-obs-form" onSubmit={agregarObservacion}>
+                      <select value={nuevaObsTipo} onChange={e => setNuevaObsTipo(e.target.value)} className="ges-obs-select">
+                        {TIPOS_OBS.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
+                      </select>
+                      <input value={nuevaObsTexto} onChange={e => setNuevaObsTexto(e.target.value)}
+                             className="ges-obs-input" placeholder="Escribir observación..." />
+                      <button type="submit" className="ges-obs-add" disabled={!nuevaObsTexto.trim()}>
+                        <span className="material-icons" style={{ fontSize: 14 }}>add</span>
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
 
               {/* Tabla artículos con diferencia */}
