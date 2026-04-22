@@ -2,12 +2,13 @@ import { useEffect, useState } from "react"
 import { NavLink } from "react-router"
 import {
   ClipboardList, LayoutDashboard, Calendar, BookOpen, Settings,
-  ChevronsLeft, ChevronsRight, Sun, Moon, ChevronRight,
+  ChevronsLeft, ChevronsRight, Sun, Moon, ChevronRight, LogOut,
   Package, Boxes, EyeOff, MessageSquare, AlertTriangle,
   RefreshCw, Sparkles, FileText, Lock, ListChecks,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/lib/theme"
+import { auth } from "@/lib/auth"
 
 const navItems = [
   { to: "/", label: "Vista general", icon: LayoutDashboard },
@@ -143,6 +144,31 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-1.5 pb-2 space-y-0.5">
+        {auth.usuario && (
+          <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md", collapsed && "justify-center")}
+               title={collapsed ? auth.usuario.nombre : undefined}>
+            {auth.usuario.foto
+              ? <img src={auth.usuario.foto} alt="" className="h-5 w-5 rounded-full shrink-0" />
+              : <div className="h-5 w-5 rounded-full bg-muted text-[10px] flex items-center justify-center shrink-0">
+                  {auth.usuario.nombre?.[0]?.toUpperCase() || '?'}
+                </div>}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] truncate">{auth.usuario.nombre}</div>
+                <div className="text-[10px] text-muted-foreground truncate">Nivel {auth.usuario.nivel}</div>
+              </div>
+            )}
+            {!collapsed && (
+              <button
+                onClick={() => { auth.logout(); window.location.reload() }}
+                className="text-muted-foreground hover:text-destructive cursor-pointer"
+                title="Cerrar sesión"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
         <button
           onClick={toggle}
           className={cn(

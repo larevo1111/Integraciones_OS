@@ -1,4 +1,4 @@
-"""API FastAPI — Programación de Producción. Puerto 9600."""
+"""API FastAPI — Programación de Producción + Inventario unificado. Puerto 9600."""
 import os, sys, jwt
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,8 +6,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import pymysql
+import urllib.request, urllib.parse, json as _json
+
+# Cargar .env del mismo directorio si existe (secrets: GOOGLE_CLIENT_ID, JWT_SECRET)
+_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_ENV_FILE):
+    for line in open(_ENV_FILE):
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        if '=' in line:
+            k, v = line.split('=', 1)
+            os.environ.setdefault(k.strip(), v.strip())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lib import cfg_local, cfg_inventario
@@ -26,8 +37,97 @@ DB_INV  = DB_INVPROD  # tablas inv_*
 DB_EFFI = dict(**cfg_local(), database='effi_data', cursorclass=pymysql.cursors.DictCursor)
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'os_secret_dev_change_me')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+# ── AUTH: Google OAuth + JWT ───────────────────────────────────────
+
+def _validar_token_google(id_token: str) -> dict:
+    """Valida el id_token con Google y devuelve el payload."""
+    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={urllib.parse.quote(id_token)}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = _json.loads(resp.read())
+    except Exception as e:
+        raise HTTPException(401, f"Token de Google inválido: {e}")
+    if data.get('error'):
+        raise HTTPException(401, "Token de Google inválido o expirado")
+    if GOOGLE_CLIENT_ID and data.get('aud') != GOOGLE_CLIENT_ID:
+        raise HTTPException(401, "Token no corresponde a esta aplicación")
+    if not data.get('email'):
+        raise HTTPException(401, "No se obtuvo email de Google")
+    return data
+
+
+def _buscar_usuario_os(email: str) -> Optional[dict]:
+    """Busca el usuario en sys_usuarios (Hostinger os_comunidad) vía helper remoto."""
+    from lib import comunidad
+    with comunidad(dict_cursor=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT Email AS email, Nombre_Usuario AS nombre, Nivel_Acceso AS nivel, "
+                "estado, foto_url FROM sys_usuarios WHERE Email = %s",
+                (email,)
+            )
+            return cur.fetchone()
+
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
+@app.post("/api/auth/google")
+def api_auth_google(req: GoogleAuthRequest):
+    """Login con Google: valida id_token, busca usuario en sys_usuarios, devuelve JWT."""
+    payload = _validar_token_google(req.id_token)
+    email = payload['email']
+    usuario = _buscar_usuario_os(email)
+    if not usuario:
+        raise HTTPException(403, "No tienes acceso. Contacta al administrador.")
+    if usuario.get('estado') != 'Activo':
+        raise HTTPException(403, "Usuario inactivo. Contacta al administrador.")
+
+    token = jwt.encode({
+        'email': usuario['email'],
+        'nombre': usuario['nombre'],
+        'nivel': usuario['nivel'],
+        'foto': payload.get('picture') or usuario.get('foto_url') or '',
+        'exp': datetime.utcnow() + timedelta(days=7),
+    }, JWT_SECRET, algorithm='HS256')
+
+    return {
+        'ok': True,
+        'token': token,
+        'usuario': {
+            'email': usuario['email'],
+            'nombre': usuario['nombre'],
+            'nivel': usuario['nivel'],
+            'foto': payload.get('picture') or usuario.get('foto_url') or '',
+        }
+    }
+
+
+def require_auth(request: Request):
+    """Dependency de FastAPI — valida JWT en header Authorization: Bearer."""
+    header = request.headers.get('authorization', '')
+    token = header[7:] if header.startswith('Bearer ') else None
+    if not token:
+        raise HTTPException(401, "No autenticado")
+    try:
+        decoded = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expirado")
+    except Exception:
+        raise HTTPException(401, "Token inválido")
+    return decoded
+
+
+@app.get("/api/auth/me")
+def api_auth_me(usuario=Depends(require_auth)):
+    """Devuelve datos del usuario autenticado (verifica que el JWT sigue válido)."""
+    return {'ok': True, 'usuario': usuario}
 
 
 def q(db, sql, params=None):
@@ -426,6 +526,38 @@ def stats_resumen():
         SELECT estado, COUNT(*) AS n FROM prod_solicitudes GROUP BY estado
     """)
     return {r['estado']: r['n'] for r in rows}
+
+
+# ── Proxy al API de inventario (puerto 9401) ──────────────
+# Temporal: mientras la UI está aquí pero los endpoints viven en el servicio os-inventario-api.
+# Cuando fusionemos backends (Fase 10), este proxy se elimina.
+
+import httpx
+
+INVENTARIO_API_BASE = os.environ.get('INVENTARIO_API_BASE', 'http://localhost:9401')
+_http_client = httpx.Client(timeout=60.0)
+
+@app.api_route("/api/inventario/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_inventario(path: str, request: Request):
+    """Proxy transparente hacia el servicio os-inventario-api."""
+    url = f"{INVENTARIO_API_BASE}/api/inventario/{path}"
+    # Copiar query string
+    if request.url.query:
+        url += "?" + request.url.query
+    # Copiar headers excepto host
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in ('host', 'content-length')}
+    body = await request.body()
+    try:
+        resp = _http_client.request(request.method, url, headers=headers, content=body)
+        from fastapi.responses import Response as FResp
+        return FResp(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers={k: v for k, v in resp.headers.items() if k.lower() not in ('content-encoding', 'transfer-encoding')},
+            media_type=resp.headers.get('content-type')
+        )
+    except Exception as e:
+        raise HTTPException(502, f"Error proxy a inventario: {e}")
 
 
 # ── Servir frontend ───────────────────────────────────────

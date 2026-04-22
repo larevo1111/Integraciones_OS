@@ -1,13 +1,22 @@
+import { auth } from './auth'
+
 const BASE = window.location.origin
 
 async function request(path, options = {}) {
-  const resp = await fetch(BASE + path, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  }
+  const t = auth.token
+  if (t) headers['Authorization'] = `Bearer ${t}`
+
+  const resp = await fetch(BASE + path, { ...options, headers })
+
+  // Auto-logout si el token expiró / inválido (solo si había token)
+  if (resp.status === 401 && t) {
+    auth.logout()
+  }
+
   if (!resp.ok) {
     let msg = `HTTP ${resp.status}`
     try {
