@@ -44,9 +44,14 @@ const COLUMNS = [
   { key: 'categoria', label: 'Tipo' },
 ]
 
-export function TablaConteo({ articulos, cargando, conteoBloqueado, onChange }) {
+export function TablaConteo({ articulos, cargando, conteoBloqueado, onChange, onAccionFila }) {
   const [menuAbierto, setMenuAbierto] = useState(null)
   const [localState, setLocalState] = useState({}) // { [id]: { fisico, estado, diferencia } } overrides en memoria
+
+  const handleAccion = (accion, art) => {
+    setMenuAbierto(null)
+    if (onAccionFila) onAccionFila(accion, art)
+  }
 
   // Mezclar estado local con artículos para reflejar conteos sin esperar reload
   const filas = articulos.map(a => ({ ...a, ...(localState[a.id] || {}) }))
@@ -165,22 +170,22 @@ export function TablaConteo({ articulos, cargando, conteoBloqueado, onChange }) 
                     </button>
                     {menuAbierto === a.id && (
                       <div className="action-menu" onClick={e => e.stopPropagation()}>
-                        <div className="action-menu-item">
+                        <div className="action-menu-item" onClick={() => handleAccion('nota', a)}>
                           <span className="material-icons" style={{ fontSize: 14 }}>edit_note</span>
                           <span>{a.notas ? 'Editar nota' : 'Agregar nota'}</span>
                         </div>
-                        <div className="action-menu-item">
+                        <div className="action-menu-item" onClick={() => handleAccion('foto', a)}>
                           <span className="material-icons" style={{ fontSize: 14 }}>photo_camera</span>
                           <span>Tomar foto</span>
                         </div>
                         {a.foto && (
-                          <div className="action-menu-item">
+                          <div className="action-menu-item" onClick={() => handleAccion('ver-foto', a)}>
                             <span className="material-icons" style={{ fontSize: 14 }}>visibility</span>
                             <span>Ver foto</span>
                           </div>
                         )}
                         {a.id_effi?.startsWith('NM-') && (
-                          <div className="action-menu-item">
+                          <div className="action-menu-item" onClick={() => handleAccion('asignar', a)}>
                             <span className="material-icons" style={{ fontSize: 14 }}>link</span>
                             <span>Asignar a Effi</span>
                           </div>

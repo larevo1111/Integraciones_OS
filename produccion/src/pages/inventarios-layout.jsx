@@ -10,6 +10,10 @@ import { auth } from "@/lib/auth"
 import { NuevoInventarioModal } from "@/components/inventario/nuevo-inventario-modal"
 import { TablaConteo } from "@/components/inventario/tabla-conteo"
 import { ConfirmModal } from "@/components/inventario/confirm-modal"
+import { NotaModal } from "@/components/inventario/nota-modal"
+import { FotoVerModal } from "@/components/inventario/foto-ver-modal"
+import { AsignarModal } from "@/components/inventario/asignar-modal"
+import { AgregarModal } from "@/components/inventario/agregar-modal"
 
 const FILTROS_BASE = [
   { key: 'todos',     label: 'Todos' },
@@ -45,6 +49,11 @@ export function InventariosLayoutPage() {
   const [estadoTeorico, setEstadoTeorico] = useState(null)
   // Modales aside
   const [modalAbierto, setModalAbierto] = useState(null)  // 'cerrar-conteo' | 'reabrir-conteo' | 'cerrar-inv' | 'reiniciar' | 'eliminar' | null
+  // Modales por fila
+  const [accionFila, setAccionFila] = useState({ tipo: null, articulo: null })  // tipo: 'nota' | 'ver-foto' | 'asignar' | null
+  const fotoInputRef = useRef(null)
+  const articuloFotoRef = useRef(null)  // qué artículo recibirá la foto pendiente
+  const [mostrarAgregar, setMostrarAgregar] = useState(false)
 
   // Reloj
   const [horaActual, setHoraActual] = useState('')
@@ -350,6 +359,14 @@ export function InventariosLayoutPage() {
               bodegaActiva={bodegaActiva}
               conteoBloqueado={estadoCierre.conteo_cerrado || estadoCierre.inventario_cerrado}
               onChange={cargarArticulos}
+              onAccionFila={(tipo, articulo) => {
+                if (tipo === 'foto') {
+                  articuloFotoRef.current = articulo
+                  fotoInputRef.current?.click()
+                } else {
+                  setAccionFila({ tipo, articulo })
+                }
+              }}
             />
           </>
         )}
@@ -431,6 +448,73 @@ export function InventariosLayoutPage() {
         variante="danger"
         mensaje={`Se eliminarán TODOS los registros del inventario ${fechaDisplay}, incluyendo conteos, notas y fotos. Esta acción es irreversible.`}
         textoConfirmar="Eliminar inventario"
+      />
+
+      {/* MODALES POR FILA */}
+      <NotaModal
+        open={accionFila.tipo === 'nota'}
+        articulo={accionFila.articulo}
+        onClose={() => setAccionFila({ tipo: null, articulo: null })}
+        onSaved={() => cargarArticulos()}
+      />
+
+      <FotoVerModal
+        open={accionFila.tipo === 'ver-foto'}
+        articulo={accionFila.articulo}
+        onClose={() => setAccionFila({ tipo: null, articulo: null })}
+      />
+
+      <AsignarModal
+        open={accionFila.tipo === 'asignar'}
+        articulo={accionFila.articulo}
+        onClose={() => setAccionFila({ tipo: null, articulo: null })}
+        onAsignado={() => cargarArticulos()}
+      />
+
+      <AgregarModal
+        open={mostrarAgregar}
+        fecha={fecha}
+        bodega={bodegaActiva}
+        onClose={() => setMostrarAgregar(false)}
+        onChange={() => { cargarArticulos(); api.get(`/api/inventario/bodegas/todas?fecha=${fecha}`).then(setBodegas) }}
+      />
+
+      {/* FAB agregar artículo (solo si conteo abierto) */}
+      {!estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
+        <button className="inv-fab" onClick={() => setMostrarAgregar(true)} title="Agregar artículo">
+          <span className="material-icons">add</span>
+        </button>
+      )}
+
+      {/* INPUT OCULTO PARA TOMAR FOTO (cámara móvil) */}
+      <input
+        ref={fotoInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0]
+          const art = articuloFotoRef.current
+          if (!file || !art) return
+          try {
+            const fd = new FormData()
+            fd.append('file', file)
+            fd.append('usuario', auth.usuario?.email || '')
+            const resp = await fetch(`/api/inventario/articulos/${art.id}/foto`, {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + (localStorage.getItem('produccion_jwt') || '') },
+              body: fd,
+            })
+            if (!resp.ok) throw new Error('upload fallido (' + resp.status + ')')
+            await cargarArticulos()
+          } catch (err) {
+            alert('Error subiendo foto: ' + err.message)
+          } finally {
+            articuloFotoRef.current = null
+            e.target.value = ''
+          }
+        }}
       />
     </div>
   )
