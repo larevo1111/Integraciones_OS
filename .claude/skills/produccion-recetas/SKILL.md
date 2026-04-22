@@ -3,27 +3,91 @@ name: produccion-recetas
 description: Cómo construir recetas correctas para crear órdenes de producción (OPs) en Effi. Triggers - orden de producción, OP, receta, tableta, cobertura, templada, frutos secos, macadamia, almendra, mani, nibs, empacar, sin empacar, manteca, cacao, moldería, lote.
 ---
 
-# Skill: Construcción de recetas de producción (Origen Silvestre)
+# Skill — Construcción de recetas de producción (Origen Silvestre)
 
-Esta skill te enseña la **metodología rigurosa** para construir recetas antes de crear una OP en Effi. Aplica para tabletas, envasado, mezclas, coberturas, todo.
+Cómo armar una OP correcta en Effi: **cantidades físicas** (receta), **costos** (materiales), **precios** (producidos), **flujo de OPs en cadena** y **ejecución con el script**.
 
-**Regla cero**: NUNCA inventar cantidades. Toda receta debe respaldarse en al menos 2 OPs históricas vigentes (o ser confirmada explícitamente por Santi).
+## Regla cero
+
+**NUNCA inventar cantidades, costos o precios**. Cada valor debe salir de:
+- **BD `effi_data`** (catálogo + histórico de OPs vigentes), o
+- **Confirmación explícita de Santi**.
+
+Si no podés confirmar un valor desde la BD, **detenete y preguntá**. Inventar (aunque sea "redondeando" o "siendo conservador") rompe reportes contables y genera OPs a anular.
 
 ---
 
-## Metodología de búsqueda — los 5 pasos
+## 1. Costos y precios — fuente de verdad
+
+Validado con las OPs correctas 2191/2194/2195 (2026-04-22). Los valores que Effi pre-llena al crear OP manual vienen de acá:
+
+| Campo del JSON | Tabla / columna | Notas |
+|---|---|---|
+| `materiales[].costo` | `zeffi_inventario.costo_manual` | Effi pre-llena con este valor. **Nunca** usar `costo_promedio` ni `ultimo_costo`. |
+| `articulos_producidos[].precio` | Último `zeffi_articulos_producidos.precio_minimo_ud` del mismo cod en OPs vigentes | El catálogo `precio_minimo_de_venta` está en **0** para casi todo. Effi lo guarda internamente en una tabla que **no exportamos** pero el valor actual coincide siempre con la última OP vigente. |
+| `otros_costos[].costo` | Manual / acordado con Santi | Ej: mano de obra (REFINADO CACAO 24H CHOCOFRUTS) se paga por hora. |
+
+### Queries listas para copiar/pegar
+
+**Costos de materiales** (catálogo):
+```sql
+SELECT id AS cod, nombre, costo_manual
+FROM zeffi_inventario
+WHERE id IN ('319','485','581','196','114','508','178','412','480','481','482','483','484')
+  AND vigencia='Vigente'
+ORDER BY CAST(id AS UNSIGNED);
+```
+
+**Precios de productos producidos** (último valor vigente, descartando OPs propias malas):
+```sql
+SELECT cod_articulo,
+       MAX(descripcion_articulo_producido) AS descripcion,
+       SUBSTRING_INDEX(GROUP_CONCAT(precio_minimo_ud ORDER BY fecha_creacion DESC), ',', 1) AS ultimo_precio,
+       MAX(fecha_creacion) AS ultima_fecha
+FROM zeffi_articulos_producidos
+WHERE cod_articulo IN ('480','481','482','483','484','320','493','494','495','496','581')
+  AND vigencia='Orden vigente'
+  AND CAST(REPLACE(precio_minimo_ud, ',', '') AS DECIMAL(18,4)) > 100
+GROUP BY cod_articulo
+ORDER BY CAST(cod_articulo AS UNSIGNED);
+```
+
+### Tabla de referencia confirmada (2026-04-22)
+
+| Cod | Producto | `costo_manual` (mat) | Último `precio_minimo_ud` (prod) |
+|---|---|---|---|
+| 319 | Cobertura 73% sin templar | $43,432 | — |
+| 485 | Manteca cacao templada | $50,000 | — |
+| 581 | Cobertura 73% templada | $43,432 | $43,432 (no hay histórico bueno → usar `costo_manual`) |
+| 196 | Macadamia tostada | $100,000 | — |
+| 114 | Maní sin cáscara | $17,000 | — |
+| 508 | Almendras tostadas | $42,000 | — |
+| 178 | Nibs cacao | $24,000 | — |
+| 412 | Caja chocolate oscuro | $1,000 | — |
+| 480-484 | Tabletas sin empacar | $5,200 | **$8,900** |
+| 320, 493-496 | Tabletas empacadas | — | **$10,529** |
+
+**Nota**: el precio histórico **cambia en el tiempo** (Effi actualiza el valor internamente cada X meses). Por eso hay que consultar la BD cada vez — no hardcodear.
+
+### Anti-patrones
+❌ Inventar el precio "redondeando" o "siendo conservador" → distorsiona Total venta / Beneficio neto.
+❌ Usar `costo_promedio` o `ultimo_costo` del catálogo en lugar de `costo_manual`.
+❌ Asumir que `precio_minimo_de_venta` del catálogo tiene el valor correcto (está en 0 para casi todo).
+
+---
+
+## 2. Cantidades — metodología de 5 pasos
 
 ### Paso 1 — Identificar la versión MÁS BÁSICA del producto
 
 Muchos productos tienen 2-3 versiones en Effi:
-- **"sin empacar"** — el producto base recién hecho, contiene la receta CRUDA (cobertura, fruto seco, etc.)
-- **"empacado"** — base + caja/etiqueta/bolsa
-- **"templado"** — versión templada de coberturas (proceso adicional)
+- **"sin empacar"** — producto base recién hecho. Contiene la receta CRUDA (cobertura + frutos secos, etc.)
+- **"empacado"** — base + caja / etiqueta / bolsa.
+- **"templado"** — versión templada de coberturas (proceso adicional).
 
-**SIEMPRE arranca por la versión sin empacar**. Ahí está la receta real de los insumos primarios. Si tu pedido es "empacar tabletas con frutos secos", combinar las recetas: receta del sin empacar + caja/etiqueta del empacado.
+**SIEMPRE arranca por la versión sin empacar** — ahí está la receta real. La empacada solo agrega caja.
 
 ```sql
--- Ejemplo: receta de tableta con nibs
 -- PRIMERO buscar versión sin empacar:
 SELECT id, nombre FROM zeffi_inventario
 WHERE vigencia='Vigente'
@@ -39,7 +103,7 @@ WHERE vigencia='Vigente'
 -- → cod 496 = "Tableta Chocolate 73p con Nibs 50 grs CPM"
 ```
 
-### Paso 2 — Traer las últimas N OPs vigentes que produjeron esa versión
+### Paso 2 — Traer las últimas OPs vigentes que produjeron esa versión
 
 ```sql
 SELECT ap.id_orden, e.fecha_de_creacion, ap.cantidad
@@ -65,19 +129,19 @@ Ej: 24 tabletas con nibs (1.2 kg producidos):
 
 ### Paso 4 — CORROBORAR con al menos 2 OPs distintas
 
-Una sola OP puede tener errores de captura. **Necesitas mínimo 2 OPs con el mismo ratio** para confianza alta. Si dan distinto:
-- Investiga la discrepancia (¿hubo merma? ¿OP de prueba?)
-- Pregunta a Santi antes de actuar
+Una sola OP puede tener errores de captura. **Mínimo 2 OPs con el mismo ratio** para confianza alta. Si difieren:
+- Investigá la discrepancia (¿merma? ¿OP de prueba?)
+- Pregúntale a Santi antes de actuar
 
 ### Paso 5 — Escalar al pedido nuevo + verificar suma
 
-Aplica los porcentajes al pedido. **La suma de materiales debe igualar el peso del producto producido** (descontando merma).
+Aplicá los porcentajes al pedido. **La suma de materiales debe igualar el peso del producto producido** (descontando merma).
 
 ---
 
-## Porcentajes confirmados — TABLETAS 50g
+## 3. Porcentajes confirmados — TABLETAS 50g
 
-Confirmados por la metodología arriba en OPs múltiples:
+Validados por la metodología arriba en múltiples OPs:
 
 | Tableta | % cobertura | % inclusión | OPs ref. |
 |---|---|---|---|
@@ -88,184 +152,121 @@ Confirmados por la metodología arriba en OPs múltiples:
 | **Nibs** | 80% (40g) | 20% nibs (10g) | 2162 |
 
 **Regla resumen**:
-- Frutos secos (mani, macadamia, almendra) = 30% inclusión / 70% cobertura
-- Nibs = 20% inclusión / 80% cobertura
-- Chocolate puro = 100% cobertura
+- Frutos secos (maní, macadamia, almendra) = **30% inclusión / 70% cobertura**
+- Nibs = **20% inclusión / 80% cobertura**
+- Chocolate puro = **100% cobertura**
 
 ---
 
-## Capacidad de moldería — restricción al pedido
+## 4. Capacidad de moldería — restricción al pedido
 
-**La moldería es el límite real de producción**. Cada lote de tabletas usa N moldes y cada molde tiene capacidad fija (ej: 4 tabletas por molde). El máximo de tabletas por OP = moldes disponibles × tabletas/molde.
+**La moldería es el límite real de producción**. Cada lote de tabletas usa N moldes con M tabletas cada uno. Caso típico: 34 moldes × 4 tabletas = **136 tabletas máximo por OP**.
 
-Cuando Santi te dice "tengo X kg de cobertura templada para tabletas":
-- ese X kg es el **peso TOTAL del producto final** (cobertura + inclusión, no solo cobertura)
-- A ese X hay que **restarle el peso de los frutos secos** para saber cuánta cobertura va
+Cuando Santi dice "tengo X kg para tabletas":
+- X kg es el **peso TOTAL del producto final** (cobertura + inclusión juntos).
+- Para saber cuánta cobertura templada necesitás: **`cobertura = X_total − sum(inclusiones)`**.
 
 Ejemplo:
-- Pedido: 50 chocolate + 30 macadamia + 30 maní + 11 almendra + 15 nibs = 136 tabletas × 50g = 6.8 kg total
+- Pedido: 50 puro + 30 mac + 30 maní + 11 alm + 15 nibs = 136 tabletas × 50g = 6.8 kg total
 - Inclusiones: 30×15g (mac) + 30×15g (mani) + 11×15g (alm) + 15×10g (nibs) = 1.215 kg
-- **Cobertura templada real necesaria: 6.8 - 1.215 = 5.585 kg**
+- **Cobertura templada necesaria: 6.8 − 1.215 = 5.585 kg**
 
 ---
 
-## Cobertura templada vs sin templar
+## 5. Cobertura templada vs sin templar — 4 productos similares
 
-Cuidado con los nombres en Effi (4 productos similares):
+Cuidado con confundirlos:
 
 | Cod | Nombre | Uso |
 |---|---|---|
-| 193 | MANTECA DE CACAO X KG | Sin templar — va en producir cobertura 73% (cod 319) |
+| 193 | MANTECA DE CACAO X KG | Sin templar — se usa para producir cobertura 73% (cod 319) |
 | 485 | MANTECA DE CACAO **TEMPLADA** X KG | Templada — solo para método de siembra |
-| 319 | COBERTURA CHOCOLATE 73% OS X KILO | Base sin templar — receta lote fijo 4kg |
-| 581 | COBERTURA CHOCOLATE 73% OS X KILO **- TEMPLADA** | Templada (siembra) — para tabletas chocolatería |
+| 319 | COBERTURA CHOCOLATE 73% OS X KILO | Base sin templar — se produce por lote fijo de 4 kg |
+| 581 | COBERTURA CHOCOLATE 73% OS X KILO **- TEMPLADA** | Templada (siembra) — es lo que va en las tabletas de chocolatería |
 
-**Cómo se produce cobertura templada (cod 581) — método siembra**:
-- Material 1: cobertura sin templar cod 319 (~93%)
-- Material 2: manteca de cacao **templada** cod 485 (~7%)
-- Producto: cod 581 templada (suma de los 2 insumos)
-- Ej: 7.9 kg sin templar + 0.6 kg manteca templada → 8.5 kg templada
+### Cómo se produce cobertura templada (cod 581) — método siembra
+- Material 1: cobertura sin templar cod **319** (~93%)
+- Material 2: manteca de cacao **templada** cod **485** (~7%)
+- Producto: cod **581** templada (suma de los 2 insumos)
+- Ej: 7.9 kg cod 319 + 0.6 kg cod 485 → 8.5 kg cod 581
 
-El ratio inclusión/cobertura (30% frutos secos, 20% nibs) **NO cambia** al usar cobertura templada.
+El ratio inclusión/cobertura (30% frutos secos, 20% nibs) **NO cambia** al usar cobertura templada vs sin templar.
 
 ---
 
-## ⭐ Costos y precios — fuente de verdad
+## 6. Flujo de OPs en cadena — SIEMPRE en OPs separadas
 
-**Regla absoluta** (validada con OPs reales 2191/2194/2195 el 2026-04-22):
+**Regla**: NUNCA combinar producción + empacado en una sola OP. Origen Silvestre lo hace SIEMPRE en OPs separadas.
 
-| Campo del JSON | De dónde sacarlo |
+### Caso A — 2 OPs (tabletas sin cobertura templada en cadena)
+
+```
+OP #1  consume cobertura sin templar (319) + frutos secos  →  produce tabletas sin empacar (480-484)
+  ↓
+OP #2  consume tabletas sin empacar + cajas (412)          →  produce tabletas empacadas (320, 493-496)
+```
+
+### Caso B — 3 OPs (con cobertura templada)
+
+```
+OP #1  consume cobertura 319 + manteca templada 485  →  produce cobertura templada 581
+  ↓
+OP #2  consume 581 + frutos secos                    →  produce tabletas sin empacar (480-484)
+  ↓
+OP #3  consume tabletas sin empacar + cajas 412      →  produce tabletas empacadas (320, 493-496)
+```
+
+### Mapeo sin empacar → empacada
+
+| Sin empacar | Empacada | Sabor |
+|---|---|---|
+| 480 | 320 | Chocolate puro |
+| 481 | 494 | Maní |
+| 482 | 493 | Macadamia |
+| 483 | 495 | Almendra |
+| 484 | 496 | Nibs |
+
+### Insumos de empacado
+- **Caja**: cod **412** CAJA CHOCOLATE OSCURO 73Pgm X UND (1 por tableta, a veces +1-6 de reserva)
+- **Etiquetas (533-538)**: NO aparecen en materiales históricos. Probable que vengan preimpresas en la caja. Si dudás, preguntá antes de agregar.
+
+---
+
+## 7. Caso real ejecutado — OPs 2191, 2194, 2195 (2026-04-22)
+
+Las 3 OPs correctas en Effi (después de corregir bugs previos). Referencia canónica:
+
+### OP 2191 — Cobertura templada (8.5 kg)
+| | |
 |---|---|
-| `materiales[].costo` | **`costo_manual`** del catálogo `zeffi_inventario` |
-| `articulos_producidos[].precio` | Último **`precio_minimo_ud`** de OPs vigentes del producto en `zeffi_articulos_producidos` |
-| `otros_costos[].costo` | Manual / acordado con Santi |
+| Materiales | 7.9 kg cod **319** @ $43,432 + 0.6 kg cod **485** @ $50,000 |
+| Producto | 8.5 kg cod **581** @ $43,432 |
+| Otros costos | 2h mano de obra (tipo 1) @ $7,000 |
+| Costo materiales | $373,113 |
+| Observación | "Cobertura templada para tabletas — método siembra" |
 
-### Por qué así
-- **Materiales**: Effi pre-llena el form con `costo_manual` del catálogo. Usar otro valor distorsiona costos contables. El histórico puede tener anomalías (p.ej. cod 485 manteca templada con $45 cuando el catálogo dice $50,000 — error humano replicado).
-- **Producidos**: el campo `precio_minimo_de_venta` del catálogo está en 0 para casi todo. Effi pre-llena con el último precio usado en OPs anteriores del mismo producto. Replicar ese mismo valor mantiene consistencia con reportes.
+### OP 2194 — Tabletas sin empacar (136 unid)
+| | |
+|---|---|
+| Materiales | 5.585 kg **581** @ $43,432 + 0.450 kg **196** @ $100,000 + 0.450 kg **114** @ $17,000 + 0.165 kg **508** @ $42,000 + 0.150 kg **178** @ $24,000 |
+| Productos | 50 × **480** + 30 × **482** + 30 × **481** + 11 × **483** + 15 × **484** (todos @ $8,900) |
+| Otros costos | 1h mano de obra @ $7,000 |
+| Costo materiales | $306,175 · Venta total $1,210,400 · Beneficio 286% |
 
-### Queries listas para copiar/pegar
-
-```sql
--- COSTO de un material (catálogo)
-SELECT id, nombre, costo_manual
-FROM zeffi_inventario
-WHERE id IN ('319','485','196','114','508','178','412','480','481','482','483','484')
-  AND vigencia='Vigente';
-
--- PRECIO de un producido (último histórico vigente, descartando OPs propias defectuosas)
-SELECT cod_articulo,
-       SUBSTRING_INDEX(GROUP_CONCAT(precio_minimo_ud ORDER BY fecha_creacion DESC), ',', 1) AS ultimo_precio,
-       MAX(fecha_creacion) AS ultima_fecha
-FROM zeffi_articulos_producidos
-WHERE cod_articulo IN ('480','481','482','483','484','320','493','494','495','496','581')
-  AND vigencia='Orden vigente'
-  AND CAST(REPLACE(precio_minimo_ud, ',', '') AS DECIMAL(18,4)) > 100
-GROUP BY cod_articulo;
-```
-
-### Tabla de referencia confirmada (2026-04-22)
-
-| Cod | Producto | Costo (mat) | Precio (prod) |
-|---|---|---|---|
-| 319 | Cobertura 73% sin templar | $43,432 | — |
-| 485 | Manteca cacao templada | $50,000 (catálogo) | — |
-| 581 | Cobertura 73% templada | $43,432 | $43,432 (no hay histórico bueno → usar costo_manual) |
-| 196 | Macadamia tostada | $100,000 | — |
-| 114 | Maní sin cáscara | $17,000 | — |
-| 508 | Almendras tostadas | $42,000 | — |
-| 178 | Nibs cacao | $24,000 | — |
-| 412 | Caja chocolate oscuro | $1,000 | — |
-| 480-484 | Tabletas sin empacar (como mat) | $5,200 | $8,900 |
-| 320, 493-496 | Tabletas empacadas | $5,200 (no aplica) | $10,529 |
-
-### Anti-patrón
-❌ Inventar el precio "redondeando" o "siendo conservador". Eso distorsiona Total venta / Beneficio neto.
-❌ Usar `costo_promedio` o `ultimo_costo` del catálogo en lugar de `costo_manual` (Effi usa el manual).
+### OP 2195 — Tabletas empacadas (136 unid)
+| | |
+|---|---|
+| Materiales | 50 × **480** + 30 × **482** + 30 × **481** + 11 × **483** + 15 × **484** (todos @ $5,200) + 136 cajas **412** @ $1,000 |
+| Productos | 50 × **320** + 30 × **493** + 30 × **494** + 11 × **495** + 15 × **496** (todos @ $10,529) |
+| Otros costos | 4.5h mano de obra @ $7,000 |
+| Costo materiales | $843,200 · Venta total $1,431,944 · Beneficio 63% |
 
 ---
 
-## Insumos de empacado tabletas
+## 8. Cómo crear las OPs — flujo operativo
 
-Confirmado en OPs históricas (2104, 1972, 2109):
-- **Caja**: cod 412 CAJA CHOCOLATE OSCURO 73Pgm X UND (1 por tableta)
-- **Etiquetas (533-538)**: NO aparecen en materiales históricos. Probable que vengan preimpresas en la caja. Si dudas, pregunta antes de inventar.
-
----
-
-## Flujo real para producir tabletas empacadas — siempre 2 OPs
-
-**Regla**: NUNCA combines producción + empacado en una sola OP. El histórico de OS lo hace SIEMPRE en 2 OPs separadas (replicar ese patrón):
-
-### OP A — tabletas sin empacar (cods 480/481/482/483/484)
-- **Materiales**: cobertura (319 sin templar o 581 templada) + frutos secos
-- **Producto**: tabletas "sin empacar"
-
-### OP B — empacado (cods 320/493/494/495/496)
-- **Materiales**: tabletas sin empacar (1:1) + cajas cod 412 (1:1, a veces +1-6 reserva)
-- **Producto**: tabletas empacadas
-
-Mapeo sin empacar → empacada:
-- 480 → 320 (chocolate puro)
-- 481 → 494 (maní)
-- 482 → 493 (macadamia)
-- 483 → 495 (almendra)
-- 484 → 496 (nibs)
-
-### Si además hay que producir cobertura templada → 3 OPs en cadena
-
-Para tabletas con cobertura templada: necesitás producir primero la cobertura templada (cod 581).
-
-```
-OP #1 → produce cobertura templada (cod 581)
-   ↓
-OP #2 → consume cod 581 + frutos secos → produce tabletas sin empacar
-   ↓
-OP #3 → consume tabletas sin empacar + cajas → produce tabletas empacadas
-```
-
-**Caso real ejecutado el 2026-04-22 (OPs 2188, 2189, 2190)**:
-
-OP #1 — Cobertura templada (8.5 kg):
-- Material: 7.9 kg cod 319 + 0.6 kg cod 485 (manteca templada)
-- Produce: 8.5 kg cod 581 (templada)
-- M.O.: 2 h
-
-OP #2 — Tabletas sin empacar (136 unid = 50 puro + 30 mac + 30 mani + 11 alm + 15 nibs):
-- Materiales:
-  - 5.585 kg cod 581 (cobertura templada)
-  - 0.450 kg cod 196 (macadamia)
-  - 0.450 kg cod 114 (maní)
-  - 0.165 kg cod 508 (almendras)
-  - 0.150 kg cod 178 (nibs)
-- Productos: 50 cod 480 + 30 cod 482 + 30 cod 481 + 11 cod 483 + 15 cod 484
-- M.O.: 1 h
-
-OP #3 — Empacado (136 unid):
-- Materiales:
-  - 50 cod 480 + 30 cod 482 + 30 cod 481 + 11 cod 483 + 15 cod 484 (consume todo lo de OP #2)
-  - 136 cod 412 (cajas)
-- Productos: 50 cod 320 + 30 cod 493 + 30 cod 494 + 11 cod 495 + 15 cod 496
-- M.O.: 4.5 h
-
-### Restricción de moldería
-
-**La moldería es el límite real**: cada lote usa N moldes con M tabletas cada uno (caso típico: 34 moldes × 4 tab = 136 tab máximo por OP).
-
-Cuando Santi dice "tengo X kg para tabletas", X es el **peso TOTAL del producto final** (cobertura + frutos secos juntos). Para calcular cuánta cobertura va, restar el peso de las inclusiones:
-
-```
-cobertura_templada = X_total - sum(inclusiones)
-```
-
-Ej: 6.8 kg total - (0.450 mac + 0.450 mani + 0.165 alm + 0.150 nibs) = 5.585 kg cobertura
-
----
-
-## Cómo crear las OPs — flujo operativo
-
-1. **Diseñar las recetas** siguiendo la metodología arriba (consultar OPs históricas, calcular % inclusión, validar 2+ OPs)
-2. **Generar JSONs** uno por OP en `/tmp/ops_produccion/opN_*.json` siguiendo el formato de `import_orden_produccion.js`
+1. **Diseñar las recetas** siguiendo §2 (cantidades) + §1 (costos/precios).
+2. **Generar JSONs** en `/tmp/ops_produccion/opN_*.json` con el formato del script.
 3. **Ejecutar en orden** (cada OP toma 60-90s):
    ```bash
    node scripts/import_orden_produccion.js /tmp/ops_produccion/op1_cobertura_templada.json
@@ -273,26 +274,103 @@ Ej: 6.8 kg total - (0.450 mac + 0.450 mani + 0.165 alm + 0.150 nibs) = 5.585 kg 
    node scripts/import_orden_produccion.js /tmp/ops_produccion/op2_tabletas_sin_empacar.json
    node scripts/import_orden_produccion.js /tmp/ops_produccion/op3_tabletas_empacadas.json
    ```
-4. **Las OPs quedan en estado Generada**. Deivy/Jenifer las pasan a Procesada y Validada manualmente desde Effi cuando corresponda. NO automatizar esos pasos.
-5. **Lote en JSON**: dejar `"lote":""` y `"serie":""` vacíos — Effi auto-asigna del stock disponible al procesar/validar. Si Santi quiere un número específico, lo edita en Effi.
+4. **Estado final**: Generada. Deivy/Jenifer las pasan a Procesada y Validada manualmente desde Effi. **NO automatizar esos pasos**.
+5. **Lote y serie**: dejar `"lote":""` y `"serie":""` vacíos — Effi auto-asigna del stock disponible al procesar. Si Santi quiere un número específico, lo edita en Effi.
+
+### Formato del JSON
+
+```json
+{
+  "sucursal_id": 1,
+  "bodega_id": 1,
+  "fecha_inicio": "2026-04-22",
+  "fecha_fin": "2026-04-22",
+  "encargado": "74084937",
+  "tercero": "",
+  "observacion": "texto descriptivo",
+  "materiales": [
+    { "cod_articulo": "319", "cantidad": 7.9, "costo": 43432, "lote": "", "serie": "" }
+  ],
+  "articulos_producidos": [
+    { "cod_articulo": "581", "cantidad": 8.5, "precio": 43432, "lote": "", "serie": "" }
+  ],
+  "otros_costos": [
+    { "tipo_costo_id": 1, "cantidad": 2, "costo": 7000 }
+  ]
+}
+```
+
+**Encargados habituales**:
+- Deivy Andres Gonzalez Gutierrez — CC `74084937`
+- Laura — CC `1017206760`
+- Jenifer Alexandra Cano Garcia — NIT `1128457413`
 
 ---
 
-## Anti-patrones — qué NO hacer
+## 9. Cómo funciona el script (para debug futuro)
 
-❌ Asumir el ratio de un producto basado en otro similar sin verificar
-❌ Ignorar el "sin empacar" y mirar solo la versión empacada (la receta cruda no está ahí)
-❌ Sumar manteca templada a cobertura sin templar (los procesos son distintos)
+**Ubicación**: `scripts/import_orden_produccion.js`. Automatiza Playwright sobre `https://effi.com.co/app/orden_produccion`.
+
+### Lógica clave — apuntar a la ÚLTIMA fila
+
+Effi mantiene IDs duplicados en el form (`#articulo_CRM` aparece varias veces tras agregar materiales). El script usa las clases de fila:
+
+| Tipo | Clase de la fila | `name=` del input artículo |
+|---|---|---|
+| Material | `.filaMateriales` | `articuloM[]` |
+| Producido | `.filaProducidos` | `articuloP[]` |
+| Costo | `.filaCostos` | `costo_produccion[]` |
+
+Helpers internos:
+- `buscarArticulo(page, 'M' | 'P', codArticulo)` — abre el modal desde la lupa de la última fila.
+- `llenarUltimaFila(page, 'M' | 'P', datos)` — llena cantidad/costo/lote/serie en la última fila.
+- `llenarUltimoCosto(page, datos)` — análogo para costos.
+
+Luego del submit, limpia **solo la última fila vacía** de cada sección (no todas las vacías — eso rompía antes).
+
+### Bug histórico — ya arreglado (commit a75da13)
+
+**Síntoma**: cada OP creada solo tenía el **último** material y el **último** producto del JSON.
+
+**Causa**: el script usaba `document.querySelector('#articulo_CRM')` que devuelve siempre el **primer** match, pero al hacer click en "Agregar material" Effi **duplica el id**. El loop sobreescribía la fila anterior en cada iteración.
+
+**Fix**: apuntar a la ÚLTIMA fila `.filaMateriales` / `.filaProducidos` / `.filaCostos` en cada iteración usando `querySelectorAll(...)[length-1]`.
+
+**Lección**: al automatizar un form HTML que permite múltiples filas, **nunca** confiar en el `id` (puede duplicarse). Usar clases CSS o selectors posicionales.
+
+---
+
+## 10. Anti-patrones — qué NO hacer
+
+### De receta / cantidades
+❌ Asumir el ratio de un producto basado en otro similar sin verificar en BD
+❌ Ignorar la versión "sin empacar" y mirar solo la empacada (la receta cruda no está ahí)
+❌ Sumar manteca templada (485) a cobertura sin templar (319) — los procesos son distintos
 ❌ Olvidar restar el peso de las inclusiones cuando el límite es el peso total final
 ❌ Usar 1 sola OP como referencia única (puede tener error de captura)
 ❌ Crear una OP sin antes consultar las 5-10 últimas OPs vigentes del producto
 
+### De costos / precios
+❌ Inventar el precio "redondeando" o "siendo conservador"
+❌ Usar `costo_promedio` o `ultimo_costo` del catálogo cuando debe ser `costo_manual`
+❌ Asumir que `precio_minimo_de_venta` del catálogo tiene valor (está en 0)
+❌ Hardcodear precios — Effi los actualiza internamente cada X meses, hay que consultar
+
+### De flujo
+❌ Combinar producción + empacado en una sola OP (OS siempre separa)
+❌ Pasar manualmente OPs a Procesada/Validada — eso lo hacen Deivy/Jenifer
+
+### De script
+❌ Usar `document.querySelector('#id')` en forms con filas repetidas (ids se duplican)
+❌ "Limpiar filas vacías" eliminando TODAS las vacías — solo la última de cada sección
+
 ---
 
-## Cómo registrar el aprendizaje
+## 11. Cómo registrar el aprendizaje
 
 Cuando descubras un nuevo producto, ratio o anomalía:
-1. Actualizar `sa_produccion/context/catalogo_productos.md` con el cod nuevo
-2. Actualizar `sa_produccion/context/logica_negocio.md` con la nueva lógica
-3. Si la receta es validada por Santi, agregar a `sa_produccion/context/recetas_validadas.md`
-4. Si fue un caso difícil, registrar en `sa_produccion/aprendizaje/casos_resueltos.md`
+1. Agregar cod nuevo a `sa_produccion/context/catalogo_productos.md`
+2. Agregar nueva lógica a `sa_produccion/context/logica_negocio.md`
+3. Si la receta está validada por Santi → `sa_produccion/context/recetas_validadas.md`
+4. Si fue un caso difícil → `sa_produccion/aprendizaje/casos_resueltos.md`
+5. **Si descubrís un bug del script o un cambio de UI en Effi** → actualizar §9 de esta skill y el script correspondiente.
