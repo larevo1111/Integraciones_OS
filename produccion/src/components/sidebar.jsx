@@ -3,8 +3,7 @@ import { NavLink } from "react-router"
 import {
   ClipboardList, LayoutDashboard, Calendar, BookOpen, Settings,
   ChevronsLeft, ChevronsRight, Sun, Moon, ChevronRight, LogOut,
-  Package, Boxes, EyeOff, MessageSquare, AlertTriangle,
-  RefreshCw, Sparkles, FileText, Lock, ListChecks,
+  Package, Boxes,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/lib/theme"
@@ -18,16 +17,8 @@ const navItems = [
   {
     label: "Inventarios", icon: Package,
     children: [
-      { to: "/inventarios/conteo",        label: "Conteo físico",  icon: ListChecks },
-      { to: "/inventarios/lista",         label: "Inventarios",    icon: Boxes },
-      { to: "/inventarios/catalogo",      label: "Catálogo",       icon: BookOpen },
-      { to: "/inventarios/excluidos",     label: "Excluidos",      icon: EyeOff },
-      { to: "/inventarios/observaciones", label: "Observaciones",  icon: MessageSquare },
-      { to: "/inventarios/ops-revisar",   label: "OPs a revisar",  icon: AlertTriangle },
-      { to: "/inventarios/sync-effi",     label: "Sync Effi",      icon: RefreshCw },
-      { to: "/inventarios/analisis-ia",   label: "Análisis IA",    icon: Sparkles },
-      { to: "/inventarios/informes",      label: "Informes",       icon: FileText },
-      { to: "/inventarios/politicas",     label: "Políticas",      icon: Lock },
+      { to: "/inventarios",  label: "Inventarios", icon: Boxes },
+      { to: "/catalogo",     label: "Catálogo",    icon: BookOpen },
     ],
   },
   { to: "/config", label: "Configuración", icon: Settings },
