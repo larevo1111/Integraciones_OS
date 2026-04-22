@@ -20,7 +20,7 @@ from pathlib import Path
 import pymysql
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
+from lib import inventario
 
 LOG_DIR = Path("/home/osserver/Proyectos_Antigravity/Integraciones_OS/logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -66,20 +66,19 @@ def log(evento: str,
         msg += f" | detalle={detalle_str[:500]}"
     _file_logger.info(msg)
 
-    # 2) BD (best-effort, no romper si falla)
+    # 2) BD (best-effort, no romper si falla) — tabla prod_logs en VPS
     try:
-        conn = pymysql.connect(**cfg_local(), database="os_produccion")
-        with conn.cursor() as cur:
-            cur.execute(
-                """INSERT INTO produccion_logs
-                   (evento, cod_articulo, cantidad, ventana_op, agente,
-                    estado_resultado, confianza, duracion_ms, detalle, error)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (evento, cod, cantidad, ventana, agente, estado, confianza,
-                 duracion_ms, detalle_str, error[:1000] if error else None)
-            )
-            conn.commit()
-        conn.close()
+        with inventario() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO prod_logs
+                       (evento, cod_articulo, cantidad, ventana_op, agente,
+                        estado_resultado, confianza, duracion_ms, detalle, error)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (evento, cod, cantidad, ventana, agente, estado, confianza,
+                     duracion_ms, detalle_str, error[:1000] if error else None)
+                )
+                conn.commit()
     except Exception as e:
         _file_logger.warning(f"log_a_bd_fallo: {e}")
 
@@ -88,12 +87,16 @@ def cronometro():
     """Helper para medir duración. Uso:
         with cronometro() as c:
             ...
-        c.ms  # duración en ms
+            c.elapsed_ms()  # duración hasta ahora (dentro del with)
+        c.ms  # duración total al salir (fuera del with)
     """
     class _Cron:
         def __enter__(self):
             self.t0 = datetime.now()
+            self.ms = 0
             return self
+        def elapsed_ms(self):
+            return int((datetime.now() - self.t0).total_seconds() * 1000)
         def __exit__(self, *a):
-            self.ms = int((datetime.now() - self.t0).total_seconds() * 1000)
+            self.ms = self.elapsed_ms()
     return _Cron()

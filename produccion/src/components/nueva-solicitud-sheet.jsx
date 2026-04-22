@@ -57,7 +57,7 @@ export function NuevaSolicitudSheet({ open, onOpenChange, articulos, onCreated }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col">
+      <SheetContent className="flex flex-col sm:!max-w-[36rem]">
         <SheetHeader>
           <SheetTitle>Nueva solicitud de producción</SheetTitle>
           <SheetDescription>Programa qué se necesita producir</SheetDescription>

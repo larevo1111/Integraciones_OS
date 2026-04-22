@@ -52,7 +52,7 @@ export function SolicitudesPage() {
     const data = await api.get('/api/articulos')
     setArticulos(data.map(a => ({
       value: a.cod,
-      label: a.nombre,
+      label: `${a.cod} — ${a.nombre}`,
       subtitle: `Stock: ${a.stock}${a.unidad ? ' ' + a.unidad : ''}`,
       badge: a.tipo,
       tipo: a.tipo,

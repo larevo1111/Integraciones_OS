@@ -6,9 +6,8 @@ import pymysql
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
-DB_INV = dict(**cfg_local(), database='os_inventario',
-              cursorclass=pymysql.cursors.DictCursor)
+from lib import cfg_local, cfg_inventario
+DB_INV = cfg_inventario(dict_cursor=True)
 
 NOMBRES_GRUPO = {
     'MP': 'Materia Prima', 'INS': 'Insumos', 'PP': 'Producto en Proceso',

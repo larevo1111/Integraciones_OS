@@ -17,9 +17,9 @@ import pymysql
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
+from lib import cfg_local, cfg_inventario
 DB_EFFI = dict(**cfg_local(), database='effi_data')
-DB_INV  = dict(**cfg_local(), database='os_inventario')
+DB_INV  = cfg_inventario(dict_cursor=False)
 
 CAUSAS = {
     'FALTA_FACTURAR': 'Faltó remisionar o facturar',

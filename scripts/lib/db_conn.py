@@ -49,7 +49,7 @@ def cfg_local():
 
 
 def cfg_remota_ssh(prefijo):
-    """Config SSH para una BD remota. prefijo ∈ {INTEGRACION, GESTION, COMUNIDAD}."""
+    """Config SSH para una BD remota. prefijo ∈ {INTEGRACION, GESTION, INVENTARIO, COMUNIDAD}."""
     P = prefijo.upper()
     return dict(
         host=os.getenv(f'DB_{P}_SSH_HOST'),
@@ -136,7 +136,7 @@ def local(db_name, dict_cursor=False):
 
 @contextmanager
 def remota(prefijo, dict_cursor=False):
-    """Conexión a una BD remota. prefijo ∈ {INTEGRACION, GESTION, COMUNIDAD}.
+    """Conexión a una BD remota. prefijo ∈ {INTEGRACION, GESTION, INVENTARIO, COMUNIDAD}.
 
     Usa SSH tunnel salvo que DB_<prefijo>_SSH_HOST sea localhost/127.0.0.1/direct,
     en cuyo caso conecta directo al MariaDB del mismo servidor."""
@@ -163,4 +163,30 @@ def remota(prefijo, dict_cursor=False):
 
 def integracion(dict_cursor=False): return remota('INTEGRACION', dict_cursor)
 def gestion(dict_cursor=False):     return remota('GESTION',     dict_cursor)
+def inventario(dict_cursor=False):  return remota('INVENTARIO',  dict_cursor)
 def comunidad(dict_cursor=False):   return remota('COMUNIDAD',   dict_cursor)
+
+
+# ─── cfg_inventario(): dict listo para pymysql.connect con tunnel SSH abierto ───
+# Útil para scripts heredados que hacen pymysql.connect(**DB_INV) estilo dict.
+# Abre el tunnel 1 vez por proceso y reusa.
+def cfg_inventario(dict_cursor=True):
+    """Retorna dict compatible con pymysql.connect(**).
+    Abre tunnel SSH al VPS si no está abierto, conecta al puerto local forwardeado.
+    """
+    P = 'INVENTARIO'
+    t = abrir_tunel(P)
+    db = cfg_remota_db(P)
+    cfg = {
+        'host': '127.0.0.1',
+        'port': t.local_bind_port if t else db['remote_port'],
+        'user': db['user'],
+        'password': db['password'],
+        'database': db['database'],
+        'charset': 'utf8mb4',
+        'autocommit': True,
+        'connect_timeout': 15,
+    }
+    if dict_cursor:
+        cfg['cursorclass'] = pymysql.cursors.DictCursor
+    return cfg

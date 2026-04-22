@@ -53,7 +53,8 @@ APPS_WEB = [
     ('IA Local',     'http://localhost:9500'),
 ]
 
-BDS_LOCALES = ['ia_service_os', 'effi_data', 'os_inventario', 'os_whatsapp', 'espocrm']
+BDS_LOCALES = ['ia_service_os', 'effi_data', 'os_whatsapp', 'espocrm']
+# os_inventario migró a VPS (inventario_produccion_effi)
 
 sys.path.insert(0, BASE_DIR)
 from lib import cfg_remota_ssh, cfg_remota_db

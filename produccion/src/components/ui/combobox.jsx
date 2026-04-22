@@ -49,25 +49,25 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
             />
           </div>
           <div
-            className="max-h-72 overflow-y-auto p-1"
+            className="max-h-96 overflow-y-auto p-1"
             onWheel={e => e.stopPropagation()}
           >
             {filtered.length === 0 ? (
-              <div className="px-2 py-6 text-center text-sm text-muted-foreground">Sin resultados</div>
+              <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">Sin resultados</div>
             ) : filtered.map(opt => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value, opt); setOpen(false); setSearch("") }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left hover:bg-accent cursor-pointer"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-left hover:bg-accent cursor-pointer"
               >
                 <Check className={cn("h-4 w-4 shrink-0", opt.value === value ? "opacity-100" : "opacity-0")} />
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{opt.label}</div>
-                  {opt.subtitle && <div className="text-xs text-muted-foreground truncate">{opt.subtitle}</div>}
+                  {opt.subtitle && <div className="text-[11px] text-muted-foreground truncate">{opt.subtitle}</div>}
                 </div>
                 {opt.badge && (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{opt.badge}</span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{opt.badge}</span>
                 )}
               </button>
             ))}

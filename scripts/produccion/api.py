@@ -10,16 +10,20 @@ from datetime import date, datetime
 import pymysql
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
+from lib import cfg_local, cfg_inventario
 
 app = FastAPI(title="Producción OS", version="1.0")
 
 BASE_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
 STATIC_DIR = os.path.join(BASE_DIR, 'produccion', 'dist')
 
-DB_PROD = dict(**cfg_local(), database='os_produccion', cursorclass=pymysql.cursors.DictCursor)
+# Conexión a BD remota inventario_produccion_effi (VPS, vía tunnel SSH automático)
+# cfg_inventario() abre el tunnel 1 vez por proceso y devuelve dict listo para pymysql.connect
+DB_INVPROD = cfg_inventario(dict_cursor=True)
+DB_PROD = DB_INVPROD  # tablas prod_*
+DB_INV  = DB_INVPROD  # tablas inv_*
+# effi_data sigue siendo local (no se migró en esta tanda)
 DB_EFFI = dict(**cfg_local(), database='effi_data', cursorclass=pymysql.cursors.DictCursor)
-DB_INV  = dict(**cfg_local(), database='os_inventario', cursorclass=pymysql.cursors.DictCursor)
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'os_secret_dev_change_me')
 
@@ -103,7 +107,7 @@ def api_crear_grupo(data: GrupoCreate):
     placeholders = ','.join(['%s'] * len(data.solicitudes_ids))
     sols = q(DB_PROD, f"""
         SELECT id, cod_articulo, nombre_articulo, cantidad, estado, op_grupo_id
-        FROM solicitudes_produccion WHERE id IN ({placeholders})
+        FROM prod_solicitudes WHERE id IN ({placeholders})
     """, tuple(data.solicitudes_ids))
 
     if len(sols) != len(data.solicitudes_ids):
@@ -124,13 +128,13 @@ def api_crear_grupo(data: GrupoCreate):
 
     # 3) Crear grupo
     grupo_id = exe(DB_PROD, """
-        INSERT INTO op_grupos (creado_por, observaciones, fecha_programada, mp_granel_principal)
+        INSERT INTO prod_grupos (creado_por, observaciones, fecha_programada, mp_granel_principal)
         VALUES (%s, %s, %s, %s)
     """, (data.creado_por, data.observaciones, data.fecha_programada, compat['mp_granel_comun']))
 
     # 4) Asociar solicitudes al grupo
     exe(DB_PROD, f"""
-        UPDATE solicitudes_produccion SET op_grupo_id = %s
+        UPDATE prod_solicitudes SET op_grupo_id = %s
         WHERE id IN ({placeholders})
     """, tuple([grupo_id] + data.solicitudes_ids))
 
@@ -140,7 +144,7 @@ def api_crear_grupo(data: GrupoCreate):
 
 @app.get("/api/produccion/grupos/{id}")
 def api_obtener_grupo(id: int):
-    rows = q(DB_PROD, "SELECT * FROM op_grupos WHERE id = %s", (id,))
+    rows = q(DB_PROD, "SELECT * FROM prod_grupos WHERE id = %s", (id,))
     if not rows:
         raise HTTPException(404, "Grupo no encontrado")
     g = rows[0]
@@ -148,7 +152,7 @@ def api_obtener_grupo(id: int):
     g['fecha_programada'] = str(g['fecha_programada']) if g.get('fecha_programada') else None
     g['solicitudes'] = q(DB_PROD, """
         SELECT id, cod_articulo, nombre_articulo, cantidad, estado
-        FROM solicitudes_produccion WHERE op_grupo_id = %s
+        FROM prod_solicitudes WHERE op_grupo_id = %s
     """, (id,))
     for s in g['solicitudes']:
         s['cantidad'] = float(s['cantidad']) if s['cantidad'] else 0
@@ -157,7 +161,7 @@ def api_obtener_grupo(id: int):
 
 @app.get("/api/produccion/grupos")
 def api_listar_grupos(estado: Optional[str] = None):
-    sql = "SELECT * FROM op_grupos WHERE 1=1"
+    sql = "SELECT * FROM prod_grupos WHERE 1=1"
     params = []
     if estado:
         sql += " AND estado = %s"
@@ -174,13 +178,13 @@ def api_listar_grupos(estado: Optional[str] = None):
 def api_eliminar_grupo(id: int):
     """Elimina un grupo y libera las solicitudes asociadas (vuelven a estado 'solicitado'
     sin op_grupo_id). Solo si el grupo está en 'borrador'."""
-    rows = q(DB_PROD, "SELECT estado FROM op_grupos WHERE id = %s", (id,))
+    rows = q(DB_PROD, "SELECT estado FROM prod_grupos WHERE id = %s", (id,))
     if not rows:
         raise HTTPException(404, "Grupo no encontrado")
     if rows[0]['estado'] != 'borrador':
         raise HTTPException(400, f"Solo se pueden eliminar grupos en borrador (este: {rows[0]['estado']})")
-    exe(DB_PROD, "UPDATE solicitudes_produccion SET op_grupo_id = NULL WHERE op_grupo_id = %s", (id,))
-    exe(DB_PROD, "DELETE FROM op_grupos WHERE id = %s", (id,))
+    exe(DB_PROD, "UPDATE prod_solicitudes SET op_grupo_id = NULL WHERE op_grupo_id = %s", (id,))
+    exe(DB_PROD, "DELETE FROM prod_grupos WHERE id = %s", (id,))
     return {"ok": True}
 
 
@@ -241,7 +245,7 @@ def api_sugerir_receta_grupo(id: int):
 
 @app.get("/api/produccion/logs")
 def api_logs(limit: int = 100, evento: Optional[str] = None, cod: Optional[str] = None):
-    sql = "SELECT * FROM produccion_logs WHERE 1=1"
+    sql = "SELECT * FROM prod_logs WHERE 1=1"
     params = []
     if evento:
         sql += " AND evento = %s"
@@ -283,35 +287,47 @@ class SolicitudUpdate(BaseModel):
     op_effi: Optional[str] = None
 
 
-# ── Artículos (desde Effi + tipos desde os_inventario) ────
+# ── Artículos (effi_data local + inv_rangos remoto en VPS) ────
 
 @app.get("/api/articulos")
 def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
     """Lista artículos de Effi vigentes con tipo (MP/PP/PT/INS/etc) desde inv_rangos.
+    Como effi_data es local y inv_rangos está en VPS, se hace merge en Python.
     tipo: filtro opcional (PT, PP, MP). Si se omite, devuelve todos.
     q: filtro de búsqueda por nombre o código.
     """
+    # 1) Traer el mapa cod → {grupo, unidad} desde inv_rangos remoto (VPS)
+    rangos_rows = q(DB_INV, "SELECT id_effi AS cod, grupo, unidad FROM inv_rangos")
+    rangos_map = {r['cod']: r for r in rangos_rows}
+
+    # 2) Traer artículos de effi_data local
     sql = """
-        SELECT e.id AS cod, e.nombre, COALESCE(r.grupo, '') AS tipo,
-               COALESCE(r.unidad, '') AS unidad,
+        SELECT e.id AS cod, e.nombre,
                CAST(REPLACE(e.stock_bodega_principal_sucursal_principal,',','.') AS DECIMAL(12,2)) AS stock
-        FROM effi_data.zeffi_inventario e
-        LEFT JOIN os_inventario.inv_rangos r ON r.id_effi COLLATE utf8mb4_unicode_ci = e.id COLLATE utf8mb4_unicode_ci
+        FROM zeffi_inventario e
         WHERE e.vigencia = 'Vigente'
     """
     params = []
-    if tipo:
-        sql += " AND r.grupo = %s"
-        params.append(tipo)
     if q_str:
         sql += " AND (e.nombre LIKE %s OR e.id LIKE %s)"
         params += [f'%{q_str}%', f'%{q_str}%']
     sql += " ORDER BY e.nombre LIMIT 500"
 
     rows = q(DB_EFFI, sql, params)
+
+    # 3) Merge en Python
+    out = []
     for r in rows:
-        r['stock'] = float(r['stock']) if r['stock'] is not None else 0
-    return rows
+        info = rangos_map.get(r['cod'], {})
+        tipo_art = info.get('grupo') or ''
+        if tipo and tipo_art != tipo:
+            continue
+        out.append({
+            'cod': r['cod'], 'nombre': r['nombre'],
+            'tipo': tipo_art, 'unidad': info.get('unidad') or '',
+            'stock': float(r['stock']) if r['stock'] is not None else 0,
+        })
+    return out
 
 
 # ── Solicitudes CRUD ──────────────────────────────────────
@@ -319,7 +335,7 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
 @app.get("/api/solicitudes")
 def listar_solicitudes(estado: Optional[str] = None, _start: int = 0, _end: int = 100,
                         _sort: Optional[str] = None, _order: Optional[str] = None):
-    sql = "SELECT * FROM solicitudes_produccion WHERE 1=1"
+    sql = "SELECT * FROM prod_solicitudes WHERE 1=1"
     params = []
     if estado:
         sql += " AND estado = %s"
@@ -332,7 +348,7 @@ def listar_solicitudes(estado: Optional[str] = None, _start: int = 0, _end: int 
 
     rows = q(DB_PROD, sql, params)
     # Conteo total
-    total_row = q(DB_PROD, "SELECT COUNT(*) AS n FROM solicitudes_produccion" + (" WHERE estado = %s" if estado else ""),
+    total_row = q(DB_PROD, "SELECT COUNT(*) AS n FROM prod_solicitudes" + (" WHERE estado = %s" if estado else ""),
                   [estado] if estado else [])
     total = total_row[0]['n']
 
@@ -348,7 +364,7 @@ def listar_solicitudes(estado: Optional[str] = None, _start: int = 0, _end: int 
 
 @app.get("/api/solicitudes/{id}")
 def obtener_solicitud(id: int):
-    rows = q(DB_PROD, "SELECT * FROM solicitudes_produccion WHERE id = %s", (id,))
+    rows = q(DB_PROD, "SELECT * FROM prod_solicitudes WHERE id = %s", (id,))
     if not rows:
         raise HTTPException(404, "Solicitud no encontrada")
     r = rows[0]
@@ -362,7 +378,7 @@ def obtener_solicitud(id: int):
 @app.post("/api/solicitudes")
 def crear_solicitud(data: SolicitudCreate):
     new_id = exe(DB_PROD, """
-        INSERT INTO solicitudes_produccion
+        INSERT INTO prod_solicitudes
             (cod_articulo, nombre_articulo, tipo_articulo, cantidad, observaciones, fecha_necesidad, fecha_programada, solicitado_por, estado)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'solicitado')
     """, (data.cod_articulo, data.nombre_articulo, data.tipo_articulo, data.cantidad,
@@ -373,7 +389,7 @@ def crear_solicitud(data: SolicitudCreate):
 @app.patch("/api/solicitudes/{id}")
 def actualizar_solicitud(id: int, data: SolicitudUpdate):
     # Validar que existe
-    existing = q(DB_PROD, "SELECT estado FROM solicitudes_produccion WHERE id = %s", (id,))
+    existing = q(DB_PROD, "SELECT estado FROM prod_solicitudes WHERE id = %s", (id,))
     if not existing:
         raise HTTPException(404, "Solicitud no encontrada")
     estado_actual = existing[0]['estado']
@@ -392,13 +408,13 @@ def actualizar_solicitud(id: int, data: SolicitudUpdate):
         return obtener_solicitud(id)
 
     valores.append(id)
-    exe(DB_PROD, f"UPDATE solicitudes_produccion SET {', '.join(campos)} WHERE id = %s", valores)
+    exe(DB_PROD, f"UPDATE prod_solicitudes SET {', '.join(campos)} WHERE id = %s", valores)
     return obtener_solicitud(id)
 
 
 @app.delete("/api/solicitudes/{id}")
 def eliminar_solicitud(id: int):
-    exe(DB_PROD, "DELETE FROM solicitudes_produccion WHERE id = %s", (id,))
+    exe(DB_PROD, "DELETE FROM prod_solicitudes WHERE id = %s", (id,))
     return {"ok": True}
 
 
@@ -407,7 +423,7 @@ def eliminar_solicitud(id: int):
 @app.get("/api/solicitudes/stats/resumen")
 def stats_resumen():
     rows = q(DB_PROD, """
-        SELECT estado, COUNT(*) AS n FROM solicitudes_produccion GROUP BY estado
+        SELECT estado, COUNT(*) AS n FROM prod_solicitudes GROUP BY estado
     """)
     return {r['estado']: r['n'] for r in rows}
 

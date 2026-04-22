@@ -44,8 +44,8 @@ app.add_middleware(
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-from lib import cfg_local
-DB_INV  = dict(**cfg_local(), database='os_inventario')
+from lib import cfg_local, cfg_inventario
+DB_INV  = cfg_inventario(dict_cursor=False)
 DB_EFFI = dict(**cfg_local(), database='effi_data')
 
 

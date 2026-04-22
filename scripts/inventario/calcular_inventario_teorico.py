@@ -35,8 +35,8 @@ import json
 # ─── Configuración ────────────────────────────────────────────────
 import sys as _sys
 _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
-DB_INV  = dict(**cfg_local(), database='os_inventario')
+from lib import cfg_local, cfg_inventario
+DB_INV  = cfg_inventario(dict_cursor=False)
 DB_EFFI = dict(**cfg_local(), database='effi_data')
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

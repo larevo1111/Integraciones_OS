@@ -103,7 +103,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col">
+      <SheetContent className="flex flex-col sm:!max-w-[36rem]">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <SheetTitle>{esNueva ? 'Nueva solicitud' : `Solicitud #${solicitud.id}`}</SheetTitle>
