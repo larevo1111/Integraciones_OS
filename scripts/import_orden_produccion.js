@@ -270,6 +270,31 @@ async function buscarTercero(page, inputNombreId, idBusqueda) {
     // Screenshot pre-crear
     await page.screenshot({ path: `/exports/op_pre_crear_${Date.now()}.png` });
 
+    // Capturar MAX(id_orden) actual desde la lista visible (una nueva pestaña con la lista)
+    async function leerMaxIdOP() {
+      const lista = await page.context().newPage()
+      try {
+        await lista.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 })
+        await lista.waitForTimeout(1500)
+        return await lista.evaluate(() => {
+          const cuerpo = document.body.innerText || ''
+          let max = 0
+          // Busca tokens "ID: 1234" en la tabla de OPs
+          const re = /ID:\s*(\d+)/g
+          let m
+          while ((m = re.exec(cuerpo)) !== null) {
+            const n = parseInt(m[1], 10)
+            if (Number.isFinite(n)) max = Math.max(max, n)
+          }
+          return max
+        })
+      } finally {
+        await lista.close()
+      }
+    }
+    const maxAntes = await leerMaxIdOP()
+    console.log(`🔢 MAX(id_orden) antes de crear: ${maxAntes}`)
+
     // 12. Crear OP
     console.log('🔄 Creando orden de producción...');
     await page.locator('button:has-text("Crear orden de producción")').click();
@@ -286,7 +311,18 @@ async function buscarTercero(page, inputNombreId, idBusqueda) {
 
     const screenshotPath = `/exports/op_resultado_${Date.now()}.png`;
     await page.screenshot({ path: screenshotPath });
-    console.log(`✅ Orden de producción creada exitosamente (screenshot: ${screenshotPath})`);
+
+    // Capturar MAX(id_orden) después de crear — el nuevo
+    await page.waitForTimeout(2000)
+    const maxDespues = await leerMaxIdOP()
+    const nuevoId = maxDespues > maxAntes ? maxDespues : null
+    if (nuevoId) {
+      // Salida machine-readable para el backend que llama
+      console.log(`OP_CREADA:${nuevoId}`)
+      console.log(`✅ Orden de producción creada — nuevo ID: ${nuevoId} (screenshot: ${screenshotPath})`);
+    } else {
+      console.log(`⚠️ Creada pero no se pudo determinar el ID nuevo (max antes: ${maxAntes}, max después: ${maxDespues}). Screenshot: ${screenshotPath}`);
+    }
 
   } catch (err) {
     console.error(`❌ ERROR: ${err.message}`);

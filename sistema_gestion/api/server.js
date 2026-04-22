@@ -1518,6 +1518,15 @@ app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req,
       })
     })
 
+    // Reflejar el nuevo estado en staging local (hasta que el próximo pipeline
+    // sincronice desde Effi). Sin esto el UI no muestra el cambio al instante.
+    try {
+      await db.integracion.query(
+        `UPDATE zeffi_produccion_encabezados SET estado = 'Procesada' WHERE id_orden = ?`,
+        [tarea.id_op]
+      )
+    } catch (upErr) { console.warn('[procesar] no se pudo actualizar staging:', upErr.message) }
+
     res.json({ ok: true, id_op: tarea.id_op, estado: 'Procesada', observacion, log: resultado.slice(-500) })
   } catch (e) {
     console.error('[procesar OP]', e)
