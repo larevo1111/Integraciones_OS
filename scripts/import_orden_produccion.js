@@ -75,18 +75,21 @@ console.log(`📅 ${data.fecha_inicio} → ${data.fecha_fin}`);
 console.log(`👤 Encargado: ${data.encargado}`);
 console.log(`📦 Materiales: ${data.materiales.length}, Producidos: ${data.articulos_producidos.length}, Otros costos: ${data.otros_costos.length}`);
 
-// Helper: buscar artículo mediante el modal Buscar artículo (stock)
-// Usado tanto para material como para producido
-async function buscarArticulo(page, inputId, codArticulo) {
-  await page.evaluate((iid) => {
-    const input = document.querySelector('#' + iid);
-    const container = input.closest('.input-group');
-    const addon = container.querySelector('.input-group-addon');
+// Helper: buscar artículo mediante el modal Buscar artículo (stock).
+// Apunta SIEMPRE a la última fila (.filaMateriales / .filaProducidos), que es la
+// fila editable vacía. El bug histórico era usar #articulo_CRM (id duplicado en DOM)
+// que siempre devolvía la PRIMERA fila y sobreescribía el material anterior.
+// tipo: 'M' (material) | 'P' (producido)
+async function buscarArticulo(page, tipo, codArticulo) {
+  const filaClass = tipo === 'M' ? 'filaMateriales' : 'filaProducidos';
+  await page.evaluate((cls) => {
+    const filas = document.querySelectorAll('.' + cls);
+    const ultima = filas[filas.length - 1];
+    const addon = ultima.querySelector('.input-group-addon');
     addon.click();
-  }, inputId);
+  }, filaClass);
   await page.waitForTimeout(1500);
 
-  // Limpiar el campo id si tiene valor anterior
   await page.locator('#id_BAS').fill(String(codArticulo));
   await page.waitForTimeout(300);
 
@@ -97,6 +100,51 @@ async function buscarArticulo(page, inputId, codArticulo) {
   await fila.waitFor({ state: 'visible', timeout: 5000 });
   await fila.click();
   await page.waitForTimeout(1000);
+}
+
+// Helper: llenar cantidad/costo/lote/serie en la ÚLTIMA fila (material o producido)
+async function llenarUltimaFila(page, tipo, datos) {
+  const filaClass = tipo === 'M' ? 'filaMateriales' : 'filaProducidos';
+  const suf = tipo;                                              // 'M' o 'P'
+  const precioField = tipo === 'M' ? 'costoM[]' : 'precioP[]';
+  const precioVal   = tipo === 'M' ? (datos.costo || 0) : (datos.precio || 0);
+
+  await page.evaluate(({ cls, suf, precioField, precioVal, cant, lote, serie }) => {
+    const filas = document.querySelectorAll('.' + cls);
+    const ultima = filas[filas.length - 1];
+    const setVal = (name, v) => {
+      const inp = ultima.querySelector(`[name="${name}"]`);
+      if (inp) {
+        inp.value = v;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+    setVal(`lote${suf}[]`, lote || '');
+    setVal(`serie${suf}[]`, serie || '');
+    setVal(`cantidad${suf}[]`, String(cant));
+    setVal(precioField, String(precioVal));
+  }, { cls: filaClass, suf, precioField, precioVal, cant: datos.cantidad, lote: datos.lote, serie: datos.serie });
+  await page.waitForTimeout(300);
+}
+
+// Helper: llenar cantidad/costo del ÚLTIMO costo de producción
+async function llenarUltimoCosto(page, datos) {
+  await page.evaluate(({ cant, costo }) => {
+    const filas = document.querySelectorAll('.filaCostos');
+    const ultima = filas[filas.length - 1];
+    const setVal = (name, v) => {
+      const inp = ultima.querySelector(`[name="${name}"]`);
+      if (inp) {
+        inp.value = v;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+    setVal('cantidad[]', String(cant));
+    setVal('costo[]', String(costo));
+  }, { cant: datos.cantidad, costo: datos.costo });
+  await page.waitForTimeout(300);
 }
 
 // Helper: buscar encargado/tercero (abre modal Buscar tercero y selecciona por CC/NIT)
@@ -196,47 +244,43 @@ async function buscarTercero(page, inputNombreId, idBusqueda) {
       await page.waitForTimeout(500);
     }
 
-    // 8. Materiales — cada iteración usa la fila de entrada (.first()) y agrega
+    // 8. Materiales — apuntar SIEMPRE a la última fila (.filaMateriales)
     for (let i = 0; i < data.materiales.length; i++) {
       const m = data.materiales[i];
-      console.log(`  📥 Material ${i+1}: ${m.cod_articulo} x${m.cantidad}`);
-      await buscarArticulo(page, 'articulo_CRM', m.cod_articulo);
-      await page.locator('#lote_CRM').first().fill(String(m.lote || ''));
-      await page.locator('#serie_CRM').first().fill(String(m.serie || ''));
-      await page.locator('#cantidad_CRM').first().fill(String(m.cantidad));
-      await page.locator('#costo_CRM').first().fill(String(m.costo || 0));
+      console.log(`  📥 Material ${i+1}/${data.materiales.length}: ${m.cod_articulo} x${m.cantidad}`);
+      await buscarArticulo(page, 'M', m.cod_articulo);
+      await llenarUltimaFila(page, 'M', m);
       await page.locator('#btnAgregarMaterial').click();
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(1000);
     }
 
-    // 9. Artículos producidos — misma lógica
+    // 9. Artículos producidos — apuntar SIEMPRE a la última fila (.filaProducidos)
     for (let i = 0; i < data.articulos_producidos.length; i++) {
       const p = data.articulos_producidos[i];
-      console.log(`  📤 Producido ${i+1}: ${p.cod_articulo} x${p.cantidad}`);
-      await buscarArticulo(page, 'articulo_CRP', p.cod_articulo);
-      await page.locator('#lote_CRP').first().fill(String(p.lote || ''));
-      await page.locator('#serie_CRP').first().fill(String(p.serie || ''));
-      await page.locator('#cantidad_CRP').first().fill(String(p.cantidad));
-      await page.locator('#precio_CRP').first().fill(String(p.precio || 0));
+      console.log(`  📤 Producido ${i+1}/${data.articulos_producidos.length}: ${p.cod_articulo} x${p.cantidad}`);
+      await buscarArticulo(page, 'P', p.cod_articulo);
+      await llenarUltimaFila(page, 'P', p);
       await page.locator('#btnAgregarProducido').click();
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(1000);
     }
 
-    // 10. Otros costos
+    // 10. Otros costos — apuntar SIEMPRE a la última fila (.filaCostos)
     for (let i = 0; i < data.otros_costos.length; i++) {
       const c = data.otros_costos[i];
-      console.log(`  💰 Otro costo ${i+1}: tipo ${c.tipo_costo_id} x${c.cantidad}`);
-      await page.evaluate((id) => {
-        const sel = document.querySelector('#costo_produccion_CR');
+      console.log(`  💰 Otro costo ${i+1}/${data.otros_costos.length}: tipo ${c.tipo_costo_id} x${c.cantidad}`);
+      // Seleccionar tipo en el chosen-select de la ÚLTIMA fila
+      await page.evaluate(({ id }) => {
+        const filas = document.querySelectorAll('.filaCostos');
+        const ultima = filas[filas.length - 1];
+        const sel = ultima.querySelector('select[name="costo_produccion[]"]');
         sel.value = String(id);
         $(sel).trigger('change');
         $(sel).trigger('chosen:updated');
-      }, c.tipo_costo_id);
-      await page.waitForTimeout(300);
-      await page.locator('#cantidad_CR').first().fill(String(c.cantidad));
-      await page.locator('input[name="costo[]"]').first().fill(String(c.costo));
-      await page.locator('button:has-text("Agregar costo")').first().click();
-      await page.waitForTimeout(800);
+      }, { id: c.tipo_costo_id });
+      await page.waitForTimeout(400);
+      await llenarUltimoCosto(page, c);
+      await page.locator('#btnAgregarCosto_CR').click();
+      await page.waitForTimeout(1000);
     }
 
     // 11. Observación
@@ -247,21 +291,24 @@ async function buscarTercero(page, inputNombreId, idBusqueda) {
       await page.waitForTimeout(300);
     }
 
-    // 11.b Limpiar filas vacías (Effi deja una fila de entrada vacía al final)
+    // 11.b Limpiar SOLO la última fila si está vacía (cada click Agregar deja una fila vacía al final)
     const eliminadas = await page.evaluate(() => {
-      // Las filas de la tabla de materiales, producidos y costos tienen inputs vacíos
-      // Buscar filas de input cuyo campo de artículo/cantidad esté vacío
       let count = 0;
-      // Buscar filas dentro del formulario que tengan inputs de articulo*/cantidad* vacíos
-      const nameTokens = ['articuloM[]', 'articuloP[]', 'costo_produccion[]'];
-      nameTokens.forEach(name => {
-        const inputs = document.querySelectorAll(`[name="${name}"]`);
-        inputs.forEach(inp => {
-          if (!inp.value || inp.value === '' || inp.value === '0') {
-            const row = inp.closest('tr, .filaMaterial, .filaProducido, .filaCosto, div.row');
-            if (row) { row.remove(); count++; }
-          }
-        });
+      const tipos = [
+        { cls: 'filaMateriales',  articulo: 'articuloM[]' },
+        { cls: 'filaProducidos',  articulo: 'articuloP[]' },
+        { cls: 'filaCostos',      articulo: 'costo_produccion[]' }
+      ];
+      tipos.forEach(({ cls, articulo }) => {
+        const filas = document.querySelectorAll('.' + cls);
+        if (filas.length === 0) return;
+        const ultima = filas[filas.length - 1];
+        const inp = ultima.querySelector(`[name="${articulo}"]`);
+        const val = inp ? (inp.value || '') : '';
+        if (!val || val === 'default') {
+          ultima.remove();
+          count++;
+        }
       });
       return count;
     });
