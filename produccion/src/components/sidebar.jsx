@@ -1,158 +1,155 @@
+/**
+ * Sidebar — 3 niveles tipo Linear/HubSpot:
+ *  - N1: items principales (Vista general, Solicitudes, ...)
+ *  - N2: sub-items con sangría (cuando un N1 es expandible)
+ *  - N3: items dinámicos con más sangría (las fechas de inventarios)
+ *
+ * El item "Inventarios" expandido muestra dos N2: "Catálogo" y "Inventarios"
+ * (este último también expandible para ver las fechas).
+ */
 import { useEffect, useState } from "react"
-import { NavLink } from "react-router"
+import { NavLink, useLocation } from "react-router"
 import {
   ClipboardList, LayoutDashboard, Calendar, BookOpen, Settings,
   ChevronsLeft, ChevronsRight, Sun, Moon, ChevronRight, LogOut,
-  Package, Boxes,
+  Package, Boxes, Plus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/lib/theme"
 import { auth } from "@/lib/auth"
-
-const navItems = [
-  { to: "/", label: "Vista general", icon: LayoutDashboard },
-  { to: "/solicitudes", label: "Solicitudes", icon: ClipboardList },
-  { to: "/calendario", label: "Calendario", icon: Calendar },
-  { to: "/recetas", label: "Recetas", icon: BookOpen },
-  {
-    label: "Inventarios", icon: Package,
-    children: [
-      { to: "/inventarios",  label: "Inventarios", icon: Boxes },
-      { to: "/catalogo",     label: "Catálogo",    icon: BookOpen },
-    ],
-  },
-  { to: "/config", label: "Configuración", icon: Settings },
-]
+import { api } from "@/lib/api"
 
 const KEY_OPEN = 'sidebar_open_groups'
 const KEY_COLLAPSED = 'sidebar_collapsed'
 
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const fmtFechaCorta = (yyyymmdd) => {
+  if (!yyyymmdd) return ''
+  const [y, m, d] = yyyymmdd.split('-')
+  return `${parseInt(d, 10)} ${MESES[parseInt(m, 10) - 1]} ${y}`
+}
+
 export function Sidebar() {
+  const location = useLocation()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(KEY_COLLAPSED) === '1')
   const [openGroups, setOpenGroups] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(KEY_OPEN) || '{}') }
-    catch { return {} }
+    try { return JSON.parse(localStorage.getItem(KEY_OPEN) || '{"Inventarios":true,"InvFechas":true}') }
+    catch { return { Inventarios: true, InvFechas: true } }
   })
   const { theme, toggle } = useTheme()
+  const [fechas, setFechas] = useState([])
 
   useEffect(() => { localStorage.setItem(KEY_COLLAPSED, collapsed ? '1' : '0') }, [collapsed])
   useEffect(() => { localStorage.setItem(KEY_OPEN, JSON.stringify(openGroups)) }, [openGroups])
 
-  const toggleGroup = (label) => {
-    if (collapsed) { setCollapsed(false); setOpenGroups(g => ({ ...g, [label]: true })); return }
-    setOpenGroups(g => ({ ...g, [label]: !g[label] }))
+  // Cargar fechas de inventarios (refresh cuando navegamos dentro)
+  useEffect(() => {
+    api.get('/api/inventario/fechas')
+      .then(d => setFechas(Array.isArray(d) ? d : []))
+      .catch(() => setFechas([]))
+  }, [location.pathname])
+
+  const toggleGroup = (key) => {
+    if (collapsed) { setCollapsed(false); setOpenGroups(g => ({ ...g, [key]: true })); return }
+    setOpenGroups(g => ({ ...g, [key]: !g[key] }))
   }
+
+  const isInventariosActive = location.pathname.startsWith('/inventarios') || location.pathname === '/catalogo'
 
   return (
     <aside
       className={cn(
-        "flex flex-col transition-[width] duration-200 shrink-0 border-r border-border",
-        collapsed ? "w-12" : "w-52"
+        "flex flex-col transition-[width] duration-200 shrink-0 border-r",
+        collapsed ? "w-12" : "w-56"
       )}
-      style={{ background: 'var(--color-sidebar)' }}
+      style={{ background: 'var(--sb-bg)', borderColor: 'var(--border)' }}
     >
       {/* Logo */}
       <div className="h-12 flex items-center px-3 gap-2 shrink-0">
-        <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-foreground font-semibold text-[11px] shrink-0">
+        <div className="w-6 h-6 rounded bg-[var(--accent)] flex items-center justify-center text-black font-semibold text-[11px] shrink-0">
           OS
         </div>
-        {!collapsed && <span className="text-[13px] font-medium truncate">Producción</span>}
+        {!collapsed && <span className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>Producción</span>}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-1.5 space-y-0.5 overflow-y-auto">
-        {navItems.map((item, idx) => {
-          if (item.children) {
-            const isOpen = openGroups[item.label] && !collapsed
-            const Icon = item.icon
-            return (
-              <div key={idx}>
-                <button
-                  onClick={() => toggleGroup(item.label)}
-                  className={cn(
-                    "w-full flex items-center gap-2.5 px-2 h-7 rounded-md text-[13px] cursor-pointer transition-colors",
-                    "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                    collapsed && "justify-center"
-                  )}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-                  {!collapsed && (
-                    <>
-                      <span className="truncate flex-1 text-left">{item.label}</span>
-                      <ChevronRight
-                        className={cn("h-3 w-3 shrink-0 transition-transform duration-150", isOpen && "rotate-90")}
-                      />
-                    </>
-                  )}
-                </button>
-                {isOpen && (
-                  <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/50 pl-1.5">
-                    {item.children.map(child => {
-                      const ChildIcon = child.icon
-                      return (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          className={({ isActive }) => cn(
-                            "flex items-center gap-2 px-2 h-6 rounded-md text-[12px] transition-colors cursor-pointer",
-                            isActive
-                              ? "bg-accent text-foreground"
-                              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                          )}
-                        >
-                          {ChildIcon && <ChildIcon className="h-3 w-3 shrink-0" strokeWidth={1.75} />}
-                          <span className="truncate">{child.label}</span>
-                        </NavLink>
-                      )
-                    })}
+      <nav className="flex-1 px-1.5 space-y-px overflow-y-auto">
+        {/* N1 — Vista general */}
+        <NavItemN1 to="/" end icon={LayoutDashboard} label="Vista general" collapsed={collapsed} />
+        <NavItemN1 to="/solicitudes" icon={ClipboardList} label="Solicitudes" collapsed={collapsed} />
+        <NavItemN1 to="/calendario"  icon={Calendar}      label="Calendario"  collapsed={collapsed} />
+        <NavItemN1 to="/recetas"     icon={BookOpen}      label="Recetas"     collapsed={collapsed} />
+
+        {/* N1 — Inventarios (expandible con N2) */}
+        <GroupHeader
+          icon={Package}
+          label="Inventarios"
+          isOpen={openGroups['Inventarios'] && !collapsed}
+          onToggle={() => toggleGroup('Inventarios')}
+          collapsed={collapsed}
+          isActive={isInventariosActive}
+        />
+        {openGroups['Inventarios'] && !collapsed && (
+          <div className="space-y-px">
+            {/* N2 — Catálogo */}
+            <NavItemN2 to="/catalogo" label="Catálogo" />
+
+            {/* N2 — Inventarios (expandible a N3 fechas) */}
+            <GroupHeaderN2
+              label="Inventarios"
+              isOpen={openGroups['InvFechas']}
+              onToggle={() => toggleGroup('InvFechas')}
+              isActive={location.pathname.startsWith('/inventarios')}
+            />
+            {openGroups['InvFechas'] && (
+              <div className="space-y-px">
+                {fechas.map(f => (
+                  <NavItemN3 key={f.fecha_inventario} to={`/inventarios/${f.fecha_inventario}`} label={fmtFechaCorta(f.fecha_inventario)} />
+                ))}
+                {!fechas.length && (
+                  <div className="text-[10px] py-1 italic" style={{ color: 'var(--text-tertiary)', paddingLeft: 38 }}>
+                    Sin inventarios
                   </div>
                 )}
+                <NavLink
+                  to="/inventarios/nuevo"
+                  className="flex items-center gap-1.5 h-6 rounded-md text-[11px] transition-colors cursor-pointer"
+                  style={{ paddingLeft: 38, paddingRight: 8, color: 'var(--text-tertiary)' }}
+                >
+                  <Plus className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+                  <span>Nuevo inventario</span>
+                </NavLink>
               </div>
-            )
-          }
-          const Icon = item.icon
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-2 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
-                isActive
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                collapsed && "justify-center"
-              )}
-              title={collapsed ? item.label : undefined}
-            >
-              <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-            </NavLink>
-          )
-        })}
+            )}
+          </div>
+        )}
+
+        {/* N1 — Configuración */}
+        <NavItemN1 to="/config" icon={Settings} label="Configuración" collapsed={collapsed} />
       </nav>
 
       {/* Footer */}
-      <div className="px-1.5 pb-2 space-y-0.5">
+      <div className="px-1.5 pb-2 space-y-px border-t pt-2" style={{ borderColor: 'var(--border)' }}>
         {auth.usuario && (
           <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md", collapsed && "justify-center")}
                title={collapsed ? auth.usuario.nombre : undefined}>
             {auth.usuario.foto
               ? <img src={auth.usuario.foto} alt="" className="h-5 w-5 rounded-full shrink-0" />
-              : <div className="h-5 w-5 rounded-full bg-muted text-[10px] flex items-center justify-center shrink-0">
+              : <div className="h-5 w-5 rounded-full text-[10px] flex items-center justify-center shrink-0"
+                     style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
                   {auth.usuario.nombre?.[0]?.toUpperCase() || '?'}
                 </div>}
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <div className="text-[12px] truncate">{auth.usuario.nombre}</div>
-                <div className="text-[10px] text-muted-foreground truncate">Nivel {auth.usuario.nivel}</div>
+                <div className="text-[12px] truncate" style={{ color: 'var(--text)' }}>{auth.usuario.nombre}</div>
+                <div className="text-[10px] truncate" style={{ color: 'var(--text-tertiary)' }}>Nivel {auth.usuario.nivel}</div>
               </div>
             )}
             {!collapsed && (
               <button
                 onClick={() => { auth.logout(); window.location.reload() }}
-                className="text-muted-foreground hover:text-destructive cursor-pointer"
+                className="hover:text-[var(--error)] cursor-pointer transition-colors"
+                style={{ color: 'var(--text-tertiary)' }}
                 title="Cerrar sesión"
               >
                 <LogOut className="h-3.5 w-3.5" />
@@ -160,31 +157,132 @@ export function Sidebar() {
             )}
           </div>
         )}
-        <button
-          onClick={toggle}
-          className={cn(
-            "w-full flex items-center gap-2.5 px-2 h-7 rounded-md text-[13px] text-muted-foreground hover:bg-accent/60 hover:text-foreground cursor-pointer",
-            collapsed && "justify-center"
-          )}
-          title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-        >
-          {theme === 'dark'
-            ? <Sun className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-            : <Moon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
-          {!collapsed && <span className="truncate">{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>}
-        </button>
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          className={cn(
-            "w-full flex items-center gap-2.5 px-2 h-7 rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground cursor-pointer",
-            collapsed && "justify-center"
-          )}
-        >
-          {collapsed
-            ? <ChevronsRight className="h-3.5 w-3.5 shrink-0" />
-            : <><ChevronsLeft className="h-3.5 w-3.5 shrink-0" /><span className="text-[13px]">Colapsar</span></>}
-        </button>
+        <FooterBtn icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'} onClick={toggle} collapsed={collapsed} />
+        <FooterBtn icon={collapsed ? ChevronsRight : ChevronsLeft} label="Colapsar" onClick={() => setCollapsed(c => !c)} collapsed={collapsed} />
       </div>
     </aside>
+  )
+}
+
+// ── Subcomponentes ──
+
+function NavItemN1({ to, end, icon: Icon, label, collapsed }) {
+  return (
+    <NavLink
+      to={to} end={end}
+      className={({ isActive }) => cn(
+        "group flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
+        collapsed && "justify-center"
+      )}
+      style={({ isActive }) => ({
+        paddingLeft: collapsed ? 0 : 8, paddingRight: 8,
+        color: isActive ? 'var(--text)' : 'var(--text-secondary)',
+        background: isActive ? 'var(--accent-muted)' : 'transparent',
+        fontWeight: isActive ? 500 : 400,
+      })}
+      title={collapsed ? label : undefined}
+    >
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </NavLink>
+  )
+}
+
+function GroupHeader({ icon: Icon, label, isOpen, onToggle, collapsed, isActive }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={cn(
+        "w-full flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
+        collapsed && "justify-center"
+      )}
+      style={{
+        paddingLeft: collapsed ? 0 : 8, paddingRight: 8,
+        color: isActive ? 'var(--text)' : 'var(--text-secondary)',
+        background: isActive && !isOpen ? 'var(--accent-muted)' : 'transparent',
+        fontWeight: isActive ? 500 : 400,
+      }}
+      title={collapsed ? label : undefined}
+    >
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+      {!collapsed && (
+        <>
+          <span className="truncate flex-1 text-left">{label}</span>
+          <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform duration-150", isOpen && "rotate-90")} />
+        </>
+      )}
+    </button>
+  )
+}
+
+function NavItemN2({ to, label }) {
+  return (
+    <NavLink
+      to={to}
+      className="flex items-center h-6 rounded-md text-[12px] transition-colors cursor-pointer"
+      style={({ isActive }) => ({
+        paddingLeft: 24, paddingRight: 8,
+        color: isActive ? 'var(--text)' : 'var(--text-secondary)',
+        background: isActive ? 'var(--accent-muted)' : 'transparent',
+        fontWeight: isActive ? 500 : 400,
+      })}
+    >
+      <span className="truncate">{label}</span>
+    </NavLink>
+  )
+}
+
+function GroupHeaderN2({ label, isOpen, onToggle, isActive }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center h-6 rounded-md text-[12px] transition-colors cursor-pointer"
+      style={{
+        paddingLeft: 24, paddingRight: 8,
+        color: isActive ? 'var(--text)' : 'var(--text-secondary)',
+        background: isActive && !isOpen ? 'var(--accent-muted)' : 'transparent',
+        fontWeight: isActive ? 500 : 400,
+      }}
+    >
+      <span className="truncate flex-1 text-left">{label}</span>
+      <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform duration-150", isOpen && "rotate-90")} />
+    </button>
+  )
+}
+
+function NavItemN3({ to, label }) {
+  return (
+    <NavLink
+      to={to}
+      className="flex items-center h-6 rounded-md text-[11px] transition-colors cursor-pointer"
+      style={({ isActive }) => ({
+        paddingLeft: 38, paddingRight: 8,
+        color: isActive ? 'var(--accent)' : 'var(--text-tertiary)',
+        background: isActive ? 'var(--accent-muted)' : 'transparent',
+        fontFamily: "var(--font-mono, 'Fragment Mono', 'JetBrains Mono', monospace)",
+      })}
+    >
+      <span className="truncate">{label}</span>
+    </NavLink>
+  )
+}
+
+function FooterBtn({ icon: Icon, label, onClick, collapsed }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2.5 h-7 rounded-md text-[12px] transition-colors cursor-pointer",
+        collapsed && "justify-center"
+      )}
+      style={{
+        paddingLeft: collapsed ? 0 : 8, paddingRight: 8,
+        color: 'var(--text-secondary)',
+      }}
+      title={collapsed ? label : undefined}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </button>
   )
 }

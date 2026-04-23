@@ -62,6 +62,31 @@ body {
 .inv-login-loading { color: var(--text-tertiary); font-size: 12px; margin-top: 8px; }
 
 .inv-app { display: flex; height: 100dvh; overflow: hidden; }
+
+/* Cuando no hay panel lateral interno (Fase A: fechas viven en sidebar global) */
+.inv-app.inv-no-panel .inv-panel { display: none; }
+.inv-app.inv-no-panel .inv-content { width: 100%; }
+
+/* Header acciones — botones de cerrar/reabrir/reiniciar (antes vivían en aside) */
+.inv-header-action {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border, rgba(255,255,255,.07));
+  background: transparent;
+  color: var(--text-secondary, #a8adb6);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  margin-right: 4px;
+  transition: all var(--transition, 120ms);
+}
+.inv-header-action:hover:not(:disabled) {
+  background: var(--bg-hover, #17181a);
+  color: var(--text, #f7f8f8);
+  border-color: var(--border-strong, rgba(255,255,255,.12));
+}
+.inv-header-action:disabled { opacity: .35; cursor: not-allowed; }
+.inv-header-action-warn:hover:not(:disabled) { color: #fbbf24; border-color: #fbbf2466; }
+.inv-header-action-danger:hover:not(:disabled) { color: var(--error, #ef4444); border-color: #ef444466; }
 .inv-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
 /* SIDE PANEL */

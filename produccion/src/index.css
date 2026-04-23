@@ -21,6 +21,42 @@
   --color-input: rgba(255, 255, 255, 0.09);
   --color-ring: rgba(94, 106, 210, 0.35);
   --color-sidebar: #0c0d0f;
+
+  /* ─ Design tokens unificados (Linear/Notion-like) ─ */
+  --bg:            #08090a;
+  --bg-elevated:   #101113;
+  --bg-hover:      #17181a;
+  --bg-active:     #1c1d21;
+  --sb-bg:         #0c0d0f;            /* sidebar */
+  --border:        rgba(255,255,255,.07);
+  --border-strong: rgba(255,255,255,.12);
+  --text:          #f7f8f8;
+  --text-secondary:#a8adb6;
+  --text-tertiary: #6b6f76;
+  --accent:        #22c55e;
+  --accent-hover:  #16a34a;
+  --accent-muted:  rgba(34,197,94,.10);
+  --error:         #ef4444;
+  --warn:          #f59e0b;
+
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-lg: 8px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  --font-mono: 'Fragment Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs:    13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+
+  --transition: 120ms cubic-bezier(.4,0,.2,1);
 }
 
 /* ─── Tema light — Linear-style claro ─── */
@@ -43,6 +79,20 @@
   --color-input: rgba(0, 0, 0, 0.10);
   --color-ring: rgba(94, 106, 210, 0.45);
   --color-sidebar: #fafafa;
+
+  --bg:            #ffffff;
+  --bg-elevated:   #ffffff;
+  --bg-hover:      #f5f5f7;
+  --bg-active:     #efeff2;
+  --sb-bg:         #fafafa;
+  --border:        rgba(0,0,0,.08);
+  --border-strong: rgba(0,0,0,.14);
+  --text:          #0f0f12;
+  --text-secondary:#525258;
+  --text-tertiary: #8c8e95;
+  --accent:        #15803d;
+  --accent-hover:  #14532d;
+  --accent-muted:  rgba(21,128,61,.10);
 }
 
 @theme inline {

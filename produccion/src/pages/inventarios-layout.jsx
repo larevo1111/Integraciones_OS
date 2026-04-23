@@ -228,93 +228,12 @@ export function InventariosLayoutPage() {
   }, [fecha])
 
   return (
-    <div className={`inv-app inv-react-root ${panelAbierto ? 'panel-open' : ''}`}>
-      {/* SIDE PANEL */}
-      <aside className={`inv-panel ${panelAbierto ? 'open' : ''}`}>
-        <div className="inv-panel-header">
-          <span className="inv-panel-title">Inventarios</span>
-          {puede('nuevo_inventario') && (
-            <button className="inv-panel-add" onClick={() => setMostrarNuevoInv(true)} title="Nuevo inventario">
-              <span className="material-icons" style={{ fontSize: 14 }}>add</span>
-            </button>
-          )}
-          <button className="inv-panel-add" onClick={() => setPanelAbierto(false)} title="Colapsar panel" style={{ marginLeft: 4 }}>
-            <span className="material-icons" style={{ fontSize: 14 }}>chevron_left</span>
-          </button>
-        </div>
-        <div className="inv-panel-list">
-          {fechas.map(f => (
-            <div key={f.fecha_inventario} className={`inv-panel-item ${fecha === f.fecha_inventario ? 'active' : ''}`}>
-              <div className="inv-panel-item-main" onClick={() => cambiarFecha(f.fecha_inventario)}>
-                <div className="inv-panel-item-fecha">{fmtFechaCorta(f.fecha_inventario)}</div>
-                <div className="inv-panel-item-stats">
-                  <span>{f.inventariables} artículos</span>
-                  <span className="inv-panel-item-pct">{f.contados}/{f.inventariables}</span>
-                </div>
-              </div>
-              {fecha === f.fecha_inventario && (
-                <div className="inv-panel-item-actions" style={{ display: 'flex', gap: 4, padding: '6px 4px 0', flexWrap: 'wrap' }}>
-                  {puede('nuevo_inventario') && (
-                    <button className={`inv-panel-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
-                            disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
-                            onClick={(e) => { e.stopPropagation(); calcularTeorico() }}
-                            title={estadoTeorico?.calculado ? `Recalcular teórico (${estadoTeorico.calculado_en || ''})` : 'Calcular inventario teórico'}>
-                      <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 13 }}>analytics</span>
-                    </button>
-                  )}
-                  {puede('cerrar_conteo') && !estadoCierre.conteo_cerrado && (
-                    <button className="inv-panel-action"
-                            onClick={(e) => { e.stopPropagation(); setModalAbierto('cerrar-conteo') }}
-                            title="Cerrar conteo físico">
-                      <span className="material-icons" style={{ fontSize: 13 }}>lock</span>
-                    </button>
-                  )}
-                  {puede('reabrir_conteo') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
-                    <button className="inv-panel-action"
-                            onClick={(e) => { e.stopPropagation(); setModalAbierto('reabrir-conteo') }}
-                            title="Reabrir conteo físico">
-                      <span className="material-icons" style={{ fontSize: 13 }}>lock_open</span>
-                    </button>
-                  )}
-                  {puede('cerrar_inventario') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
-                    <button className="inv-panel-action inv-panel-action-warn"
-                            onClick={(e) => { e.stopPropagation(); setModalAbierto('cerrar-inv') }}
-                            title="Cerrar inventario completo">
-                      <span className="material-icons" style={{ fontSize: 13 }}>verified</span>
-                    </button>
-                  )}
-                  {puede('reiniciar_inventario') && !estadoCierre.conteo_cerrado && (
-                    <button className="inv-panel-action inv-panel-action-danger"
-                            onClick={(e) => { e.stopPropagation(); setModalAbierto('reiniciar') }}
-                            title="Reiniciar conteos (borra TODO — solo Admin)">
-                      <span className="material-icons" style={{ fontSize: 13 }}>restart_alt</span>
-                    </button>
-                  )}
-                  {puede('eliminar_inventario') && !estadoCierre.inventario_cerrado && (
-                    <button className="inv-panel-action inv-panel-action-danger"
-                            onClick={(e) => { e.stopPropagation(); setModalAbierto('eliminar') }}
-                            title="Eliminar inventario">
-                      <span className="material-icons" style={{ fontSize: 13 }}>delete_outline</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-          {!fechas.length && <div className="inv-panel-empty">Sin inventarios</div>}
-        </div>
-      </aside>
-
+    <div className="inv-app inv-react-root inv-no-panel">
       {/* CONTENT */}
       <div className="inv-content">
         {/* HEADER */}
         <div className="inv-header">
           <div className="inv-header-left">
-            {!panelAbierto && (
-              <button className="inv-panel-toggle" onClick={() => setPanelAbierto(true)} title="Inventarios">
-                <span className="material-icons" style={{ fontSize: 18 }}>menu</span>
-              </button>
-            )}
             <div className="inv-avatar">{(auth.usuario?.nombre || '?').charAt(0).toUpperCase()}</div>
             <div className="inv-user-info">
               <span className="inv-user-name">{auth.usuario?.nombre}</span>
@@ -334,6 +253,40 @@ export function InventariosLayoutPage() {
             </div>
           </div>
           <div className="inv-header-right">
+            {/* Acciones del inventario activo (antes vivían en el aside) */}
+            {fecha && puede('nuevo_inventario') && (
+              <button className={`inv-header-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
+                      disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
+                      onClick={calcularTeorico}
+                      title={estadoTeorico?.calculado ? `Recalcular teórico (${estadoTeorico.calculado_en || ''})` : 'Calcular inventario teórico'}>
+                <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 16 }}>analytics</span>
+              </button>
+            )}
+            {fecha && puede('cerrar_conteo') && !estadoCierre.conteo_cerrado && (
+              <button className="inv-header-action" onClick={() => setModalAbierto('cerrar-conteo')} title="Cerrar conteo físico">
+                <span className="material-icons" style={{ fontSize: 16 }}>lock</span>
+              </button>
+            )}
+            {fecha && puede('reabrir_conteo') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
+              <button className="inv-header-action" onClick={() => setModalAbierto('reabrir-conteo')} title="Reabrir conteo físico">
+                <span className="material-icons" style={{ fontSize: 16 }}>lock_open</span>
+              </button>
+            )}
+            {fecha && puede('cerrar_inventario') && estadoCierre.conteo_cerrado && !estadoCierre.inventario_cerrado && (
+              <button className="inv-header-action inv-header-action-warn" onClick={() => setModalAbierto('cerrar-inv')} title="Cerrar inventario completo">
+                <span className="material-icons" style={{ fontSize: 16 }}>verified</span>
+              </button>
+            )}
+            {fecha && puede('reiniciar_inventario') && !estadoCierre.conteo_cerrado && (
+              <button className="inv-header-action inv-header-action-danger" onClick={() => setModalAbierto('reiniciar')} title="Reiniciar conteos">
+                <span className="material-icons" style={{ fontSize: 16 }}>restart_alt</span>
+              </button>
+            )}
+            {fecha && puede('eliminar_inventario') && !estadoCierre.inventario_cerrado && (
+              <button className="inv-header-action inv-header-action-danger" onClick={() => setModalAbierto('eliminar')} title="Eliminar inventario">
+                <span className="material-icons" style={{ fontSize: 16 }}>delete_outline</span>
+              </button>
+            )}
             <div className="inv-clock">{horaActual}</div>
             <div className="inv-progress-wrap">
               <div className="inv-progress-track">
