@@ -1,23 +1,25 @@
 /**
- * Sidebar — 3 niveles tipo Linear/HubSpot:
+ * Sidebar — 2 niveles visibles + panel flotante lateral para sub-sub-items.
  *  - N1: items principales (Vista general, Solicitudes, ...)
  *  - N2: sub-items con sangría (cuando un N1 es expandible)
- *  - N3: items dinámicos con más sangría (las fechas de inventarios)
+ *  - N3: NO viven en el sidebar. Al hacer click en un N2 con "hasFloating"
+ *        se abre <FloatingSubmenu /> a la derecha del sidebar (HubSpot-style).
  *
- * El item "Inventarios" expandido muestra dos N2: "Catálogo" y "Inventarios"
- * (este último también expandible para ver las fechas).
+ * El item "Inventarios" (N2) abre un FloatingSubmenu con las fechas
+ * de inventario + acción "+ Nuevo inventario".
  */
-import { useEffect, useState } from "react"
-import { NavLink, useLocation } from "react-router"
+import { useEffect, useRef, useState, forwardRef } from "react"
+import { NavLink, useLocation, useNavigate } from "react-router"
 import {
   ClipboardList, LayoutDashboard, Calendar, BookOpen, Settings,
   ChevronsLeft, ChevronsRight, Sun, Moon, ChevronRight, LogOut,
-  Package, Boxes, Plus,
+  Package, Boxes, Plus, Calendar as CalIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/lib/theme"
 import { auth } from "@/lib/auth"
 import { api } from "@/lib/api"
+import { FloatingSubmenu } from "./floating-submenu"
 
 const KEY_OPEN = 'sidebar_open_groups'
 const KEY_COLLAPSED = 'sidebar_collapsed'
@@ -31,22 +33,32 @@ const fmtFechaCorta = (yyyymmdd) => {
 
 export function Sidebar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(KEY_COLLAPSED) === '1')
   const [openGroups, setOpenGroups] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(KEY_OPEN) || '{"Inventarios":true,"InvFechas":true}') }
-    catch { return { Inventarios: true, InvFechas: true } }
+    try { return JSON.parse(localStorage.getItem(KEY_OPEN) || '{"Inventarios":true}') }
+    catch { return { Inventarios: true } }
   })
   const { theme, toggle } = useTheme()
   const [fechas, setFechas] = useState([])
 
+  // Panel flotante (N3)
+  const [floatingOpen, setFloatingOpen] = useState(false)
+  const inventariosN2Ref = useRef(null)
+
   useEffect(() => { localStorage.setItem(KEY_COLLAPSED, collapsed ? '1' : '0') }, [collapsed])
   useEffect(() => { localStorage.setItem(KEY_OPEN, JSON.stringify(openGroups)) }, [openGroups])
 
-  // Cargar fechas de inventarios (refresh cuando navegamos dentro)
+  // Cargar fechas
   useEffect(() => {
     api.get('/api/inventario/fechas')
       .then(d => setFechas(Array.isArray(d) ? d : []))
       .catch(() => setFechas([]))
+  }, [location.pathname])
+
+  // Cerrar floating cuando la ruta cambia a algo no-inventarios
+  useEffect(() => {
+    if (!location.pathname.startsWith('/inventarios')) setFloatingOpen(false)
   }, [location.pathname])
 
   const toggleGroup = (key) => {
@@ -55,112 +67,128 @@ export function Sidebar() {
   }
 
   const isInventariosActive = location.pathname.startsWith('/inventarios') || location.pathname === '/catalogo'
+  const currentFecha = (location.pathname.match(/\/inventarios\/(\d{4}-\d{2}-\d{2})/) || [])[1]
+
+  const handleClickInventariosN2 = () => {
+    setFloatingOpen(v => !v)
+  }
 
   return (
-    <aside
-      className={cn(
-        "flex flex-col transition-[width] duration-200 shrink-0 border-r",
-        collapsed ? "w-12" : "w-56"
-      )}
-      style={{ background: 'var(--sb-bg)', borderColor: 'var(--border)' }}
-    >
-      {/* Logo */}
-      <div className="h-12 flex items-center px-3 gap-2 shrink-0">
-        <div className="w-6 h-6 rounded bg-[var(--accent)] flex items-center justify-center text-black font-semibold text-[11px] shrink-0">
-          OS
+    <>
+      <aside
+        className={cn(
+          "flex flex-col transition-[width] duration-200 shrink-0 border-r",
+          collapsed ? "w-12" : "w-56"
+        )}
+        style={{ background: 'var(--sb-bg)', borderColor: 'var(--border)' }}
+      >
+        {/* Logo */}
+        <div className="h-12 flex items-center px-3 gap-2 shrink-0">
+          <div className="w-6 h-6 rounded flex items-center justify-center font-semibold text-[11px] shrink-0"
+               style={{ background: 'var(--accent)', color: '#000' }}>
+            OS
+          </div>
+          {!collapsed && <span className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>Producción</span>}
         </div>
-        {!collapsed && <span className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>Producción</span>}
-      </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-1.5 space-y-px overflow-y-auto">
-        {/* N1 — Vista general */}
-        <NavItemN1 to="/" end icon={LayoutDashboard} label="Vista general" collapsed={collapsed} />
-        <NavItemN1 to="/solicitudes" icon={ClipboardList} label="Solicitudes" collapsed={collapsed} />
-        <NavItemN1 to="/calendario"  icon={Calendar}      label="Calendario"  collapsed={collapsed} />
-        <NavItemN1 to="/recetas"     icon={BookOpen}      label="Recetas"     collapsed={collapsed} />
+        {/* Nav */}
+        <nav className="flex-1 px-1.5 space-y-px overflow-y-auto">
+          <NavItemN1 to="/" end icon={LayoutDashboard} label="Vista general" collapsed={collapsed} />
+          <NavItemN1 to="/solicitudes" icon={ClipboardList} label="Solicitudes" collapsed={collapsed} />
+          <NavItemN1 to="/calendario"  icon={Calendar}      label="Calendario"  collapsed={collapsed} />
+          <NavItemN1 to="/recetas"     icon={BookOpen}      label="Recetas"     collapsed={collapsed} />
 
-        {/* N1 — Inventarios (expandible con N2) */}
-        <GroupHeader
-          icon={Package}
-          label="Inventarios"
-          isOpen={openGroups['Inventarios'] && !collapsed}
-          onToggle={() => toggleGroup('Inventarios')}
-          collapsed={collapsed}
-          isActive={isInventariosActive}
-        />
-        {openGroups['Inventarios'] && !collapsed && (
-          <div className="space-y-px">
-            {/* N2 — Catálogo */}
-            <NavItemN2 to="/catalogo" label="Catálogo" />
+          {/* N1 — Inventarios (expandible con N2) */}
+          <GroupHeader
+            icon={Package}
+            label="Inventarios"
+            isOpen={openGroups['Inventarios'] && !collapsed}
+            onToggle={() => toggleGroup('Inventarios')}
+            collapsed={collapsed}
+            isActive={isInventariosActive}
+          />
+          {openGroups['Inventarios'] && !collapsed && (
+            <div className="space-y-px">
+              <NavItemN2 to="/catalogo" label="Catálogo" />
+              {/* N2 con panel flotante: Inventarios */}
+              <NavItemN2Floating
+                ref={inventariosN2Ref}
+                label="Inventarios"
+                isActive={location.pathname.startsWith('/inventarios')}
+                isFloatingOpen={floatingOpen}
+                onClick={handleClickInventariosN2}
+              />
+            </div>
+          )}
 
-            {/* N2 — Inventarios (expandible a N3 fechas) */}
-            <GroupHeaderN2
-              label="Inventarios"
-              isOpen={openGroups['InvFechas']}
-              onToggle={() => toggleGroup('InvFechas')}
-              isActive={location.pathname.startsWith('/inventarios')}
-            />
-            {openGroups['InvFechas'] && (
-              <div className="space-y-px">
-                {fechas.map(f => (
-                  <NavItemN3 key={f.fecha_inventario} to={`/inventarios/${f.fecha_inventario}`} label={fmtFechaCorta(f.fecha_inventario)} />
-                ))}
-                {!fechas.length && (
-                  <div className="text-[10px] py-1 italic" style={{ color: 'var(--text-tertiary)', paddingLeft: 38 }}>
-                    Sin inventarios
-                  </div>
-                )}
-                <NavLink
-                  to="/inventarios/nuevo"
-                  className="flex items-center gap-1.5 h-6 rounded-md text-[11px] transition-colors cursor-pointer"
-                  style={{ paddingLeft: 38, paddingRight: 8, color: 'var(--text-tertiary)' }}
+          <NavItemN1 to="/config" icon={Settings} label="Configuración" collapsed={collapsed} />
+        </nav>
+
+        {/* Footer */}
+        <div className="px-1.5 pb-2 space-y-px border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+          {auth.usuario && (
+            <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md", collapsed && "justify-center")}
+                 title={collapsed ? auth.usuario.nombre : undefined}>
+              {auth.usuario.foto
+                ? <img src={auth.usuario.foto} alt="" className="h-5 w-5 rounded-full shrink-0" />
+                : <div className="h-5 w-5 rounded-full text-[10px] flex items-center justify-center shrink-0"
+                       style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
+                    {auth.usuario.nombre?.[0]?.toUpperCase() || '?'}
+                  </div>}
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] truncate" style={{ color: 'var(--text)' }}>{auth.usuario.nombre}</div>
+                  <div className="text-[10px] truncate" style={{ color: 'var(--text-tertiary)' }}>Nivel {auth.usuario.nivel}</div>
+                </div>
+              )}
+              {!collapsed && (
+                <button
+                  onClick={() => { auth.logout(); window.location.reload() }}
+                  className="hover:text-[var(--error)] cursor-pointer transition-colors"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  title="Cerrar sesión"
                 >
-                  <Plus className="h-3 w-3 shrink-0" strokeWidth={1.75} />
-                  <span>Nuevo inventario</span>
-                </NavLink>
-              </div>
-            )}
-          </div>
-        )}
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          <FooterBtn icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'} onClick={toggle} collapsed={collapsed} />
+          <FooterBtn icon={collapsed ? ChevronsRight : ChevronsLeft} label="Colapsar" onClick={() => setCollapsed(c => !c)} collapsed={collapsed} />
+        </div>
+      </aside>
 
-        {/* N1 — Configuración */}
-        <NavItemN1 to="/config" icon={Settings} label="Configuración" collapsed={collapsed} />
-      </nav>
-
-      {/* Footer */}
-      <div className="px-1.5 pb-2 space-y-px border-t pt-2" style={{ borderColor: 'var(--border)' }}>
-        {auth.usuario && (
-          <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md", collapsed && "justify-center")}
-               title={collapsed ? auth.usuario.nombre : undefined}>
-            {auth.usuario.foto
-              ? <img src={auth.usuario.foto} alt="" className="h-5 w-5 rounded-full shrink-0" />
-              : <div className="h-5 w-5 rounded-full text-[10px] flex items-center justify-center shrink-0"
-                     style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
-                  {auth.usuario.nombre?.[0]?.toUpperCase() || '?'}
-                </div>}
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <div className="text-[12px] truncate" style={{ color: 'var(--text)' }}>{auth.usuario.nombre}</div>
-                <div className="text-[10px] truncate" style={{ color: 'var(--text-tertiary)' }}>Nivel {auth.usuario.nivel}</div>
-              </div>
-            )}
-            {!collapsed && (
-              <button
-                onClick={() => { auth.logout(); window.location.reload() }}
-                className="hover:text-[var(--error)] cursor-pointer transition-colors"
-                style={{ color: 'var(--text-tertiary)' }}
-                title="Cerrar sesión"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        )}
-        <FooterBtn icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'} onClick={toggle} collapsed={collapsed} />
-        <FooterBtn icon={collapsed ? ChevronsRight : ChevronsLeft} label="Colapsar" onClick={() => setCollapsed(c => !c)} collapsed={collapsed} />
-      </div>
-    </aside>
+      {/* Panel flotante para N3: fechas de inventario */}
+      <FloatingSubmenu
+        open={floatingOpen}
+        onClose={() => setFloatingOpen(false)}
+        anchorRef={inventariosN2Ref}
+        title="Inventarios"
+        groups={[
+          {
+            title: 'Por fecha',
+            items: fechas.map(f => ({
+              to: `/inventarios/${f.fecha_inventario}`,
+              label: fmtFechaCorta(f.fecha_inventario),
+              icon: CalIcon,
+              monospace: true,
+              active: currentFecha === f.fecha_inventario,
+              onClick: () => setFloatingOpen(false),
+            })),
+          },
+          {
+            items: [
+              {
+                onClick: () => { setFloatingOpen(false); navigate('/inventarios/nuevo') },
+                label: 'Nuevo inventario',
+                icon: Plus,
+                rightSlot: null,
+              },
+            ],
+          },
+        ]}
+      />
+    </>
   )
 }
 
@@ -170,10 +198,8 @@ function NavItemN1({ to, end, icon: Icon, label, collapsed }) {
   return (
     <NavLink
       to={to} end={end}
-      className={({ isActive }) => cn(
-        "group flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
-        collapsed && "justify-center"
-      )}
+      className={cn("group flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
+        collapsed && "justify-center")}
       style={({ isActive }) => ({
         paddingLeft: collapsed ? 0 : 8, paddingRight: 8,
         color: isActive ? 'var(--text)' : 'var(--text-secondary)',
@@ -192,10 +218,8 @@ function GroupHeader({ icon: Icon, label, isOpen, onToggle, collapsed, isActive 
   return (
     <button
       onClick={onToggle}
-      className={cn(
-        "w-full flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
-        collapsed && "justify-center"
-      )}
+      className={cn("w-full flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
+        collapsed && "justify-center")}
       style={{
         paddingLeft: collapsed ? 0 : 8, paddingRight: 8,
         color: isActive ? 'var(--text)' : 'var(--text-secondary)',
@@ -232,53 +256,33 @@ function NavItemN2({ to, label }) {
   )
 }
 
-function GroupHeaderN2({ label, isOpen, onToggle, isActive }) {
+// N2 que abre panel flotante al clicar (HubSpot-like con chevron ">")
+const NavItemN2Floating = forwardRef(function NavItemN2Floating({ label, isActive, isFloatingOpen, onClick }, ref) {
   return (
     <button
-      onClick={onToggle}
+      ref={ref}
+      onClick={onClick}
       className="w-full flex items-center h-6 rounded-md text-[12px] transition-colors cursor-pointer"
       style={{
         paddingLeft: 24, paddingRight: 8,
-        color: isActive ? 'var(--text)' : 'var(--text-secondary)',
-        background: isActive && !isOpen ? 'var(--accent-muted)' : 'transparent',
+        color: isActive || isFloatingOpen ? 'var(--text)' : 'var(--text-secondary)',
+        background: (isActive && !isFloatingOpen) ? 'var(--accent-muted)' : (isFloatingOpen ? 'var(--bg-hover)' : 'transparent'),
         fontWeight: isActive ? 500 : 400,
       }}
     >
       <span className="truncate flex-1 text-left">{label}</span>
-      <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform duration-150", isOpen && "rotate-90")} />
+      <ChevronRight className="h-3 w-3 shrink-0" strokeWidth={1.75} />
     </button>
   )
-}
-
-function NavItemN3({ to, label }) {
-  return (
-    <NavLink
-      to={to}
-      className="flex items-center h-6 rounded-md text-[11px] transition-colors cursor-pointer"
-      style={({ isActive }) => ({
-        paddingLeft: 38, paddingRight: 8,
-        color: isActive ? 'var(--accent)' : 'var(--text-tertiary)',
-        background: isActive ? 'var(--accent-muted)' : 'transparent',
-        fontFamily: "var(--font-mono, 'Fragment Mono', 'JetBrains Mono', monospace)",
-      })}
-    >
-      <span className="truncate">{label}</span>
-    </NavLink>
-  )
-}
+})
 
 function FooterBtn({ icon: Icon, label, onClick, collapsed }) {
   return (
     <button
       onClick={onClick}
-      className={cn(
-        "w-full flex items-center gap-2.5 h-7 rounded-md text-[12px] transition-colors cursor-pointer",
-        collapsed && "justify-center"
-      )}
-      style={{
-        paddingLeft: collapsed ? 0 : 8, paddingRight: 8,
-        color: 'var(--text-secondary)',
-      }}
+      className={cn("w-full flex items-center gap-2.5 h-7 rounded-md text-[12px] transition-colors cursor-pointer",
+        collapsed && "justify-center")}
+      style={{ paddingLeft: collapsed ? 0 : 8, paddingRight: 8, color: 'var(--text-secondary)' }}
       title={collapsed ? label : undefined}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />

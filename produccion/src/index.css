@@ -150,3 +150,68 @@ body {
 h1, h2, h3 { letter-spacing: -0.02em; }
 
 *:focus { outline: none; }
+
+/* ─── Floating Submenu (HubSpot-like) ─── */
+.floating-submenu {
+  position: fixed;
+  top: 0; left: var(--sidebar-w, 224px);
+  width: 240px; height: 100dvh;
+  background: var(--bg-elevated, #101113);
+  border-right: 1px solid var(--border, rgba(255,255,255,.07));
+  padding: 12px 0;
+  z-index: 30;
+  overflow-y: auto;
+  animation: fsub-in 140ms cubic-bezier(.4,0,.2,1);
+}
+@keyframes fsub-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.floating-submenu-title {
+  padding: 4px 16px 10px;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-tertiary, #6b6f76);
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.floating-submenu-group { padding: 2px 8px; }
+.floating-submenu-group.with-separator {
+  border-top: 1px solid var(--border, rgba(255,255,255,.07));
+  margin-top: 6px; padding-top: 8px;
+}
+.floating-submenu-group-title {
+  padding: 4px 8px 6px;
+  font-size: 10px; font-weight: 600;
+  color: var(--text-tertiary, #6b6f76);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.floating-submenu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 13px; font-weight: 400;
+  color: var(--text-secondary, #a8adb6);
+  background: transparent; border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--transition, 120ms), color var(--transition, 120ms);
+}
+.floating-submenu-item:hover {
+  background: var(--bg-hover, #17181a);
+  color: var(--text, #f7f8f8);
+}
+.floating-submenu-item:hover .floating-submenu-chev { color: var(--text-secondary, #a8adb6); }
+.floating-submenu-item.active {
+  background: var(--accent-muted, rgba(34,197,94,.10));
+  color: var(--accent, #22c55e);
+  font-weight: 500;
+}
+.floating-submenu-chev {
+  color: var(--text-tertiary, #6b6f76);
+  transition: color var(--transition, 120ms);
+}
+.floating-submenu-mono {
+  font-family: var(--font-mono, 'Fragment Mono', monospace);
+  font-size: 12px;
+  letter-spacing: -.01em;
+}
