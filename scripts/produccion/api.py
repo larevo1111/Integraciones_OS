@@ -528,6 +528,99 @@ def stats_resumen():
     return {r['estado']: r['n'] for r in rows}
 
 
+# ── Libro de recetas ───────────────────────────────────────
+
+@app.get("/api/recetas")
+def listar_recetas(familia: Optional[str] = None, estado: Optional[str] = None,
+                   confianza: Optional[str] = None, q_str: Optional[str] = None):
+    """Lista las recetas del libro maestro con filtros opcionales."""
+    sql = """
+        SELECT r.id, r.cod_articulo, r.nombre, r.familia, r.patron,
+               r.cantidad_lote_std, r.unidad_producto, r.confianza, r.estado,
+               r.n_ops_analizadas, r.updated_at,
+               (SELECT COUNT(*) FROM prod_recetas_materiales WHERE receta_id=r.id) AS n_materiales,
+               (SELECT COUNT(*) FROM prod_recetas_costos WHERE receta_id=r.id) AS n_costos
+        FROM prod_recetas r
+        WHERE 1=1
+    """
+    params = []
+    if familia:
+        sql += " AND r.familia = %s"
+        params.append(familia)
+    if estado:
+        sql += " AND r.estado = %s"
+        params.append(estado)
+    if confianza:
+        sql += " AND r.confianza = %s"
+        params.append(confianza)
+    if q_str:
+        sql += " AND (r.cod_articulo LIKE %s OR r.nombre LIKE %s)"
+        params.extend([f"%{q_str}%", f"%{q_str}%"])
+    sql += " ORDER BY r.familia, r.cod_articulo"
+    return q(DB_PROD, sql, params)
+
+
+@app.get("/api/recetas/{cod}")
+def obtener_receta(cod: str):
+    """Devuelve la receta completa con materiales, productos y costos."""
+    rec = q(DB_PROD, "SELECT * FROM prod_recetas WHERE cod_articulo=%s", (cod,))
+    if not rec:
+        raise HTTPException(404, f"Receta no encontrada para cod={cod}")
+    r = rec[0]
+    rid = r['id']
+    r['materiales'] = q(DB_PROD,
+        "SELECT * FROM prod_recetas_materiales WHERE receta_id=%s ORDER BY cantidad_por_lote DESC", (rid,))
+    r['productos'] = q(DB_PROD,
+        "SELECT * FROM prod_recetas_productos WHERE receta_id=%s ORDER BY es_principal DESC", (rid,))
+    r['costos'] = q(DB_PROD,
+        "SELECT * FROM prod_recetas_costos WHERE receta_id=%s", (rid,))
+    return r
+
+
+@app.get("/api/recetas/stats/resumen")
+def recetas_stats():
+    """Resumen por familia: total / con receta / validadas."""
+    rows = q(DB_PROD, """
+        SELECT familia,
+               COUNT(*) AS total,
+               SUM(CASE WHEN estado='validada' THEN 1 ELSE 0 END) AS validadas,
+               SUM(CASE WHEN confianza='alta' THEN 1 ELSE 0 END) AS conf_alta
+        FROM prod_recetas
+        GROUP BY familia
+        ORDER BY total DESC
+    """)
+    return rows
+
+
+class RecetaPatch(BaseModel):
+    estado: Optional[str] = None
+    confianza: Optional[str] = None
+    notas_analisis: Optional[str] = None
+
+
+@app.patch("/api/recetas/{cod}")
+def actualizar_receta(cod: str, data: RecetaPatch, usuario=Depends(require_auth)):
+    """Permite actualizar estado/confianza/notas desde la UI."""
+    sets = []
+    params = []
+    if data.estado:
+        sets.append("estado=%s")
+        params.append(data.estado)
+        if data.estado == 'validada':
+            sets.append("validated_at=NOW()")
+    if data.confianza:
+        sets.append("confianza=%s")
+        params.append(data.confianza)
+    if data.notas_analisis is not None:
+        sets.append("notas_analisis=%s")
+        params.append(data.notas_analisis)
+    if not sets:
+        raise HTTPException(400, "Sin campos para actualizar")
+    params.append(cod)
+    exe(DB_PROD, f"UPDATE prod_recetas SET {', '.join(sets)} WHERE cod_articulo=%s", params)
+    return {"ok": True}
+
+
 # ── Proxy al API de inventario (puerto 9401) ──────────────
 # Temporal: mientras la UI está aquí pero los endpoints viven en el servicio os-inventario-api.
 # Cuando fusionemos backends (Fase 10), este proxy se elimina.

@@ -10,7 +10,9 @@ import { DashboardPage } from "@/pages/dashboard"
 import { PlaceholderPage } from "@/pages/placeholder"
 import { InventariosLayoutPage } from "@/pages/inventarios-layout"
 import { CatalogoPage } from "@/pages/catalogo"
-import { Calendar, BookOpen, Settings } from "lucide-react"
+import { RecetasPage } from "@/pages/recetas"
+import { RecetaDetallePage } from "@/pages/receta-detalle"
+import { Calendar, Settings } from "lucide-react"
 
 const GOOGLE_CLIENT_ID = "290093919454-j2l1el0p624v65cada556pdc3r2gm6k7.apps.googleusercontent.com"
 
@@ -21,7 +23,8 @@ function AppRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/solicitudes" element={<SolicitudesPage />} />
         <Route path="/calendario" element={<PlaceholderPage title="Calendario" icon={Calendar} descripcion="Vista mensual de solicitudes programadas (próximamente)" />} />
-        <Route path="/recetas" element={<PlaceholderPage title="Recetas" icon={BookOpen} descripcion="Gestión de recetas por producto (próximamente)" />} />
+        <Route path="/recetas" element={<RecetasPage />} />
+        <Route path="/recetas/:cod" element={<RecetaDetallePage />} />
         <Route path="/config" element={<PlaceholderPage title="Configuración" icon={Settings} descripcion="Parámetros del módulo (próximamente)" />} />
 
         {/* Inventarios: flyout de fechas + vista completa por fecha */}

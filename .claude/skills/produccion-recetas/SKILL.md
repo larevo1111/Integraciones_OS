@@ -498,3 +498,91 @@ Cuando descubras un nuevo producto, ratio o anomalía:
 3. Si la receta está validada por Santi → `sa_produccion/context/recetas_validadas.md`
 4. Si fue un caso difícil → `sa_produccion/aprendizaje/casos_resueltos.md`
 5. **Si descubrís un bug del script o un cambio de UI en Effi** → actualizar §9 de esta skill y el script correspondiente.
+
+---
+
+## 12. Libro de Recetas — infraestructura 2026-04-22
+
+**Ubicación**: BD VPS `inventario_produccion_effi` → 4 tablas: `prod_recetas`, `prod_recetas_materiales`, `prod_recetas_productos`, `prod_recetas_costos`.
+
+**UI**: `inv.oscomunidad.com/recetas` (lista) y `/recetas/:cod` (detalle editable).
+
+**Scripts**: `scripts/produccion/libro_recetas/`:
+- `listar_universo.py [--familia X] [--resumen] [--pendientes]`
+- `dossier_producto.py <cod> [--n_ops N]` — detalle completo de OPs históricas
+- `construir_receta.py <cod>` — receta propuesta (usa motor de atribución)
+- `simular_op.py <cod>` — aplica receta a la última OP real y diffea
+- `persistir_receta.py <cod> [--estado ...] [--notas ...]` — INSERT/UPDATE
+- `persistir_todas.py` — itera todos los pendientes
+- `override_receta.py` — módulo para overrides manuales (YO lo uso cuando el motor falla)
+- `sugerir_atribuido.py` — variante del algoritmo que ATRIBUYE materiales por OP multi-producto
+
+### Atribución multi-producto (clave)
+
+**Problema**: las OPs con varios productos producidos hacen que el script estándar mezcle materiales de otros productos en la receta.
+
+**Solución** (en `sugerir_atribuido.py`):
+1. **Afinidad semántica**: materiales con tokens específicos (`mani`, `macadamia`, `nibs`, etc.) que NO aparecen en el nombre del principal pero sí en otro producido → descartar.
+2. **Match por cantidad**: si `cantidad_material ≈ cantidad_principal (±5%)` → 100% al principal; si coincide con otro producido → 0%.
+3. **Share uniforme**: el resto se distribuye por `cant_principal / cant_total`.
+
+Este motor acierta en >80% de casos. El 20% restante requiere override manual.
+
+### Patrones de envase-peso (derivados al procesar el libro)
+
+**Densidad por familia** (confirmada empíricamente):
+
+| Producto | Densidad |
+|---|---|
+| Miel | ~1.28 g/ml |
+| Propóleo | ~1.30 g/ml |
+| Chocomiel | ~1.10 g/ml |
+| Polen | ~0.65 g/ml (menos denso) |
+
+**Mapeo envase estándar por presentación**:
+
+| Peso/vol | Envase vidrio | Cod |
+|---|---|---|
+| 50cc | MB50H 50cc | **232** |
+| 110cc | R mb110h 110cc | **86** |
+| 130cc | R 4186-2465 130cc | **135** (crema maní) |
+| 230cc | R 2670 230cc | **87** |
+| 500cc | R 1263 500cc | **88** |
+| 750cc | R 1264 750cc | **85** |
+| Bolsa doy pack | PET flex transparente | **332** |
+| Bolsa flex up 450g | 160x240 | **100** |
+| Bolsa flex up pequeña | PET coext metalizado | **143** |
+
+**Etiquetas por presentación**: cada peso tiene su etiqueta específica (ej: Etiqueta Miel 640 = cod 262). La etiqueta tapa 90 ("Origen Silvestre tapa") va en casi todos los envasados con tapa.
+
+### Cómo identificar envase correcto cuando una OP es multi-producto
+
+Query SQL clave:
+```sql
+SELECT p.cod_articulo, m.cod_material,
+       SUM(CASE WHEN CAST(REPLACE(p.cantidad,',','.') AS DECIMAL(10,2))
+                   = CAST(REPLACE(m.cantidad,',','.') AS DECIMAL(10,2)) THEN 1 ELSE 0 END) matches
+FROM zeffi_articulos_producidos p
+JOIN zeffi_materiales m ON m.id_orden=p.id_orden
+WHERE p.cod_articulo = :cod AND m.cod_material IN (:envases_candidatos)
+  AND p.vigencia='Orden vigente' AND m.vigencia='Orden vigente'
+GROUP BY p.cod_articulo, m.cod_material
+HAVING matches >= 3
+ORDER BY matches DESC;
+```
+
+Si `matches >= 3` para un envase específico → ese es el envase del producto (1:1 entre cantidad de envase y cantidad producida).
+
+### Estados de receta
+
+- `borrador` — generada automáticamente, revisión pendiente. NO se debe usar para generar OPs.
+- `validada` — revisada y confirmada. Lista para generar OPs desde la UI.
+
+### Cobertura lograda (2026-04-22)
+
+108 productos con receta, 72 validadas (67%). Los 36 en borrador son:
+- Variantes de 1-2 OPs (infusionadas, DS, bombones rellenos)
+- Productos con composición compleja que requieren razonamiento específico (chocobeetal, mix frutos secos, panal)
+- Graneles intermedios que Santi debe confirmar (chocomiel 346, extracto vainilla 134)
+
+El sistema permite consultar/editar desde la UI — ideal para que yo (o Santi) complete estos 36 con razonamiento caso por caso.

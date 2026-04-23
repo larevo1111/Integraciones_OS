@@ -1,5 +1,5 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-20
+**Actualizado**: 2026-04-23
 
 ## Módulos activos en paralelo
 
@@ -14,7 +14,25 @@
 | Producción | `produccion/` + `scripts/produccion/api.py:9600` | React + Shadcn/ui + Tailwind (style Linear), BD `os_produccion` | Operativo — solicitudes → OPs Effi via Playwright |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
-## Trabajo activo (2026-04-20)
+## Trabajo activo (2026-04-23)
+
+### Completado 2026-04-23 — Libro de Recetas de Producción
+
+**Objetivo**: eliminar la deducción manual de recetas para cada OP. Catálogo maestro con receta por producto.
+
+**Infraestructura**:
+- BD VPS `inventario_produccion_effi`: 4 tablas nuevas (`prod_recetas`, `_materiales`, `_productos`, `_costos`)
+- 8 scripts en `scripts/produccion/libro_recetas/`:
+  - `listar_universo.py`, `dossier_producto.py`, `construir_receta.py`, `simular_op.py`, `persistir_receta.py`
+  - `sugerir_atribuido.py` — motor propio que atribuye materiales en OPs multi-producto (afinidad semántica + match por cantidad + share)
+  - `override_receta.py` — módulo para overrides manuales con razonamiento de Claude/Santi
+  - `persistir_todas.py` — procesamiento masivo
+- Endpoints API: `/api/recetas`, `/api/recetas/{cod}`, `/api/recetas/{cod}` PATCH, `/api/recetas/stats/resumen`
+- UI: `/recetas` (lista con OsDataTable + resumen por familia) y `/recetas/:cod` (detalle con materiales/productos/costos + tarjetas económicas + textarea razonamiento + botones validar/devolver)
+
+**Cobertura**: 108/108 productos con receta (productos producidos desde 2025-01-01). 72/108 validadas (67%). Los 36 en borrador son productos de 1-2 OPs que requieren razonamiento específico con Santi.
+
+**Patrones documentados en skill `produccion-recetas` §12**: densidades (miel 1.28, polen 0.65, propóleo 1.30 g/ml), mapeo envase-peso, query SQL para identificar envase por match de cantidad.
 
 ### Completado 2026-04-20 — Inventario parcial abril + módulo Producción
 
