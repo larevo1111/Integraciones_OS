@@ -125,6 +125,7 @@
 import { computed, ref, nextTick, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
 import CronoDisplay from './CronoDisplay.vue'
+import { parseBackendDate, localISO } from 'src/services/fecha'
 
 const props = defineProps({
   tarea:              { type: Object, required: true },
@@ -239,14 +240,21 @@ const proyNombreCorto = computed(() => {
   return n.length > max ? n.slice(0, max) : n
 })
 
-function isoFecha(f) {
+// En tareas completadas el chip principal muestra la fecha real de ejecución
+// (la que el sistema usa para filtros). En pendientes, la fecha estimada.
+function _toISO(f) {
   if (!f) return null
-  const s = typeof f === 'string' ? f : f.toISOString()
-  return s.slice(0, 10)
+  const d = parseBackendDate(f)
+  return d ? localISO(d) : null
 }
+const fechaChipISO = computed(() => {
+  const t = props.tarea
+  const raw = esCompletada.value ? (t.fecha_fin_real || t.fecha_limite) : t.fecha_limite
+  return _toISO(raw)
+})
 
 const fechaDisplay = computed(() => {
-  const iso = isoFecha(props.tarea.fecha_limite)
+  const iso = fechaChipISO.value
   if (!iso) return ''
   const d      = new Date(iso + 'T00:00:00')
   const hoy    = new Date(); hoy.setHours(0,0,0,0)
@@ -255,12 +263,11 @@ const fechaDisplay = computed(() => {
   if (d.getTime() === hoy.getTime())    return 'Hoy'
   if (d.getTime() === manana.getTime()) return props.compacto ? 'Mañ' : 'Mañana'
   if (d.getTime() === ayer.getTime())   return props.compacto ? 'Ayr' : 'Ayer'
-  // Para fechas específicas: "5 jun" en desktop, "5j" sería raro, dejamos igual
   return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
 })
 
 const clasesFecha = computed(() => {
-  const iso = isoFecha(props.tarea.fecha_limite)
+  const iso = fechaChipISO.value
   if (!iso) return ''
   const d   = new Date(iso + 'T00:00:00')
   const hoy = new Date(); hoy.setHours(0,0,0,0)

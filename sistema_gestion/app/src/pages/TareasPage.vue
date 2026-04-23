@@ -739,7 +739,7 @@ function isoRelativo(dias) {
 const menuOrdenar            = ref(false)
 const btnOrdenarRef          = ref(null)
 const dropdownOrdenarStyle   = ref({})
-const filtroActivo      = ref('todas')
+const filtroActivo      = ref('hoy')
 const ordenarPor        = ref(localStorage.getItem('gestion_ordenar') || 'manual')
 const agruparPor        = ref(localStorage.getItem('gestion_agrupar') || 'categoria')
 
@@ -959,8 +959,8 @@ async function qaAgregar() {
 }
 
 const FILTROS = [
-  { key: 'todas',        label: 'Todas' },
   { key: 'hoy',          label: 'Hoy' },
+  { key: 'todas',        label: 'Todas' },
   { key: 'en_progreso',  label: 'En curso' },
   { key: 'manana',       label: 'Mañana' },
   { key: 'ayer',         label: 'Ayer' },
@@ -1004,7 +1004,7 @@ function onAplicarFiltro(filtros) {
 
 function onCerrarFiltroPopup() {
   mostrarFiltroPopup.value = false
-  if (!filtroPersonalizado.value) filtroActivo.value = 'todas'
+  if (!filtroPersonalizado.value) filtroActivo.value = 'hoy'
 }
 const ORDENAMIENTOS = [
   { key: 'manual',          label: 'Manual' },

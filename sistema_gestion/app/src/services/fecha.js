@@ -40,5 +40,7 @@ export function parseBackendDate(str) {
   if (!str) return null
   const s = String(str)
   if (s.includes('Z') || s.includes('+') || s.match(/-\d{2}:\d{2}$/)) return new Date(s)
+  // Fecha pura "YYYY-MM-DD" → medianoche en timezone local
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(`${s}T00:00:00${TZ_OFFSET}`)
   return new Date(s.replace(' ', 'T') + TZ_OFFSET)
 }
