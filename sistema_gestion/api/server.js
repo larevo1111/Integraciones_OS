@@ -1516,12 +1516,8 @@ app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req,
       return res.status(403).json({ error: 'No tenés permisos para procesar esta OP (no sos responsable y tu nivel no supera al del responsable)' })
     }
 
-    // Nombre del reportador (usuario que hace click)
-    const [[me]] = await db.comunidad.query(
-      'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?',
-      [req.usuario.email]
-    )
-    const nombreReportador = me?.nombre || req.usuario.email
+    // Nombre del reportador — JWT ya trae nombre, evita dependencia de comunidad (Hostinger)
+    const nombreReportador = req.usuario.nombre || req.usuario.email
     const observacion = `Reportó: ${nombreReportador} (OS Gestión)`
 
     // Ejecutar script Playwright
@@ -1602,15 +1598,17 @@ app.post('/api/gestion/tareas/:id/produccion/validar', requireAuth, async (req, 
     const costoPorCod   = Object.fromEntries(matsCostos.map(m => [String(m.cod), Number(String(m.costo_ud || '').replace(',', '.')) || 0]))
     const precioPorCod  = Object.fromEntries(prodPrecios.map(p => [String(p.cod), Number(String(p.precio_minimo_ud || '').replace(',', '.')) || 0]))
 
-    // 4. Datos del validador + reportador (para observación)
-    const [[me]] = await db.comunidad.query(
-      'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?', [req.usuario.email]
-    )
-    const [[resp]] = tarea.responsable ? await db.comunidad.query(
-      'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?', [tarea.responsable]
-    ) : [[]]
-    const nombreValidador  = me?.nombre || req.usuario.email
-    const nombreReportador = resp?.nombre || tarea.responsable || '?'
+    // 4. Datos del validador + reportador — tolerante a comunidad (Hostinger) caído
+    let nombreValidador  = req.usuario.nombre || req.usuario.email
+    let nombreReportador = tarea.responsable || '?'
+    if (db.comunidad) {
+      try {
+        const [[resp]] = tarea.responsable ? await db.comunidad.query(
+          'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?', [tarea.responsable]
+        ) : [[]]
+        if (resp?.nombre) nombreReportador = resp.nombre
+      } catch (e) { console.warn('[validar] comunidad no disponible para nombre responsable:', e.message) }
+    }
     const obsOriginal      = (op.observacion || '').replace(/\s+/g, ' ').trim()
     const observacion      = `Validación OS · Reportó: ${nombreReportador} · Validó: ${nombreValidador}${obsOriginal ? ' · Obs OP orig: ' + obsOriginal.slice(0, 200) : ''}`
 

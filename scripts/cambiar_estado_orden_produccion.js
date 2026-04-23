@@ -72,8 +72,8 @@ console.log(`📝 Observación: ${observacion}`);
     await fila.locator('button.dropdown-toggle, button:has(.fa-ellipsis-v), button:has(.caret)').first().click();
     await page.waitForTimeout(500);
 
-    // Click "Cambiar estado"
-    await page.locator('a:has-text("Cambiar estado"), button:has-text("Cambiar estado")').first().click();
+    // Click "Cambiar estado" del dropdown (es <a>, no el <button> del modal)
+    await page.locator('.dropdown-menu a:has-text("Cambiar estado"), ul.dropdown-menu a:has-text("Cambiar estado"), li > a:has-text("Cambiar estado")').first().click();
     await page.waitForTimeout(1500);
 
     // Modal: seleccionar nuevo estado (dropdown Chosen)
