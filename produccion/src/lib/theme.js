@@ -3,7 +3,9 @@ import { useEffect, useState } from "react"
 const KEY = 'os_theme'
 
 export function getTheme() {
-  return localStorage.getItem(KEY) || 'light'
+  // TEMPORALMENTE dark para test visual con screenshot MCP que tiene bug
+  // con backgrounds claros. Cambiar a 'light' al finalizar pulido visual.
+  return localStorage.getItem(KEY) || 'dark'
 }
 
 export function setTheme(theme) {

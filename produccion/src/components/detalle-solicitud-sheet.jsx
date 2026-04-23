@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 import { Combobox } from "@/components/ui/combobox"
 import { Badge } from "@/components/ui/badge"
 import { api } from "@/lib/api"
@@ -115,23 +116,24 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
         <div className="space-y-4 flex-1 overflow-y-auto pr-1 -mr-1">
           {editableProducto ? (
             <>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label>Tipo de artículo</Label>
                 <div className="flex gap-1.5 flex-wrap">
                   {TIPOS_FILTRO.map(t => (
                     <button
                       key={t.value}
                       onClick={() => setFiltroTipo(t.value)}
-                      className={`px-2.5 py-1 rounded-full text-xs border transition-colors cursor-pointer ${
+                      className={cn(
+                        "px-3 py-1.5 rounded-md text-[12px] font-medium border transition-all cursor-pointer",
                         filtroTipo === t.value
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'border-border text-muted-foreground hover:text-foreground'
-                      }`}
+                          ? 'bg-primary/10 text-primary border-primary/30'
+                          : 'bg-background border-border text-muted-foreground hover:text-foreground hover:border-border/80'
+                      )}
                     >{t.label}</button>
                   ))}
                 </div>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label>Producto</Label>
                 <Combobox
                   value={cod}
@@ -144,7 +146,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
               </div>
             </>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label>Producto</Label>
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
                 <div>{solicitud?.nombre_articulo}</div>
@@ -154,7 +156,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
             </div>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label>Cantidad</Label>
             <Input
               type="text"
@@ -166,8 +168,8 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
               <Label>Necesidad para</Label>
               <Input
                 type="date"
@@ -176,7 +178,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
               />
               <p className="text-[11px] text-muted-foreground">Fecha en que se necesita</p>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label>Programada</Label>
               <Input
                 type="date"
@@ -189,17 +191,17 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
 
           {!esNueva && (
             <>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label>Estado</Label>
                 <select
                   value={estado}
                   onChange={e => setEstado(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm cursor-pointer outline-none focus:ring-1 focus:ring-ring"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] cursor-pointer outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 >
                   {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
                 </select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label>OP Effi (opcional)</Label>
                 <Input
                   value={opEffi}
@@ -210,7 +212,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
             </>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label>Observaciones</Label>
             <textarea
               value={observaciones}

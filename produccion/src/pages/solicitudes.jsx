@@ -122,11 +122,11 @@ export function SolicitudesPage() {
   }
 
   return (
-    <div className="p-5 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between mb-5">
+    <div className="px-8 pt-8 pb-6 max-w-[1400px] mx-auto">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[16px] font-semibold">Solicitudes de Producción</h1>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
+          <h1 className="text-[18px] font-semibold tracking-tight">Solicitudes de Producción</h1>
+          <p className="text-[12px] text-muted-foreground mt-1">
             Selecciona varias para programarlas en una sola OP, o click en una fila para ver el detalle
           </p>
         </div>

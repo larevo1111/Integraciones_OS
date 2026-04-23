@@ -83,16 +83,16 @@ export function Sidebar() {
         style={{ background: 'var(--sb-bg)', borderColor: 'var(--border)' }}
       >
         {/* Logo */}
-        <div className="h-12 flex items-center px-3 gap-2 shrink-0">
-          <div className="w-6 h-6 rounded flex items-center justify-center font-semibold text-[11px] shrink-0"
+        <div className="h-14 flex items-center px-3 gap-2.5 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="w-7 h-7 rounded-md flex items-center justify-center font-semibold text-[11px] shrink-0"
                style={{ background: 'var(--accent)', color: '#000' }}>
             OS
           </div>
-          {!collapsed && <span className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>Producción</span>}
+          {!collapsed && <span className="text-[13.5px] font-semibold truncate tracking-tight" style={{ color: 'var(--text)' }}>Producción</span>}
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-1.5 space-y-px overflow-y-auto">
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           <NavItemN1 to="/" end icon={LayoutDashboard} label="Vista general" collapsed={collapsed} />
           <NavItemN1 to="/solicitudes" icon={ClipboardList} label="Solicitudes" collapsed={collapsed} />
           <NavItemN1 to="/calendario"  icon={Calendar}      label="Calendario"  collapsed={collapsed} />
