@@ -92,13 +92,13 @@
 
     <!-- Fecha -->
     <q-chip
-      clickable dense
+      :clickable="!fechaReadonly" dense
       icon="event"
       class="tf-chip"
       :class="{ 'tf-chip-filled': fechaLimite }"
     >
       <span>{{ fechaLimite ? fechaLabel : 'Fecha' }}</span>
-      <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+      <q-menu v-if="!fechaReadonly" class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
         <q-date
           :model-value="fechaLimite ? String(fechaLimite).slice(0,10) : ''"
           mask="YYYY-MM-DD"
@@ -156,8 +156,9 @@ const props = defineProps({
   proyectos:            { type: Array, default: () => [] },
 
   // Flags
-  showEstado: { type: Boolean, default: false },
-  iaLoading:  { type: Boolean, default: false }
+  showEstado:    { type: Boolean, default: false },
+  iaLoading:     { type: Boolean, default: false },
+  fechaReadonly: { type: Boolean, default: false }
 })
 
 defineEmits([

@@ -45,7 +45,8 @@
         :categoria-id="tarea.categoria_id"
         :prioridad="tarea.prioridad"
         :etiquetas="(tarea.etiquetas||[]).map(e=>e.id)"
-        :fecha-limite="tarea.fecha_limite ? String(tarea.fecha_limite).slice(0,10) : ''"
+        :fecha-limite="fechaChipISO"
+        :fecha-readonly="esCompletada"
         :responsables="tarea.responsables || (tarea.responsable ? [tarea.responsable] : [])"
         :proyecto-id="tarea.proyecto_id"
         :categorias="categorias"
@@ -195,6 +196,12 @@
         </div>
         <div class="divider" style="margin:8px 0"></div>
         <div class="field-row">
+          <span class="field-label">Fecha estimada</span>
+          <input type="date" class="input-field" style="height:28px;font-size:12px"
+            :value="tarea.fecha_limite ? String(tarea.fecha_limite).slice(0,10) : ''"
+            @change="actualizarFechaEstimada($event.target.value || null)" />
+        </div>
+        <div class="field-row">
           <span class="field-label">Inicio estimado</span>
           <input type="datetime-local" class="input-field" style="height:28px;font-size:12px"
             :value="tarea.fecha_inicio_estimada ? String(tarea.fecha_inicio_estimada).replace(' ', 'T').slice(0,16) : ''"
@@ -249,6 +256,7 @@
 <script setup>
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
+import { parseBackendDate, localISO } from 'src/services/fecha'
 import { crearSubtarea as crearSubtareaFn } from 'src/composables/useTareas'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
@@ -328,6 +336,17 @@ const mostrarFechas = ref(false)
 const esCompletada = computed(() =>
   ['Completada', 'Cancelada'].includes(props.tarea?.estado)
 )
+
+// En completadas el chip principal muestra fecha_fin_real (no editable);
+// la fecha estimada queda en "Más campos".
+const fechaChipISO = computed(() => {
+  const t = props.tarea
+  if (!t) return ''
+  const raw = esCompletada.value ? (t.fecha_fin_real || t.fecha_limite) : t.fecha_limite
+  if (!raw) return ''
+  const d = parseBackendDate(raw)
+  return d ? localISO(d) : ''
+})
 
 function fmtDT(val) {
   if (!val) return ''
