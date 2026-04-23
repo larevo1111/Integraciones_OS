@@ -50,6 +50,40 @@
   --tx: 120ms cubic-bezier(.4,0,.2,1);
 }
 
+/* ─── Tokens tema claro ─── */
+.light {
+  --bg-app:        #ffffff;
+  --bg-sidebar:    #fafafa;
+  --bg-card:       #ffffff;
+  --bg-modal:      #ffffff;
+  --bg-toolbar:    #fafafa;
+  --bg-input:      #ffffff;
+  --bg-row-hover:  rgba(0,0,0,.025);
+  --bg-row-selected: rgba(21,128,61,.06);
+  --bg-card-hover: #f7f7f9;
+
+  --accent:        #15803d;
+  --accent-hover:  #14532d;
+  --accent-muted:  rgba(21,128,61,.08);
+  --accent-border: rgba(21,128,61,.30);
+
+  --text-primary:  #0f0f12;
+  --text-secondary:#525258;
+  --text-tertiary: #8c8e95;
+
+  --border-subtle:  rgba(0,0,0,.05);
+  --border-default: rgba(0,0,0,.08);
+  --border-strong:  rgba(0,0,0,.14);
+
+  --color-ok:      #15803d;
+  --color-success: #15803d;
+  --color-warning: #d97706;
+  --color-error:   #dc2626;
+  --color-pending: #6b7280;
+
+  --shadow-lg: 0 10px 40px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.04);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -65,8 +99,8 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,.4); }
 /* LOGIN */
 .inv-login { display: flex; align-items: center; justify-content: center; height: 100vh; background: var(--bg-app); }
 .inv-login-card { background: var(--bg-card, #1c1c1e); border: 1px solid var(--border-default); border-radius: 12px; padding: 40px 36px; text-align: center; width: 360px; box-shadow: 0 20px 80px rgba(0,0,0,0.5); }

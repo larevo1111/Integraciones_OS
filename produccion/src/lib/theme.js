@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 const KEY = 'os_theme'
 
 export function getTheme() {
-  return localStorage.getItem(KEY) || 'dark'
+  return localStorage.getItem(KEY) || 'light'
 }
 
 export function setTheme(theme) {
