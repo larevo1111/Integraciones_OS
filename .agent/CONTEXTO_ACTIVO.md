@@ -1,6 +1,30 @@
 # Contexto Activo — Integraciones OS
 **Actualizado**: 2026-04-23
 
+## Completado 2026-04-23 — Detalles de Producción + reporte de reales + validación (Sistema Gestión v2.8.5)
+
+Módulo completo para que el operario reporte consumos reales en una OP vinculada a una tarea, y nivel ≥ 5 valide (anular + crear nueva con reales + marcar Validado en Effi).
+
+**Entregado:**
+- Panel de tarea con acordeón "Detalles de producción" (visible solo si categoría=Producción + `id_op` vinculado).
+- Tabla materiales + productos con columnas Material/Estimado/Real (siembra automática desde Effi, unidades desde `os_integracion.unidades_articulos`).
+- 4 inputs de tiempo (Alistamiento, Producción, Empaque, Limpieza) + total calculado en vivo.
+- Chip de estado (Generada gris / Procesada naranja / Validado verde / Anulada gris oscuro).
+- Botón "Procesar" (responsable o nivel ≥ responsable): cambia estado de OP a Procesada en Effi.
+- Botón "Validar" (solo nivel ≥ 5): anula OP original + crea nueva con reales + marca Validado. `id_op_original` queda guardado, UI muestra "OP orig: xxxx".
+- Decimal tolerante (coma y punto ambos válidos).
+- Observación auto-generada: "Validación OS · Reportó: X · Validó: Y · Obs OP orig: ..."
+
+**Versiones**: v2.8.0 → v2.8.5 (12 commits entre `58e54c8` y `021c421`).
+
+**Plan completo** + lista de archivos + pendientes: [.agent/planes/completados/PLAN_DETALLES_PRODUCCION_2026-04-20.md](planes/completados/PLAN_DETALLES_PRODUCCION_2026-04-20.md).
+
+### Infraestructura resuelta durante la ejecución
+- **DNS gestion.oscomunidad.com reapuntado al tunnel local** (no al VPS) porque VPS no puede ejecutar Playwright confiablemente contra Effi (Effi limita acciones según IP). Comando: `cloudflared tunnel route dns --overwrite-dns 9cacb3dc-... gestion.oscomunidad.com` (requiere `cert.pem` del VPS). Hostname quitado del config del VPS (`/etc/cloudflared/config.yml`).
+- **SSH jump tunnel a Hostinger**: la IP del local está bloqueada por Hostinger. Nuevo servicio `tunnel-hostinger.service` mantiene SSH via VPS Contabo como jumphost. Expone MySQL Hostinger como `127.0.0.1:3313` en el local. `.env` → `DB_COMUNIDAD_SSH_HOST=direct`, `DB_COMUNIDAD_REMOTE_PORT=3313`.
+- **`db.js` pool dinámico**: antes cacheaba el pool al arrancar; tras reconexión SSH quedaba obsoleto ("Pool is closed"). Ahora los getters leen el pool actual del helper central en cada acceso.
+- **comunidad opcional al arranque**: si Hostinger tarda en responder, el server arranca igual y reintenta en background cada 15s. `/procesar` y `/validar` usan `req.usuario.nombre` del JWT (no dependen de comunidad).
+
 ## Módulos activos en paralelo
 
 | Módulo | Archivo de contexto | Estado actual | Prioridad |
@@ -8,7 +32,7 @@
 | Servicio IA + Bot Telegram | [contextos/ia_service.md](contextos/ia_service.md) | Super Agente activo, mejora continua cron | Alta |
 | Pipeline Effi | [contextos/pipeline_effi.md](contextos/pipeline_effi.md) | Estable, 18 pasos activos | Normal |
 | ERP Frontend | [contextos/erp_frontend.md](contextos/erp_frontend.md) | Módulo Ventas completo | Normal |
-| Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ activos | Alta |
+| Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ + Detalles de Producción ✅ (v2.8.5) | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Estable — sin trabajo activo | — |
 | Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | Operativo — inv.oscomunidad.com, inventarios completos + parciales | Alta |
 | Producción | `produccion/` + `scripts/produccion/api.py:9600` | React + Shadcn/ui + Tailwind (style Linear), BD `os_produccion` | Operativo — solicitudes → OPs Effi via Playwright |

@@ -1,5 +1,5 @@
 # Contexto: Sistema Gestión OS
-**Actualizado**: 2026-04-09
+**Actualizado**: 2026-04-23
 
 ## Propósito
 
@@ -42,7 +42,8 @@ Pool `comunidad` usa SSH tunnel a Hostinger (puerto 65002, key `sos_erp`). Pools
 | Tabla | Descripción |
 |---|---|
 | `g_categorias` | 13 seeds con color e icono. Campo `es_empaque` para categoría Empaque |
-| `g_tareas` | Tareas con duraciones 5S: `duracion_usuario_seg`, `duracion_cronometro_seg`, `duracion_sistema_seg` (INT, segundos), `crono_inicio` (DATETIME, NULL=pausado) |
+| `g_tareas` | Tareas con duraciones 5S: `duracion_usuario_seg`, `duracion_cronometro_seg`, `duracion_sistema_seg` (INT, segundos), `crono_inicio` (DATETIME, NULL=pausado). **Desde 2026-04-23**: `id_op_original` (varchar), `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min` (INT, para Detalles de producción) |
+| `g_tarea_produccion_lineas` | **Nueva (2026-04-21)** — líneas materiales/productos de la OP vinculada a una tarea. Columnas: `tarea_id`, `tipo` enum('material','producto'), `cod_articulo`, `descripcion`, `cantidad_teorica` (desde Effi), `cantidad_real` (input usuario). Siembra automática al abrir acordeón |
 | `g_tarea_tiempo` | Legacy — ya no se consulta. Las duraciones viven en `g_tareas` directamente |
 | `g_usuarios_config` | Configuración por usuario |
 | `g_perfiles` | Perfiles de usuario |
@@ -52,6 +53,49 @@ Pool `comunidad` usa SSH tunnel a Hostinger (puerto 65002, key `sos_erp`). Pools
 | `g_etiquetas` | Etiquetas de la empresa |
 | `g_etiquetas_tareas` | Relación etiquetas-tareas |
 | `g_etiquetas_proyectos` | Relación etiquetas-proyectos |
+
+### Tabla auxiliar en `os_integracion` (VPS)
+| Tabla | Descripción |
+|---|---|
+| `unidades_articulos` | **Nueva (2026-04-21)** — 490 filas con `cod_articulo` + `unidad` (UND/KG/GRS/etc). Copia de `inv_rangos` de `os_inventario` local para lookup desde VPS. Se usa en el endpoint `/produccion` para mostrar unidad al lado del estimado/real |
+
+## Feature: Detalles de Producción (2026-04-23, v2.8.5)
+
+Sección "Detalles de producción" dentro del panel de tarea. Se renderiza solo si `categoria.es_produccion = 1` **y** `tarea.id_op` vinculado.
+
+### Componentes
+- [DetallesProduccion.vue](../../sistema_gestion/app/src/components/DetallesProduccion.vue) — acordeón con 3 bloques: OP vinculada, Materiales+Productos (tabla con Teórico/Real), Tiempos (4 inputs + total).
+- [services/numero.js](../../sistema_gestion/app/src/services/numero.js) — helpers `parseDecimal()` (acepta coma y punto) y `fmtNum()` (formato es-CO).
+
+### Endpoints (backend)
+- `GET /api/gestion/tareas/:id/produccion` — devuelve materiales, productos, tiempos. Siembra automática desde Effi si no hay líneas locales. Detecta cambio de OP (si los `cod_articulo` de las líneas locales no coinciden con los de la OP actual en Effi, re-siembra — solo si no hay `cantidad_real` guardada aún, para no perder datos del usuario).
+- `PUT /api/gestion/tareas/:id/produccion/lineas/:lineaId` — actualiza `cantidad_real` de una línea.
+- `PUT /api/gestion/tareas/:id/produccion/tiempos` — actualiza los 4 tiempos.
+- `POST /api/gestion/tareas/:id/produccion/procesar` — cambia estado de la OP a **Procesada** en Effi. Permisos: responsable de la tarea o nivel ≥ responsable. Observación auto-generada: `"Reportó: <nombre> (OS Gestión)"`. Refleja el cambio al instante en `zeffi_produccion_encabezados` (staging) para que el UI vea `Procesada` sin esperar el pipeline.
+- `POST /api/gestion/tareas/:id/produccion/validar` — solo nivel ≥ 5. Flujo completo encadenado (~2-3 min):
+  1. Anular OP original con observación.
+  2. Crear OP nueva con cantidades reales (JSON construido desde `g_tarea_produccion_lineas.cantidad_real` + metadata copiada de la OP original).
+  3. Capturar `OP_CREADA:<id>` del stdout de `import_orden_produccion.js`.
+  4. Cambiar estado de la nueva OP a **Validado**.
+  5. Actualizar `g_tareas.id_op` (nueva) + `id_op_original` (anterior).
+  6. Reflejar en staging: vieja → Anulada, nueva → Validado.
+
+### Scripts Playwright utilizados
+- `scripts/anular_orden_produccion.js` (existente)
+- `scripts/import_orden_produccion.js` (modificado — ahora imprime `OP_CREADA:<id>` en stdout)
+- `scripts/cambiar_estado_orden_produccion.js` (nuevo — estados Generada/Procesada/Validado)
+
+### Protección 503 + retry
+Los endpoints `/procesar` y `/validar` verifican al arranque si el server tiene Playwright + session.json. Si no (p. ej. servidor de respaldo sin playwright), devuelven `503 {retry:true}` y el frontend (`services/api.js`) reintenta automáticamente hasta 5 veces. Útil para setups multi-server donde solo uno tiene Playwright.
+
+### UX
+- Chip de estado junto al ID de OP: Generada (gris), Procesada (naranja), Validado (verde), Anulada (gris oscuro).
+- Si `tarea.id_op_original` → texto chico gris "OP orig: xxxx".
+- Botón "Procesar" se deshabilita si OP ya está Procesada o Validado.
+- Botón "Validar" solo visible para `auth.usuario.nivel >= 5`.
+- Modales de confirmación con `dark: true` (contraste correcto en oscuro y claro).
+- Inputs `filled` de Quasar con `--bg-row-hover` para contraste en dark mode del proyecto.
+- Decimal tolerante: `3,8` y `3.8` equivalen (frontend normaliza con `.replace(',', '.')` antes de enviar).
 
 ## Auth Google OAuth + JWT multi-empresa
 

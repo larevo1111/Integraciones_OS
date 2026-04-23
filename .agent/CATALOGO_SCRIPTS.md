@@ -443,33 +443,64 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Plantilla de referencia**: `plantilla_importacion_ajuste_inventario.xlsx` (raíz del repo)
 
 ### import_orden_produccion.js
-- **Propósito**: Crear órdenes de producción en Effi via Playwright desde un JSON
+- **Propósito**: Crear OP en Effi vía Playwright a partir de un JSON. La OP queda en estado **Generada** (NO procesa ni valida — eso lo hace el operario humano desde Effi después).
 - **Tipo**: Playwright action (escritura en Effi)
-- **Ejecución manual**:
+- **Ejecución**:
   ```
   node scripts/import_orden_produccion.js /tmp/op.json
   ```
-- **Formato JSON**:
+- **Tiempo aprox**: 60-90s por OP (apertura browser + navegación + llenado formulario + click Crear)
+- **Output**: línea `OP_CREADA:<id>` con el ID asignado por Effi + screenshot en `/exports/op_resultado_*.png`
+- **Formato JSON** (ver ejemplos en `/tmp/ops_produccion/op*_*.json` del 2026-04-22):
   ```json
   {
-    "sucursal_id": 1, "bodega_id": 1,
-    "fecha_inicio": "2026-04-21", "fecha_fin": "2026-04-21",
-    "encargado": "74084937",
-    "observacion": "LOTE xxx",
-    "materiales": [{"cod_articulo":"319","cantidad":0.95,"costo":43432}],
-    "articulos_producidos": [{"cod_articulo":"483","cantidad":16,"precio":5200}],
-    "otros_costos": [{"tipo_costo_id":1,"cantidad":1,"costo":5000}]
+    "sucursal_id": 1,
+    "bodega_id": 1,
+    "fecha_inicio": "2026-04-22",
+    "fecha_fin": "2026-04-22",
+    "encargado": "74084937",        // CC: Deivy=74084937, Jenifer=1128457413, Laura=1017206760
+    "tercero": "",
+    "observacion": "Texto descriptivo (sin LOTE numerado, Effi auto-asigna del stock)",
+    "materiales": [
+      {"cod_articulo":"319","cantidad":7.9,"costo":43432,"lote":"","serie":""}
+    ],
+    "articulos_producidos": [
+      {"cod_articulo":"581","cantidad":8.5,"precio":43432,"lote":"","serie":""}
+    ],
+    "otros_costos": [
+      {"tipo_costo_id":1,"cantidad":2,"costo":7000}     // tipo_costo_id 1 = M.O. HORA OS @ 7000/h
+    ]
   }
   ```
-- **Flujo**: click Crear → sucursal/bodega via Chosen → fechas → modal buscar encargado (modalBuscarTercero) → loop materiales (modalBuscarArticuloStock + cantidad/costo + btnAgregarMaterial) → loop producidos → loop otros costos → observación → limpiar filas vacías → Crear
-- **Probado**: OP 2182 creada exitosamente (2026-04-21)
+- **Encargados habituales en producción** (verificado en histórico):
+  - Deivy CC 74084937 (50+ OPs) — el principal en tabletas/coberturas
+  - Laura CC 1017206760
+  - Jenifer NIT 1128457413
+- **Flujo interno**: click Crear → sucursal/bodega via Chosen → fechas → modalBuscarTercero (encargado) → loop materiales (modalBuscarArticuloStock + cantidad/costo + btnAgregarMaterial) → loop producidos → loop otros costos → observación → limpiar filas vacías → Crear orden
+- **Probado en producción real**: OPs **2188, 2189, 2190** (2026-04-22) — flujo de 3 OPs encadenadas para producir tabletas (cobertura templada → tabletas sin empacar → tabletas empacadas)
 - **Dependencias**: `session.js`
+- **Skill relacionado**: `produccion-recetas` — explica cómo construir las recetas correctas
 
 ### anular_orden_produccion.js
 - **Propósito**: Anular OP existente por ID
 - **Ejecución manual**: `node scripts/anular_orden_produccion.js <id_orden> [observacion]`
 - **Dependencias**: `session.js`
-- **Notas**: flujo probable (buscar fila, menú acciones, Anular, confirmar con observación). Necesita primera prueba en vivo para validar selectores.
+- **Estado**: ✅ Operativo (2026-04-23). Probado anulando OPs 2183/2184/2185/2197. Encadenado en endpoint `/validar` como primer paso del flujo.
+
+### cambiar_estado_orden_produccion.js — NUEVO (2026-04-22)
+- **Propósito**: Cambiar estado de una OP en Effi (`Generada` → `Procesada` → `Validado`) vía Playwright
+- **Tipo**: Playwright action (escritura en Effi)
+- **Ejecución manual**: `node scripts/cambiar_estado_orden_produccion.js <id_orden> <estado> [observacion]`
+  - Estados válidos: `"Generada"`, `"Procesada"`, `"Validado"`
+  - Ejemplo: `node scripts/cambiar_estado_orden_produccion.js 2197 "Procesada" "Reportó: Jennifer Cano"`
+- **Tiempo aprox**: 10-20s (sesión reutilizada) / 40-60s (si hace login)
+- **Output**: screenshot en `/exports/op_estado_<id>_<estado>_<ts>.png`
+- **Flujo interno**: abrir filtros → buscar OP por ID → dropdown "Opciones" de la fila → click "Cambiar estado" del menú (selector `.dropdown-menu a:has-text("Cambiar estado")` para evitar matchear el botón del modal con mismo texto) → modal con Chosen select → seleccionar estado → confirmar con observación.
+- **Gotcha**: Chosen envuelve el `<select>` nativo (queda oculto). Hay que interactuar con la UI Chosen (`.chosen-container` click + `.chosen-results li`). `selectOption()` de Playwright falla con "element is not visible".
+- **Limitación**: Effi filtra las acciones del dropdown según estado actual de la OP. Si ya está Procesada, ese item no aparece. Si Validado, solo muestra opciones de consulta. Si Anulada (desde la lista), el dropdown puede no aparecer.
+- **Probado**: OPs 2182 (Generada→Procesada), 2185 (Generada→Validado vía endpoint `/validar`), 2197 (Generada→Procesada vía URL pública).
+- **Dependencias**: `session.js`
+- **Consumido por**: endpoints `/api/gestion/tareas/:id/produccion/procesar` y `/api/gestion/tareas/:id/produccion/validar` del Sistema Gestión OS.
 
 ---
 
@@ -482,6 +513,19 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Salida**: `{ browser, context, page }` ya autenticado
 - **Dependencias**: Playwright, `/scripts/session.json` (estado de sesión guardado)
 - **Notas**: reutiliza sesión si `session.json` existe y está válida. Si la sesión expiró, hace login automático con `ORIGENSILVESTRE.COL@GMAIL.COM`. Guarda nueva sesión en `/scripts/session.json`.
+- **Gotcha**: el path `SESSION_FILE = '/scripts/session.json'` es absoluto — requiere symlink `/scripts → <repo>/scripts` en el sistema de archivos. Ya existe en local y VPS.
+
+---
+
+### tunnel_hostinger.sh — NUEVO (2026-04-23)
+- **Propósito**: Mantener SSH jump tunnel desde el servidor local → VPS Contabo → Hostinger MySQL. Necesario porque la IP del servidor local está bloqueada por Hostinger (timeout directo al puerto 65002).
+- **Tipo**: utilidad de infraestructura — corre como daemon
+- **Systemd unit**: `/etc/systemd/system/tunnel-hostinger.service` (enabled + always restart, 15s)
+- **Uso manual**: `/home/osserver/Proyectos_Antigravity/Integraciones_OS/scripts/tunnel_hostinger.sh` (bucle infinito con reconexión a 10s si el tunnel cae)
+- **Qué hace**: `ssh -L 3313:127.0.0.1:3306 -J root@94.72.115.156 u768061575@109.106.250.195 -p 65002 -i ~/.ssh/sos_erp`. Expone MySQL de Hostinger como `127.0.0.1:3313` en el servidor local.
+- **Config relacionada** (`integracion_conexionesbd.env`): `DB_COMUNIDAD_SSH_HOST=direct`, `DB_COMUNIDAD_REMOTE_HOST=127.0.0.1`, `DB_COMUNIDAD_REMOTE_PORT=3313`. El helper `lib/db_conn.js` detecta "direct" y se conecta al puerto local sin SSH adicional.
+- **Verificar**: `systemctl is-active tunnel-hostinger.service` + `ss -tln | grep 3313`
+- **Logs**: `journalctl -u tunnel-hostinger.service -f`
 
 ---
 

@@ -330,6 +330,39 @@ Observaciones asociadas a un inventario. Pueden ser automáticas (generadas por 
 
 ---
 
+## SISTEMA GESTIÓN OS (BD `os_gestion` en VPS Contabo)
+
+Tablas `g_*` del módulo de tareas, jornadas, proyectos. Detalle completo en `.agent/contextos/sistema_gestion.md`.
+
+### g_tareas
+Tareas principales. Campos 5S de duración (`duracion_usuario_seg`, `duracion_cronometro_seg`, `duracion_sistema_seg`, `crono_inicio`).
+**Desde 2026-04-23**: `id_op` (varchar, OP Effi vinculada), `id_op_original` (varchar, OP anterior tras validación), `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min` (INT, para Detalles de producción).
+
+### g_tarea_produccion_lineas — NUEVA (2026-04-21)
+Líneas de materiales y productos de la OP vinculada a una tarea, con cantidades reales reportadas por el operario.
+**Campos**: `tarea_id`, `tipo` enum('material','producto'), `cod_articulo`, `descripcion`, `cantidad_teorica` decimal(12,3) (desde Effi), `cantidad_real` decimal(12,3) (input usuario), `usuario_ult_modificacion`, `fecha_ult_modificacion`.
+**Unique key**: `(tarea_id, tipo, cod_articulo)` — siembra idempotente. **FK**: `tarea_id → g_tareas.id` con `ON DELETE CASCADE`.
+**Usar para**: siembra desde Effi al abrir acordeón "Detalles de producción"; cantidades reales reportadas; fuente para `/validar` (arma la OP nueva con `cantidad_real`).
+
+### g_jornadas + g_jornada_pausas
+Tracking de jornadas laborales y pausas. `hora_inicio/fin` = reportado por usuario; `*_registro` = timestamp real del sistema (Colombia).
+
+### Otras tablas g_*
+`g_categorias` (con flags `es_produccion`, `es_empaque`), `g_proyectos` (items unificados con campo `tipo`), `g_etiquetas` + relaciones, `g_usuarios_config`, `g_perfiles`, `g_tareas_responsables`, `g_tarea_tiempo` (legacy).
+
+---
+
+## TABLAS AUXILIARES (BD `os_integracion` en VPS Contabo)
+
+Complementan a `zeffi_*` de staging.
+
+### unidades_articulos — NUEVA (2026-04-21)
+Lookup de unidades de medida por artículo. 490 filas replicadas desde `inv_rangos` de `os_inventario` (local) al VPS, para que el endpoint `/produccion` pueda consultar unidades sin depender de la BD local.
+**Campos**: `cod_articulo` (PK), `unidad` (UND/KG/GRS/etc), `grupo`.
+**Usar para**: mostrar unidad al lado de estimado/real en el panel de Detalles de producción.
+
+---
+
 ## Guía rápida — qué tabla usar
 
 | Necesito saber... | Tabla recomendada |

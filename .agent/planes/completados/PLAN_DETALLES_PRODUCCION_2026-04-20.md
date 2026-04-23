@@ -1,9 +1,60 @@
 ---
-estado: propuesto — pendiente de orden de Santi para implementar
+estado: ✅ COMPLETADO
 creado: 2026-04-20
+completado: 2026-04-23
 modulo: sistema_gestion
-version_objetivo: v2.8.0 (cambio significativo, no v2.7.x)
+versiones_entregadas: v2.8.0 → v2.8.5
 ---
+
+## Estado: COMPLETADO 2026-04-23
+
+Todo el plan implementado, testeado end-to-end y desplegado en producción (gestion.oscomunidad.com). 12 commits entre `58e54c8` (2026-04-21) y `021c421` (2026-04-23).
+
+### Versiones entregadas
+- **v2.8.0** — Schema + endpoints GET/PUT + componente `DetallesProduccion.vue` inicial con OP, materiales, productos, tiempos (coma/punto decimal OK).
+- **v2.8.1** — Refactor layout Quasar puro, OP vinculada DENTRO del acordeón, contraste dark (q-input `filled`), botones sutiles.
+- **v2.8.2** — Chip de estado (Generada/Procesada/Validado/Anulada con colores), botón "Procesar" + endpoint `/procesar`, script `cambiar_estado_orden_produccion.js`, columna `id_op_original`.
+- **v2.8.3** — Botones flat/dense/size="sm" no-caps (estilo sutil).
+- **v2.8.4** — Endpoint `/validar` (anular + crear con reales + cambiar estado Validado), captura `OP_CREADA:<id>` en `import_orden_produccion.js`.
+- **v2.8.5** — Protección 503 si server no tiene Playwright + retry automático. Modal confirmación `dark:true`. Selector dropdown fix. `comunidad` (Hostinger) opcional al arranque. `/procesar` y `/validar` usan `req.usuario.nombre` del JWT (no dependen de comunidad).
+
+### Tests end-to-end verificados (2026-04-22 y 23)
+- OP 2183: `/procesar` vía localhost ✅
+- OP 2184 → 2185: `/validar` flujo completo (anular + crear + cambio estado, 1min 10s) ✅
+- OP 2197: `/procesar` vía **URL pública gestion.oscomunidad.com** ✅ (16s, tras fix DNS)
+- Desktop dark/claro: chip + botones + layout ✅
+- Móvil 390×844 bsheet dark/claro ✅
+- Coma decimal (3,8) y punto (20.5) ambos OK ✅
+- Diff en vivo (+4,5 GRS verde / -0,2 KG rojo) ✅
+
+### Infraestructura resuelta durante la ejecución
+- **Bug pool "Pool is closed"**: `db.js` cacheaba pool obsoleto tras reconexión SSH → getters dinámicos que leen del helper central en cada acceso.
+- **Hostinger bloquea IP local**: SSH jump tunnel `local → VPS Contabo → Hostinger MySQL` vía `scripts/tunnel_hostinger.sh` + systemd unit `tunnel-hostinger.service`. Expone MySQL Hostinger como `127.0.0.1:3313`. COMUNIDAD en `.env` ahora usa modo `direct` a ese puerto.
+- **Cloudflare DNS balanceando entre 2 tunnels**: reapuntado `gestion.oscomunidad.com` al tunnel local (único con Playwright) via `cloudflared tunnel route dns --overwrite-dns`. Hostname quitado del config del VPS.
+- **Arranque robusto**: `db.js` ya no bloquea si Hostinger tarda. Reintento en background cada 15s.
+
+### Archivos creados/modificados
+- `sistema_gestion/app/src/components/DetallesProduccion.vue` (nuevo)
+- `sistema_gestion/app/src/services/numero.js` (nuevo — `parseDecimal`, `fmtNum`)
+- `sistema_gestion/api/server.js` (3 endpoints + helper `PLAYWRIGHT_OK`)
+- `sistema_gestion/api/db.js` (getters dinámicos + comunidad opcional)
+- `scripts/cambiar_estado_orden_produccion.js` (nuevo — Playwright)
+- `scripts/import_orden_produccion.js` (modificado — captura `OP_CREADA:<id>` en stdout)
+- `scripts/tunnel_hostinger.sh` (nuevo — SSH jump tunnel con reconexión)
+- `/etc/systemd/system/tunnel-hostinger.service` (nuevo — daemon del tunnel)
+
+### BD: migraciones aplicadas en VPS (os_gestion)
+- Tabla `g_tarea_produccion_lineas` creada.
+- `g_tareas`: columnas nuevas `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min`, `id_op_original`.
+- `os_integracion.unidades_articulos`: tabla creada (490 artículos) replicada desde `os_inventario.inv_rangos` local para lookup de unidades.
+
+### Pendiente/Descartado
+- **Ventas / CRM**: no se implementó (Santi pidió esperar a que el CRM esté más adelantado).
+- **Botón "+ agregar consumo" manual**: descartado (solo lo que viene de Effi).
+- **Mapeo automático sucursal_id/bodega_id**: hoy hardcoded a `1 = Principal`. Si operan con otra sucursal/bodega, ampliar `sucursalIdMap` en `server.js`.
+
+---
+
 
 # Plan — Sección "Detalles de producción" en panel de tarea
 
