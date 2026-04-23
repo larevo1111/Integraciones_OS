@@ -10,13 +10,21 @@ const central = require('../../lib/db_conn')
 
 async function conectar() {
   // gestion/integracion son críticos (viven en VPS Contabo, misma red). comunidad
-  // está en Hostinger (SSH externo, a veces falla handshake) — lo dejamos opcional:
-  // si tarda demasiado, arranca igual e intenta reconectar en background después.
+  // está en Hostinger (SSH externo, a veces falla handshake) — no bloquea arranque,
+  // se reintenta cada 15s hasta que conecte.
   await Promise.all([central.gestion(), central.integracion()])
-  central.comunidad().catch(err => {
-    console.warn('[db] comunidad (Hostinger) no disponible al arranque:', err.message)
-  })
+  intentarComunidad()
   console.log(`[db] Pools listos (gestion+integracion) — timezone: ${central.TIMEZONE}`)
+}
+
+async function intentarComunidad() {
+  try {
+    await central.comunidad()
+    console.log('[db] comunidad (Hostinger) listo')
+  } catch (err) {
+    console.warn('[db] comunidad reintentando en 15s:', err.message)
+    setTimeout(intentarComunidad, 15000)
+  }
 }
 
 module.exports = {
