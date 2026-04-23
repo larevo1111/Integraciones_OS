@@ -21,14 +21,29 @@ export function apiFetch(url, options = {}) {
 }
 
 export async function api(url, options = {}) {
-  const res = await apiFetch(url, options)
-  if (!res.ok) {
+  const maxRetries = options.maxRetries ?? 5
+  let intento = 0
+  while (true) {
+    const res = await apiFetch(url, options)
+    if (res.ok) {
+      const ct = res.headers.get('content-type') || ''
+      return ct.includes('application/json') ? res.json() : res.text()
+    }
+    // 503 con flag retry → el server no puede atender (ej: sin Playwright), reintentar
+    // hasta que Cloudflare rote al otro tunnel.
+    if (res.status === 503 && intento < maxRetries) {
+      try {
+        const e = await res.clone().json()
+        if (e?.retry) {
+          intento++
+          await new Promise(r => setTimeout(r, 800 + Math.random() * 600))
+          continue
+        }
+      } catch {}
+    }
     let msg = `Error ${res.status}`
     try { const e = await res.json(); msg = e.error || msg } catch {}
-    // 403 por token temporal → volver al login
     if (res.status === 403 && msg === 'Selección de empresa pendiente') limpiarSesion()
     throw new Error(msg)
   }
-  const ct = res.headers.get('content-type') || ''
-  return ct.includes('application/json') ? res.json() : res.text()
 }

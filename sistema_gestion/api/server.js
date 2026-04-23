@@ -41,6 +41,20 @@ const PORT             = 9300
 // Timezone: helpers centralizados en lib/timezone.js (fuente única: APP_TIMEZONE en .env)
 const { localDate: localDateCO, parseHora: parseHoraCO, TZ_NAME } = require('../../lib/timezone')
 
+// ¿Este server puede correr los scripts Playwright de Effi?
+// Los scripts viven en <repo>/scripts/ y usan require('./session'), que a su vez
+// require('playwright') desde scripts/node_modules. Si falta el módulo o la
+// sesión, /procesar y /validar retornan 503 con flag retry para que el cliente
+// intente de nuevo (y Cloudflare eventualmente rotee a otro tunnel).
+const PLAYWRIGHT_OK = (() => {
+  try {
+    const scriptsDir = path.join(__dirname, '../../scripts')
+    return fs.existsSync(path.join(scriptsDir, 'node_modules/playwright'))
+        && fs.existsSync(path.join(scriptsDir, 'session.json'))
+  } catch { return false }
+})()
+console.log(`[server] Playwright + session Effi disponibles: ${PLAYWRIGHT_OK}`)
+
 if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
   console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET en .env')
   process.exit(1)
@@ -1475,6 +1489,9 @@ app.put('/api/gestion/tareas/:id/produccion/tiempos', requireAuth, async (req, r
 // POST /api/gestion/tareas/:id/produccion/procesar — marca OP vinculada como "Procesada"
 // Permiso: usuario es responsable de la tarea, O su nivel > nivel del responsable.
 app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req, res) => {
+  if (!PLAYWRIGHT_OK) {
+    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
+  }
   const tareaId = parseInt(req.params.id, 10)
   try {
     const [[tarea]] = await db.gestion.query(
@@ -1539,6 +1556,9 @@ app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req,
 // estado a "Validado" → guardar id_op_original en g_tareas.
 // Retorna { id_op_anterior, id_op_nueva }. Demora 2-3 min (3 scripts Playwright).
 app.post('/api/gestion/tareas/:id/produccion/validar', requireAuth, async (req, res) => {
+  if (!PLAYWRIGHT_OK) {
+    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
+  }
   const tareaId = parseInt(req.params.id, 10)
   const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
   if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })

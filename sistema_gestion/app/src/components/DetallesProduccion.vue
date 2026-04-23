@@ -310,7 +310,9 @@ async function marcarProcesada() {
   $q.dialog({
     title: 'Marcar OP como procesada',
     message: `Esto cambiará el estado de la OP ${props.tarea.id_op} a "Procesada" en Effi. El cambio puede tardar ~30-60 segundos.`,
-    cancel: true, persistent: false
+    cancel: true, persistent: false,
+    dark: true,
+    ok: { label: 'Procesar', color: 'warning' }
   }).onOk(async () => {
     procesando.value = true
     try {
@@ -328,7 +330,8 @@ async function validarOp() {
   $q.dialog({
     title: 'Validar OP',
     message: `Esto anulará la OP ${props.tarea.id_op}, creará una nueva con los valores reales reportados y la marcará como "Validado". Demora ~2-3 minutos. ¿Continuar?`,
-    cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true
+    cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true,
+    dark: true
   }).onOk(async () => {
     validando.value = true
     $q.notify({ type: 'info', message: 'Validando OP… puede tardar 2-3 min.', position: 'top', timeout: 0, group: 'validar-prog' })
