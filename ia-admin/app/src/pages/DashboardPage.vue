@@ -195,6 +195,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
+import { localMonth } from 'src/services/fecha'
 import { RefreshCwIcon, AlertTriangleIcon } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
@@ -208,25 +209,26 @@ const cargandoLogs = ref(true)
 
 // ─── Costo / llamadas / tokens del mes actual ──────────────────────
 // fecha del historico llega como "Fri, 13 Mar 2026 00:00:00 GMT" — normalizar
+// a YYYY-MM en hora Colombia (no UTC, para no saltar de mes a las 19:00 COL del último día).
 function fechaMes(f) {
   if (!f) return ''
-  return new Date(f).toISOString().slice(0, 7) // "2026-03"
+  return localMonth(new Date(f))
 }
 const costoMes = computed(() => {
   if (!historico.value.length) return 0
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = localMonth()
   return historico.value
     .filter(r => fechaMes(r.fecha) === mesActual)
     .reduce((acc, r) => acc + Number(r.costo_usd || 0), 0)
 })
 const llamadasMes = computed(() => {
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = localMonth()
   return historico.value
     .filter(r => fechaMes(r.fecha) === mesActual)
     .reduce((acc, r) => acc + (r.llamadas || 0), 0)
 })
 const tokensMes = computed(() => {
-  const mesActual = new Date().toISOString().slice(0, 7)
+  const mesActual = localMonth()
   return historico.value
     .filter(r => fechaMes(r.fecha) === mesActual)
     .reduce((acc, r) => acc + (r.tokens_total || 0), 0)
