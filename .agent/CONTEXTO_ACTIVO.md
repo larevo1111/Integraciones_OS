@@ -1,5 +1,35 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-23
+**Actualizado**: 2026-04-24
+
+## Completado 2026-04-24 — Reversión arquitectura a VPS + auto-cierre jornadas + diagnóstico Playwright VPS
+
+**Resumen**: Producción de `gestion.oscomunidad.com` vuelve a correr 100% en VPS Contabo (arquitectura correcta). El "bloqueante" que el 2026-04-23 motivó reapuntar DNS al local (supuesto filtro de Effi por IP) era falso — la sesión `session.json` stale copiada del local generaba cookies no reconocidas. Con login fresh generado en el VPS, Playwright ejecuta en VPS idéntico al local.
+
+**Cambios aplicados:**
+- **DNS `gestion.oscomunidad.com`** revertido al tunnel VPS (`fa4a4f3d`). Verificado con test destructivo: `systemctl stop os-gestion` local → `gestion.oscomunidad.com` HTTP 200 (tráfico 100% VPS).
+- **Config `/etc/cloudflared/config.yml` del VPS** restaurado desde `.bak` (hostname `gestion.oscomunidad.com` → `localhost:9300` agregado de vuelta).
+- **Config cloudflared LOCAL**: quitada la línea `gestion.oscomunidad.com` (ya no enruta esa URL).
+- **Playwright + chromium** quedan instalados en VPS (operativos, usados por `/procesar` y `/validar`).
+- **`session.json`**: generada fresh desde el VPS (no copiada del local). Cookies atadas al browser del VPS.
+- **Auto-cierre de jornadas**: nuevo helper `cerrarJornadaAbandonada()` + endpoint `POST /api/internal/jornadas/auto-cierre` (interno, solo localhost) + cron horario `0 * * * *` **solo en VPS** (antes estaba también en local, ahora redundante porque prod es VPS).
+- **Máxima absoluta** agregada a `CLAUDE.md`: "NUNCA cambios de infraestructura sin autorización explícita". Lista concreta de qué es "infraestructura" (DNS, /etc/, systemd, crontab, apt install, SSH tunnels, Playwright en servidores). Flujo: PARAR → explicar → esperar "sí hacelo" → reportar con sección "Cambios de infraestructura".
+- **Merges desde GitHub** (trabajo de Santi en Claude web):
+  - `claude/analyze-test-coverage-yL3oB`: fix ia-admin timezone (ContextosPage + DashboardPage), regla absoluta HELPERS en CLAUDE.md, fix `notif_jornadas_abiertas.py` a helpers, tests para `lib/timezone.js` / `lib/db_conn.js` / `scripts/lib/db_conn.py`.
+  - `claude/check-repo-access-qHEpR`: pipeline frecuencia 2h→1h + docs `.agent/` actualizados.
+
+**El jump tunnel a Hostinger** (`tunnel-hostinger.service` en local) se **mantiene activo** porque el servidor local (modo dev) sigue necesitándolo: Hostinger bloquea la IP del local para SSH directo. VPS en cambio llega directo a Hostinger sin jumphost (verificado `ssh u768061575@109.106.250.195:65002`). `.env` del VPS ya apunta directo.
+
+**Verificación end-to-end** (Chrome DevTools via `gestion.oscomunidad.com`):
+- Login con JWT inyectado en `localStorage.gestion_jwt` → app carga.
+- API GET (tareas, usuarios, jornadas) → responde desde VPS.
+- Crear tarea POST → OK en BD VPS.
+- `/procesar` ciclo completo con OP test 2211 → OP en Effi pasa a Procesada.
+- `/validar` ciclo completo con OP test 2212 → anula 2212, crea 2213 con reales (0.08 kg / 0.9 und), marca 2213 Validado. 1min 15s.
+- OPs test (2211, 2212, 2213) anuladas al final. Tarea 557 limpia. Tarea 705 de test Chrome DevTools borrada.
+
+**Plan completo**: [.agent/planes/completados/reversion_arquitectura_vps_2026-04-24.md](planes/completados/reversion_arquitectura_vps_2026-04-24.md).
+
+---
 
 ## Completado 2026-04-23 — Detalles de Producción + reporte de reales + validación (Sistema Gestión v2.8.5)
 
@@ -20,8 +50,8 @@ Módulo completo para que el operario reporte consumos reales en una OP vinculad
 **Plan completo** + lista de archivos + pendientes: [.agent/planes/completados/PLAN_DETALLES_PRODUCCION_2026-04-20.md](planes/completados/PLAN_DETALLES_PRODUCCION_2026-04-20.md).
 
 ### Infraestructura resuelta durante la ejecución
-- **DNS gestion.oscomunidad.com reapuntado al tunnel local** (no al VPS) porque VPS no puede ejecutar Playwright confiablemente contra Effi (Effi limita acciones según IP). Comando: `cloudflared tunnel route dns --overwrite-dns 9cacb3dc-... gestion.oscomunidad.com` (requiere `cert.pem` del VPS). Hostname quitado del config del VPS (`/etc/cloudflared/config.yml`).
-- **SSH jump tunnel a Hostinger**: la IP del local está bloqueada por Hostinger. Nuevo servicio `tunnel-hostinger.service` mantiene SSH via VPS Contabo como jumphost. Expone MySQL Hostinger como `127.0.0.1:3313` en el local. `.env` → `DB_COMUNIDAD_SSH_HOST=direct`, `DB_COMUNIDAD_REMOTE_PORT=3313`.
+- ~~**DNS gestion.oscomunidad.com reapuntado al tunnel local**~~ — **revertido el 2026-04-24**: el diagnóstico era falso. Ver entrada del 2026-04-24.
+- **SSH jump tunnel a Hostinger** (`tunnel-hostinger.service`): **se mantiene activo solo en local** (modo dev) porque la IP del local está bloqueada por Hostinger para SSH. VPS (prod) conecta directo sin jumphost.
 - **`db.js` pool dinámico**: antes cacheaba el pool al arrancar; tras reconexión SSH quedaba obsoleto ("Pool is closed"). Ahora los getters leen el pool actual del helper central en cada acceso.
 - **comunidad opcional al arranque**: si Hostinger tarda en responder, el server arranca igual y reintenta en background cada 15s. `/procesar` y `/validar` usan `req.usuario.nombre` del JWT (no dependen de comunidad).
 
