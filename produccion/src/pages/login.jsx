@@ -58,7 +58,7 @@ export function LoginPage() {
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground mt-6">
-          Solo usuarios autorizados en sys_usuarios pueden acceder
+          Solo usuarios autorizados pueden acceder
         </p>
       </div>
     </div>
