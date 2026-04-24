@@ -29,7 +29,7 @@
         <span :style="`color:${PRIORIDAD_COLORS[value]||'#78909C'};font-weight:500`">{{ value }}</span>
       </template>
       <template #cell-fecha_estimada_fin="{ value }">
-        {{ value ? new Date(value).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '—' }}
+        {{ value ? (parseBackendDate(value)?.toLocaleDateString('es-CO', { timeZone: TZ_NAME, day: 'numeric', month: 'short' }) || '—') : '—' }}
       </template>
       <template #cell-responsables_str="{ value }">
         {{ value ? value.split(',').map(e => e.split('@')[0]).join(', ') : '—' }}
@@ -67,6 +67,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, inject } from 'vue'
 import { api } from 'src/services/api'
+import { parseBackendDate, TZ_NAME } from 'src/services/fecha'
 import OsDataTable from 'src/components/OsDataTable.vue'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import MultiActionBar from 'src/components/MultiActionBar.vue'

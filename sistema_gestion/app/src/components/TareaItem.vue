@@ -125,7 +125,7 @@
 import { computed, ref, nextTick, onUnmounted } from 'vue'
 import EstadoBadge from './EstadoBadge.vue'
 import CronoDisplay from './CronoDisplay.vue'
-import { parseBackendDate, localISO } from 'src/services/fecha'
+import { parseBackendDate, localISO, hoyLocal, TZ_NAME } from 'src/services/fecha'
 
 const props = defineProps({
   tarea:              { type: Object, required: true },
@@ -256,23 +256,24 @@ const fechaChipISO = computed(() => {
 const fechaDisplay = computed(() => {
   const iso = fechaChipISO.value
   if (!iso) return ''
-  const d      = new Date(iso + 'T00:00:00')
-  const hoy    = new Date(); hoy.setHours(0,0,0,0)
-  const manana = new Date(hoy); manana.setDate(hoy.getDate()+1)
-  const ayer   = new Date(hoy); ayer.setDate(hoy.getDate()-1)
-  if (d.getTime() === hoy.getTime())    return 'Hoy'
-  if (d.getTime() === manana.getTime()) return props.compacto ? 'Mañ' : 'Mañana'
-  if (d.getTime() === ayer.getTime())   return props.compacto ? 'Ayr' : 'Ayer'
-  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+  // Comparación por string YYYY-MM-DD (hoyLocal ya está en TZ Colombia)
+  const diaISO = String(iso).slice(0, 10)
+  const h = hoyLocal()
+  const mk = (offset) => { const d = parseBackendDate(h); d.setDate(d.getDate() + offset); return localISO(d) }
+  if (diaISO === h)       return 'Hoy'
+  if (diaISO === mk(+1))  return props.compacto ? 'Mañ' : 'Mañana'
+  if (diaISO === mk(-1))  return props.compacto ? 'Ayr' : 'Ayer'
+  const d = parseBackendDate(diaISO)
+  return d.toLocaleDateString('es-CO', { timeZone: TZ_NAME, day: 'numeric', month: 'short' })
 })
 
 const clasesFecha = computed(() => {
   const iso = fechaChipISO.value
   if (!iso) return ''
-  const d   = new Date(iso + 'T00:00:00')
-  const hoy = new Date(); hoy.setHours(0,0,0,0)
-  if (d < hoy) return 'vencida'
-  if (d.getTime() === hoy.getTime()) return 'hoy'
+  const diaISO = String(iso).slice(0, 10)
+  const h = hoyLocal()
+  if (diaISO < h)  return 'vencida'
+  if (diaISO === h) return 'hoy'
   return ''
 })
 

@@ -273,6 +273,7 @@
 import { ref, computed, onMounted, nextTick, watch, inject } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/services/api'
+import { parseBackendDate, TZ_NAME } from 'src/services/fecha'
 import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import CategoriaSelector from './CategoriaSelector.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
@@ -623,12 +624,12 @@ async function eliminar() {
 
 function fmtFecha(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
+  const d = parseBackendDate(iso); if (!d) return ''
   const dias = Math.floor((Date.now() - d.getTime()) / 86400000)
   if (dias === 0) return 'hoy'
   if (dias === 1) return 'ayer'
   if (dias < 7) return `hace ${dias} días`
-  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+  return d.toLocaleDateString('es-CO', { timeZone: TZ_NAME, day: 'numeric', month: 'short', year: 'numeric' })
 }
 </script>
 

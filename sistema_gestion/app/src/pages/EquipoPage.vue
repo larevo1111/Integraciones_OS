@@ -115,7 +115,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import { api } from 'src/services/api'
-import { hoyLocal, localISO } from 'src/services/fecha'
+import { hoyLocal, localISO, parseBackendDate, TZ_NAME } from 'src/services/fecha'
 import OsDataTable from 'src/components/OsDataTable.vue'
 import JornadaDetallePopup from 'src/components/JornadaDetallePopup.vue'
 
@@ -274,7 +274,8 @@ function fmtFecha(val) {
 }
 function formatHora(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const d = parseBackendDate(iso); if (!d) return '—'
+  return d.toLocaleTimeString('es-CO', { timeZone: TZ_NAME, hour: '2-digit', minute: '2-digit' })
 }
 function formatMins(mins) {
   if (mins === null || mins === undefined) return '—'

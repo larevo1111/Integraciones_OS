@@ -256,7 +256,7 @@
 <script setup>
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
-import { parseBackendDate, localISO } from 'src/services/fecha'
+import { parseBackendDate, localISO, TZ_NAME } from 'src/services/fecha'
 import { crearSubtarea as crearSubtareaFn } from 'src/composables/useTareas'
 import EstadoBadge          from './EstadoBadge.vue'
 import Cronometro           from './Cronometro.vue'
@@ -350,8 +350,8 @@ const fechaChipISO = computed(() => {
 
 function fmtDT(val) {
   if (!val) return ''
-  const d = new Date(String(val).replace(' ', 'T'))
-  return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const d = parseBackendDate(val); if (!d) return ''
+  return d.toLocaleString('es-CO', { timeZone: TZ_NAME, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // Mostrar OP Effi solo si la categoría seleccionada es Producción

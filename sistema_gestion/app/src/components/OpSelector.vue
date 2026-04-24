@@ -95,6 +95,7 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { api } from 'src/services/api'
+import { parseBackendDate, TZ_NAME } from 'src/services/fecha'
 
 const props = defineProps({
   modelValue: { type: String, default: '' }   // id_orden seleccionado
@@ -184,8 +185,8 @@ function truncar(str, n) {
 
 function formatFecha(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+  const d = parseBackendDate(iso); if (!d) return ''
+  return d.toLocaleDateString('es-CO', { timeZone: TZ_NAME, day: 'numeric', month: 'short' })
 }
 
 function badgeClass(estado) {

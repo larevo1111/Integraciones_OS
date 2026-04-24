@@ -517,11 +517,16 @@ async function guardarEditPausa() {
 }
 
 // ── Edición jornada ──
+// Convierte un datetime del backend a YYYY-MM-DDTHH:MM (sin segundos, sin TZ)
+// para el input[type=datetime-local]. Interpreta el valor como hora Colombia
+// independiente del TZ del browser.
 function toLocalISO(iso) {
   if (!iso) return ''
-  const d = new Date(iso)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const d = parseBackendDate(iso)
+  if (!d) return ''
+  // Usar sv-SE con timeZone Colombia → formato 'YYYY-MM-DD HH:MM:SS'
+  const s = d.toLocaleString('sv-SE', { timeZone: TZ_NAME })
+  return s.replace(' ', 'T').slice(0, 16)
 }
 
 function iniciarEdicion() {
@@ -582,11 +587,13 @@ function fmtFechaConDia(val) {
 
 function fmt(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+  const d = parseBackendDate(iso); if (!d) return '—'
+  return d.toLocaleString('es-CO', { timeZone: TZ_NAME, day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
 }
 function fmtHora(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  const d = parseBackendDate(iso); if (!d) return '—'
+  return d.toLocaleTimeString('es-CO', { timeZone: TZ_NAME, hour: '2-digit', minute: '2-digit' })
 }
 function formatMins(mins) {
   if (mins === null || mins === undefined) return '—'

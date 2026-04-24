@@ -63,7 +63,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { hoyLocal } from 'src/services/fecha'
+import { hoyLocal, parseBackendDate } from 'src/services/fecha'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -116,8 +116,8 @@ function confirmar() {
   if (props.retroactiva) {
     if (!horaInicio.value || !horaFin.value) { errorTiempo.value = 'Completa los dos horarios'; return }
     const fecha = props.fecha || hoyLocal()
-    const ini   = new Date(`${fecha}T${horaInicio.value}:00`)
-    const fin   = new Date(`${fecha}T${horaFin.value}:00`)
+    const ini   = parseBackendDate(`${fecha} ${horaInicio.value}:00`)
+    const fin   = parseBackendDate(`${fecha} ${horaFin.value}:00`)
     if (fin <= ini) { errorTiempo.value = 'La hora de fin debe ser después del inicio'; return }
 
     emit('confirmar', {
@@ -129,7 +129,7 @@ function confirmar() {
   } else {
     // Pausa normal: construir hora_inicio desde el input de hora
     const fecha = props.fecha || hoyLocal()
-    const horaInicioISO = new Date(`${fecha}T${horaInicio.value}:00`).toISOString()
+    const horaInicioISO = parseBackendDate(`${fecha} ${horaInicio.value}:00`).toISOString()
     emit('confirmar', { tipos: seleccionados.value, observaciones: observaciones.value.trim(), hora_inicio: horaInicioISO })
   }
   cerrar()
