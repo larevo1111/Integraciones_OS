@@ -275,7 +275,7 @@ export function OsDataTable({
   const toggleColVisible = (key) => setLocalColumns(cols => cols.map(c => c.key === key ? { ...c, visible: c.visible === false } : c))
 
   return (
-    <div className="flex flex-col rounded-md border bg-card overflow-visible relative">
+    <div className="flex flex-col rounded-lg border border-border/60 bg-card overflow-visible relative">
       {/* TOOLBAR */}
       <div ref={toolbarRef} className="flex items-center justify-between h-9 px-3 border-b border-border">
         <div className="flex items-center gap-2">

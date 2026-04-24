@@ -104,7 +104,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col sm:!max-w-[36rem]">
+      <SheetContent className="flex flex-col sm:!max-w-[480px]">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <SheetTitle>{esNueva ? 'Nueva solicitud' : `Solicitud #${solicitud.id}`}</SheetTitle>
@@ -118,7 +118,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
             <>
               <div className="space-y-2">
                 <Label>Tipo de artículo</Label>
-                <div className="flex gap-1.5 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
                   {TIPOS_FILTRO.map(t => (
                     <button
                       key={t.value}

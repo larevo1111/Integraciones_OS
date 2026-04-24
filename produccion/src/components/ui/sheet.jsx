@@ -25,13 +25,13 @@ const SheetContent = React.forwardRef(({ className, children, ...props }, ref) =
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-y-0 right-0 z-50 h-full w-3/4 border-l border-border bg-card px-7 py-6 shadow-2xl transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=closed]:slide-out-to-right data-[state=open]:animate-in data-[state=open]:duration-500 data-[state=open]:slide-in-from-right sm:max-w-md",
+        "fixed inset-y-0 right-0 z-50 h-full w-[95vw] max-w-[460px] border-l border-border bg-card px-7 pt-7 pb-5 shadow-2xl transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=closed]:slide-out-to-right data-[state=open]:animate-in data-[state=open]:duration-500 data-[state=open]:slide-in-from-right",
         className
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-5 top-5 rounded-sm opacity-60 hover:opacity-100 transition-opacity focus:outline-none cursor-pointer">
+      <DialogPrimitive.Close className="absolute right-5 top-6 rounded-sm opacity-60 hover:opacity-100 transition-opacity focus:outline-none cursor-pointer">
         <X className="h-4 w-4" />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -39,7 +39,7 @@ const SheetContent = React.forwardRef(({ className, children, ...props }, ref) =
 ))
 
 function SheetHeader({ className, ...props }) {
-  return <div className={cn("flex flex-col space-y-1 text-left mb-5 pb-4 border-b border-border", className)} {...props} />
+  return <div className={cn("flex flex-col gap-1 text-left mb-5 pb-4 border-b border-border", className)} {...props} />
 }
 
 function SheetFooter({ className, ...props }) {

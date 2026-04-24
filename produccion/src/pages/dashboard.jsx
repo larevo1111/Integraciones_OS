@@ -22,22 +22,22 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="p-5 max-w-[1400px] mx-auto">
-      <div className="mb-5">
-        <h1 className="text-[16px] font-semibold">Vista general</h1>
-        <p className="text-[12px] text-muted-foreground mt-0.5">Resumen de solicitudes de producción</p>
+    <div className="px-10 pt-10 pb-8 max-w-[1400px] mx-auto">
+      <div className="mb-7">
+        <h1 className="text-[18px] font-semibold tracking-tight">Vista general</h1>
+        <p className="text-[12px] text-muted-foreground mt-1">Resumen de solicitudes de producción</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {kpis.map(k => {
           const Icon = k.icon
           return (
-            <div key={k.label} className="rounded-md border border-border bg-card p-3.5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] text-muted-foreground">{k.label}</span>
+            <div key={k.label} className="rounded-lg border border-border/60 bg-card px-4 py-3 hover:border-border transition-colors">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] text-muted-foreground uppercase tracking-wider">{k.label}</span>
                 <Icon className={cn("h-3.5 w-3.5", k.color)} strokeWidth={2} />
               </div>
-              <div className="text-[22px] font-semibold tabular-nums tracking-tight">{loading ? '—' : k.value}</div>
+              <div className="text-[24px] font-semibold tabular-nums tracking-tight leading-none">{loading ? '—' : k.value}</div>
             </div>
           )
         })}
@@ -45,11 +45,11 @@ export function DashboardPage() {
 
       <Link
         to="/solicitudes"
-        className="group rounded-md border border-border bg-card p-4 flex items-center justify-between hover:bg-accent/50 transition-colors cursor-pointer"
+        className="group rounded-lg border border-border/60 bg-card px-4 py-3 flex items-center justify-between hover:bg-accent/40 hover:border-border transition-colors cursor-pointer"
       >
         <div>
           <h2 className="text-[13px] font-medium mb-0.5">Ver solicitudes</h2>
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-[11.5px] text-muted-foreground">
             Crea solicitudes, asigna fechas y haz seguimiento hasta validación.
           </p>
         </div>
