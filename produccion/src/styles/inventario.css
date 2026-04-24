@@ -84,7 +84,10 @@
   --shadow-lg: 0 10px 40px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.04);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* Reset CSS — limitado a componentes inv-* para no romper Tailwind del resto de la app.
+   Antes era `* { ... }` global, lo que mataba todos los px-N, pt-N, etc. de Tailwind. */
+.inv-app *,
+.inv-login * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   font-family: 'Inter', 'Helvetica Neue', sans-serif;
