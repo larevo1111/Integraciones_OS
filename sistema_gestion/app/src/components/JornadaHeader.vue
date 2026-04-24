@@ -135,7 +135,7 @@ import { useAuthStore } from 'src/stores/authStore'
 import { useJornadaStore } from 'src/stores/jornadaStore'
 import JornadaPopover from './JornadaPopover.vue'
 import PausaDialog from './PausaDialog.vue'
-import { hoyLocal } from 'src/services/fecha'
+import { hoyLocal, parseBackendDate, TZ_NAME } from 'src/services/fecha'
 
 const $q = useQuasar()
 
@@ -173,28 +173,28 @@ const nombreUsuario = computed(() => {
 const fechaISO = computed(() => hoyLocal())
 
 const fechaHoy = computed(() => {
-  return new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })
+  return new Date().toLocaleDateString('es-CO', { timeZone: TZ_NAME, weekday: 'short', day: 'numeric', month: 'short' })
 })
 
 const horaInicio = computed(() => {
   if (!store.jornada?.hora_inicio) return ''
-  return new Date(store.jornada.hora_inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  return parseBackendDate(store.jornada.hora_inicio).toLocaleTimeString('es-CO', { timeZone: TZ_NAME, hour: '2-digit', minute: '2-digit' })
 })
 
 const horaFin = computed(() => {
   if (!store.jornada?.hora_fin) return ''
-  return new Date(store.jornada.hora_fin).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+  return parseBackendDate(store.jornada.hora_fin).toLocaleTimeString('es-CO', { timeZone: TZ_NAME, hour: '2-digit', minute: '2-digit' })
 })
 
 // Timer: segundos laborados (total - pausas cerradas). Se calcula desde jornada directamente,
 // sin depender de store.timerSegundos, para evitar el flash inicial de "0m".
 const timerLaboradoSeg = computed(() => {
   if (!store.jornada?.hora_inicio) return 0
-  const inicio = new Date(store.jornada.hora_inicio).getTime()
+  const inicio = parseBackendDate(store.jornada.hora_inicio).getTime()
   let pausaMs = 0
   for (const p of (store.jornada.pausas || [])) {
     if (p.hora_fin) {
-      pausaMs += new Date(p.hora_fin).getTime() - new Date(p.hora_inicio).getTime()
+      pausaMs += parseBackendDate(p.hora_fin).getTime() - parseBackendDate(p.hora_inicio).getTime()
     }
   }
   return Math.max(0, Math.floor((ahora.value - inicio - pausaMs) / 1000))
@@ -204,7 +204,7 @@ const timerLaboradoSeg = computed(() => {
 const timerPausaSeg = computed(() => {
   const p = store.pausaActiva
   if (!p?.hora_inicio) return 0
-  return Math.max(0, Math.floor((ahora.value - new Date(p.hora_inicio).getTime()) / 1000))
+  return Math.max(0, Math.floor((ahora.value - parseBackendDate(p.hora_inicio).getTime()) / 1000))
 })
 
 function fmtSeg(s) {
@@ -221,14 +221,14 @@ const timerFormateado = computed(() => {
 
 const minutosParaReabrir = computed(() => {
   if (!store.jornada?.hora_fin_registro) return 0
-  const ms = 60 * 60 * 1000 - (ahora.value - new Date(store.jornada.hora_fin_registro).getTime())
+  const ms = 60 * 60 * 1000 - (ahora.value - parseBackendDate(store.jornada.hora_fin_registro).getTime())
   return ms > 0 ? Math.ceil(ms / 60000) : 0
 })
 
 // Minutos restantes para poder abrir una nueva jornada (gap mínimo 6h)
 const minutosParaNuevaJornada = computed(() => {
   if (!store.jornada?.hora_fin_registro) return 0
-  const ms = 6 * 60 * 60 * 1000 - (ahora.value - new Date(store.jornada.hora_fin_registro).getTime())
+  const ms = 6 * 60 * 60 * 1000 - (ahora.value - parseBackendDate(store.jornada.hora_fin_registro).getTime())
   return ms > 0 ? Math.ceil(ms / 60000) : 0
 })
 

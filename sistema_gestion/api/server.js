@@ -39,7 +39,7 @@ const IA_SERVICE_URL   = process.env.IA_SERVICE_URL || 'http://127.0.0.1:5100'
 const PORT             = 9300
 
 // Timezone: helpers centralizados en lib/timezone.js (fuente única: APP_TIMEZONE en .env)
-const { localDate: localDateCO, parseHora: parseHoraCO, TZ_NAME } = require('../../lib/timezone')
+const { localDate: localDateCO, parseHora: parseHoraCO, parseBackendDate, TZ_NAME } = require('../../lib/timezone')
 
 // ¿Este server puede correr los scripts Playwright de Effi?
 // Los scripts viven en <repo>/scripts/ y usan require('./session'), que a su vez
@@ -151,8 +151,8 @@ function indicadorConfianza(jornada) {
   if (!jornada.hora_fin) return null // abierta, no aplica
   if (jornada.cierre_automatico) return 'rojo'
   if (!jornada.ultima_actividad_tareas) return 'gris'
-  const fin = new Date(jornada.hora_fin)
-  const ult = new Date(jornada.ultima_actividad_tareas)
+  const fin = parseBackendDate(jornada.hora_fin)
+  const ult = parseBackendDate(jornada.ultima_actividad_tareas)
   const diffMin = (fin - ult) / 60000
   // Amarillo: última tarea completada >45min antes del cierre O completó tareas >45min después del cierre
   if (diffMin > 45 || diffMin < -45) return 'amarillo'
@@ -521,7 +521,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
   // Filtro de fecha — siempre usar fecha Colombia via localDateCO()
   const hoyRef = fecha_hoy || localDateCO()
   function fechaRefOffset(dias) {
-    const d = new Date(hoyRef + 'T00:00:00')
+    const d = parseBackendDate(hoyRef)
     d.setDate(d.getDate() + dias)
     return localDateCO(d)
   }
@@ -535,7 +535,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
   } else if (filtro === 'ayer') {
     where.push('t.fecha_limite = ?'); params.push(fechaRefOffset(-1))
   } else if (filtro === 'semana') {
-    const d   = new Date(hoyRef + 'T00:00:00')
+    const d   = parseBackendDate(hoyRef)
     const dow = d.getDay() === 0 ? 6 : d.getDay() - 1  // lunes=0
     const lun = new Date(d); lun.setDate(d.getDate() - dow)
     const dom = new Date(lun); dom.setDate(lun.getDate() + 6)
@@ -2430,7 +2430,7 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
       [req.empresa, req.usuario.email, hoy]
     )
     if (cerrada) {
-      const minDesdecierre = (ahora - new Date(cerrada.hora_fin_registro)) / 60000
+      const minDesdecierre = (ahora - parseBackendDate(cerrada.hora_fin_registro)) / 60000
       if (minDesdecierre < 360) {
         const restantes = Math.ceil(360 - minDesdecierre)
         const horas = Math.floor(restantes / 60)
@@ -2810,7 +2810,7 @@ app.put('/api/gestion/jornadas/:id/reabrir', requireAuth, async (req, res) => {
 
     const esDueno  = jornada.usuario === req.usuario.email
     const esAdmin  = (req.usuario.nivel || 1) >= 7
-    const msDesde  = Date.now() - new Date(jornada.hora_fin_registro).getTime()
+    const msDesde  = Date.now() - parseBackendDate(jornada.hora_fin_registro).getTime()
     const dentroVentana = msDesde <= 60 * 60 * 1000 // 1 hora
 
     if (!esAdmin && !(esDueno && dentroVentana)) {

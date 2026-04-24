@@ -266,6 +266,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue'
 import { api } from 'src/services/api'
+import { parseBackendDate, TZ_NAME } from 'src/services/fecha'
 import OsDataTable from 'src/components/OsDataTable.vue'
 
 const props = defineProps({
@@ -339,7 +340,7 @@ const badgeClass = computed(() => {
 // Reabrir — solo si fue hace menos de 1h
 const puedeReabrir = computed(() => {
   if (!props.jornada.hora_fin || !props.jornada.hora_fin_registro) return false
-  const ms = Date.now() - new Date(props.jornada.hora_fin_registro).getTime()
+  const ms = Date.now() - parseBackendDate(props.jornada.hora_fin_registro).getTime()
   return ms < 60 * 60 * 1000
 })
 
@@ -421,8 +422,8 @@ async function guardarNuevaPausa() {
   if (!npHoraInicio.value || !npHoraFin.value) { npErrorTiempo.value = 'Completa los dos horarios'; return }
 
   const fecha = String(props.jornada.fecha).slice(0, 10)
-  const ini = new Date(`${fecha}T${npHoraInicio.value}:00`)
-  const fin = new Date(`${fecha}T${npHoraFin.value}:00`)
+  const ini = parseBackendDate(`${fecha} ${npHoraInicio.value}:00`)
+  const fin = parseBackendDate(`${fecha} ${npHoraFin.value}:00`)
   if (fin <= ini) { npErrorTiempo.value = 'La hora de fin debe ser después del inicio'; return }
 
   guardandoPausa.value = true
@@ -453,9 +454,10 @@ function abrirEditPausa(p) {
   editPausaRegistroInicio.value = p.hora_inicio_registro
   editPausaRegistroFin.value = p.hora_fin_registro
 
-  // Extraer HH:MM de las horas editables
-  epHoraInicio.value = p.hora_inicio ? new Date(p.hora_inicio).toTimeString().slice(0, 5) : ''
-  epHoraFin.value    = p.hora_fin ? new Date(p.hora_fin).toTimeString().slice(0, 5) : ''
+  // Extraer HH:MM directo del string backend (evita conversiones TZ del browser)
+  const hhmm = v => { const m = String(v || '').match(/(\d{2}):(\d{2})/); return m ? `${m[1]}:${m[2]}` : '' }
+  epHoraInicio.value = hhmm(p.hora_inicio)
+  epHoraFin.value    = hhmm(p.hora_fin)
   epObservaciones.value = p.observaciones || ''
 
   // Resolver tipos seleccionados a partir de nombres
@@ -485,8 +487,8 @@ async function guardarEditPausa() {
   const fecha = String(props.jornada.fecha).slice(0, 10)
   let horaInicioISO = null
   let horaFinISO = null
-  if (epHoraInicio.value) horaInicioISO = new Date(`${fecha}T${epHoraInicio.value}:00`).toISOString()
-  if (epHoraFin.value) horaFinISO = new Date(`${fecha}T${epHoraFin.value}:00`).toISOString()
+  if (epHoraInicio.value) horaInicioISO = parseBackendDate(`${fecha} ${epHoraInicio.value}:00`).toISOString()
+  if (epHoraFin.value) horaFinISO = parseBackendDate(`${fecha} ${epHoraFin.value}:00`).toISOString()
 
   if (horaInicioISO && horaFinISO && new Date(horaFinISO) <= new Date(horaInicioISO)) {
     epErrorTiempo.value = 'La hora de fin debe ser después del inicio'
@@ -594,14 +596,14 @@ function formatMins(mins) {
 }
 function fmtDT(val) {
   if (!val) return '—'
-  const d = new Date(val)
-  if (isNaN(d)) return '—'
-  return d.toLocaleString('es-CO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+  const d = parseBackendDate(val)
+  if (!d || isNaN(d)) return '—'
+  return d.toLocaleString('es-CO', { timeZone: TZ_NAME, day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
 }
 function durPausa(p) {
   if (!p.hora_inicio) return '—'
-  const fin = p.hora_fin ? new Date(p.hora_fin) : new Date()
-  const min = Math.round((fin - new Date(p.hora_inicio)) / 60000)
+  const fin = p.hora_fin ? parseBackendDate(p.hora_fin) : new Date()
+  const min = Math.round((fin - parseBackendDate(p.hora_inicio)) / 60000)
   return formatMins(min)
 }
 </script>
