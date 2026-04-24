@@ -100,6 +100,30 @@ async function ultimaActividadTareas(email, fecha) {
   return row?.ultima ? new Date(row.ultima) : null
 }
 
+/**
+ * Cierra una jornada abandonada (abierta más de UMBRAL_CIERRE_H horas).
+ * Calcula hora_fin = última actividad de tareas + 30min, o hora_inicio + 13h si no hubo actividad.
+ * Devuelve { cerrada, cierreAuto?, horasAbiertas, motivo? }.
+ */
+const UMBRAL_CIERRE_H = 13
+async function cerrarJornadaAbandonada(jornada, ahora = new Date()) {
+  const horasAbiertas = (ahora - new Date(jornada.hora_inicio)) / 3600000
+  if (horasAbiertas <= UMBRAL_CIERRE_H) return { cerrada: false, horasAbiertas, motivo: 'menor-al-umbral' }
+
+  const ultimaAct = await ultimaActividadTareas(jornada.usuario, jornada.fecha)
+  const cierreAuto = ultimaAct
+    ? new Date(ultimaAct.getTime() + 30 * 60000)
+    : new Date(new Date(jornada.hora_inicio).getTime() + UMBRAL_CIERRE_H * 3600000)
+
+  await db.gestion.query(
+    `UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = NOW(),
+       cierre_automatico = 1, ultima_actividad_tareas = ?, usuario_ult_modificacion = ?
+     WHERE id = ? AND hora_fin IS NULL`,
+    [cierreAuto, ultimaAct, 'sistema', jornada.id]
+  )
+  return { cerrada: true, cierreAuto, horasAbiertas: Math.round(horasAbiertas * 10) / 10, ultimaAct }
+}
+
 // Indicador de confianza de una jornada cerrada
 // 🔴 rojo: cierre automático  🟡 amarillo: gap >1h entre última tarea y cierre  🟢 verde: alineada  ⚪ gris: sin tareas completadas
 function indicadorConfianza(jornada) {
@@ -2373,19 +2397,8 @@ app.post('/api/gestion/jornadas/iniciar', requireAuth, async (req, res) => {
       [req.empresa, req.usuario.email]
     )
     if (activa) {
-      const horasAbiertas = (ahora - new Date(activa.hora_inicio)) / 3600000
-      if (horasAbiertas > 13) {
-        // Auto-cerrar jornada abandonada (>13h)
-        const ultimaAct = await ultimaActividadTareas(req.usuario.email, activa.fecha)
-        // Cierre = última actividad + 30min, o hora_inicio + 13h si no hay actividad
-        const cierreAuto = ultimaAct
-          ? new Date(ultimaAct.getTime() + 30 * 60000)
-          : new Date(new Date(activa.hora_inicio).getTime() + 13 * 3600000)
-        await db.gestion.query(
-          'UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = NOW(), cierre_automatico = 1, ultima_actividad_tareas = ?, usuario_ult_modificacion = ? WHERE id = ?',
-          [cierreAuto, ultimaAct, 'sistema', activa.id]
-        )
-      } else {
+      const r = await cerrarJornadaAbandonada({ ...activa, usuario: req.usuario.email }, ahora)
+      if (!r.cerrada) {
         return res.status(409).json({ error: `Tienes una jornada abierta del ${activa.fecha}. Ciérrala antes de iniciar una nueva.` })
       }
     }
@@ -2494,6 +2507,35 @@ app.put('/api/gestion/jornadas/:id/finalizar', requireAuth, async (req, res) => 
       tareas_pausadas: tareasRunning.map(t => ({ id: t.id, titulo: t.titulo, seg_recuperados: t.seg_recuperados }))
     })
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/internal/jornadas/auto-cierre — cierra en lote todas las jornadas
+// abandonadas (hora_fin NULL y abiertas >UMBRAL_CIERRE_H horas).
+// Ruta interna (no bajo /api/gestion → sin requireAuth). Protegida por IP localhost.
+app.post('/api/internal/jornadas/auto-cierre', async (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress || ''
+  const esLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
+  if (!esLocal) return res.status(403).json({ error: 'Solo acceso interno (localhost)' })
+
+  try {
+    const [abiertas] = await db.gestion.query(
+      `SELECT id, empresa, usuario, fecha, hora_inicio FROM g_jornadas WHERE hora_fin IS NULL`
+    )
+    const cerradas = []
+    for (const j of abiertas) {
+      const r = await cerrarJornadaAbandonada(j)
+      if (r.cerrada) cerradas.push({
+        id: j.id, usuario: j.usuario, fecha: j.fecha,
+        horas_abiertas: r.horasAbiertas,
+        cierre_auto: r.cierreAuto,
+      })
+    }
+    if (cerradas.length) console.log(`[auto-cierre] ${cerradas.length} jornada(s) cerrada(s)`)
+    res.json({ ok: true, revisadas: abiertas.length, cerradas })
+  } catch (e) {
+    console.error('[auto-cierre]', e)
+    res.status(500).json({ error: e.message })
+  }
 })
 
 // PUT /api/gestion/jornadas/:id/editar — editar horas reportadas
