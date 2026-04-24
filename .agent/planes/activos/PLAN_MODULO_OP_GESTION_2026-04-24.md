@@ -1,6 +1,7 @@
 ---
-estado: 🟡 BORRADOR — bloqueado en preguntas abiertas
+estado: ✅ APROBADO — listo para Fase 1 (pendiente de arrancar)
 creado: 2026-04-24
+aprobado: 2026-04-24
 modulo: sistema_gestion
 version_objetivo: v2.9.0 → v2.9.x
 depende_de: v2.8.7 (Detalles de Producción en panel de tarea)
@@ -10,333 +11,302 @@ depende_de: v2.8.7 (Detalles de Producción en panel de tarea)
 
 ## Resumen ejecutivo
 
-Nuevo módulo dentro de `sistema_gestion` que replica el patrón del módulo **Proyectos** pero para **Órdenes de Producción (OPs)**. La OP es un "mini proyecto" que agrupa N tareas. Los tiempos y consumos reales se consolidan **a nivel OP** (no tarea).
+Nuevo módulo en `sistema_gestion` que replica el patrón del módulo **Proyectos** pero para **Órdenes de Producción (OPs)**. La OP es un "mini proyecto" que agrupa N tareas. Los tiempos y consumos reales se consolidan **a nivel OP** (no tarea).
 
 Cambios principales:
-1. **Quitar** de `DetallesProduccion.vue` los inputs de tiempo, observaciones manuales, y los botones Procesar/Validar. Queda **solo-lectura** (OP vinculada + materiales + productos con estimado desde Effi).
-2. **Agregar** sección "Órdenes de producción" al sidebar (Mis Tareas + Equipo + tabla independiente) con el mismo patrón que Proyectos.
-3. **Crear** ficha de OP con cabecera + materiales/productos reales editables + tiempos consolidados (automáticos desde cronómetro de las tareas agrupados por categoría de tiempo) + observaciones del lote + acciones Procesar/Validar.
-4. **Agregar** a cada tarea vinculada a una OP la **categoría de tiempo** (lista fija: Alistamiento, Limpieza, Empaque, Enmoldado, Templado, Etiquetado, Sellado, Esterilización, Pasteurización, Encordonado, Loteado, Otra).
+1. **Reducir** `DetallesProduccion.vue` del panel de tarea: queda solo-lectura. Se quitan tiempos, observaciones manuales y botones Procesar/Validar.
+2. **Agregar** sección "Órdenes de producción" al sidebar (Mis Tareas + Equipo + tabla independiente).
+3. **Crear** ficha de OP (`OpPanel`) con cabecera + materiales/productos reales + tiempos consolidados automáticos + observaciones + Procesar/Validar.
+4. **Agregar** campo `categoria_produccion_id` a cada tarea vinculada a OP (Alistamiento, Templado, etc.).
+5. **Crear tabla `g_op_tiempos`** que al validar una OP snapshotea los segundos totales por categoría, para análisis histórico.
 
 ---
 
-## 1. Estado actual (punto de partida verificado)
+## 1. Estado actual verificado
 
 ### Sistema Gestión (v2.8.7)
-- Sidebar ya tiene patrón de Proyectos — [MainLayout.vue:40-395](../../../sistema_gestion/app/src/layouts/MainLayout.vue): bloque "Mis Tareas" + bloque "Equipo" + sección "Tablas". Cada bloque tiene acordeón con subitems clicables que filtran tareas por `proyecto_id`.
-- Tabla Proyectos independiente: [ItemsTablePage.vue](../../../sistema_gestion/app/src/pages/ItemsTablePage.vue) con `OsDataTable`. Click en fila → abre `ProyectoPanel` lateral.
-- `g_tareas` tiene `id_op VARCHAR(50)` ya usado (set por `OpSelector`).
+- Sidebar con patrón Proyectos: [MainLayout.vue:40-395](../../../sistema_gestion/app/src/layouts/MainLayout.vue).
+- Tabla Proyectos: [ItemsTablePage.vue](../../../sistema_gestion/app/src/pages/ItemsTablePage.vue) con `OsDataTable`. Click → `ProyectoPanel`.
+- `g_tareas.id_op VARCHAR(50)` ya lo setea `OpSelector`.
 
 ### Detalles de Producción actual (a desmantelar parcialmente)
-Archivo: [DetallesProduccion.vue](../../../sistema_gestion/app/src/components/DetallesProduccion.vue)
-Endpoints actuales en [server.js:1369-1750](../../../sistema_gestion/api/server.js):
-- `GET  /api/gestion/tareas/:id/produccion`
-- `PUT  /api/gestion/tareas/:id/produccion/lineas/:lineaId`
-- `PUT  /api/gestion/tareas/:id/produccion/tiempos` ← **ELIMINAR**
-- `POST /api/gestion/tareas/:id/produccion/procesar` ← **MOVER a `/op/:id/procesar`**
-- `POST /api/gestion/tareas/:id/produccion/validar` ← **MOVER a `/op/:id/validar`**
-
-Tabla `g_tarea_produccion_lineas` (por tarea) → **migrar a `g_op_lineas` (por OP)**.
-`g_tareas`: columnas `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min`, `id_op_original` → **`id_op_original` se MANTIENE** (ahora a nivel OP), los 4 tiempos se ELIMINAN de `g_tareas`.
+- Componente: [DetallesProduccion.vue](../../../sistema_gestion/app/src/components/DetallesProduccion.vue).
+- Endpoints en [server.js:1369-1750](../../../sistema_gestion/api/server.js): quedará solo el GET reducido.
+- Tabla `g_tarea_produccion_lineas` → se **DROPEA** (datos viejos descartados — Q13).
+- `g_tareas`: columnas `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min`, `id_op_original` → **eliminar**.
 
 ### Fuente de OPs (solo lectura)
-BD `os_integracion` en VPS Contabo:
-- `zeffi_produccion_encabezados` — 2213 filas. Estados reales: `Generada` (968), `Procesada` (1243), `Validado` (2). Vigencia: `Vigente` (1158) / `Anulado` (1055).
-- `zeffi_articulos_producidos` — productos por OP (cod_articulo, cantidad, precio_minimo_ud, etc.)
-- `zeffi_materiales` — materiales por OP (cod_material, cantidad, costo_ud, etc.)
+BD `os_integracion` en VPS (94.72.115.156):
+- `zeffi_produccion_encabezados` — 2213 filas. Estados: `Generada` (968), `Procesada` (1243), `Validado` (2). Vigencia: `Vigente` (1158) / `Anulado` (1055).
+- `zeffi_articulos_producidos` — productos (cod_articulo, cantidad, precio_minimo_ud).
+- `zeffi_materiales` — materiales (cod_material, cantidad, costo_ud).
 
-**Columnas útiles en `zeffi_produccion_encabezados`**: `id_orden`, `estado`, `vigencia`, `nombre_encargado`, `id_encargado`, `nombre_tercero`, `fecha_inicial`, `fecha_final`, `fecha_de_creacion`, `responsable_de_creacion`, `observacion`, `sucursal`, `bodega`.
+Columnas relevantes de `zeffi_produccion_encabezados`: `id_orden`, `estado`, `vigencia`, `nombre_encargado`, `id_encargado` (formato `CC: 1128457413`), `fecha_inicial`, `fecha_final`, `fecha_de_creacion`, `observacion`, `sucursal`, `bodega`.
 
----
+### Mapeo usuarios Effi ↔ Gestión (Q3 verificado)
+`sys_usuarios` (Hostinger) tiene `num_id VARCHAR(50)` → hoy todos en NULL excepto los que actualicemos. 7 usuarios activos legítimos (el 8º, maskedaltfivem, ya fue eliminado 2026-04-24 por intrusión — ver sección §12).
 
-## 2. Preguntas abiertas — BLOQUEAN Fase 1
+**Cédulas confirmadas por Santi**:
 
-**Hay que resolver esto antes de tocar código. Si quedan ambiguas, el módulo sale mal.**
+| Email | Cédula | Nombre Effi |
+|---|---|---|
+| ssierra047@gmail.com (Santiago) | **3506889** | — |
+| jennifercanogarcia@gmail.com | 1128457413 | Jenifer Alexandra Cano Garcia |
+| amaragonzalez21valen@gmail.com (Deivy) | 74084937 | Deivy Andres Gonzalez Gutierrez |
+| lauramarcela758@gmail.com | 1017206760 | LAURA MARCELA ECHAVARRIA PATIÑO |
+| rialgar82@gmail.com | 3502398759 | Ricardo Garcia |
+| larevo1111@gmail.com, doblessas@gmail.com | **no mapear** | no activos en Effi |
 
-### Q1 — Categoría de tiempo vs categoría de tarea
-La tarea hoy tiene `categoria_id` que apunta a `g_categorias` (Producción, Ventas, Logística, etc., 13 seeds, con flags `es_produccion`, `es_empaque`).
-
-Ahora quieres que cada tarea vinculada a una OP lleve **obligatoriamente** una "categoría de tiempo" (Alistamiento, Limpieza, Empaque, Enmoldado, Templado, Etiquetado, Sellado, Esterilización, Pasteurización, Encordonado, Loteado, Otra).
-
-**¿Qué prefieres?**
-- **Opción A** — Campo nuevo `categoria_tiempo` (VARCHAR o FK) en `g_tareas`. Se suma al `categoria_id` existente. Solo obligatorio si `id_op IS NOT NULL`.
-- **Opción B** — Tabla nueva `g_categorias_tiempo` (id, nombre, orden, activa) + FK `g_tareas.categoria_tiempo_id`. Más prolijo y preparado para hacer configurable a futuro.
-- **Opción C** — Reemplazar `categoria_id` SOLO en tareas de producción: el usuario cuando categoría=Producción elige una sub-categoría de esta lista en vez de la genérica.
-
-**Mi recomendación: Opción B** (tabla nueva, FK, se siembran las 12 categorías de tiempo iniciales). Limpio y extensible.
-
-### Q2 — ¿Qué estados filtra el sidebar en la parte de arriba?
-Escribiste: *"salen todas las Ops en estado generada, o reportada (se omiten validadas y anuladas)"*.
-
-Los estados reales de Effi son: **Generada / Procesada / Validado / Anulada**. ¿"Reportada" = "Procesada"?
-
-Asumo que sí. **Confirmar.**
-
-### Q3 — Columna "Responsable" en la tabla principal de OPs
-Puede ser:
-- (a) `nombre_encargado` de la OP en Effi (el que creó la OP allá, ej. "CLAUDIA PATRICIA SIERRA").
-- (b) El responsable de la tarea de Gestión asociada a esa OP. Pero varias tareas → varios responsables.
-
-**¿Cuál querés en la columna? Mi default: (a) — es dato directo de Effi, no ambiguo.**
-
-### Q4 — Columna(s) de productos en la tabla
-Escribiste: *"4 columnas para los 4 principales artículos producidos **o** un campo compuesto separado por comas"*.
-
-**¿Cuál de las dos?**
-- Compuesto separado por comas → 1 columna, simple. Lo recomiendo.
-- 4 columnas → ¿criterio para elegir los 4 principales (mayor cantidad, mayor precio, alfabético)?
-
-### Q5 — Materiales/artículos reales: ¿nueva tabla `g_op_lineas`?
-Hoy están en `g_tarea_produccion_lineas` ligados a `tarea_id`. El nuevo modelo los quiere a **nivel OP**.
-
-**Plan propuesto**: crear `g_op_lineas (id, id_op, tipo, cod_articulo, descripcion, unidad, cantidad_teorica, cantidad_real, costo_unit, precio_unit, usuario_ult_modificacion, fecha_ult_modificacion)` con `UNIQUE(id_op, tipo, cod_articulo)`. **Eliminar** `g_tarea_produccion_lineas` cuando la migración esté lista. ¿OK?
-
-### Q6 — Observaciones del lote y tiempos manuales corregidos: ¿dónde viven?
-Necesito una tabla nueva para lo agregado por Gestión a nivel OP (que no está en Effi). Propongo:
-
-```sql
-CREATE TABLE g_op_detalle (
-  id_op VARCHAR(50) PRIMARY KEY,
-  observaciones_lote TEXT NULL,
-  tiempos_override_json JSON NULL,  -- {alistamiento:120, limpieza:30,...} solo en modo corrección
-  procesado_por VARCHAR(255) NULL,
-  procesado_en DATETIME NULL,
-  validado_por VARCHAR(255) NULL,
-  validado_en DATETIME NULL,
-  id_op_original VARCHAR(50) NULL,
-  empresa VARCHAR(64) NOT NULL
-);
-```
-
-**¿OK con este diseño?**
-
-### Q7 — "+ agregar material no previsto"
-El plan anterior (Detalles de Producción) lo descartó. Acá aparece de nuevo en la ficha de OP. **¿Va en esta versión, sí o no?**
-
-### Q8 — Permisos Procesar / Validar
-Se mantienen igual que hoy a nivel OP:
-- Procesar: cualquier responsable de alguna tarea de la OP, o nivel ≥ responsable de esas tareas.
-- Validar: solo nivel ≥ 5.
-
-**¿Se mantiene? ¿O cambia ahora que el contexto es OP (ej. cualquiera del equipo de producción puede procesar)?**
-
-### Q9 — Observación de la nueva OP al validar
-Hoy genera: `"Validación OS · Reportó: X · Validó: Y · Obs OP orig: ..."`
-
-Dijiste: *"debe quedar Lote: xxxx siendo xxxx el numero de la op original. Ejemplo: op 12, al validar se anula la 12 y se crea la 17, entonces de primero en las observaciones de la op17 debe decir: LOTE 12, y adicional las otras cosas que habíamos definido como el responsable y podemos ponerle tambien los tiempos por categoria mayores a cero"*.
-
-Propuesta de formato:
-```
-LOTE 12 · Validó: Santiago Sierra · Reportó: Claudia Sierra
-Tiempos: Alistamiento 30m · Templado 240m · Enmoldado 45m · Empaque 90m · Limpieza 20m
-Obs orig: <observación de la OP 12>
-```
-
-**¿OK el formato, o quieres otro?**
-
-### Q10 — Eliminar/anular OP
-Escribiste: *"Si se elimina una OP, las tareas quedan con `op_id = null`"*. Pero las OPs no se eliminan desde Gestión (son de Effi). ¿Te refieres a:
-- Cuando en Effi la OP se anula (vigencia=Anulado) → las tareas de Gestión que la tenían vinculada quedan con `id_op = null`? (Eso no pasa hoy. Habría que hacerlo.)
-- O cuando el usuario en Gestión "desvincula" manualmente la OP de una tarea?
-
-**Clarificar.** Yo por ahora NO automatizaría nada: si en Effi se anula, la tarea en Gestión sigue mostrando el id_op pero con chip "Anulada" (gris).
-
-### Q11 — Tareas mostradas en la ficha de OP
-*"Tareas vinculadas a esa op. Lista de las tareas con fecha, responsable, tiempo y categoría. Click en una → abre esa tarea."*
-
-**¿Muestra tareas de todos los usuarios o solo las del usuario actual?** Mi default: todas las del equipo.
-
-### Q12 — Vista del sidebar "Mis Tareas" / "Equipo" al clicar una OP
-- En "Mis Tareas" → filtra tareas con `id_op = X` **Y** `responsable = yo`. ✅ Claro.
-- En "Equipo" → filtra todas las tareas con `id_op = X`. ✅ Claro.
-- Se respetan las pestañas de fecha (Hoy/Mañana/Semana) y demás filtros existentes (estado, etc.).
-
-**¿Confirmado?**
-
-### Q13 — ¿Qué pasa con los datos viejos en `g_tarea_produccion_lineas`?
-Hay datos ya registrados. Opciones:
-- (a) Migrar a `g_op_lineas` (agrupando por `id_op` de la tarea; si 2 tareas distintas reportaron realidades para la misma OP, tomar la de la tarea más reciente). Luego DROP.
-- (b) Dejar ambas tablas un tiempo, datos viejos quedan muertos.
-
-**Mi recomendación: (a), mismo commit.** Confirmar.
+**Pendiente**: Santi dijo "las demás no importan" — se interpretan como no mapeables. Si alguno aparece luego como encargado de Effi, se amplía el mapeo.
 
 ---
 
-## 3. Diseño de datos — cambios en BD `os_gestion`
+## 2. Decisiones cerradas (todas confirmadas por Santi 2026-04-24)
 
-### 3.1 Tablas nuevas
+| # | Decisión |
+|---|---|
+| Q1 | `categoria_produccion_id INT NULL` en `g_tareas` + tabla seed `g_categorias_produccion` (12 filas) |
+| Q2 | Sidebar muestra OPs en estado Generada **y** Procesada (omite Validado + Anulada) |
+| Q3 | UPDATE `sys_usuarios.num_id` con cédulas confirmadas (5 usuarios) |
+| Q4 | Columna `articulos` = string compuesto separado por comas |
+| Q5 | Nueva `g_op_lineas` (materiales+productos real a nivel OP) + **nueva `g_op_tiempos`** (snapshot segundos totales por categoría al validar) |
+| Q6 | Nueva `g_op_detalle` (obs lote + sellos procesar/validar + op_anterior) — separada de Q5 |
+| Q7 | Botón "+ agregar material no previsto" en ficha OP, **solo si estado=Generada** |
+| Q8 | Procesar: `nivel ≥ 3` · Validar: `nivel ≥ 5` |
+| Q9 | Observación OP nueva = `LOTE X · Validó · Reportó · Creada/Procesada/Validada · Tiempos · Obs orig` |
+| Q10 | Al validar: anular en Effi → crear nueva (Playwright) → UPDATE `g_tareas SET id_op = id_nueva` → guardar `op_anterior` en `g_op_detalle` de la nueva |
+| Q11 | Ficha OP muestra TODAS las tareas vinculadas (sin filtro de responsable) |
+| Q12 | Sidebar "Mis" filtra id_op+responsable=yo · "Equipo" filtra solo id_op |
+| Q13 | `g_tarea_produccion_lineas` se DROPEA, datos viejos se descartan (no migrar) |
+
+### Detalle — responsable de la OP (Q3 aclaración Santi)
+- En la tabla y ficha: el **`nombre_encargado`** de la OP en Effi (el que figura allá).
+- Las tareas tienen sus propios responsables (los de Gestión, independientes).
+- **Al validar**, el responsable de la OP nueva se puede cambiar por el del validador (ver `g_op_detalle.responsable_validado`).
+
+### Detalle — snapshot de tiempos al validar (Q5 ampliado)
+- Mientras la OP está Generada/Procesada → tiempos se calculan **al vuelo** con `SUM(duracion_cronometro_seg) GROUP BY categoria_produccion_id` sobre `g_tareas` (cifras vivas, siguen moviendo).
+- **Al validar** → se congela un snapshot en `g_op_tiempos` (una fila por categoría con segundos > 0). A partir de ahí la ficha lee de esa tabla.
+- La clave `(id_op, empresa, categoria_produccion_id)` garantiza no duplicar.
+- Los totales van también a la observación de la nueva OP en Effi (ver §6.2).
+
+---
+
+## 3. Diseño de datos — BD `os_gestion` (VPS)
+
+### 3.1 Tabla seed: categorías de producción
 
 ```sql
--- Categoría de tiempo (seed inicial de 12 rows)
-CREATE TABLE g_categorias_tiempo (
+CREATE TABLE g_categorias_produccion (
   id     INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(50) NOT NULL UNIQUE,
   orden  INT NOT NULL DEFAULT 0,
   activa TINYINT(1) NOT NULL DEFAULT 1
 );
 
-INSERT INTO g_categorias_tiempo (nombre, orden) VALUES
-  ('Alistamiento', 1), ('Limpieza', 2), ('Empaque', 3), ('Enmoldado', 4),
-  ('Templado', 5), ('Etiquetado', 6), ('Sellado', 7), ('Esterilización', 8),
-  ('Pasteurización', 9), ('Encordonado', 10), ('Loteado', 11), ('Otra', 99);
+INSERT INTO g_categorias_produccion (nombre, orden) VALUES
+  ('Alistamiento',   1),
+  ('Templado',       2),
+  ('Enmoldado',      3),
+  ('Empaque',        4),
+  ('Etiquetado',     5),
+  ('Sellado',        6),
+  ('Esterilización', 7),
+  ('Pasteurización', 8),
+  ('Encordonado',    9),
+  ('Loteado',       10),
+  ('Limpieza',      11),
+  ('Otra',          99);
+```
 
--- Líneas de materiales + productos (consolidado a nivel OP)
+### 3.2 Tabla de líneas materiales/productos (a nivel OP)
+
+```sql
 CREATE TABLE g_op_lineas (
-  id              INT AUTO_INCREMENT PRIMARY KEY,
-  id_op           VARCHAR(50) NOT NULL,
-  empresa         VARCHAR(64) NOT NULL,
-  tipo            ENUM('material','producto') NOT NULL,
-  cod_articulo    VARCHAR(50) NOT NULL,
-  descripcion     VARCHAR(500),
-  unidad          VARCHAR(20),
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  id_op            VARCHAR(50) NOT NULL,
+  empresa          VARCHAR(64) NOT NULL,
+  tipo             ENUM('material','producto') NOT NULL,
+  cod_articulo     VARCHAR(50) NOT NULL,
+  descripcion      VARCHAR(500),
+  unidad           VARCHAR(20),
   cantidad_teorica DECIMAL(12,3),
-  cantidad_real   DECIMAL(12,3),
-  costo_unit      DECIMAL(14,2),    -- costo_ud de Effi (snapshot)
-  precio_unit     DECIMAL(14,2),    -- precio_minimo_ud de Effi (snapshot, solo productos)
-  es_no_previsto  TINYINT(1) DEFAULT 0,  -- agregado manualmente (no estaba en Effi)
+  cantidad_real    DECIMAL(12,3),
+  costo_unit       DECIMAL(14,2),
+  precio_unit      DECIMAL(14,2),
+  es_no_previsto   TINYINT(1) DEFAULT 0,
   usuario_ult_modificacion VARCHAR(255),
-  fecha_ult_modificacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unq_op_tipo_cod (id_op, tipo, cod_articulo),
-  INDEX idx_op (id_op)
+  fecha_ult_modificacion   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unq_op_tipo_cod (id_op, empresa, tipo, cod_articulo),
+  INDEX idx_op (id_op, empresa)
 );
+```
 
--- Detalle OP agregado por Gestión (lo que no está en Effi)
+### 3.3 Tabla de tiempos consolidados (snapshot al validar)
+
+```sql
+CREATE TABLE g_op_tiempos (
+  id_op                    VARCHAR(50) NOT NULL,
+  empresa                  VARCHAR(64) NOT NULL,
+  categoria_produccion_id  INT NOT NULL,
+  segundos_totales         INT NOT NULL DEFAULT 0,
+  fecha_totalizacion       DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_op, empresa, categoria_produccion_id),
+  INDEX idx_cat (categoria_produccion_id),
+  FOREIGN KEY (categoria_produccion_id) REFERENCES g_categorias_produccion(id)
+);
+```
+
+### 3.4 Tabla de detalle OP (1 fila por OP)
+
+```sql
 CREATE TABLE g_op_detalle (
   id_op                   VARCHAR(50) NOT NULL,
   empresa                 VARCHAR(64) NOT NULL,
   observaciones_lote      TEXT NULL,
-  tiempos_override_json   JSON NULL,
   procesado_por           VARCHAR(255) NULL,
   procesado_en            DATETIME NULL,
   validado_por            VARCHAR(255) NULL,
   validado_en             DATETIME NULL,
-  id_op_original          VARCHAR(50) NULL,
+  op_anterior             VARCHAR(50) NULL,       -- si esta OP viene de validación
+  responsable_validado    VARCHAR(255) NULL,      -- email, puede cambiar al validar
+  fecha_creacion_detalle  DATETIME DEFAULT CURRENT_TIMESTAMP,
+  fecha_ult_modificacion  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id_op, empresa)
 );
 ```
 
-### 3.2 Alter `g_tareas`
+### 3.5 Alter `g_tareas`
 
 ```sql
--- Agregar FK categoría de tiempo (NULL si la tarea no está vinculada a OP)
-ALTER TABLE g_tareas ADD COLUMN categoria_tiempo_id INT NULL;
-ALTER TABLE g_tareas ADD INDEX idx_categoria_tiempo (categoria_tiempo_id);
+-- Nueva columna FK
+ALTER TABLE g_tareas ADD COLUMN categoria_produccion_id INT NULL;
+ALTER TABLE g_tareas ADD INDEX idx_categoria_produccion (categoria_produccion_id);
 
--- Eliminar columnas de tiempo manuales (ahora se consolidan automáticamente en la OP)
+-- Eliminar columnas obsoletas
 ALTER TABLE g_tareas DROP COLUMN tiempo_alistamiento_min;
 ALTER TABLE g_tareas DROP COLUMN tiempo_produccion_min;
 ALTER TABLE g_tareas DROP COLUMN tiempo_empaque_min;
 ALTER TABLE g_tareas DROP COLUMN tiempo_limpieza_min;
-ALTER TABLE g_tareas DROP COLUMN id_op_original;  -- ahora vive en g_op_detalle
+ALTER TABLE g_tareas DROP COLUMN id_op_original;  -- ahora vive en g_op_detalle.op_anterior
 ```
 
-### 3.3 Migración de datos existentes
+### 3.6 DROP tabla vieja (Q13)
 
-Antes del DROP en `g_tareas`:
-1. Backup completo: `mysqldump os_gestion g_tareas g_tarea_produccion_lineas > backups/os_gestion/pre_op_module_{ts}.sql`
-2. Migrar filas de `g_tarea_produccion_lineas` → `g_op_lineas` con UPSERT por `(id_op, tipo, cod_articulo)` (si duplicadas, tomar la de mayor `fecha_ult_modificacion`).
-3. Migrar `g_tareas.id_op_original` a `g_op_detalle.id_op_original`.
-4. Drop `g_tarea_produccion_lineas` después de verificar.
+```sql
+DROP TABLE g_tarea_produccion_lineas;
+```
+
+### 3.7 Update cédulas en Hostinger (Q3)
+
+```sql
+-- Solo los 5 mapeables confirmados
+UPDATE sys_usuarios SET num_id='3506889'     WHERE Email='ssierra047@gmail.com';
+UPDATE sys_usuarios SET num_id='1128457413'  WHERE Email='jennifercanogarcia@gmail.com';
+UPDATE sys_usuarios SET num_id='74084937'    WHERE Email='amaragonzalez21valen@gmail.com';
+UPDATE sys_usuarios SET num_id='1017206760'  WHERE Email='lauramarcela758@gmail.com';
+UPDATE sys_usuarios SET num_id='3502398759'  WHERE Email='rialgar82@gmail.com';
+```
 
 ---
 
 ## 4. Endpoints API
 
-### 4.1 Nuevos — OPs (a nivel OP, no tarea)
+### 4.1 Nuevos — OPs
 ```
-GET  /api/gestion/op                        — listar OPs (filtros ?estado=&vigencia=&q=&desde=&hasta=)
-                                              Mezcla zeffi_produccion_encabezados con g_op_detalle.
-                                              Campos: id_orden, estado, vigencia, nombre_encargado,
-                                              fecha_inicial, fecha_de_creacion, articulos,
-                                              procesado_por, procesado_en, validado_por, validado_en
-GET  /api/gestion/op/:id                    — detalle completo:
-                                              { cabecera (Effi), materiales[], productos[],
-                                                tiempos_consolidados[{categoria_tiempo, minutos}],
-                                                tareas_vinculadas[], detalle (g_op_detalle) }
-PUT  /api/gestion/op/:id/detalle            — guardar observaciones_lote + tiempos_override_json
-PUT  /api/gestion/op/:id/lineas/:lineaId    — actualizar cantidad_real (y/o costo/precio)
-POST /api/gestion/op/:id/lineas             — agregar línea no prevista (si Q7=sí)
-DELETE /api/gestion/op/:id/lineas/:lineaId  — eliminar línea no prevista (si Q7=sí)
-POST /api/gestion/op/:id/procesar           — mover del endpoint de tarea (lógica idéntica)
-POST /api/gestion/op/:id/validar            — mover del endpoint de tarea (lógica ajustada al formato Q9)
-```
-
-### 4.2 Nuevos — Categorías de tiempo
-```
-GET /api/gestion/categorias-tiempo          — seed de 12 filas
+GET  /api/gestion/op                        — listar (?estado=&vigencia=&q=&desde=&hasta=)
+                                              Fuente: zeffi_produccion_encabezados ∪ g_op_detalle
+                                              Columnas: id_orden, estado, vigencia, nombre_encargado,
+                                              fecha_creacion, articulos (comp.), procesado/validado
+GET  /api/gestion/op/:id                     — detalle:
+                                              { cabecera, materiales[], productos[],
+                                                tiempos[{categoria, segundos}],
+                                                tareas_vinculadas[], detalle }
+                                              Tiempos: si hay g_op_tiempos → leer de ahí;
+                                                        si no → calcular al vuelo sobre g_tareas.
+PUT  /api/gestion/op/:id/detalle             — obs_lote + responsable_validado
+PUT  /api/gestion/op/:id/lineas/:lineaId     — cantidad_real
+POST /api/gestion/op/:id/lineas              — línea no prevista (solo si estado=Generada)
+DELETE /api/gestion/op/:id/lineas/:lineaId   — borrar no prevista
+POST /api/gestion/op/:id/procesar            — nivel ≥ 3
+POST /api/gestion/op/:id/validar             — nivel ≥ 5
 ```
 
-### 4.3 Ajuste en GET /api/gestion/tareas
-Devolver `categoria_tiempo_id`, `categoria_tiempo_nombre`.
+### 4.2 Categorías de producción
+```
+GET /api/gestion/categorias-produccion       — 12 seeds
+```
 
-### 4.4 Eliminar / deprecar
-- `PUT  /api/gestion/tareas/:id/produccion/tiempos` → eliminar.
-- `POST /api/gestion/tareas/:id/produccion/procesar` → **redirigir 307** al equivalente de OP durante 1 release.
-- `POST /api/gestion/tareas/:id/produccion/validar` → idem.
+### 4.3 Ajuste `GET /api/gestion/tareas`
+- Incluir `categoria_produccion_id` y `categoria_produccion_nombre`.
+- Aceptar filtro `?op_id=X`.
 
-### 4.5 Simplificar
-`GET /api/gestion/tareas/:id/produccion` → retorna **solo** materiales + productos desde `g_op_lineas` (ya agregados a nivel OP). El frontend de `DetallesProduccion.vue` deja de editar nada.
+### 4.4 Endpoints a eliminar
+- `PUT  /api/gestion/tareas/:id/produccion/tiempos`
+- `POST /api/gestion/tareas/:id/produccion/procesar`
+- `POST /api/gestion/tareas/:id/produccion/validar`
+- `GET  /api/gestion/tareas/:id/produccion` → reducir: retorna materiales/productos desde `g_op_lineas` en modo readonly.
 
 ---
 
 ## 5. Frontend — cambios por componente
 
-### 5.1 `DetallesProduccion.vue` — reducir a solo-lectura
-- Quitar inputs de tiempos (bloque entero).
-- Quitar textarea de observaciones.
-- Quitar botones Procesar / Validar + sus modales de confirmación.
-- Materiales y productos: solo lectura. Para editar cantidad real → **link "Editar en la OP"** que abre la ficha de OP.
-- Mantener chip de estado OP (Generada / Procesada / Validado / Anulada).
+### 5.1 `DetallesProduccion.vue` (reducir)
+- Quitar inputs de tiempos.
+- Quitar textarea observaciones.
+- Quitar botones Procesar/Validar + modales.
+- Materiales y productos: readonly. Mostrar desde `g_op_lineas`.
+- Link "Editar en la OP" que abre `OpPanel`.
+- Mantener chip de estado OP.
 
-### 5.2 Componente nuevo: `OpPanel.vue` (equivalente a `ProyectoPanel.vue`)
-Panel lateral derecho 500px desktop, bottom-sheet móvil. Bloques:
-1. **Cabecera** (readonly): `id_orden`, producto principal, estado (chip), fecha creación, nombre_encargado.
-2. **Materiales** (tabla): `Material | Estimado | Real | Costo unit | Subtotal real`. Inputs de real con `parseDecimal` + autosave debounce 800ms. Botón **+ agregar material no previsto** (si Q7=sí).
-3. **Artículos producidos** (tabla): `Artículo | Estimado | Real | Precio unit | Subtotal real`. Mismo patrón.
-4. **Tiempos consolidados** (grid o tabla): se calcula en backend sumando `cronometro` de las tareas vinculadas agrupando por `categoria_tiempo`. Muestra `Categoría | Minutos`. Botón "modo corrección" abre inputs para override manual → guarda en `g_op_detalle.tiempos_override_json`.
-5. **Tareas vinculadas** (lista): filas con `fecha | responsable | título | categoría_tiempo | cron | estado`. Click → abre `TareaPanel` embebido con ← Volver (mismo patrón que ProyectoPanel).
-6. **Observaciones del lote** (textarea): autosave debounce 1s → `g_op_detalle.observaciones_lote`.
-7. **Acciones**: `[Procesar]` (responsable o ≥ responsable) y `[Validar]` (nivel ≥ 5). Mismas protecciones 503 + retry.
+### 5.2 `OpPanel.vue` (nuevo — 500px desktop / bottom-sheet móvil)
 
-### 5.3 `ItemsTablePage.vue` reutilizable → extender con `tipo='op'` **o** crear `OpTablePage.vue`
-Decisión: **crear `OpTablePage.vue` separado** (comportamiento distinto: origen de datos es `os_integracion` no `g_proyectos`; hay columna de artículos compuesta; ordena por estado-entonces-fecha).
+**7 bloques**:
 
-Columnas de la tabla (orden propuesto):
-1. `estado` (chip, prioriza Generada primero)
+1. **Cabecera** (readonly): `id_orden`, artículo principal, chip de estado, `fecha_de_creacion`, `nombre_encargado`.
+2. **Materiales** (tabla editable): `Material | Est. | Real | Costo U | Subtotal`. Autosave 800ms. Botón **"+ agregar material no previsto"** solo visible si `estado = Generada`.
+3. **Artículos producidos** (tabla editable): `Artículo | Est. | Real | Precio U | Subtotal`.
+4. **Tiempos consolidados** (tabla readonly): `Categoría | Tiempo (hh:mm:ss)`. Si OP validada → lee `g_op_tiempos`; si no → calcula al vuelo.
+5. **Tareas vinculadas** (lista): `fecha · responsable · título · categoría_produccion · cron · estado`. Click → `TareaPanel` embebido con ← Volver.
+6. **Observaciones del lote** (textarea): autosave 1s.
+7. **Acciones**: `[Procesar]` (nivel ≥ 3) y `[Validar]` (nivel ≥ 5). Modales dark. 503+retry si Playwright.
+
+### 5.3 `OpTablePage.vue` (nuevo)
+Columnas:
+1. `estado` (chip con colores; orden prioriza Generada)
 2. `id_orden`
-3. `nombre_encargado` (Responsable)
-4. `articulos` (compuesto separado por comas — según Q4)
+3. `nombre_encargado`
+4. `articulos` (compuesto comas, truncado con tooltip)
 5. `fecha_de_creacion`
 6. `vigencia` (chip chico)
 
-Ordenamiento default: `FIELD(estado, 'Generada', 'Procesada', 'Validado'), fecha_de_creacion DESC`.
-Click en fila → abre `OpPanel`.
+Orden default SQL:
+```sql
+ORDER BY FIELD(estado,'Generada','Procesada','Validado','Anulada'), fecha_de_creacion DESC
+```
+Click fila → `OpPanel`.
 
 ### 5.4 `MainLayout.vue` — sidebar
-Agregar bloque "Órdenes de Producción" al mismo nivel que "Proyectos":
 
-**Arriba (en bloque "Mis Tareas" y "Equipo")**:
+**Mis Tareas** (acordeón superior):
 ```
-▸ Órdenes de producción
-   ├─ OP 2180 · Chocolate 70% · Generada  [N tareas mías]
-   ├─ OP 2181 · Nibs 100g · Procesada     [M]
-   └─ ...
+▸ Órdenes de producción (5)
+    [🟢 Generada]   OP 2180 · 3 mis tareas
+    [🟠 Procesada]  OP 2181 · 1 mi tarea
 ```
-Click → navega a `/tareas?op_id=X` (Mis) o `/equipo?op_id=X` (Equipo). TareasPage filtra por `id_op`.
+Fuente: OPs con ≥ 1 tarea del usuario actual. Click → `/tareas?op_id=X`.
 
-**Abajo (sección "Tablas")**:
-```
-[icon precision_manufacturing] Órdenes de producción    → ruta `/ops-tabla`
-```
+**Equipo** (acordeón): mismo patrón sin filtro de responsable. Click → `/equipo?op_id=X`.
 
-### 5.5 `TareasPage.vue` — agregar filtro por `op_id`
-Equivalente a `proyecto_id`. `watch($route.query.op_id)` + backend.
+**Tablas** (sección inferior): link "Órdenes de producción" → `/ops-tabla`.
 
-### 5.6 `TareaForm.vue` + `TareaPanel.vue` — selector de categoría de tiempo
-Si la tarea tiene `id_op`: mostrar selector obligatorio `categoria_tiempo_id` (chips pill, 12 opciones). Si no tiene OP: oculto.
+### 5.5 `TareasPage.vue`
+`watch($route.query.op_id)` → refetch con filtro, análogo a `proyecto_id`.
 
-### 5.7 Ruta nueva
-`src/router/routes.js`:
+### 5.6 `TareaForm.vue` + `TareaPanel.vue`
+Selector `categoria_produccion_id` (chips pill). Solo visible si `tarea.id_op` seteado. Obligatorio al guardar.
+
+### 5.7 `src/router/routes.js`
 ```js
 { path: 'ops-tabla', component: () => import('pages/OpTablePage.vue') }
 ```
@@ -345,78 +315,125 @@ Si la tarea tiene `id_op`: mostrar selector obligatorio `categoria_tiempo_id` (c
 
 ## 6. Backend — lógica especial
 
-### 6.1 Tiempos consolidados por categoría (GET /api/gestion/op/:id)
-```sql
-SELECT ct.nombre AS categoria_tiempo,
-       SUM(t.duracion_cronometro_seg) / 60 AS minutos
-FROM g_tareas t
-LEFT JOIN g_categorias_tiempo ct ON ct.id = t.categoria_tiempo_id
-WHERE t.id_op = ? AND t.empresa = ?
-GROUP BY ct.id, ct.nombre
-ORDER BY ct.orden
-```
-Si hay override en `g_op_detalle.tiempos_override_json`, retorna override.
+### 6.1 Tiempos consolidados (GET /api/gestion/op/:id)
 
-### 6.2 Observación de la OP nueva al validar (Q9)
-Nueva plantilla:
 ```js
-const tiemposStr = tiempos.filter(t => t.minutos > 0)
-  .map(t => `${t.categoria_tiempo} ${t.minutos}m`).join(' · ')
-const observacion = [
-  `LOTE ${idOpOriginal}`,
-  `Validó: ${nombreValidador}`,
-  `Reportó: ${nombreReportador}`,
-  tiemposStr && `Tiempos: ${tiemposStr}`,
-  obsOriginal && `Obs orig: ${obsOriginal.slice(0, 200)}`
-].filter(Boolean).join(' · ')
+async function tiemposConsolidados(idOp, empresa) {
+  // Si hay snapshot (OP validada) → usar eso
+  const [snapshot] = await db.gestion.query(
+    `SELECT cp.nombre AS categoria, ot.segundos_totales AS segundos
+     FROM g_op_tiempos ot
+     JOIN g_categorias_produccion cp ON cp.id = ot.categoria_produccion_id
+     WHERE ot.id_op = ? AND ot.empresa = ?
+     ORDER BY cp.orden`,
+    [idOp, empresa]
+  )
+  if (snapshot.length) return { fuente: 'snapshot', tiempos: snapshot }
+
+  // Si no → calcular al vuelo
+  const [vivo] = await db.gestion.query(
+    `SELECT cp.nombre AS categoria,
+            COALESCE(SUM(t.duracion_cronometro_seg),0) AS segundos
+     FROM g_tareas t
+     LEFT JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
+     WHERE t.id_op = ? AND t.empresa = ?
+     GROUP BY cp.id, cp.nombre
+     HAVING segundos > 0
+     ORDER BY cp.orden`,
+    [idOp, empresa]
+  )
+  return { fuente: 'vivo', tiempos: vivo }
+}
+```
+Frontend convierte `segundos` → `hh:mm:ss`.
+
+### 6.2 Procesar OP (POST /api/gestion/op/:id/procesar)
+
+```
+1. Validar nivel ≥ 3 (desde JWT).
+2. Observacion = "Procesado por <nombre> (OS Gestión)".
+3. execFile cambiar_estado_orden_produccion.js(id_op, 'Procesada', observacion).
+4. UPDATE o INSERT en g_op_detalle: procesado_por, procesado_en = NOW().
+5. UPDATE staging zeffi_produccion_encabezados SET estado='Procesada'.
+6. Responder OK.
+```
+
+### 6.3 Validar OP (POST /api/gestion/op/:id/validar) — flujo completo
+
+```
+1. Validar nivel ≥ 5.
+2. Cargar metadata OP original (zeffi_produccion_encabezados).
+3. Cargar g_op_lineas + g_op_detalle.observaciones_lote + g_op_detalle.procesado_en.
+4. Calcular tiempos consolidados (§6.1, modo vivo).
+5. Armar observación nueva (Q9):
+     LOTE <id_original> · Validó: <nombre> · Reportó: <nombre_encargado_effi>
+     Creada: <fecha_orig> · Procesada: <procesado_en> · Validada: <AHORA>
+     Tiempos: Templado 4h0m · Enmoldado 45m · ...
+     Obs orig: <observaciones_lote + observacion_effi>
+6. Playwright: anular_orden_produccion.js(id_original, observacion).
+7. Playwright: import_orden_produccion.js(json con reales) → capturar OP_CREADA:<id_nueva>.
+8. Playwright: cambiar_estado_orden_produccion.js(id_nueva, 'Validado', observacion).
+9. UPDATE g_tareas SET id_op=<id_nueva> WHERE id_op=<id_original>.
+10. INSERT INTO g_op_detalle (id_nueva):
+      op_anterior=<id_original>, validado_por, validado_en=NOW(),
+      observaciones_lote=<copia>, responsable_validado=<opcional>.
+11. Copiar g_op_lineas al id_nueva (nuevas filas con id_op=<id_nueva>, cantidad_real=cantidad_teorica=lo reportado).
+12. Calcular tiempos consolidados sobre <id_nueva> (ahora las tareas apuntan ahí)
+    → INSERT INTO g_op_tiempos una fila por categoría con segundos > 0.
+13. UPDATE staging: original → Anulada/Anulado; insertar nueva en staging con Validado/Vigente.
+14. Responder { id_op_anterior, id_op_nueva }.
 ```
 
 ---
 
 ## 7. Fases de ejecución
 
-### Fase 0 — Aclarar preguntas abiertas (Santi)
-Bloquea todo lo demás. Sin respuestas a Q1–Q13, no se toca código.
+### Fase 0 — Prerrequisito de seguridad
+Antes de tocar schema: ver §12 y confirmar con Santi que el bloqueo de la cuenta atacante está completo y el vector de entrada cerrado.
 
-### Fase 1 — Schema + migración datos
-1. Backup completo BD `os_gestion` en VPS.
-2. Crear `g_categorias_tiempo`, `g_op_lineas`, `g_op_detalle`.
-3. ALTER `g_tareas`: agregar `categoria_tiempo_id`.
-4. Migrar datos: `g_tarea_produccion_lineas` → `g_op_lineas`; `g_tareas.id_op_original` → `g_op_detalle.id_op_original`.
-5. Validar conteos post-migración. DROP `g_tarea_produccion_lineas` y las 4 columnas de tiempo de `g_tareas`.
+### Fase 1 — Schema + datos iniciales
+1. Backup `os_gestion` (VPS) y `u768061575_os_comunidad` (Hostinger).
+2. Crear `g_categorias_produccion` (+ seeds), `g_op_lineas`, `g_op_tiempos`, `g_op_detalle`.
+3. ALTER `g_tareas`: +`categoria_produccion_id`, −4 `tiempo_*`, −`id_op_original`.
+4. DROP `g_tarea_produccion_lineas`.
+5. UPDATE `sys_usuarios.num_id` con las 5 cédulas confirmadas.
 
 ### Fase 2 — Backend: endpoints OP
-1. `GET /api/gestion/op` y `GET /api/gestion/op/:id` (con materiales, productos, tiempos consolidados, tareas vinculadas, detalle).
-2. `PUT` detalle + lineas. `POST/DELETE` líneas no previstas (Q7).
-3. Mover `procesar` y `validar` a `/op/:id/...` con la nueva plantilla de observación.
-4. Endpoint `GET /api/gestion/categorias-tiempo`.
-5. Ajustar `GET /api/gestion/tareas` → devolver `categoria_tiempo_*`; soportar filtro `op_id`.
-6. Endpoint 307 redirect para las rutas viejas (compat temporal).
+1. `GET /api/gestion/op` y `/api/gestion/op/:id` (con lineas, tiempos, tareas, detalle).
+2. `PUT/POST/DELETE` líneas + detalle.
+3. `POST /procesar` y `/validar` con la lógica de §6.2 y §6.3.
+4. `GET /api/gestion/categorias-produccion`.
+5. Ajustar `GET /api/gestion/tareas`: incluir `categoria_produccion_*`, soportar `op_id`.
+6. Borrar endpoints viejos (§4.4).
 
 ### Fase 3 — Frontend: reducir `DetallesProduccion.vue`
-Quitar inputs/botones. Link "Editar en la OP" (si hay OP).
+Solo-lectura + link "Editar en la OP".
 
 ### Fase 4 — Frontend: `OpPanel.vue`
-7 bloques (ver 5.2). Reutilizar patrones de `ProyectoPanel` donde apliquen.
+7 bloques, reutilizando patrones de `ProyectoPanel`.
 
 ### Fase 5 — Frontend: `OpTablePage.vue` + ruta
-OsDataTable con columnas del 5.3. Click → OpPanel.
+OsDataTable con las 6 columnas, click → OpPanel.
 
-### Fase 6 — Frontend: Sidebar en MainLayout
-Sección "Órdenes de producción" en Mis Tareas + Equipo + Tablas. Carga de OPs vía `/api/gestion/op?estado_in=Generada,Procesada`.
+### Fase 6 — Frontend: Sidebar
+Sub-sección OP en Mis Tareas + Equipo + link en Tablas.
 
-### Fase 7 — Frontend: TareasPage + TareaForm/Panel
-Filtro `op_id`. Selector `categoria_tiempo_id` visible si `id_op` seteado, obligatorio al guardar.
+### Fase 7 — Frontend: TareasPage + Form/Panel
+Filtro `op_id` + selector `categoria_produccion_id`.
 
 ### Fase 8 — Testing end-to-end
-- Crear tarea con OP y categoría de tiempo → cronómetro → ver suma en ficha OP.
-- Abrir ficha OP → editar real de material → autosave.
-- Procesar OP desde ficha (responsable) → estado pasa a Procesada en Effi + staging + chip.
-- Validar OP (nivel ≥ 5) → anular + crear + estado Validado. Observación nueva: `LOTE xxxx · Validó...`.
+- Crear tarea con OP y categoría Templado → cronómetro → ficha OP muestra suma correcta (modo vivo).
+- Editar real material → autosave.
+- "+ agregar material no previsto" (solo Generada).
+- Procesar OP desde ficha (nivel ≥ 3) → estado Procesada en Effi + chip.
+- Validar OP (nivel 5) → nueva OP creada + todas las tareas migran de id_op + op_anterior guardado + `g_op_tiempos` con snapshot + observación con LOTE+fechas+tiempos.
+- Abrir OP validada: tiempos vienen de snapshot (fuente='snapshot').
 - Sidebar: click OP → filtra tareas. Mobile + desktop + dark + claro.
 
 ### Fase 9 — Limpieza
-Eliminar endpoints viejos tras confirmar que el frontend no los llama. Actualizar `.agent/contextos/sistema_gestion.md` y `CATALOGO_APIS.md`. Bump versión MainLayout.
+- Actualizar `.agent/contextos/sistema_gestion.md`, `CATALOGO_APIS.md`.
+- Bump versión MainLayout a v2.9.x.
+- Commit + push.
 
 ---
 
@@ -425,22 +442,22 @@ Eliminar endpoints viejos tras confirmar que el frontend no los llama. Actualiza
 ### Nuevos
 - `sistema_gestion/app/src/components/OpPanel.vue`
 - `sistema_gestion/app/src/pages/OpTablePage.vue`
-- `sistema_gestion/app/src/components/CategoriaTiempoSelector.vue`
+- `sistema_gestion/app/src/components/CategoriaProduccionSelector.vue`
 - `sistema_gestion/api/migrations/2026-04-24_modulo_op.sql`
 
 ### Modificados
 - `sistema_gestion/app/src/components/DetallesProduccion.vue` — reducir
-- `sistema_gestion/app/src/components/TareaForm.vue` — selector categoría tiempo
-- `sistema_gestion/app/src/components/TareaPanel.vue` — selector categoría tiempo
-- `sistema_gestion/app/src/pages/TareasPage.vue` — filtro op_id
-- `sistema_gestion/app/src/layouts/MainLayout.vue` — sidebar
-- `sistema_gestion/app/src/router/routes.js` — ruta `/ops-tabla`
-- `sistema_gestion/api/server.js` — endpoints (nuevos + deprecar viejos + filtro op_id en tareas)
+- `sistema_gestion/app/src/components/TareaForm.vue`
+- `sistema_gestion/app/src/components/TareaPanel.vue`
+- `sistema_gestion/app/src/pages/TareasPage.vue` — filtro `op_id`
+- `sistema_gestion/app/src/layouts/MainLayout.vue`
+- `sistema_gestion/app/src/router/routes.js`
+- `sistema_gestion/api/server.js`
 
-### Eliminados tras validar
+### Eliminados
 - Tabla `g_tarea_produccion_lineas`
 - Columnas `tiempo_*` y `id_op_original` de `g_tareas`
-- Endpoints viejos `/tareas/:id/produccion/tiempos`, `/procesar`, `/validar`
+- Endpoints viejos en [4.4]
 
 ---
 
@@ -448,22 +465,69 @@ Eliminar endpoints viejos tras confirmar que el frontend no los llama. Actualiza
 
 | Riesgo | Mitigación |
 |---|---|
-| Datos en `g_tarea_produccion_lineas` se pierden | Backup antes. Migración con conteos antes/después. Rollback SQL listo. |
-| Usuarios con la app abierta llaman endpoints viejos | 307 redirect a los nuevos durante 1 release + bump versión MainLayout fuerza refresh PWA. |
-| OPs anuladas en Effi rompen UI al cargar | Incluir `vigencia` en respuestas; frontend muestra chip gris "Anulada" sin fallar. |
-| `categoria_tiempo_id NOT NULL` rompe tareas existentes sin OP | Nullable. Solo obligatorio en frontend cuando `id_op` seteado. |
-| Playwright no disponible en servidor de respaldo | Ya existe protección 503 + retry del frontend (v2.8.5). Se mantiene. |
+| UPDATE cédulas en Hostinger toca dato sensible | Backup previo + UPDATE puntual solo a `num_id` de 5 usuarios + confirmación |
+| Tareas con OP anulada en Effi | Chip gris "Anulada" en UI, no rompe carga |
+| PWA cacheada llama endpoints viejos | Bump versión MainLayout fuerza refresh; endpoints viejos retornan 410 Gone |
+| `categoria_produccion_id NULL` en tareas viejas con OP | Backfill opcional; obligatorio solo en UI al guardar |
+| Servidor de respaldo sin Playwright | Protección 503 + retry existente (v2.8.5) se mantiene |
+| Validar falla a mitad de los 3 scripts Playwright | Logs detallados en cada paso; rollback manual si la OP queda en estado inconsistente |
 
 ---
 
-## 10. Tareas para Antigravity (Google Labs)
+## 10. Validaciones antes de merge
 
-- QA visual del `OpPanel` y `OpTablePage` contra el mockup y el patrón de Proyectos. Spacing, tipografía, chips.
-- Revisar que la UX del sidebar (3 niveles — OP, arriba en "Mis/Equipo" y abajo en "Tablas") no se sienta redundante.
+- [ ] Backups de `os_gestion` y `u768061575_os_comunidad` ejecutados.
+- [ ] UPDATE cédulas confirmado por Santi antes de ejecutar.
+- [ ] Migración aplicada en VPS con conteos verificados.
+- [ ] Fase 8 E2E pasa.
+- [ ] Chrome DevTools MCP screenshots: OpPanel + OpTablePage dark/light/mobile.
+- [ ] Bump versión MainLayout.
+- [ ] `.agent/contextos/sistema_gestion.md` actualizado.
 
-## 11. Tareas para Subagentes (Claude)
+---
 
-- Fase 1 (migración SQL): `feature-dev:code-architect` prepara las sentencias + script de migración idempotente.
-- Fase 2 (endpoints backend): subagente genera los 6 endpoints nuevos + ajustes al listado de tareas.
-- Fase 4 (OpPanel): subagente genera el componente Vue con los 7 bloques.
-- Fase 5 (OpTablePage): subagente genera la página tabla.
+## 11. Subagentes
+
+- Fase 1 (SQL): `feature-dev:code-architect` genera migration idempotente.
+- Fase 2 (backend): subagente implementa endpoints + tests.
+- Fase 4 (OpPanel): subagente genera componente Vue.
+- Fase 5 (OpTablePage): subagente genera página.
+
+---
+
+## 12. Contexto de seguridad (2026-04-24) — NO BORRAR
+
+### Intrusión `maskedaltfivem@gmail.com` — RESUELTA
+
+**Identificado durante el diseño de este módulo**, al revisar usuarios de `sys_usuarios` para el mapeo de cédulas (Q3).
+
+- Cuenta con Nivel 9 + PRODUCCION_SUPERUSUARIO + "DIRECCION GENERAL" + teléfono UK +44 7877 178402.
+- Creada el 2026-04-01 16:46:30 (autoasignada 6 min después).
+- Solo 3 rastros en BD (ya eliminados):
+  1. `u768061575_os_comunidad.sys_usuarios` (Hostinger) — ELIMINADO.
+  2. `u768061575_os_comunidad.sys_usuarios_empresas` — ELIMINADO.
+  3. VPS `os_gestion.g_usuarios_config` — ELIMINADO.
+- Backup previo: `/home/osserver/Proyectos_Antigravity/backups/intrusion_2026-04-01/backup_maskedalt_20260424_161055.json`.
+
+**Alcance verificado**:
+- NO tuvo shell en servidor local (SSH log 2026-04-01: solo IPs 100.89.52.63 y 172.18.0.9 Docker, 125 eventos legítimos).
+- NO tuvo shell en VPS (la fila en VPS es herencia de la migración 2026-04-20).
+- SÍ entró a gestion.oscomunidad.com vía Google OAuth (servidor local en ese entonces). Solo quedó config de tema "light". NO creó tareas, jornadas, proyectos.
+- Santi confirmó: entró **directamente a la BD Hostinger** vía el PHP de WordPress (ya bloqueado por Santi). La validación de endpoint HTTP no aplicaba.
+
+### Acciones post-intrusión (pendientes de otra sesión)
+
+1. **Investigar code.oscomunidad.com** (code-server:9400 en VPS).
+   - Clave nueva puesta el 2026-04-21 13:18 CEST.
+   - Bind 0.0.0.0:9400 sin HTTPS (`cert: false`).
+   - Pendiente: revisar logs de acceso, IPs, posibles comprometidos.
+
+2. **Aislar Hostinger de la validación de usuarios** — propuesta de Santi:
+   - Mover la fuente de verdad de usuarios a una tabla master en el VPS.
+   - Gestión (y resto de apps) validan contra VPS, NO contra Hostinger.
+   - Hostinger queda solo para `u768061575_os_comunidad` del ERP Effi, totalmente aislado.
+   - **Pendiente**: verificar si ya existe esa tabla master en VPS. Si existe, verificar que no contenga maskedaltfivem ni otros intrusos.
+
+3. **Revisar WP php bloqueado**: confirmar que el endpoint vulnerable está cerrado y no haya otros vectores similares.
+
+Esto se resuelve **antes o en paralelo** a la Fase 1 del módulo OP, porque tocar `sys_usuarios` para cédulas depende de que Hostinger siga siendo fuente de verdad o no.

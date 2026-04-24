@@ -2,7 +2,8 @@
  * sistema_gestion/api/server.js
  * Puerto: 9300
  * Auth: Google OAuth (id_token) → JWT propio, multi-empresa
- * Usuarios/empresas: READ de u768061575_os_comunidad (sys_usuarios, sys_empresa, sys_usuarios_empresas)
+ * Usuarios/empresas: READ de sos_master_erp (sis_usuarios, sis_empresas, sis_usuarios_empresas)
+ *                    desde 2026-04-24 (pre-aislamiento de Hostinger)
  * Datos: READ/WRITE de u768061575_os_gestion (g_*)
  * OPs: READ de u768061575_os_integracion (zeffi_produccion_encabezados)
  */
@@ -66,7 +67,7 @@ const nivelCache = {}  // { 'email@...': nivel }
 
 async function refrescarNiveles() {
   try {
-    const [rows] = await db.comunidad.query('SELECT `Email` AS email, `Nivel_Acceso` AS nivel FROM sys_usuarios')
+    const [rows] = await db.master.query('SELECT email, nivel_global AS nivel FROM sis_usuarios')
     for (const r of rows) nivelCache[r.email] = r.nivel || 1
     console.log(`[niveles] Caché actualizado: ${rows.length} usuarios`)
   } catch (e) {
@@ -262,21 +263,23 @@ app.post('/api/gestion/auth/google', async (req, res) => {
     const payload = await validarTokenGoogle(id_token)
     const email   = payload.email
 
-    // Verificar en sys_usuarios (comunidad)
-    const [[usuario]] = await db.comunidad.query(
-      'SELECT `Email`, `Nombre_Usuario`, `Nivel_Acceso`, `estado` FROM `sys_usuarios` WHERE `Email` = ?',
+    // Verificar en sis_usuarios (master — fuente de verdad desde 2026-04-24)
+    const [[usuario]] = await db.master.query(
+      'SELECT email, nombre, nivel_global, estado FROM sis_usuarios WHERE email = ?',
       [email]
     )
     if (!usuario)              return res.status(403).json({ error: 'No tienes acceso. Contacta al administrador.' })
-    if (usuario.estado !== 'Activo') return res.status(403).json({ error: 'Usuario inactivo. Contacta al administrador.' })
+    if (String(usuario.estado).toLowerCase() !== 'activo') {
+      return res.status(403).json({ error: 'Usuario inactivo. Contacta al administrador.' })
+    }
 
     // Obtener empresas del usuario
-    const [empresas] = await db.comunidad.query(`
-      SELECT e.uid, e.nombre_empresa AS nombre, e.siglas, ue.Nivel_Acceso AS nivel_ue
-      FROM sys_usuarios_empresas ue
-      JOIN sys_empresa e ON e.uid = ue.empresa
-      WHERE ue.usuario = ? AND ue.estado = 'Activo' AND (e.estado = 'Activa' OR e.estado IS NULL)
-      ORDER BY e.nombre_empresa
+    const [empresas] = await db.master.query(`
+      SELECT e.uid, e.nombre, e.siglas, ue.nivel_empresa AS nivel_ue
+      FROM sis_usuarios_empresas ue
+      JOIN sis_empresas e ON e.uid = ue.empresa_uid
+      WHERE ue.usuario_email = ? AND ue.estado = 'activo' AND (e.estado = 'activa' OR e.estado IS NULL)
+      ORDER BY e.nombre
     `, [email])
 
     if (!empresas.length) return res.status(403).json({ error: 'No tienes empresas asignadas.' })
@@ -288,10 +291,10 @@ app.post('/api/gestion/auth/google', async (req, res) => {
     )
 
     const userBase = {
-      email:  usuario.Email,
-      nombre: usuario.Nombre_Usuario,
+      email:  usuario.email,
+      nombre: usuario.nombre,
       foto:   payload.picture || '',
-      nivel:  usuario.Nivel_Acceso,
+      nivel:  usuario.nivel_global,
       tema:   config?.tema  || 'dark',
       perfil: config?.perfil || null
     }
@@ -341,11 +344,11 @@ app.post('/api/gestion/auth/seleccionar_empresa', async (req, res) => {
   if (!empresa_uid) return res.status(400).json({ error: 'Falta empresa_uid' })
 
   try {
-    const [[emp]] = await db.comunidad.query(`
-      SELECT e.uid, e.nombre_empresa AS nombre, e.siglas
-      FROM sys_usuarios_empresas ue
-      JOIN sys_empresa e ON e.uid = ue.empresa
-      WHERE ue.usuario = ? AND ue.empresa = ? AND ue.estado = 'Activo' AND (e.estado = 'Activa' OR e.estado IS NULL)
+    const [[emp]] = await db.master.query(`
+      SELECT e.uid, e.nombre, e.siglas
+      FROM sis_usuarios_empresas ue
+      JOIN sis_empresas e ON e.uid = ue.empresa_uid
+      WHERE ue.usuario_email = ? AND ue.empresa_uid = ? AND ue.estado = 'activo' AND (e.estado = 'activa' OR e.estado IS NULL)
     `, [decoded.email, empresa_uid])
 
     if (!emp) return res.status(403).json({ error: 'No tienes acceso a esa empresa' })
@@ -435,13 +438,13 @@ app.use('/api/gestion', requireAuth)
 // GET /api/gestion/usuarios
 app.get('/api/gestion/usuarios', async (req, res) => {
   try {
-    const [rows] = await db.comunidad.query(`
-      SELECT u.\`Email\` AS email, u.\`Nombre_Usuario\` AS nombre,
-             u.\`Nivel_Acceso\` AS nivel, u.\`foto_url\` AS foto, ue.rol
-      FROM sys_usuarios_empresas ue
-      JOIN sys_usuarios u ON u.\`Email\` = ue.usuario
-      WHERE ue.empresa = ? AND ue.estado = 'Activo' AND u.\`estado\` = 'Activo'
-      ORDER BY u.\`Nombre_Usuario\`
+    const [rows] = await db.master.query(`
+      SELECT u.email, u.nombre,
+             u.nivel_global AS nivel, u.foto_url AS foto, ue.rol_uid AS rol
+      FROM sis_usuarios_empresas ue
+      JOIN sis_usuarios u ON u.email = ue.usuario_email
+      WHERE ue.empresa_uid = ? AND ue.estado = 'activo' AND u.estado = 'activo'
+      ORDER BY u.nombre
     `, [req.empresa])
     res.json({ ok: true, usuarios: rows })
   } catch (e) {
@@ -653,8 +656,8 @@ app.get('/api/gestion/tareas', async (req, res) => {
     let nombreMap = {}
     if (allEmails.length) {
       try {
-        const [users] = await db.comunidad.query(
-          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${allEmails.map(() => '?').join(',')})`,
+        const [users] = await db.master.query(
+          `SELECT email, nombre FROM sis_usuarios WHERE email IN (${allEmails.map(() => '?').join(',')})`,
           allEmails
         )
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
@@ -723,8 +726,8 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
     let nombreMap = {}
     if (allEmails.length) {
       try {
-        const [users] = await db.comunidad.query(
-          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${allEmails.map(() => '?').join(',')})`,
+        const [users] = await db.master.query(
+          `SELECT email, nombre FROM sis_usuarios WHERE email IN (${allEmails.map(() => '?').join(',')})`,
           allEmails
         )
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
@@ -804,8 +807,8 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
     let nombreMap = {}
     if (emails.length) {
       try {
-        const [users] = await db.comunidad.query(
-          `SELECT \`Email\` AS email, \`Nombre_Usuario\` AS nombre FROM sys_usuarios WHERE \`Email\` IN (${emails.map(() => '?').join(',')})`,
+        const [users] = await db.master.query(
+          `SELECT email, nombre FROM sis_usuarios WHERE email IN (${emails.map(() => '?').join(',')})`,
           emails
         )
         nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
@@ -1643,16 +1646,16 @@ app.post('/api/gestion/tareas/:id/produccion/validar', requireAuth, async (req, 
     const costoPorCod   = Object.fromEntries(matsCostos.map(m => [String(m.cod), Number(String(m.costo_ud || '').replace(',', '.')) || 0]))
     const precioPorCod  = Object.fromEntries(prodPrecios.map(p => [String(p.cod), Number(String(p.precio_minimo_ud || '').replace(',', '.')) || 0]))
 
-    // 4. Datos del validador + reportador — tolerante a comunidad (Hostinger) caído
+    // 4. Datos del validador + reportador — desde master (VPS)
     let nombreValidador  = req.usuario.nombre || req.usuario.email
     let nombreReportador = tarea.responsable || '?'
-    if (db.comunidad) {
+    if (db.master) {
       try {
-        const [[resp]] = tarea.responsable ? await db.comunidad.query(
-          'SELECT `Nombre_Usuario` AS nombre FROM sys_usuarios WHERE `Email` = ?', [tarea.responsable]
+        const [[resp]] = tarea.responsable ? await db.master.query(
+          'SELECT nombre FROM sis_usuarios WHERE email = ?', [tarea.responsable]
         ) : [[]]
         if (resp?.nombre) nombreReportador = resp.nombre
-      } catch (e) { console.warn('[validar] comunidad no disponible para nombre responsable:', e.message) }
+      } catch (e) { console.warn('[validar] master no disponible para nombre responsable:', e.message) }
     }
     const obsOriginal      = (op.observacion || '').replace(/\s+/g, ' ').trim()
     const observacion      = `Validación OS · Reportó: ${nombreReportador} · Validó: ${nombreValidador}${obsOriginal ? ' · Obs OP orig: ' + obsOriginal.slice(0, 200) : ''}`
@@ -2621,34 +2624,43 @@ app.get('/api/gestion/jornadas/historial', requireAuth, async (req, res) => {
     let where = 'j.empresa = ?'
     const params = [req.empresa]
 
-    // Visibilidad por nivel
+    // Visibilidad por nivel — filtro de emails visibles precomputado desde master
+    let emailsVisibles = null
     if (req.usuario.nivel < 7) {
-      if (usuario) {
-        // Solo puede ver usuarios de nivel inferior o a sí mismo
-        where += ' AND (j.usuario = ? OR EXISTS (SELECT 1 FROM ' +
-          'u768061575_os_comunidad.sys_usuarios su ' +
-          'WHERE su.Email = j.usuario AND su.Nivel_Acceso < ?))'
-        params.push(req.usuario.email, req.usuario.nivel)
-      } else {
-        where += ' AND (j.usuario = ? OR EXISTS (SELECT 1 FROM ' +
-          'u768061575_os_comunidad.sys_usuarios su ' +
-          'WHERE su.Email = j.usuario AND su.Nivel_Acceso < ?))'
-        params.push(req.usuario.email, req.usuario.nivel)
-      }
+      const [usuariosInferiores] = await db.master.query(
+        'SELECT email FROM sis_usuarios WHERE nivel_global < ?',
+        [req.usuario.nivel]
+      )
+      emailsVisibles = new Set([req.usuario.email, ...usuariosInferiores.map(u => u.email)])
     }
 
     if (usuario) { where += ' AND j.usuario = ?'; params.push(usuario) }
     if (fecha_desde) { where += ' AND j.fecha >= ?'; params.push(fecha_desde) }
     if (fecha_hasta) { where += ' AND j.fecha <= ?'; params.push(fecha_hasta) }
 
-    const [jornadas] = await db.gestion.query(`
-      SELECT j.*, su.Nombre_Usuario AS nombre_usuario
+    const [jornadasRaw] = await db.gestion.query(`
+      SELECT j.*
       FROM g_jornadas j
-      LEFT JOIN u768061575_os_comunidad.sys_usuarios su ON su.Email = j.usuario
       WHERE ${where}
       ORDER BY j.fecha DESC, j.hora_inicio DESC
       LIMIT 100
     `, params)
+
+    // Filtrar por visibilidad en JS (más simple que join cross-db)
+    const jornadas = emailsVisibles
+      ? jornadasRaw.filter(j => emailsVisibles.has(j.usuario))
+      : jornadasRaw
+
+    // Enriquecer con nombre desde master
+    if (jornadas.length) {
+      const emails = [...new Set(jornadas.map(j => j.usuario).filter(Boolean))]
+      const [users] = await db.master.query(
+        `SELECT email, nombre FROM sis_usuarios WHERE email IN (${emails.map(() => '?').join(',')})`,
+        emails
+      )
+      const nombreMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
+      jornadas.forEach(j => { j.nombre_usuario = nombreMap[j.usuario] || j.usuario })
+    }
 
     // Agregar indicador de confianza a cada jornada cerrada
     const jornadasConIndicador = jornadas.map(j => ({
@@ -2872,18 +2884,18 @@ app.get('/api/gestion/jornadas/equipo', requireAuth, async (req, res) => {
       ORDER BY j.fecha DESC, j.hora_inicio
     `, [req.empresa, desde, hasta])
 
-    // Enriquecer con nombres desde comunidad DB (pool separado, sin cross-join SQL)
+    // Enriquecer con nombres desde master (pool separado, sin cross-join SQL)
     if (jornadas.length > 0) {
       const emails = jornadas.map(j => j.usuario)
       const placeholders = emails.map(() => '?').join(',')
-      const [usuarios] = await db.comunidad.query(
-        `SELECT \`Email\`, \`Nombre_Usuario\`, \`Nivel_Acceso\` FROM sys_usuarios WHERE \`Email\` IN (${placeholders})`,
+      const [usuarios] = await db.master.query(
+        `SELECT email, nombre, nivel_global FROM sis_usuarios WHERE email IN (${placeholders})`,
         emails
       )
-      const uMap = Object.fromEntries(usuarios.map(u => [u.Email, u]))
+      const uMap = Object.fromEntries(usuarios.map(u => [u.email, u]))
       jornadas.forEach(j => {
-        j.Nombre_Usuario = uMap[j.usuario]?.Nombre_Usuario || null
-        j.Nivel_Acceso   = uMap[j.usuario]?.Nivel_Acceso   || null
+        j.Nombre_Usuario = uMap[j.usuario]?.nombre       || null
+        j.Nivel_Acceso   = uMap[j.usuario]?.nivel_global || null
       })
     }
 

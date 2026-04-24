@@ -164,6 +164,7 @@ def remota(prefijo, dict_cursor=False):
 def integracion(dict_cursor=False): return remota('INTEGRACION', dict_cursor)
 def gestion(dict_cursor=False):     return remota('GESTION',     dict_cursor)
 def inventario(dict_cursor=False):  return remota('INVENTARIO',  dict_cursor)
+def master(dict_cursor=False):      return remota('MASTER',      dict_cursor)
 def comunidad(dict_cursor=False):   return remota('COMUNIDAD',   dict_cursor)
 
 
@@ -187,6 +188,17 @@ def cfg_integracion(dict_cursor=True):
     local es solo intermediaria del pipeline (ver MANIFESTO §8).
     """
     return _cfg_remota_dict('INTEGRACION', dict_cursor)
+
+
+def cfg_master(dict_cursor=True):
+    """Retorna dict compatible con pymysql.connect(**) para sos_master_erp en VPS.
+    Abre tunnel SSH al VPS si no está abierto.
+
+    USAR PARA: validación de usuarios, empresas, roles, permisos. Única fuente
+    de verdad post-aislamiento de Hostinger (2026-04-24). Reemplaza
+    sys_usuarios/sys_usuarios_empresas/sys_empresa de u768061575_os_comunidad.
+    """
+    return _cfg_remota_dict('MASTER', dict_cursor)
 
 
 def _cfg_remota_dict(prefijo, dict_cursor):

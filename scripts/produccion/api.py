@@ -63,13 +63,13 @@ def _validar_token_google(id_token: str) -> dict:
 
 
 def _buscar_usuario_os(email: str) -> Optional[dict]:
-    """Busca el usuario en sys_usuarios (Hostinger os_comunidad) vía helper remoto."""
-    from lib import comunidad
-    with comunidad(dict_cursor=True) as conn:
+    """Busca el usuario en sis_usuarios (master VPS) — fuente de verdad desde 2026-04-24."""
+    from lib import master
+    with master(dict_cursor=True) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT Email AS email, Nombre_Usuario AS nombre, Nivel_Acceso AS nivel, "
-                "estado, foto_url FROM sys_usuarios WHERE Email = %s",
+                "SELECT email, nombre, nivel_global AS nivel, "
+                "estado, foto_url FROM sis_usuarios WHERE email = %s",
                 (email,)
             )
             return cur.fetchone()
@@ -81,13 +81,13 @@ class GoogleAuthRequest(BaseModel):
 
 @app.post("/api/auth/google")
 def api_auth_google(req: GoogleAuthRequest):
-    """Login con Google: valida id_token, busca usuario en sys_usuarios, devuelve JWT."""
+    """Login con Google: valida id_token, busca usuario en sis_usuarios (master), devuelve JWT."""
     payload = _validar_token_google(req.id_token)
     email = payload['email']
     usuario = _buscar_usuario_os(email)
     if not usuario:
         raise HTTPException(403, "No tienes acceso. Contacta al administrador.")
-    if usuario.get('estado') != 'Activo':
+    if str(usuario.get('estado', '')).lower() != 'activo':
         raise HTTPException(403, "Usuario inactivo. Contacta al administrador.")
 
     token = jwt.encode({

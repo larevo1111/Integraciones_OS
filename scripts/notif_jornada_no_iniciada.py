@@ -4,47 +4,33 @@ Notificación de jornada NO iniciada — se ejecuta a las 9am L-V vía cron.
 Criterios:
 - Usuario activo = tuvo al menos una jornada en los últimos 7 días
 - NO tiene jornada de hoy (ni abierta ni cerrada)
-- Está en sys_usuarios con estado='Activo' y tiene teléfono registrado
+- Está en sis_usuarios con estado='activo' y tiene teléfono registrado
 
 - Envía aviso por WhatsApp al usuario.
 - Envía resumen al admin (Santiago) por WhatsApp.
 
 Fuentes de datos:
-- Jornadas: u768061575_os_gestion (Hostinger)
-- Usuarios y teléfonos: u768061575_os_comunidad.sys_usuarios (Hostinger)
+- Jornadas: os_gestion (VPS Contabo)
+- Usuarios y teléfonos: sos_master_erp.sis_usuarios (VPS) — desde 2026-04-24
 """
 import os
 import sys
-import pymysql
 import requests
 from datetime import date, timedelta
-from sshtunnel import SSHTunnelForwarder
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 DRY_RUN = '--dry-run' in sys.argv
 
-# ── Config (via helper central) ─────────────────────────────────
+# ── Helper central de BD ───────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import cfg_remota_ssh, cfg_remota_db
-
-_ssh_g = cfg_remota_ssh('GESTION')
-SSH_HOST = _ssh_g['host']
-SSH_PORT = _ssh_g['port']
-SSH_USER = _ssh_g['user']
-SSH_KEY  = _ssh_g['key']
-
-_dbg = cfg_remota_db('GESTION')
-GESTION_DB, GESTION_USER, GESTION_PASS = _dbg['database'], _dbg['user'], _dbg['password']
-
-_dbc = cfg_remota_db('COMUNIDAD')
-COMUNIDAD_DB, COMUNIDAD_USER, COMUNIDAD_PASS = _dbc['database'], _dbc['user'], _dbc['password']
+from lib import gestion, master
 
 WA_BRIDGE_URL = 'http://localhost:3100'
 ADMIN_PHONE   = '573022921455'  # Santiago (ssierra047@gmail.com)
 
-EMPRESA      = 'Ori_Sil_2'
+EMPRESA      = 'ori_sil_2'
 
 
 def enviar_whatsapp(telefono, mensaje):
@@ -69,27 +55,19 @@ def enviar_whatsapp(telefono, mensaje):
         return False
 
 
-def obtener_contactos(emails: list, tunnel_port: int) -> dict:
-    """Busca nombre y teléfono en sys_usuarios (os_comunidad) vía SSH tunnel."""
+def obtener_contactos(emails: list) -> dict:
+    """Busca nombre y teléfono en sis_usuarios (master VPS)."""
     if not emails:
         return {}
-    conn = pymysql.connect(
-        host='127.0.0.1', port=tunnel_port,
-        user=COMUNIDAD_USER, password=COMUNIDAD_PASS,
-        database=COMUNIDAD_DB,
-        cursorclass=pymysql.cursors.DictCursor
-    )
-    try:
+    with master(dict_cursor=True) as conn:
         with conn.cursor() as cur:
             placeholders = ','.join(['%s'] * len(emails))
             cur.execute(
-                f"SELECT `Email`, `Nombre_Usuario`, `telefono` FROM sys_usuarios "
-                f"WHERE `Email` IN ({placeholders}) AND estado='Activo'",
+                f"SELECT email AS Email, nombre AS Nombre_Usuario, telefono FROM sis_usuarios "
+                f"WHERE email IN ({placeholders}) AND estado='activo'",
                 emails
             )
             return {r['Email']: r for r in cur.fetchall()}
-    finally:
-        conn.close()
 
 
 def main():
@@ -97,49 +75,31 @@ def main():
     hace7dias  = (date.today() - timedelta(days=7)).isoformat()
     print(f'[notif_jornada_no_iniciada] {hoy} — verificando usuarios sin jornada hoy...')
 
-    # Conectar a Hostinger vía SSH tunnel
-    with SSHTunnelForwarder(
-        (SSH_HOST, SSH_PORT),
-        ssh_username=SSH_USER,
-        ssh_pkey=SSH_KEY,
-        remote_bind_address=('127.0.0.1', 3306),
-        local_bind_address=('127.0.0.1', 0)
-    ) as tunnel:
-        local_port = tunnel.local_bind_port
+    # 1. Usuarios activos (con jornada en últimos 7 días) SIN jornada hoy
+    with gestion(dict_cursor=True) as conn_g:
+        with conn_g.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT j.usuario
+                FROM g_jornadas j
+                WHERE j.empresa = %s
+                  AND j.fecha >= %s
+                  AND j.usuario NOT IN (
+                      SELECT usuario FROM g_jornadas
+                      WHERE empresa = %s AND fecha = %s
+                  )
+                ORDER BY j.usuario
+            """, (EMPRESA, hace7dias, EMPRESA, hoy))
+            sin_jornada_hoy = cur.fetchall()
 
-        # 1. Usuarios activos (con jornada en últimos 7 días) SIN jornada hoy
-        conn_g = pymysql.connect(
-            host='127.0.0.1', port=local_port,
-            user=GESTION_USER, password=GESTION_PASS,
-            database=GESTION_DB,
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        try:
-            with conn_g.cursor() as cur:
-                cur.execute("""
-                    SELECT DISTINCT j.usuario
-                    FROM g_jornadas j
-                    WHERE j.empresa = %s
-                      AND j.fecha >= %s
-                      AND j.usuario NOT IN (
-                          SELECT usuario FROM g_jornadas
-                          WHERE empresa = %s AND fecha = %s
-                      )
-                    ORDER BY j.usuario
-                """, (EMPRESA, hace7dias, EMPRESA, hoy))
-                sin_jornada_hoy = cur.fetchall()
-        finally:
-            conn_g.close()
+    if not sin_jornada_hoy:
+        print('  Todos los usuarios activos ya iniciaron jornada hoy. OK.')
+        return
 
-        if not sin_jornada_hoy:
-            print('  Todos los usuarios activos ya iniciaron jornada hoy. OK.')
-            return
+    print(f'  {len(sin_jornada_hoy)} usuario(s) activo(s) sin jornada hoy')
 
-        print(f'  {len(sin_jornada_hoy)} usuario(s) activo(s) sin jornada hoy')
-
-        # 2. Consultar teléfonos y nombres desde sys_usuarios (os_comunidad)
-        emails = [u['usuario'] for u in sin_jornada_hoy]
-        contactos = obtener_contactos(emails, local_port)
+    # 2. Consultar teléfonos y nombres desde sis_usuarios (master VPS)
+    emails = [u['usuario'] for u in sin_jornada_hoy]
+    contactos = obtener_contactos(emails)
 
     # 3. Enviar notificaciones WhatsApp
     notificados   = []
@@ -148,7 +108,7 @@ def main():
 
     for u in sin_jornada_hoy:
         info = contactos.get(u['usuario'])
-        # Si no está en sys_usuarios con estado='Activo', se descarta
+        # Si no está en sis_usuarios con estado='activo', se descarta
         if not info:
             inactivos.append(u['usuario'])
             continue

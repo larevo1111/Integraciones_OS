@@ -5,8 +5,8 @@ Notificación de jornadas abiertas — se ejecuta a las 8pm todos los días vía
 - Si alguien no tiene teléfono registrado, lo reporta en el resumen.
 
 Fuentes de datos:
-- Jornadas: u768061575_os_gestion (Hostinger)
-- Usuarios y teléfonos: u768061575_os_comunidad.sys_usuarios (Hostinger)
+- Jornadas: os_gestion (VPS Contabo)
+- Usuarios y teléfonos: sos_master_erp.sis_usuarios (VPS) — desde 2026-04-24
 - NUNCA consultar ia_service_os para datos de usuarios.
 """
 import os
@@ -20,7 +20,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 # ── Helper central de BD (SSH tunnel + SET time_zone='-05:00' en sesión) ──
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import gestion, comunidad
+from lib import gestion, master
 
 WA_BRIDGE_URL = 'http://localhost:3100'
 ADMIN_PHONE   = '573022921455'  # Santiago (ssierra047@gmail.com)
@@ -47,15 +47,15 @@ def enviar_whatsapp(telefono, mensaje):
 
 
 def obtener_contactos(emails):
-    """Busca nombre y teléfono en sys_usuarios (os_comunidad)."""
+    """Busca nombre y teléfono en sis_usuarios (master VPS)."""
     if not emails:
         return {}
-    with comunidad(dict_cursor=True) as conn:
+    with master(dict_cursor=True) as conn:
         with conn.cursor() as cur:
             placeholders = ','.join(['%s'] * len(emails))
             cur.execute(
-                f"SELECT `Email`, `Nombre_Usuario`, `telefono` FROM sys_usuarios "
-                f"WHERE `Email` IN ({placeholders}) AND estado='Activo'",
+                f"SELECT email AS Email, nombre AS Nombre_Usuario, telefono FROM sis_usuarios "
+                f"WHERE email IN ({placeholders}) AND estado='activo'",
                 emails
             )
             return {r['Email']: r for r in cur.fetchall()}
@@ -88,7 +88,7 @@ def main():
 
     print(f'  {len(abiertas)} jornada(s) abierta(s)')
 
-    # 2. Consultar teléfonos desde sys_usuarios (os_comunidad)
+    # 2. Consultar teléfonos desde sis_usuarios (master VPS)
     emails = [j['usuario'] for j in abiertas]
     contactos = obtener_contactos(emails)
 

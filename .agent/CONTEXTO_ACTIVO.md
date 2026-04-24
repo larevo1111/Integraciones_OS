@@ -1,6 +1,30 @@
 # Contexto Activo — Integraciones OS
 **Actualizado**: 2026-04-24
 
+## Completado 2026-04-24 — Aislamiento de Hostinger: usuarios desde sos_master_erp (VPS)
+
+**Contexto**: Tras detectar y limpiar una intrusión (`maskedaltfivem@gmail.com`, ver `.agent/planes/activos/PLAN_MODULO_OP_GESTION_2026-04-24.md` §12), Santi decidió cortar la dependencia de Hostinger para validar usuarios. Hostinger queda aislado exclusivamente para el ERP Effi real (`u768061575_os_comunidad`).
+
+**Cambios:**
+- **Tabla master verificada**: `sos_master_erp.sis_usuarios` en VPS Contabo (creada 2026-04-20, 7 usuarios activos, sincronizada con Hostinger).
+- **Helper nuevo `db.master()`**: en `lib/db_conn.js` + `scripts/lib/db_conn.py` + `scripts/lib/__init__.py` (+ `cfg_master()`).
+- **Usuario MySQL `os_master` en VPS**: SELECT sobre `sos_master_erp.*` + INSERT sobre `audit_logins` y `audit_sos`.
+- **Bloque `DB_MASTER_*` en `.env`**: local (SSH al VPS) + VPS (modo directo) + plantilla `.env.example`.
+- **Sistema Gestión refactorizado**: `sistema_gestion/api/server.js` — 15+ queries que usaban `db.comunidad` + `sys_usuarios*` ahora usan `db.master` + `sis_usuarios*`. Mapping: `Email→email`, `Nombre_Usuario→nombre`, `Nivel_Acceso→nivel_global`, `estado 'Activo'→'activo'`, `sys_empresa.nombre_empresa→sis_empresas.nombre`, `ue.usuario→ue.usuario_email`, `ue.empresa→ue.empresa_uid`.
+- **Producción refactorizado**: `scripts/produccion/api.py._buscar_usuario_os()` → master.
+- **Scripts notificación refactorizados**: `notif_jornadas_abiertas.py`, `notif_jornada_no_iniciada.py` → master (eliminan SSH tunnel manual a Hostinger).
+- **Cross-database JOIN eliminado**: en Gestión había JOIN entre `os_gestion.g_jornadas` y `u768061575_os_comunidad.sys_usuarios` (BDs en servers distintos → roto desde 2026-04-20). Reemplazado por 2 queries + merge en Node.
+- **ERP Frontend + Inventario**: NO requieren cambios (ERP solo usa `db.integracion`; Inventario delega JWT a Gestión).
+
+**Resultado**: si un atacante vuelve a entrar al ERP Hostinger (por WP PHP u otro vector), NO afecta a gestion/producción/inventario. Hostinger aislado funcionalmente.
+
+**Pendientes:**
+- Reiniciar `os-gestion.service` en VPS (requiere sudo Santi via code-server; archivos ya desplegados).
+- Activar registro en `audit_logins` desde el flujo de login.
+- Normalizar `g_jornadas.empresa` y `g_tareas.empresa` a lowercase (opcional, collation `_ci` ya matchea).
+
+---
+
 ## Completado 2026-04-24 — Limpieza arquitectura BDs: effi_data ya no es fuente de verdad
 
 **Problema detectado**: la app de Producción/Inventario aún consultaba `effi_data` LOCAL para tablas zeffi_* (OPs, materiales, artículos, recetas). Eso violaba la arquitectura: `effi_data` es **intermediaria del pipeline**, la fuente de verdad consolidada es `os_integracion` en VPS.
