@@ -337,6 +337,7 @@
 
 <script setup>
 import { apiFetch, api } from 'src/services/api'
+import { localDatetime, fmtDatetime } from 'src/services/fecha'
 import AyudaPanel from 'src/components/AyudaPanel.vue'
 import { ref, computed, onMounted } from 'vue'
 import { PlusIcon, PencilIcon, XIcon, TrashIcon, UploadIcon, FileTextIcon } from 'lucide-vue-next'
@@ -453,7 +454,7 @@ async function syncSchema() {
     const data = await api(`/api/ia/esquemas/${temaActivo.value.id}/sync`, { method: 'POST' })
     schemaMsg.value = data.mensaje || 'Schema sincronizado'
     schemaMsgOk.value = data.ok !== false
-    if (data.ok) { esquema.value = { ...esquema.value, ddl_auto: data.schema, ultima_sync: new Date().toISOString() } }
+    if (data.ok) { esquema.value = { ...esquema.value, ddl_auto: data.schema, ultima_sync: localDatetime() } }
   } catch (e) {
     schemaMsg.value = e.message; schemaMsgOk.value = false
   } finally { sincronizando.value = false }
@@ -475,10 +476,9 @@ async function guardarSchema() {
   } finally { guardandoSchema.value = false }
 }
 
-function fmtFecha(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })
-}
+// Usa fmtDatetime del helper: siempre muestra hora Colombia sin depender de la
+// zona del navegador (antes era inconsistente si el admin se abría desde fuera de CO).
+const fmtFecha = fmtDatetime
 
 // ── Documentos ────────────────────────────────────────────────────
 async function cargarDocumentos() {
