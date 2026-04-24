@@ -1,7 +1,7 @@
 # Catálogo de Tablas — Origen Silvestre
 
 Descripción de negocio de cada tabla disponible para el análisis de IA.
-**Fuente de datos**: VPS Contabo `os_integracion` (desde 2026-04-20, migrada de Hostinger). Sincronizada cada 2h desde Effi vía pipeline.
+**Fuente de datos**: VPS Contabo `os_integracion` (desde 2026-04-20, migrada de Hostinger). Sincronizada cada 1h desde Effi vía pipeline.
 
 ---
 

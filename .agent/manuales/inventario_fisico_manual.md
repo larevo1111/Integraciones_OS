@@ -175,7 +175,7 @@ Resultado del calculo de inventario teorico a fecha de corte.
 Catalogo de articulos de Effi con unidad y grupo precalculados. Vive en `effi_data` (local) y en `u768061575_os_integracion` (Hostinger). Mismo patron que `crm_contactos`.
 
 **Se actualiza de 2 formas:**
-1. Cada 2 horas — paso 6e del pipeline (`sync_inventario_catalogo.py`)
+1. Cada 1 hora — paso 6e del pipeline (`sync_inventario_catalogo.py`)
 2. Bajo demanda — boton "Sync Effi" en la app de inventario
 
 **Script:** `scripts/sync_inventario_catalogo.py`
@@ -196,7 +196,7 @@ Catalogo de articulos de Effi con unidad y grupo precalculados. Vive en `effi_da
 | actualizado_en | DATETIME | Timestamp de ultima sincronizacion |
 
 **Por que existe esta tabla y no se usa `zeffi_inventario` directamente:**
-`import_all.js` hace DROP TABLE + CREATE en cada ejecucion del pipeline (cada 2h). Cualquier columna extra (unidad, grupo) se pierde. `inv_catalogo_articulos` usa CREATE IF NOT EXISTS + TRUNCATE + INSERT — la estructura sobrevive. Mismo patron que `crm_contactos` de EspoCRM.
+`import_all.js` hace DROP TABLE + CREATE en cada ejecucion del pipeline (cada 1h). Cualquier columna extra (unidad, grupo) se pierde. `inv_catalogo_articulos` usa CREATE IF NOT EXISTS + TRUNCATE + INSERT — la estructura sobrevive. Mismo patron que `crm_contactos` de EspoCRM.
 
 **Quien la usa:**
 - El endpoint `/api/inventario/articulos/buscar` (modal de asignar articulos NM)
@@ -876,7 +876,7 @@ Requisito: nivel >= 5 (Supervisor).
 
 **El proceso tarda 2-3 minutos.** No se puede clickear dos veces (bloqueado mientras hay sync).
 
-**Tambien se ejecuta automaticamente** cada 2h como paso 6e del pipeline (orquestador.py).
+**Tambien se ejecuta automaticamente** cada 1h como paso 6e del pipeline (orquestador.py).
 
 ---
 

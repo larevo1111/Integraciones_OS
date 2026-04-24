@@ -332,7 +332,7 @@ App independiente para conteo de inventario. Separada de sistema_gestion.
 - **Manual completo**: `.agent/manuales/inventario_fisico_manual.md` — **21 secciones, v2.0**
 - **App**: `inv.oscomunidad.com` — Vue 3 + Vite frontend, FastAPI backend (puerto 9401)
 - **BD**: `os_inventario` — 4 tablas: `inv_conteos`, `inv_rangos`, `inv_auditorias`, `inv_teorico`
-- **Catálogo**: `inv_catalogo_articulos` (effi_data local + Hostinger) — artículos con unidad y grupo precalculados, sync cada 2h + botón Sync Effi
+- **Catálogo**: `inv_catalogo_articulos` (effi_data local + Hostinger) — artículos con unidad y grupo precalculados, sync cada 1h + botón Sync Effi
 - **Scripts inventario**: `depurar_inventario.py`, `calcular_rangos.py`, `calcular_inventario_teorico.py`, `api.py`
 - **Scripts sync/ajuste**: `sync_inventario_catalogo.py` (paso 6e pipeline), `import_ajuste_inventario.js` (Playwright, crea ajustes en Effi)
 - **Auth**: Google OAuth, JWT compartido con sistema_gestion
@@ -686,7 +686,7 @@ Para mover `os_integracion` y/o `os_gestion` a otro servidor (ej: Hostinger → 
 - **Acceso público**: Cloudflare Tunnel → dominios `*.oscomunidad.com`.
 
 ### Orquestador Python (effi-pipeline)
-- **Script**: `scripts/orquestador.py` — corre export + import cada 2h (Lun–Sab, 06:00–20:00).
+- **Script**: `scripts/orquestador.py` — corre export + import cada 1h (Lun–Sab, 06:00–20:00).
 - **Credenciales**: `scripts/.env` — **NUNCA subir a Git.**
 - **Notificaciones**: email siempre + Telegram solo en error → usa `@os_notificaciones_sys_bot` (`TELEGRAM_NOTIF_BOT_TOKEN`). Bot de IA (`TELEGRAM_BOT_TOKEN`) es solo para conversaciones.
 - **Systemd**: `systemd/effi-pipeline.service` + `.timer`

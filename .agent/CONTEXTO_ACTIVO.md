@@ -219,7 +219,7 @@ Credenciales locales: `osadmin` / `Epist2487.`
 
 | Archivo | Propósito |
 |---|---|
-| `scripts/orquestador.py` | Orquestador pipeline (cada 2h Lun-Sab 06:00-20:00) |
+| `scripts/orquestador.py` | Orquestador pipeline (cada 1h Lun-Sab 06:00-20:00) |
 | `scripts/.env` | Credenciales (NO en git) |
 | `logs/pipeline.log` | Log del pipeline |
 | `/home/osserver/docker/docker-compose.yml` | Docker compose |

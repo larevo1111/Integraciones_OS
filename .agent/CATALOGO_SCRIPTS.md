@@ -59,7 +59,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 | **7b** | `import_clientes_effi.js` | Node/Playwright | Sube XLSX a Effi vía formulario masivo (condicional: solo si 7a generó) |
 
 **Orquestador**: `python3 scripts/orquestador.py --forzar`
-**Horario**: Lun–Sáb 06:00–20:00 cada 2h (systemd timer `effi-pipeline.timer`)
+**Horario**: Lun–Sáb 06:00–20:00 cada 1h (systemd timer `effi-pipeline.timer`)
 **Notificaciones**: email siempre + Telegram en error
 
 ---
@@ -77,7 +77,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Salida**: logs en stdout + `logs/pipeline.log`; email siempre; Telegram solo en error
 - **Tabla(s) MariaDB**: ninguna directamente (delega a import_all.js y los 8 scripts calcular_resumen_*)
 - **Dependencias**: `export_all.sh`, `import_all.js`, todos los `calcular_resumen_ventas_*.py` (pasos 3a/3b/3c/3d/4a/4b/4c/4d), `sync_catalogo_articulos.py`, `sync_hostinger.py`, `sync_espocrm_marketing.py`, `sync_espocrm_contactos.py`, `sync_espocrm_to_hostinger.py`, `generar_plantilla_import_effi.py`, `import_clientes_effi.js`, `scripts/.env`
-- **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 2h)
+- **Horario operativo**: Lun–Sáb, 06:00–20:00 (systemd timer cada 1h)
 - **Systemd**:
   ```bash
   systemctl status effi-pipeline.timer     # estado y próxima ejecución
