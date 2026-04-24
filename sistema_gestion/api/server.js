@@ -91,29 +91,50 @@ function filtrarPorNivel(items, reqUsuario, campoResponsables = 'responsables') 
 // Última actividad PROPIA de tareas de un usuario en una fecha
 // Solo usa fecha_fin_real (completar tarea) — fecha_ult_modificacion es ruidosa (cualquier persona la cambia)
 async function ultimaActividadTareas(email, fecha) {
+  // Devuelve string 'YYYY-MM-DD HH:MM:SS' en TZ Colombia (pool ya tiene timezone -05:00).
+  // Trabajar con strings evita la doble conversión de TZ que ocurre si el OS del server
+  // está en otro TZ (ej. VPS en CEST) al convertir Date de mysql2 ↔ new Date() de Node.
   const [[row]] = await db.gestion.query(`
-    SELECT MAX(t.fecha_fin_real) AS ultima
+    SELECT DATE_FORMAT(MAX(t.fecha_fin_real), '%Y-%m-%d %H:%i:%s') AS ultima
     FROM g_tareas t
     JOIN g_tareas_responsables tr ON tr.tarea_id = t.id
     WHERE tr.email = ? AND DATE(t.fecha_fin_real) = ?
   `, [email, fecha])
-  return row?.ultima ? new Date(row.ultima) : null
+  return row?.ultima || null
 }
 
 /**
  * Cierra una jornada abandonada (abierta más de UMBRAL_CIERRE_H horas).
- * Calcula hora_fin = última actividad de tareas + 30min, o hora_inicio + 13h si no hubo actividad.
- * Devuelve { cerrada, cierreAuto?, horasAbiertas, motivo? }.
+ * TODO el cálculo de tiempo se hace en SQL usando NOW() del pool (TZ Colombia),
+ * para evitar bugs de TZ cuando el server corre en otra zona horaria (ej. VPS CEST).
  */
 const UMBRAL_CIERRE_H = 13
-async function cerrarJornadaAbandonada(jornada, ahora = new Date()) {
-  const horasAbiertas = (ahora - new Date(jornada.hora_inicio)) / 3600000
-  if (horasAbiertas <= UMBRAL_CIERRE_H) return { cerrada: false, horasAbiertas, motivo: 'menor-al-umbral' }
+async function cerrarJornadaAbandonada(jornada) {
+  const [[row]] = await db.gestion.query(
+    `SELECT TIMESTAMPDIFF(MINUTE, ?, NOW()) AS minutos_abiertos`,
+    [jornada.hora_inicio]
+  )
+  const minutosAbiertos = row?.minutos_abiertos || 0
+  const horasAbiertas = Math.round(minutosAbiertos / 6) / 10
+  if (minutosAbiertos <= UMBRAL_CIERRE_H * 60) {
+    return { cerrada: false, horasAbiertas, motivo: 'menor-al-umbral' }
+  }
 
   const ultimaAct = await ultimaActividadTareas(jornada.usuario, jornada.fecha)
-  const cierreAuto = ultimaAct
-    ? new Date(ultimaAct.getTime() + 30 * 60000)
-    : new Date(new Date(jornada.hora_inicio).getTime() + UMBRAL_CIERRE_H * 3600000)
+
+  // Calcular cierre_auto en SQL (string en TZ Colombia):
+  // - con actividad: ultimaAct + 30min
+  // - sin actividad: hora_inicio + 13h
+  const [[cierreRow]] = ultimaAct
+    ? await db.gestion.query(
+        `SELECT DATE_FORMAT(DATE_ADD(?, INTERVAL 30 MINUTE), '%Y-%m-%d %H:%i:%s') AS cierre`,
+        [ultimaAct]
+      )
+    : await db.gestion.query(
+        `SELECT DATE_FORMAT(DATE_ADD(?, INTERVAL ? HOUR), '%Y-%m-%d %H:%i:%s') AS cierre`,
+        [jornada.hora_inicio, UMBRAL_CIERRE_H]
+      )
+  const cierreAuto = cierreRow.cierre
 
   await db.gestion.query(
     `UPDATE g_jornadas SET hora_fin = ?, hora_fin_registro = NOW(),
@@ -121,7 +142,7 @@ async function cerrarJornadaAbandonada(jornada, ahora = new Date()) {
      WHERE id = ? AND hora_fin IS NULL`,
     [cierreAuto, ultimaAct, 'sistema', jornada.id]
   )
-  return { cerrada: true, cierreAuto, horasAbiertas: Math.round(horasAbiertas * 10) / 10, ultimaAct }
+  return { cerrada: true, cierreAuto, horasAbiertas, ultimaAct }
 }
 
 // Indicador de confianza de una jornada cerrada
