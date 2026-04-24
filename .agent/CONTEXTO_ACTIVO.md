@@ -1,6 +1,25 @@
 # Contexto Activo — Integraciones OS
 **Actualizado**: 2026-04-24
 
+## Completado 2026-04-24 — Limpieza arquitectura BDs: effi_data ya no es fuente de verdad
+
+**Problema detectado**: la app de Producción/Inventario aún consultaba `effi_data` LOCAL para tablas zeffi_* (OPs, materiales, artículos, recetas). Eso violaba la arquitectura: `effi_data` es **intermediaria del pipeline**, la fuente de verdad consolidada es `os_integracion` en VPS.
+
+**Hecho:**
+- ✅ Helper nuevo `cfg_integracion()` en `scripts/lib/db_conn.py` (análogo a `cfg_inventario()`, abre tunnel SSH al VPS automático)
+- ✅ Reapuntados 12 archivos Python (5 producción + 7 inventario): `cfg_local()+'effi_data'` → `cfg_integracion()`
+- ✅ Documentación: MANIFESTO §8 reescrito + memoria persistente `feedback_effi_data_intermediaria.md`
+- ✅ Test exhaustivo 18/18 endpoints OK contra VPS (494 artículos, 60 solicitudes post-migración, 306 inventario, recetas)
+- ✅ Backups de TODAS las BDs: `backups/{bd}/2026-04-24_131441.sql` (effi_data 58MB, ia_service_os 26MB, espocrm 1.6MB, os_whatsapp 52KB, os_inventario 1.2MB, os_produccion 16KB, comunidad 756KB)
+- ✅ Migración legacy `os_produccion.solicitudes_produccion` (55 datos viejos) → VPS `prod_solicitudes` preservando IDs (1 grupo + 55 solicitudes con IDs 1-55)
+- ✅ DROP de BDs locales duplicadas: `os_inventario` (1.7MB, 10 tablas inv_*) y `os_produccion` (3 tablas prod_*) — todo está en `inventario_produccion_effi` VPS
+- ✅ Smoke test post-DROP: todos los endpoints siguen 200 OK
+
+**Mapa final de BDs** (ver MANIFESTO §8):
+- LOCAL: nextcloud, **effi_data** (intermediaria pipeline), ia_service_os, espocrm, nocodb_meta, sos_erp_local, ia_local, os_whatsapp
+- VPS: **os_integracion** (fuente de verdad zeffi_* + resumen_* + crm_contactos + catalogo_articulos), os_gestion, **inventario_produccion_effi** (prod_* + inv_*)
+- HOSTINGER: solo `u768061575_os_comunidad` (ERP real)
+
 ## Completado 2026-04-24 — Reversión arquitectura a VPS + auto-cierre jornadas + diagnóstico Playwright VPS
 
 **Resumen**: Producción de `gestion.oscomunidad.com` vuelve a correr 100% en VPS Contabo (arquitectura correcta). El "bloqueante" que el 2026-04-23 motivó reapuntar DNS al local (supuesto filtro de Effi por IP) era falso — la sesión `session.json` stale copiada del local generaba cookies no reconocidas. Con login fresh generado en el VPS, Playwright ejecuta en VPS idéntico al local.
@@ -82,7 +101,7 @@ Módulo completo para que el operario reporte consumos reales en una OP vinculad
 | Sistema Gestión OS | [contextos/sistema_gestion.md](contextos/sistema_gestion.md) | Jornadas ✅ + Tareas ✅ + Detalles de Producción ✅ (v2.8.5) | Alta |
 | EspoCRM | [contextos/espocrm.md](contextos/espocrm.md) | Estable — sin trabajo activo | — |
 | Inventario Físico | [contextos/inventario_fisico.md](contextos/inventario_fisico.md) | Operativo — inv.oscomunidad.com, inventarios completos + parciales | Alta |
-| Producción | `produccion/` + `scripts/produccion/api.py:9600` | React + Shadcn/ui + Tailwind (style Linear), BD `os_produccion` | Operativo — solicitudes → OPs Effi via Playwright |
+| Producción | `produccion/` + `scripts/produccion/api.py:9600` | React + Shadcn/ui + Tailwind (style Linear). BD `inventario_produccion_effi` VPS (`prod_*`). Consulta zeffi de `os_integracion` VPS | Operativo — solicitudes → OPs Effi via Playwright |
 | WA Bridge | `wa_bridge/` | ✅ Activo — puerto 3100, número 573214550933 vinculado | Normal |
 
 ## Trabajo activo (2026-04-23)
