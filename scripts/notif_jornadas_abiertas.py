@@ -11,29 +11,16 @@ Fuentes de datos:
 """
 import os
 import sys
-import pymysql
+
 import requests
 from datetime import date
-from sshtunnel import SSHTunnelForwarder
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
-# ── Config (via helper central) ─────────────────────────────────
+# ── Helper central de BD (SSH tunnel + SET time_zone='-05:00' en sesión) ──
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lib import cfg_remota_ssh, cfg_remota_db
-
-_ssh_g = cfg_remota_ssh('GESTION')
-SSH_HOST = _ssh_g['host']
-SSH_PORT = _ssh_g['port']
-SSH_USER = _ssh_g['user']
-SSH_KEY  = _ssh_g['key']
-
-_dbg = cfg_remota_db('GESTION')
-GESTION_DB, GESTION_USER, GESTION_PASS = _dbg['database'], _dbg['user'], _dbg['password']
-
-_dbc = cfg_remota_db('COMUNIDAD')
-COMUNIDAD_DB, COMUNIDAD_USER, COMUNIDAD_PASS = _dbc['database'], _dbc['user'], _dbc['password']
+from lib import gestion, comunidad
 
 WA_BRIDGE_URL = 'http://localhost:3100'
 ADMIN_PHONE   = '573022921455'  # Santiago (ssierra047@gmail.com)
@@ -59,17 +46,11 @@ def enviar_whatsapp(telefono, mensaje):
         return False
 
 
-def obtener_contactos(emails: list, tunnel_port: int) -> dict:
-    """Busca nombre y teléfono en sys_usuarios (os_comunidad) vía SSH tunnel."""
+def obtener_contactos(emails):
+    """Busca nombre y teléfono en sys_usuarios (os_comunidad)."""
     if not emails:
         return {}
-    conn = pymysql.connect(
-        host='127.0.0.1', port=tunnel_port,
-        user=COMUNIDAD_USER, password=COMUNIDAD_PASS,
-        database=COMUNIDAD_DB,
-        cursorclass=pymysql.cursors.DictCursor
-    )
-    try:
+    with comunidad(dict_cursor=True) as conn:
         with conn.cursor() as cur:
             placeholders = ','.join(['%s'] * len(emails))
             cur.execute(
@@ -78,56 +59,38 @@ def obtener_contactos(emails: list, tunnel_port: int) -> dict:
                 emails
             )
             return {r['Email']: r for r in cur.fetchall()}
-    finally:
-        conn.close()
 
 
 def main():
     hoy = date.today().isoformat()
     print(f'[notif_jornadas] {hoy} — verificando jornadas abiertas...')
 
-    # Conectar a Hostinger vía SSH tunnel
-    with SSHTunnelForwarder(
-        (SSH_HOST, SSH_PORT),
-        ssh_username=SSH_USER,
-        ssh_pkey=SSH_KEY,
-        remote_bind_address=('127.0.0.1', 3306),
-        local_bind_address=('127.0.0.1', 0)
-    ) as tunnel:
-        local_port = tunnel.local_bind_port
+    # 1. Consultar jornadas abiertas. NOW() devuelve hora Colombia (el helper
+    # hace SET time_zone='-05:00' en la sesión) → consistente con cómo se
+    # guarda `hora_inicio_registro` (también NOW() en pool con -05:00).
+    with gestion(dict_cursor=True) as conn_g:
+        with conn_g.cursor() as cur:
+            cur.execute("""
+                SELECT j.id, j.usuario, j.fecha, j.hora_inicio,
+                       j.hora_inicio_registro,
+                       TIMESTAMPDIFF(MINUTE, j.hora_inicio_registro, NOW()) AS minutos_activa
+                FROM g_jornadas j
+                WHERE j.empresa = %s
+                  AND j.fecha = %s
+                  AND j.hora_fin IS NULL
+                ORDER BY j.hora_inicio_registro
+            """, (EMPRESA, hoy))
+            abiertas = cur.fetchall()
 
-        # 1. Consultar jornadas abiertas (os_gestion)
-        conn_g = pymysql.connect(
-            host='127.0.0.1', port=local_port,
-            user=GESTION_USER, password=GESTION_PASS,
-            database=GESTION_DB,
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        try:
-            with conn_g.cursor() as cur:
-                cur.execute("""
-                    SELECT j.id, j.usuario, j.fecha, j.hora_inicio,
-                           j.hora_inicio_registro,
-                           TIMESTAMPDIFF(MINUTE, j.hora_inicio_registro, UTC_TIMESTAMP()) AS minutos_activa
-                    FROM g_jornadas j
-                    WHERE j.empresa = %s
-                      AND j.fecha = %s
-                      AND j.hora_fin IS NULL
-                    ORDER BY j.hora_inicio_registro
-                """, (EMPRESA, hoy))
-                abiertas = cur.fetchall()
-        finally:
-            conn_g.close()
+    if not abiertas:
+        print('  Sin jornadas abiertas. OK.')
+        return
 
-        if not abiertas:
-            print('  Sin jornadas abiertas. OK.')
-            return
+    print(f'  {len(abiertas)} jornada(s) abierta(s)')
 
-        print(f'  {len(abiertas)} jornada(s) abierta(s)')
-
-        # 2. Consultar teléfonos desde sys_usuarios (os_comunidad)
-        emails = [j['usuario'] for j in abiertas]
-        contactos = obtener_contactos(emails, local_port)
+    # 2. Consultar teléfonos desde sys_usuarios (os_comunidad)
+    emails = [j['usuario'] for j in abiertas]
+    contactos = obtener_contactos(emails)
 
     # 3. Enviar notificaciones WhatsApp
     notificados = []
