@@ -515,7 +515,7 @@ app.get('/api/gestion/perfiles', async (req, res) => {
 // GET /api/gestion/tareas
 // Filtros: ?filtro=hoy|manana|ayer|semana&responsable=email&categoria_id=&estado=&prioridad=&agrupar=categoria|prioridad|fecha|persona
 app.get('/api/gestion/tareas', async (req, res) => {
-  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id, fecha_hoy, id_op, id_pedido, id_remision, nombre } = req.query
+  const { filtro, responsable, categoria_id, estado, prioridad, solo_mias, proyecto_id, fecha_hoy, id_op, op_id, id_pedido, id_remision, nombre, categoria_produccion_id } = req.query
   const empresa = req.empresa
 
   const where  = ['t.empresa = ?', 't.parent_id IS NULL']   // excluir subtareas de la lista principal
@@ -571,10 +571,21 @@ app.get('/api/gestion/tareas', async (req, res) => {
   // Búsqueda por nombre (parcial)
   if (nombre) { where.push('t.titulo LIKE ?'); params.push(`%${nombre}%`) }
 
-  // id_op, id_pedido, id_remision: búsqueda parcial
+  // id_op, id_pedido, id_remision: búsqueda parcial (LIKE)
   if (id_op)       { where.push('t.id_op LIKE ?');       params.push(`%${id_op}%`) }
   if (id_pedido)   { where.push('t.id_pedido LIKE ?');   params.push(`%${id_pedido}%`) }
   if (id_remision) { where.push('t.id_remision LIKE ?'); params.push(`%${id_remision}%`) }
+
+  // op_id: match exacto (usado por sidebar "Órdenes de producción")
+  if (op_id) { where.push('t.id_op = ?'); params.push(String(op_id)) }
+
+  // categoria_produccion_id: simple o multi (categorias_produccion=1,2,3)
+  const catProdRaw = req.query.categorias_produccion || categoria_produccion_id
+  if (catProdRaw) {
+    const ids = String(catProdRaw).split(',').map(Number).filter(Boolean)
+    if (ids.length === 1) { where.push('t.categoria_produccion_id = ?'); params.push(ids[0]) }
+    else if (ids.length > 1) { where.push(`t.categoria_produccion_id IN (${ids.map(() => '?').join(',')})`); params.push(...ids) }
+  }
 
   // categoria_id: soporte simple y multi (categorias=1,2,3)
   const categoriasRaw = req.query.categorias || categoria_id
@@ -630,6 +641,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
         t.orden, t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
         t.duracion_usuario_seg, t.duracion_cronometro_seg, t.duracion_sistema_seg,
         t.crono_inicio,
+        t.categoria_produccion_id, cp.nombre AS categoria_produccion_nombre,
         -- Conteo subtareas
         (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id) AS subtareas_total,
         (SELECT COUNT(*) FROM g_tareas s WHERE s.parent_id = t.id AND s.estado IN ('Completada','Cancelada')) AS subtareas_completadas,
@@ -641,6 +653,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
+      LEFT JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
       WHERE ${where.join(' AND ')}
       ORDER BY t.orden DESC
     `, params)
@@ -890,7 +903,8 @@ app.post('/api/gestion/tareas', async (req, res) => {
   const {
     titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable, responsables,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-    tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas, parent_id
+    tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas, parent_id,
+    categoria_produccion_id
   } = req.body
 
   if (!titulo || !categoria_id) return res.status(400).json({ error: 'Faltan titulo y categoria_id' })
@@ -921,8 +935,9 @@ app.post('/api/gestion/tareas', async (req, res) => {
       INSERT INTO g_tareas
         (empresa, parent_id, titulo, descripcion, categoria_id, proyecto_id, prioridad, responsable,
          fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-         tiempo_estimado_min, id_op, id_remision, id_pedido, notas, orden, usuario_creador, usuario_ult_modificacion)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         tiempo_estimado_min, id_op, id_remision, id_pedido, notas, orden, usuario_creador, usuario_ult_modificacion,
+         categoria_produccion_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       req.empresa, parent_id || null,
       titulo, descripcion || null, categoria_id,
@@ -934,7 +949,8 @@ app.post('/api/gestion/tareas', async (req, res) => {
       fecha_fin_estimada    || fecha_limite || null,
       tiempo_estimado_min || null,
       id_op || null, id_remision || null, id_pedido || null, notas || null, nuevoOrden,
-      req.usuario.email, req.usuario.email
+      req.usuario.email, req.usuario.email,
+      categoria_produccion_id || null
     ])
 
     const tareaId = result.insertId
@@ -969,7 +985,8 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
   const {
     titulo, descripcion, categoria_id, proyecto_id, estado, prioridad, responsable, responsables,
     fecha_limite, fecha_inicio_estimada, fecha_fin_estimada,
-    tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas
+    tiempo_estimado_min, id_op, id_remision, id_pedido, notas, etiquetas,
+    categoria_produccion_id
   } = req.body
 
   try {
@@ -997,6 +1014,10 @@ app.put('/api/gestion/tareas/:id', async (req, res) => {
     if (id_remision      !== undefined) { sets.push('id_remision = ?');        params.push(id_remision) }
     if (id_pedido        !== undefined) { sets.push('id_pedido = ?');          params.push(id_pedido) }
     if (notas            !== undefined) { sets.push('notas = ?');              params.push(notas) }
+    if (categoria_produccion_id !== undefined) {
+      sets.push('categoria_produccion_id = ?')
+      params.push(categoria_produccion_id === null || categoria_produccion_id === '' ? null : parseInt(categoria_produccion_id, 10))
+    }
 
     if (sets.length) {
       sets.push('usuario_ult_modificacion = ?')
@@ -1368,6 +1389,621 @@ async function _lookupUnidades(codigos) {
   for (const r of rows) map[r.cod_articulo] = r.unidad || ''
   return map
 }
+
+// ─── MÓDULO OP (nuevo, 2026-04-24) ────────────────────────────────
+// Endpoints a nivel OP (antes vivían colgados de tarea, ahora son propios).
+// Plan: .agent/planes/activos/PLAN_MODULO_OP_GESTION_2026-04-24.md
+
+// GET /api/gestion/categorias-produccion — 12 seeds
+app.get('/api/gestion/categorias-produccion', async (_req, res) => {
+  try {
+    const [rows] = await db.gestion.query(
+      'SELECT id, nombre, orden, activa FROM g_categorias_produccion WHERE activa = 1 ORDER BY orden, nombre'
+    )
+    res.json({ ok: true, categorias: rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/op — lista de OPs (fuente: zeffi_produccion_encabezados enriquecida)
+// Filtros: ?estado=Generada,Procesada  ?vigencia=Vigente  ?q=texto  ?desde=YYYY-MM-DD  ?hasta=YYYY-MM-DD
+// Orden default: Generada → Procesada → Validado → Anulada, luego fecha_de_creacion DESC.
+app.get('/api/gestion/op', async (req, res) => {
+  try {
+    const { estado, vigencia, q, desde, hasta } = req.query
+    const where = []
+    const params = []
+
+    if (estado) {
+      const estados = String(estado).split(',').map(s => s.trim()).filter(Boolean)
+      if (estados.length) {
+        where.push(`e.estado IN (${estados.map(() => '?').join(',')})`)
+        params.push(...estados)
+      }
+    }
+    if (vigencia) { where.push('e.vigencia = ?'); params.push(vigencia) }
+    if (q) {
+      where.push('(e.id_orden LIKE ? OR a.descripcion_articulo_producido LIKE ?)')
+      params.push(`%${q}%`, `%${q}%`)
+    }
+    if (desde) { where.push('e.fecha_de_creacion >= ?'); params.push(desde) }
+    if (hasta) { where.push('e.fecha_de_creacion <= ?'); params.push(`${hasta} 23:59:59`) }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+
+    const [ops] = await db.integracion.query(`
+      SELECT e.id_orden, e.estado, e.vigencia, e.nombre_encargado,
+             e.id_encargado, e.fecha_inicial, e.fecha_final, e.fecha_de_creacion,
+             GROUP_CONCAT(DISTINCT a.descripcion_articulo_producido
+               ORDER BY a.descripcion_articulo_producido SEPARATOR ', ') AS articulos
+      FROM zeffi_produccion_encabezados e
+      LEFT JOIN zeffi_articulos_producidos a ON a.id_orden = e.id_orden
+      ${whereSql}
+      GROUP BY e.id_orden, e.estado, e.vigencia, e.nombre_encargado,
+               e.id_encargado, e.fecha_inicial, e.fecha_final, e.fecha_de_creacion
+      ORDER BY FIELD(e.estado, 'Generada', 'Procesada', 'Validado', 'Anulada'),
+               e.fecha_de_creacion DESC
+      LIMIT 500
+    `, params)
+
+    // Enriquecer con detalle de Gestión (procesado_por, validado_por, op_anterior)
+    if (ops.length) {
+      const ids = ops.map(o => String(o.id_orden))
+      const [detalles] = await db.gestion.query(
+        `SELECT id_op, procesado_por, procesado_en, validado_por, validado_en,
+                op_anterior, responsable_validado
+         FROM g_op_detalle
+         WHERE empresa = ? AND id_op IN (${ids.map(() => '?').join(',')})`,
+        [req.empresa || 'ori_sil_2', ...ids]
+      )
+      const dMap = Object.fromEntries(detalles.map(d => [String(d.id_op), d]))
+      ops.forEach(o => {
+        const d = dMap[String(o.id_orden)]
+        o.procesado_por        = d?.procesado_por        || null
+        o.procesado_en         = d?.procesado_en         || null
+        o.validado_por         = d?.validado_por         || null
+        o.validado_en          = d?.validado_en          || null
+        o.op_anterior          = d?.op_anterior          || null
+        o.responsable_validado = d?.responsable_validado || null
+      })
+    }
+    res.json({ ok: true, ops })
+  } catch (e) {
+    console.error('[GET /op]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/gestion/op/:id_op/ficha — detalle completo
+// Retorna: cabecera (Effi) + materiales[] + productos[] + tiempos[] + tareas_vinculadas[] + detalle.
+// Si la OP aún no tiene líneas en g_op_lineas, SIEMBRA desde zeffi_materiales/zeffi_articulos_producidos.
+app.get('/api/gestion/op/:id_op/ficha', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  try {
+    // 1. Cabecera desde Effi
+    const [[cabecera]] = await db.integracion.query(`
+      SELECT e.id_orden, e.estado, e.vigencia, e.nombre_encargado, e.id_encargado,
+             e.sucursal, e.bodega, e.fecha_inicial, e.fecha_final,
+             e.fecha_de_creacion, e.observacion
+      FROM zeffi_produccion_encabezados e
+      WHERE e.id_orden = ? LIMIT 1
+    `, [idOp])
+    if (!cabecera) return res.status(404).json({ error: 'OP no encontrada' })
+
+    // 2. Líneas locales (g_op_lineas). Si vacías → sembrar desde Effi.
+    const [countLineas] = await db.gestion.query(
+      'SELECT COUNT(*) AS n FROM g_op_lineas WHERE empresa = ? AND id_op = ?',
+      [req.empresa, idOp]
+    )
+    if (countLineas[0].n === 0) {
+      const [matsEffi] = await db.integracion.query(
+        `SELECT cod_material AS cod, descripcion_material AS descripcion, cantidad, costo_ud
+         FROM zeffi_materiales WHERE id_orden = ?`, [idOp]
+      )
+      const [prodsEffi] = await db.integracion.query(
+        `SELECT cod_articulo AS cod, descripcion_articulo_producido AS descripcion, cantidad, precio_minimo_ud
+         FROM zeffi_articulos_producidos WHERE id_orden = ?`, [idOp]
+      )
+      const codigos = [...new Set([...matsEffi.map(m=>m.cod), ...prodsEffi.map(p=>p.cod)].map(String))]
+      const unidadMap = await _lookupUnidades(codigos)
+      const toNum = x => { const n = Number(String(x ?? '').replace(',', '.')); return Number.isFinite(n) ? n : null }
+      if (matsEffi.length || prodsEffi.length) {
+        const inserts = []
+        for (const m of matsEffi) {
+          inserts.push([
+            idOp, req.empresa, 'material', String(m.cod), m.descripcion || '',
+            unidadMap[String(m.cod)] || '', toNum(m.cantidad), null, toNum(m.costo_ud), null,
+            0, req.usuario.email
+          ])
+        }
+        for (const p of prodsEffi) {
+          inserts.push([
+            idOp, req.empresa, 'producto', String(p.cod), p.descripcion || '',
+            unidadMap[String(p.cod)] || '', toNum(p.cantidad), null, null, toNum(p.precio_minimo_ud),
+            0, req.usuario.email
+          ])
+        }
+        await db.gestion.query(
+          `INSERT IGNORE INTO g_op_lineas
+             (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
+              cantidad_teorica, cantidad_real, costo_unit, precio_unit,
+              es_no_previsto, usuario_ult_modificacion)
+           VALUES ?`,
+          [inserts]
+        )
+      }
+    }
+
+    const [lineas] = await db.gestion.query(
+      `SELECT id, tipo, cod_articulo, descripcion, unidad,
+              cantidad_teorica, cantidad_real, costo_unit, precio_unit, es_no_previsto
+       FROM g_op_lineas
+       WHERE empresa = ? AND id_op = ?
+       ORDER BY tipo DESC, descripcion`,
+      [req.empresa, idOp]
+    )
+    const materiales = lineas.filter(l => l.tipo === 'material')
+    const productos  = lineas.filter(l => l.tipo === 'producto')
+
+    // 3. Tiempos consolidados. Si hay snapshot (g_op_tiempos) → usarlo. Si no → calcular al vuelo.
+    const [snapshot] = await db.gestion.query(
+      `SELECT cp.nombre AS categoria, ot.categoria_produccion_id AS categoria_id, ot.segundos_totales AS segundos
+       FROM g_op_tiempos ot
+       JOIN g_categorias_produccion cp ON cp.id = ot.categoria_produccion_id
+       WHERE ot.empresa = ? AND ot.id_op = ?
+       ORDER BY cp.orden`,
+      [req.empresa, idOp]
+    )
+    let tiempos, fuente_tiempos
+    if (snapshot.length) {
+      tiempos = snapshot
+      fuente_tiempos = 'snapshot'
+    } else {
+      const [vivo] = await db.gestion.query(
+        `SELECT cp.nombre AS categoria, cp.id AS categoria_id,
+                COALESCE(SUM(t.duracion_cronometro_seg), 0) AS segundos
+         FROM g_tareas t
+         JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
+         WHERE t.id_op = ? AND t.empresa = ?
+         GROUP BY cp.id, cp.nombre, cp.orden
+         HAVING segundos > 0
+         ORDER BY cp.orden`,
+        [idOp, req.empresa]
+      )
+      tiempos = vivo
+      fuente_tiempos = 'vivo'
+    }
+
+    // 4. Tareas vinculadas a esta OP
+    const [tareasRaw] = await db.gestion.query(
+      `SELECT t.id, t.titulo, t.estado, t.responsable, t.fecha_inicio_estimada,
+              t.fecha_inicio_real, t.fecha_fin_real, t.duracion_cronometro_seg,
+              t.categoria_produccion_id, cp.nombre AS categoria_produccion_nombre
+       FROM g_tareas t
+       LEFT JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
+       WHERE t.id_op = ? AND t.empresa = ?
+       ORDER BY t.fecha_creacion DESC`,
+      [idOp, req.empresa]
+    )
+    // enriquecer nombres de responsable desde master
+    if (tareasRaw.length) {
+      const emails = [...new Set(tareasRaw.map(t => t.responsable).filter(Boolean))]
+      if (emails.length) {
+        const [users] = await db.master.query(
+          `SELECT email, nombre FROM sis_usuarios WHERE email IN (${emails.map(()=>'?').join(',')})`,
+          emails
+        )
+        const nMap = Object.fromEntries(users.map(u => [u.email, u.nombre]))
+        tareasRaw.forEach(t => { t.responsable_nombre = nMap[t.responsable] || t.responsable })
+      }
+    }
+
+    // 5. Detalle local (g_op_detalle)
+    const [[detalle]] = await db.gestion.query(
+      `SELECT observaciones_lote, procesado_por, procesado_en, validado_por, validado_en,
+              op_anterior, responsable_validado
+       FROM g_op_detalle WHERE empresa = ? AND id_op = ?`,
+      [req.empresa, idOp]
+    )
+
+    res.json({
+      ok: true,
+      cabecera, materiales, productos, tiempos, fuente_tiempos,
+      tareas_vinculadas: tareasRaw,
+      detalle: detalle || null
+    })
+  } catch (e) {
+    console.error('[GET /op/:id/ficha]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// PUT /api/gestion/op/:id_op/detalle — guardar observaciones_lote + responsable_validado
+app.put('/api/gestion/op/:id_op/detalle', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const { observaciones_lote, responsable_validado } = req.body
+  try {
+    // UPSERT
+    await db.gestion.query(
+      `INSERT INTO g_op_detalle (id_op, empresa, observaciones_lote, responsable_validado)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         observaciones_lote   = VALUES(observaciones_lote),
+         responsable_validado = VALUES(responsable_validado)`,
+      [idOp, req.empresa, observaciones_lote ?? null, responsable_validado ?? null]
+    )
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('[PUT /op/:id/detalle]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// PUT /api/gestion/op/:id_op/lineas/:lineaId — actualizar cantidad_real
+app.put('/api/gestion/op/:id_op/lineas/:lineaId', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const lineaId = parseInt(req.params.lineaId, 10)
+  const { cantidad_real } = req.body
+  try {
+    const cant = cantidad_real === '' || cantidad_real == null ? null : Number(String(cantidad_real).replace(',', '.'))
+    if (cant !== null && !Number.isFinite(cant)) {
+      return res.status(400).json({ error: 'cantidad_real inválida' })
+    }
+    const [r] = await db.gestion.query(
+      `UPDATE g_op_lineas
+       SET cantidad_real = ?, usuario_ult_modificacion = ?
+       WHERE id = ? AND empresa = ? AND id_op = ?`,
+      [cant, req.usuario.email, lineaId, req.empresa, idOp]
+    )
+    if (!r.affectedRows) return res.status(404).json({ error: 'Línea no encontrada' })
+    res.json({ ok: true, cantidad_real: cant })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/op/:id_op/lineas — agregar línea no prevista (solo si estado=Generada)
+app.post('/api/gestion/op/:id_op/lineas', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const { tipo, cod_articulo, descripcion, unidad, cantidad_real, costo_unit, precio_unit } = req.body
+  if (!['material','producto'].includes(tipo)) return res.status(400).json({ error: "tipo debe ser 'material' o 'producto'" })
+  if (!cod_articulo) return res.status(400).json({ error: 'cod_articulo requerido' })
+  try {
+    // Verificar estado Generada
+    const [[op]] = await db.integracion.query(
+      'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ?', [idOp]
+    )
+    if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
+    if (op.estado !== 'Generada') {
+      return res.status(400).json({ error: `Solo se pueden agregar líneas no previstas en OPs Generadas (estado actual: ${op.estado})` })
+    }
+    const cant = cantidad_real == null || cantidad_real === '' ? null : Number(String(cantidad_real).replace(',', '.'))
+    const [r] = await db.gestion.query(
+      `INSERT INTO g_op_lineas
+        (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
+         cantidad_teorica, cantidad_real, costo_unit, precio_unit,
+         es_no_previsto, usuario_ult_modificacion)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, 1, ?)`,
+      [idOp, req.empresa, tipo, String(cod_articulo), descripcion || '', unidad || '',
+       cant, costo_unit ?? null, precio_unit ?? null, req.usuario.email]
+    )
+    res.json({ ok: true, id: r.insertId })
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe una línea para ese cod_articulo en esta OP' })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// DELETE /api/gestion/op/:id_op/lineas/:lineaId — solo líneas no previstas
+app.delete('/api/gestion/op/:id_op/lineas/:lineaId', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const lineaId = parseInt(req.params.lineaId, 10)
+  try {
+    const [r] = await db.gestion.query(
+      `DELETE FROM g_op_lineas
+       WHERE id = ? AND empresa = ? AND id_op = ? AND es_no_previsto = 1`,
+      [lineaId, req.empresa, idOp]
+    )
+    if (!r.affectedRows) return res.status(400).json({ error: 'Línea no encontrada o no es no-prevista' })
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// POST /api/gestion/op/:id_op/procesar — cambia estado OP a Procesada en Effi
+// Permisos: nivel >= 3.
+app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
+  if (!PLAYWRIGHT_OK) {
+    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
+  }
+  const idOp = String(req.params.id_op)
+  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+  if (miNivel < 3) return res.status(403).json({ error: 'Procesar requiere nivel >= 3' })
+  try {
+    // Verificar OP existe y estado actual
+    const [[op]] = await db.integracion.query(
+      'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOp]
+    )
+    if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
+    if (op.estado === 'Procesada' || op.estado === 'Validado') {
+      return res.status(400).json({ error: `OP ya está en estado ${op.estado}` })
+    }
+
+    const nombre = req.usuario.nombre || req.usuario.email
+    const observacion = `Procesado por ${nombre} (OS Gestión)`
+
+    const scriptPath = path.join(__dirname, '../../scripts/cambiar_estado_orden_produccion.js')
+    await new Promise((resolve, reject) => {
+      execFile('node', [scriptPath, idOp, 'Procesada', observacion], {
+        timeout: 90000, cwd: path.join(__dirname, '../../scripts')
+      }, (err, stdout, stderr) => {
+        if (err) return reject(new Error((stderr || err.message).slice(-500)))
+        resolve(stdout || '')
+      })
+    })
+
+    // Sellos en g_op_detalle
+    await db.gestion.query(
+      `INSERT INTO g_op_detalle (id_op, empresa, procesado_por, procesado_en)
+       VALUES (?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE procesado_por = VALUES(procesado_por),
+                               procesado_en  = VALUES(procesado_en)`,
+      [idOp, req.empresa, req.usuario.email]
+    )
+
+    // Reflejar en staging
+    try {
+      await db.integracion.query(
+        `UPDATE zeffi_produccion_encabezados SET estado = 'Procesada' WHERE id_orden = ?`, [idOp]
+      )
+    } catch (e) { console.warn('[op/procesar] staging no actualizable:', e.message) }
+
+    res.json({ ok: true, id_op: idOp, estado: 'Procesada', procesado_por: req.usuario.email })
+  } catch (e) {
+    console.error('[POST /op/:id/procesar]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/gestion/op/:id_op/validar — flujo completo:
+//   1. Calcular tiempos consolidados vivos (SUM sobre g_tareas por categoría).
+//   2. Armar observación nueva (LOTE X · Validó · Reportó · fechas · tiempos · obs orig).
+//   3. Anular OP original en Effi (Playwright).
+//   4. Crear OP nueva con cantidades reales (Playwright) → capturar id_nueva.
+//   5. Cambiar estado OP nueva a Validado (Playwright).
+//   6. UPDATE g_tareas SET id_op = <id_nueva> WHERE id_op = <id_original>.
+//   7. Copiar g_op_lineas de id_original a id_nueva (datos reales congelados).
+//   8. INSERT/UPDATE g_op_detalle (id_nueva): validado_por, validado_en, op_anterior.
+//   9. Snapshot de tiempos: INSERT g_op_tiempos (id_nueva, categoria, segundos) por cada categoría > 0.
+//  10. Reflejar en staging (original Anulada, nueva Validado).
+// Permisos: nivel >= 5.
+app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
+  if (!PLAYWRIGHT_OK) {
+    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
+  }
+  const idOpOriginal = String(req.params.id_op)
+  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+  if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })
+
+  try {
+    // 1. Metadata OP original
+    const [[op]] = await db.integracion.query(
+      `SELECT sucursal, bodega, id_encargado, nombre_encargado, id_tercero, activo_productivo,
+              fecha_inicial, fecha_final, fecha_de_creacion, observacion, estado
+       FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1`,
+      [idOpOriginal]
+    )
+    if (!op) return res.status(404).json({ error: `OP ${idOpOriginal} no encontrada en Effi` })
+    if (op.estado === 'Validado') return res.status(400).json({ error: 'OP ya validada' })
+
+    // 2. Líneas actuales con cantidades reales
+    const [lineas] = await db.gestion.query(
+      `SELECT tipo, cod_articulo, cantidad_teorica, cantidad_real, costo_unit, precio_unit
+       FROM g_op_lineas WHERE empresa = ? AND id_op = ?`,
+      [req.empresa, idOpOriginal]
+    )
+    if (!lineas.length) return res.status(400).json({ error: 'No hay líneas registradas para esta OP. Cargá cantidades reales primero.' })
+
+    // 3. Detalle local (obs_lote + procesado_en)
+    const [[det]] = await db.gestion.query(
+      'SELECT observaciones_lote, procesado_en, responsable_validado FROM g_op_detalle WHERE empresa = ? AND id_op = ?',
+      [req.empresa, idOpOriginal]
+    )
+
+    // 4. Tiempos consolidados (modo vivo — aún no hay snapshot para la nueva OP)
+    const [tiemposVivos] = await db.gestion.query(
+      `SELECT cp.id AS categoria_produccion_id, cp.nombre AS categoria,
+              COALESCE(SUM(t.duracion_cronometro_seg), 0) AS segundos
+       FROM g_tareas t
+       JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
+       WHERE t.id_op = ? AND t.empresa = ?
+       GROUP BY cp.id, cp.nombre, cp.orden
+       HAVING segundos > 0
+       ORDER BY cp.orden`,
+      [idOpOriginal, req.empresa]
+    )
+
+    // 5. Nombre del validador (req.usuario) y reportador
+    const nombreValidador = req.usuario.nombre || req.usuario.email
+    let nombreReportador = op.nombre_encargado || '?'
+    if (det?.procesado_en && det) {
+      // Si hay procesado_por, usarlo como reportador
+      const [procRow] = await db.gestion.query(
+        'SELECT procesado_por FROM g_op_detalle WHERE empresa = ? AND id_op = ?',
+        [req.empresa, idOpOriginal]
+      )
+      if (procRow[0]?.procesado_por) {
+        try {
+          const [[uMaster]] = await db.master.query(
+            'SELECT nombre FROM sis_usuarios WHERE email = ?',
+            [procRow[0].procesado_por]
+          )
+          if (uMaster?.nombre) nombreReportador = uMaster.nombre
+        } catch (_) {}
+      }
+    }
+
+    // 6. Armar observación nueva (Q9 + Q10)
+    function fmtFecha(d) {
+      if (!d) return ''
+      const dt = new Date(d)
+      if (isNaN(dt)) return String(d)
+      return dt.toLocaleDateString('es-CO') + ' ' + dt.toTimeString().slice(0, 5)
+    }
+    function fmtMin(seg) {
+      const m = Math.round(seg / 60)
+      if (m < 60) return `${m}m`
+      const h = Math.floor(m / 60), mm = m % 60
+      return mm ? `${h}h${mm}m` : `${h}h`
+    }
+    const tiemposStr = tiemposVivos.map(t => `${t.categoria} ${fmtMin(t.segundos)}`).join(' · ')
+    const obsOrig = [
+      (det?.observaciones_lote || '').replace(/\s+/g, ' ').trim(),
+      (op.observacion || '').replace(/\s+/g, ' ').trim()
+    ].filter(Boolean).join(' | ').slice(0, 400)
+
+    const observacion = [
+      `LOTE ${idOpOriginal}`,
+      `Validó: ${nombreValidador}`,
+      `Reportó: ${nombreReportador}`,
+      `Creada: ${fmtFecha(op.fecha_de_creacion)}`,
+      det?.procesado_en ? `Procesada: ${fmtFecha(det.procesado_en)}` : null,
+      `Validada: ${fmtFecha(new Date())}`,
+      tiemposStr ? `Tiempos: ${tiemposStr}` : null,
+      obsOrig ? `Obs orig: ${obsOrig}` : null
+    ].filter(Boolean).join(' · ')
+
+    // 7. Preparar JSON para import_orden_produccion.js
+    const sucursalIdMap = { 'Principal': 1 }
+    const bodegaIdMap   = { 'Principal': 1 }
+    const sucursal_id = sucursalIdMap[op.sucursal] || 1
+    const bodega_id   = bodegaIdMap[op.bodega] || 1
+    const encargadoCC = String(op.id_encargado || '').replace(/^CC:\s*/, '').trim()
+    const terceroCC   = op.id_tercero ? String(op.id_tercero).replace(/^CC:\s*/, '').trim() : ''
+    const fechaInicio = String(op.fecha_inicial || '').slice(0, 10)
+    const fechaFin    = String(op.fecha_final   || '').slice(0, 10)
+
+    const jsonOp = {
+      sucursal_id, bodega_id,
+      fecha_inicio: fechaInicio, fecha_fin: fechaFin,
+      encargado: encargadoCC,
+      tercero: terceroCC,
+      activo_productivo_id: null,
+      observacion,
+      materiales: lineas.filter(l => l.tipo === 'material').map(l => ({
+        cod_articulo: l.cod_articulo,
+        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
+        costo: Number(l.costo_unit || 0),
+        lote: '', serie: '',
+      })),
+      articulos_producidos: lineas.filter(l => l.tipo === 'producto').map(l => ({
+        cod_articulo: l.cod_articulo,
+        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
+        precio: Number(l.precio_unit || 0),
+        lote: '', serie: '',
+      })),
+      otros_costos: [],
+    }
+
+    const jsonPath = `/tmp/op_validacion_${idOpOriginal}_${Date.now()}.json`
+    fs.writeFileSync(jsonPath, JSON.stringify(jsonOp, null, 2))
+
+    // 8. Ejecutar 3 scripts Playwright secuencialmente
+    const scripts = path.join(__dirname, '../../scripts')
+    function ejecutar(args, timeoutMs) {
+      return new Promise((resolve, reject) => {
+        execFile('node', args, { timeout: timeoutMs, cwd: scripts }, (err, stdout, stderr) => {
+          if (err) return reject(new Error((stderr || err.message).slice(-800)))
+          resolve(stdout || '')
+        })
+      })
+    }
+
+    console.log(`[op/validar] ${idOpOriginal} — anular`)
+    await ejecutar([path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion], 120000)
+
+    console.log(`[op/validar] ${idOpOriginal} — crear nueva con reales`)
+    const stdoutCrear = await ejecutar([path.join(scripts, 'import_orden_produccion.js'), jsonPath], 180000)
+    const matchId = stdoutCrear.match(/OP_CREADA:(\d+)/)
+    if (!matchId) throw new Error('No se pudo capturar el ID de la nueva OP. Revisar logs.')
+    const idOpNueva = matchId[1]
+    console.log(`[op/validar] OP nueva: ${idOpNueva}`)
+
+    await ejecutar([path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion], 90000)
+
+    // 9. Actualizar g_tareas: todas las que tenían id_op original → id_op nueva
+    const [updTareas] = await db.gestion.query(
+      'UPDATE g_tareas SET id_op = ?, usuario_ult_modificacion = ? WHERE id_op = ? AND empresa = ?',
+      [idOpNueva, req.usuario.email, idOpOriginal, req.empresa]
+    )
+
+    // 10. Copiar g_op_lineas de la original a la nueva (datos congelados)
+    await db.gestion.query(
+      `INSERT INTO g_op_lineas
+        (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
+         cantidad_teorica, cantidad_real, costo_unit, precio_unit,
+         es_no_previsto, usuario_ult_modificacion)
+       SELECT ?, empresa, tipo, cod_articulo, descripcion, unidad,
+              cantidad_real AS cantidad_teorica,  -- al validar, real pasa a ser teórico de la nueva OP
+              cantidad_real, costo_unit, precio_unit,
+              es_no_previsto, usuario_ult_modificacion
+       FROM g_op_lineas WHERE empresa = ? AND id_op = ?`,
+      [idOpNueva, req.empresa, idOpOriginal]
+    )
+
+    // 11. INSERT g_op_detalle para la nueva OP (validado_por, validado_en, op_anterior)
+    await db.gestion.query(
+      `INSERT INTO g_op_detalle
+         (id_op, empresa, observaciones_lote, validado_por, validado_en, op_anterior, responsable_validado)
+       VALUES (?, ?, ?, ?, NOW(), ?, ?)
+       ON DUPLICATE KEY UPDATE
+         observaciones_lote   = VALUES(observaciones_lote),
+         validado_por         = VALUES(validado_por),
+         validado_en          = VALUES(validado_en),
+         op_anterior          = VALUES(op_anterior),
+         responsable_validado = VALUES(responsable_validado)`,
+      [idOpNueva, req.empresa, det?.observaciones_lote ?? null, req.usuario.email,
+       idOpOriginal, det?.responsable_validado ?? null]
+    )
+
+    // 12. Snapshot tiempos en g_op_tiempos (id_nueva)
+    for (const t of tiemposVivos) {
+      await db.gestion.query(
+        `INSERT INTO g_op_tiempos (id_op, empresa, categoria_produccion_id, segundos_totales)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE segundos_totales = VALUES(segundos_totales)`,
+        [idOpNueva, req.empresa, t.categoria_produccion_id, t.segundos]
+      )
+    }
+
+    // 13. Reflejar en staging: original Anulada, nueva Validado
+    try {
+      await db.integracion.query(
+        `UPDATE zeffi_produccion_encabezados SET estado = 'Anulada', vigencia = 'Anulado' WHERE id_orden = ?`,
+        [idOpOriginal]
+      )
+      await db.integracion.query(
+        `INSERT IGNORE INTO zeffi_produccion_encabezados
+           (id_orden, sucursal, bodega, id_encargado, nombre_encargado,
+            fecha_inicial, fecha_final, fecha_de_creacion, observacion, estado, vigencia)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'Validado', 'Vigente')`,
+        [idOpNueva, op.sucursal, op.bodega, op.id_encargado, op.nombre_encargado,
+         op.fecha_inicial, op.fecha_final, observacion]
+      )
+    } catch (e) { console.warn('[op/validar] staging no actualizable:', e.message) }
+
+    try { fs.unlinkSync(jsonPath) } catch (_) {}
+
+    res.json({
+      ok: true,
+      id_op_anterior: idOpOriginal,
+      id_op_nueva: idOpNueva,
+      tareas_migradas: updTareas.affectedRows,
+      tiempos_snapshot: tiemposVivos.length,
+      observacion
+    })
+  } catch (e) {
+    console.error('[POST /op/:id/validar]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 
 // GET /api/gestion/tareas/:id/produccion — materiales + productos + tiempos
 // Si la tarea tiene id_op y no hay filas locales, siembra desde Effi.
