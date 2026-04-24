@@ -174,9 +174,24 @@ def cfg_inventario(dict_cursor=True):
     """Retorna dict compatible con pymysql.connect(**).
     Abre tunnel SSH al VPS si no está abierto, conecta al puerto local forwardeado.
     """
-    P = 'INVENTARIO'
-    t = abrir_tunel(P)
-    db = cfg_remota_db(P)
+    return _cfg_remota_dict('INVENTARIO', dict_cursor)
+
+
+def cfg_integracion(dict_cursor=True):
+    """Retorna dict compatible con pymysql.connect(**) para os_integracion en VPS.
+    Abre tunnel SSH al VPS si no está abierto, conecta al puerto local forwardeado.
+
+    USAR PARA: scripts/apps de inventario, producción, gestión, ERP que necesiten
+    consultar tablas zeffi_* (OPs, materiales, artículos, recetas, costos) o
+    resumen_ventas_*. NUNCA usar cfg_local()+'effi_data' para esto — effi_data
+    local es solo intermediaria del pipeline (ver MANIFESTO §8).
+    """
+    return _cfg_remota_dict('INTEGRACION', dict_cursor)
+
+
+def _cfg_remota_dict(prefijo, dict_cursor):
+    t = abrir_tunel(prefijo)
+    db = cfg_remota_db(prefijo)
     cfg = {
         'host': '127.0.0.1',
         'port': t.local_bind_port if t else db['remote_port'],

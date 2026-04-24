@@ -17,8 +17,8 @@ import pymysql
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local, cfg_inventario
-DB_EFFI = dict(**cfg_local(), database='effi_data')
+from lib import cfg_integracion, cfg_inventario
+DB_EFFI = cfg_integracion(dict_cursor=False)  # os_integracion VPS — ver MANIFESTO §8
 DB_INV  = cfg_inventario(dict_cursor=False)
 
 CAUSAS = {

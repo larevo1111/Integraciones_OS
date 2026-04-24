@@ -8,13 +8,14 @@ sino que la sugerencia esté en línea con el promedio de las OPs históricas li
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
+from lib import cfg_integracion
 import pymysql
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sugerir_receta import sugerir_receta, obtener_detalle_op, to_float
 from statistics import median
 
-DB_EFFI = dict(**cfg_local(), database='effi_data', cursorclass=pymysql.cursors.DictCursor)
+# os_integracion VPS — ver MANIFESTO §8
+DB_EFFI = cfg_integracion(dict_cursor=True)
 
 
 def q(sql, params=None):

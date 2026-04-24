@@ -12,13 +12,15 @@ Algoritmo:
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
+from lib import cfg_integracion
 import pymysql
 from statistics import median
 from typing import Optional
 
 
-DB_EFFI = dict(**cfg_local(), database='effi_data', cursorclass=pymysql.cursors.DictCursor)
+# Apunta a os_integracion en VPS (fuente de verdad). effi_data local es solo
+# intermediaria del pipeline. Ver MANIFESTO §8.
+DB_EFFI = cfg_integracion(dict_cursor=True)
 
 
 def to_float(v) -> float:
@@ -451,11 +453,11 @@ def sugerir_iterativo(cod_articulo: str, cantidad: float,
                     'ventana_final': n, 'min_consistentes_requerido': min_consistentes,
                     'iteraciones': len(historial), 'historial': historial,
                     'estado': 'concluyente', 'fuente': 'algoritmo_estadistico',
-                    'duracion_total_ms': cron_total.ms,
+                    'duracion_total_ms': cron_total.elapsed_ms(),
                 }
                 log("sugerir_fin", cod=cod_articulo, cantidad=cantidad,
                     ventana=n, agente='algoritmo', estado='concluyente',
-                    confianza=s.get('confianza'), duracion_ms=cron_total.ms)
+                    confianza=s.get('confianza'), duracion_ms=cron_total.elapsed_ms())
                 return s
             # Guardar la mejor opción por si nunca es concluyente
             if mejor is None or ops_limpias > (mejor.get('estrategia') or {}).get('ops_limpias_max', 0):
@@ -481,7 +483,7 @@ def sugerir_iterativo(cod_articulo: str, cantidad: float,
                 'estado': agente_result['estado'],
                 'fuente': 'agente_ia',
                 'agente_usado': agente_result.get('agente_usado'),
-                'duracion_total_ms': cron_total.ms + cron_ag.ms,
+                'duracion_total_ms': cron_total.elapsed_ms() + cron_ag.ms,
             }
             return agente_result
 
@@ -490,12 +492,12 @@ def sugerir_iterativo(cod_articulo: str, cantidad: float,
         'ventana_final': ventanas[-1], 'iteraciones': len(historial),
         'historial': historial, 'estado': 'no_concluyente',
         'fuente': 'algoritmo_estadistico',
-        'duracion_total_ms': cron_total.ms,
+        'duracion_total_ms': cron_total.elapsed_ms(),
         'mensaje': f'Después de {len(historial)} iteraciones (hasta {ventanas[-1]} OPs), '
                    f'no se encontró un patrón consistente.',
     }
     log("sugerir_fin", cod=cod_articulo, cantidad=cantidad,
-        agente='algoritmo', estado='no_concluyente', duracion_ms=cron_total.ms)
+        agente='algoritmo', estado='no_concluyente', duracion_ms=cron_total.elapsed_ms())
     return mejor
 
 

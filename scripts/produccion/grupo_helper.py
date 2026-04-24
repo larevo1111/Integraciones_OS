@@ -23,9 +23,10 @@ from typing import Optional
 import pymysql
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local
+from lib import cfg_integracion
 
-DB_EFFI = dict(**cfg_local(), database='effi_data', cursorclass=pymysql.cursors.DictCursor)
+# os_integracion VPS — ver MANIFESTO §8
+DB_EFFI = cfg_integracion(dict_cursor=True)
 
 _CACHE = {}  # cod_articulo -> (mp_granel_cod, ts)
 _TTL = 60.0

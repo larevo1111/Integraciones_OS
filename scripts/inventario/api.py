@@ -1,6 +1,7 @@
 """
 API FastAPI para inventario físico OS.
-Puerto 9401. Sirve datos de os_inventario + effi_data + frontend estático.
+Puerto 9401. Sirve datos de inventario_produccion_effi + os_integracion (VPS) + frontend estático.
+Regla: effi_data local es solo intermediaria del pipeline. Ver MANIFESTO §8.
 """
 import os, re, json, jwt, uuid, shutil, subprocess
 from fastapi import FastAPI, HTTPException, Request, Depends, UploadFile, File, Form, BackgroundTasks
@@ -44,9 +45,10 @@ app.add_middleware(
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-from lib import cfg_local, cfg_inventario
+from lib import cfg_integracion, cfg_inventario
 DB_INV  = cfg_inventario(dict_cursor=False)
-DB_EFFI = dict(**cfg_local(), database='effi_data')
+# DB_EFFI = os_integracion en VPS Contabo. Ver MANIFESTO §8.
+DB_EFFI = cfg_integracion(dict_cursor=False)
 
 
 def db_query(db_config, sql, params=None):
@@ -331,7 +333,7 @@ class ArticuloAgregar(BaseModel):
 @app.post("/api/inventario/articulos/agregar")
 def agregar_articulo(data: ArticuloAgregar):
     """Agrega un artículo a una bodega (hallazgo durante conteo)."""
-    # Buscar datos del artículo en effi_data
+    # Buscar datos del artículo en os_integracion (VPS)
     rows = db_query(DB_EFFI, """
         SELECT id, cod_barras, nombre, categoria,
                CAST(REPLACE(COALESCE(costo_manual,'0'), ',', '.') AS DECIMAL(12,2)) AS costo_manual

@@ -6,10 +6,10 @@ from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local, cfg_inventario
+from lib import cfg_integracion, cfg_inventario
 DB_INV  = cfg_inventario(dict_cursor=True)
-DB_EFFI = dict(**cfg_local(), database='effi_data',
-               cursorclass=pymysql.cursors.DictCursor)
+# os_integracion VPS — ver MANIFESTO §8
+DB_EFFI = cfg_integracion(dict_cursor=True)
 IA_URL = 'http://localhost:5100/ia/simple'
 
 

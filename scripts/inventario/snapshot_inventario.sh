@@ -1,6 +1,11 @@
 #!/bin/bash
 # Snapshot de inventario Effi: corre pipeline + guarda copia de zeffi_inventario
 # Ejecución: bash scripts/inventario/snapshot_inventario.sh
+#
+# NOTA: este script es PARTE del pipeline (invoca orquestador.py). Por eso lee
+# de effi_data local como excepción válida a la regla de MANIFESTO §8
+# ("effi_data = intermediaria, solo el orquestador puede usarla").
+# Otros scripts que NO son del pipeline deben consultar os_integracion en VPS.
 
 set -e
 cd /home/osserver/Proyectos_Antigravity/Integraciones_OS

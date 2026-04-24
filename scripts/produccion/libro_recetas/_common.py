@@ -9,7 +9,7 @@ if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
 import pymysql
-from lib import cfg_local  # type: ignore
+from lib import cfg_integracion  # type: ignore
 from lib.db_conn import cfg_inventario  # type: ignore
 
 
@@ -38,13 +38,10 @@ def familia_por_nombre(nombre: str) -> str:
     return 'otros'
 
 
-# ─── Conexión effi_data (lectura de OPs y catálogos) ─────────────────────
+# ─── Conexión os_integracion VPS (lectura de OPs y catálogos) ─────────────
+# effi_data local es solo intermediaria del pipeline. Ver MANIFESTO §8.
 def db_effi():
-    return pymysql.connect(
-        **cfg_local(),
-        database='effi_data',
-        cursorclass=pymysql.cursors.DictCursor,
-    )
+    return pymysql.connect(**cfg_integracion(dict_cursor=True))
 
 
 def q_effi(sql: str, params=None):

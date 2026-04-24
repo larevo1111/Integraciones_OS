@@ -186,15 +186,17 @@ MEMORY.md de Claude siempre refleja el módulo activo y su estado.
 
 | BD | Ubicación | Rol |
 |---|---|---|
-| `effi_data` | MariaDB local | Staging pipeline (41 tablas zeffi_* + catalogo_articulos) |
+| `effi_data` | MariaDB local | **INTERMEDIARIA del pipeline. SOLO el orquestador la usa.** Apps consultan os_integracion |
 | `ia_service_os` | MariaDB local | Servicio IA (17 tablas + 1 vista) |
 | `os_whatsapp` | MariaDB local | WA Bridge (wa_config, wa_contactos, wa_mensajes_entrantes, wa_mensajes_salientes) |
 | `espocrm` | MariaDB local | CRM (488 contactos) |
 | `nocodb_meta` | MariaDB local | Metadatos NocoDB |
-| `u768061575_os_integracion` | Hostinger | Fuente de verdad: 51 tablas (41 zeffi + 8 resumen + crm_contactos + catalogo_articulos) |
-| `u768061575_os_gestion` | Hostinger | Sistema Gestión OS |
-| `os_inventario` | MariaDB local | Inventario físico (inv_conteos, inv_rangos, inv_auditorias, inv_teorico, inv_observaciones) |
-| `u768061575_os_comunidad` | Hostinger | **ERP REAL — PROHIBICIÓN ABSOLUTA, NO TOCAR** |
+| `os_integracion` | **VPS Contabo (94.72.115.156)** | **Fuente de verdad** — 56 tablas (41 zeffi + resumen_* + crm_contactos + catalogo_articulos + inv_catalogo_articulos). Migrada de Hostinger 2026-04-20. |
+| `os_gestion` | **VPS Contabo** | Sistema Gestión OS. Migrada de Hostinger 2026-04-20. |
+| `inventario_produccion_effi` | **VPS Contabo** | Solicitudes producción + grupos + recetas + logs + inventario físico (17 tablas: prod_* + inv_*). NO contiene zeffi_*. |
+| `u768061575_os_comunidad` | **Hostinger** | **ERP REAL — PROHIBICIÓN ABSOLUTA, NO TOCAR**. Único uso restante de Hostinger. |
+
+**Regla activa desde 2026-04-24** (ver MANIFESTO §8): `effi_data` es intermediaria del pipeline. Apps de inventario, producción, gestión, ERP consultan `os_integracion` en el VPS, no `effi_data` local.
 
 MariaDB corre en el **host** (systemd), NO en Docker — puerto 3306.
 Credenciales locales: `osadmin` / `Epist2487.`

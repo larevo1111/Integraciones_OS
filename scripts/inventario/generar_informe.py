@@ -6,7 +6,7 @@ import pymysql
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local, cfg_inventario
+from lib import cfg_inventario
 DB_INV = cfg_inventario(dict_cursor=True)
 
 NOMBRES_GRUPO = {

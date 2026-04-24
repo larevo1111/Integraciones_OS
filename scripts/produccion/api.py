@@ -21,7 +21,7 @@ if os.path.exists(_ENV_FILE):
             os.environ.setdefault(k.strip(), v.strip())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local, cfg_inventario
+from lib import cfg_integracion, cfg_inventario
 
 app = FastAPI(title="Producción OS", version="1.0")
 
@@ -33,8 +33,9 @@ STATIC_DIR = os.path.join(BASE_DIR, 'produccion', 'dist')
 DB_INVPROD = cfg_inventario(dict_cursor=True)
 DB_PROD = DB_INVPROD  # tablas prod_*
 DB_INV  = DB_INVPROD  # tablas inv_*
-# effi_data sigue siendo local (no se migró en esta tanda)
-DB_EFFI = dict(**cfg_local(), database='effi_data', cursorclass=pymysql.cursors.DictCursor)
+# DB_EFFI apunta a os_integracion en VPS Contabo (fuente de verdad).
+# effi_data local es SOLO intermediaria del pipeline — ver MANIFESTO §8.
+DB_EFFI = cfg_integracion(dict_cursor=True)
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'os_secret_dev_change_me')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -387,12 +388,12 @@ class SolicitudUpdate(BaseModel):
     op_effi: Optional[str] = None
 
 
-# ── Artículos (effi_data local + inv_rangos remoto en VPS) ────
+# ── Artículos (os_integracion VPS + inv_rangos en inventario_produccion_effi VPS) ──
 
 @app.get("/api/articulos")
 def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
     """Lista artículos de Effi vigentes con tipo (MP/PP/PT/INS/etc) desde inv_rangos.
-    Como effi_data es local y inv_rangos está en VPS, se hace merge en Python.
+    os_integracion e inv_rangos están ambas en VPS (BDs distintas), se hace merge en Python.
     tipo: filtro opcional (PT, PP, MP). Si se omite, devuelve todos.
     q: filtro de búsqueda por nombre o código.
     """
@@ -400,7 +401,7 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
     rangos_rows = q(DB_INV, "SELECT id_effi AS cod, grupo, unidad FROM inv_rangos")
     rangos_map = {r['cod']: r for r in rangos_rows}
 
-    # 2) Traer artículos de effi_data local
+    # 2) Traer artículos de os_integracion VPS
     sql = """
         SELECT e.id AS cod, e.nombre,
                CAST(REPLACE(e.stock_bodega_principal_sucursal_principal,',','.') AS DECIMAL(12,2)) AS stock

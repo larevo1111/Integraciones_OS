@@ -536,19 +536,55 @@ Todo trabajo, pruebas y cambios estructurales de BD se hacen en entorno local/st
 
 Un agente que toque Producción manualmente comete una falta crítica.
 
-### BDs en Hostinger — reglas específicas
+### Mapa real de BDs (actualizado 2026-04-24)
 
-| BD | Propósito | Acceso permitido |
+| BD | Ubicación física | Rol |
 |---|---|---|
-| `u768061575_os_comunidad` | ERP en producción (`menu.oscomunidad.com`)| **NUNCA tocar — PROHIBICIÓN ABSOLUTA** |
-| `u768061575_os_integracion` | Datos Effi + analíticas | Lectura/escritura solo por el pipeline |
+| `effi_data` | MariaDB **local** (servidor casa) | **Intermediaria de tránsito del pipeline. SOLO el orquestador puede leer/escribir.** Ningún otro script o app debe consultarla. |
+| `os_integracion` | MariaDB **VPS Contabo** (94.72.115.156) | **Fuente de verdad consolidada** (41 tablas zeffi_* + resumen_ventas_* + crm_contactos + catalogo_articulos + inv_catalogo_articulos). Toda app/script de inventario, producción, gestión, ERP la consulta acá. |
+| `os_gestion` | MariaDB **VPS Contabo** | Sistema Gestión OS (jornadas, tareas, etiquetas) |
+| `inventario_produccion_effi` | MariaDB **VPS Contabo** | Solicitudes (`prod_solicitudes`), grupos (`prod_grupos`), recetas (`prod_recetas*`), logs (`prod_logs`), inventario físico (`inv_*`). NO contiene tablas zeffi_* (las consulta desde os_integracion). |
+| `ia_service_os` | MariaDB **local** | Servicio Central de IA (reglas, ejemplos, agentes, prompts) |
+| `os_whatsapp` | MariaDB **local** | WA Bridge (config, contactos, mensajes) |
+| `espocrm` | MariaDB **local** | CRM (488 contactos, vía Docker) |
+| `u768061575_os_comunidad` | **Hostinger** | ERP en producción (`menu.oscomunidad.com`) — **NUNCA tocar — PROHIBICIÓN ABSOLUTA** |
 
-**`u768061575_os_comunidad`**: ni lectura masiva, ni escritura, ni DROP, ni ALTER sin autorización explícita de Santi. Falta crítica.
+> **Hostinger ya NO se usa para `os_integracion` ni `os_gestion`.** Esas BDs se migraron al VPS Contabo el 2026-04-20. **Hostinger queda exclusivamente para `os_comunidad`** (el ERP real, intocable).
 
-### Tablas analíticas — viven SOLO en Hostinger
-Las tablas `resumen_ventas_*` tienen como única fuente de verdad `u768061575_os_integracion`.
-El pipeline las calcula en local (staging temporal), las copia a Hostinger, y luego las borra de local.
-**NO existen en `effi_data` local entre corridas. No leer ni escribir la versión local.**
+### Regla absoluta: `effi_data` = intermediaria, no fuente de verdad
+
+**`effi_data` (local) es una BD de tránsito**. El orquestador del pipeline (`scripts/orquestador.py`) la usa para:
+1. Recibir lo que descarga de Effi.com.co (vía exports Playwright)
+2. Calcular tablas resumen
+3. Propagarlo todo a `os_integracion` en el VPS (`scripts/sync_hostinger.py` — nombre legacy, ya apunta al VPS)
+
+**Después de cada corrida del pipeline, los datos quedan idénticos en local y VPS.** Pero solo el VPS es la fuente de verdad. Si una app necesita datos de Effi (OPs, materiales, artículos, recetas, costos), **debe consultar `os_integracion` en el VPS, NUNCA `effi_data` local**.
+
+#### Por qué esta regla
+- `effi_data` puede tener datos parciales mientras corre el pipeline → race conditions
+- Si en algún momento queremos apagar el servidor de casa, las apps no se rompen porque ya leen del VPS
+- Coherencia: una sola fuente de verdad para todo el ecosistema
+
+#### Cómo conectarse a `os_integracion` desde código
+```python
+# Python
+from lib import integracion
+with integracion(dict_cursor=True) as conn:
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM zeffi_produccion_encabezados WHERE ...")
+```
+```js
+// Node
+const db = require('./lib/db_conn')
+const pool = await db.integracion()
+const [rows] = await pool.query("SELECT * FROM zeffi_produccion_encabezados WHERE ...")
+```
+
+#### Excepción única
+El **orquestador y sus scripts hijos** (`scripts/sync_*.py`, `calcular_resumen_*.py`, `import_all.js`, `export_*.js`, etc.) sí escriben en `effi_data` local — ese es su trabajo. Cualquier otro código no.
+
+### Tablas analíticas — viven en `os_integracion` (VPS)
+Las tablas `resumen_ventas_*` (resumen_ventas_facturas_mes, resumen_ventas_remisiones_canal_mes, etc) tienen como única fuente de verdad `os_integracion` en el VPS. El pipeline las calcula en local (staging temporal) y las propaga al VPS. **NO leer la versión local entre corridas.**
 
 ---
 

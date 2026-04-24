@@ -35,9 +35,10 @@ import json
 # ─── Configuración ────────────────────────────────────────────────
 import sys as _sys
 _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lib import cfg_local, cfg_inventario
+from lib import cfg_integracion, cfg_inventario
 DB_INV  = cfg_inventario(dict_cursor=False)
-DB_EFFI = dict(**cfg_local(), database='effi_data')
+# DB_EFFI = os_integracion en VPS. Ver MANIFESTO §8.
+DB_EFFI = cfg_integracion(dict_cursor=False)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_DIR = os.path.join(SCRIPT_DIR, '..', '..', 'logs')
