@@ -29,6 +29,23 @@
 
 **Plan completo**: [.agent/planes/completados/reversion_arquitectura_vps_2026-04-24.md](planes/completados/reversion_arquitectura_vps_2026-04-24.md).
 
+### Extensión 2026-04-24 — Fix masivo de timezone en jornadas
+
+**Contexto**: tras poner el cron auto-cierre en VPS, la jornada de Deivy (id 45) se cerró equivocadamente a las 14:00 Colombia cuando llevaba 6.5h abiertas (no 13h). El bug: el helper `cerrarJornadaAbandonada` calculaba tiempos en Node con `new Date()` / `new Date(str)`, que dependen del TZ del OS. VPS en `Europe/Berlin (CEST, +02:00)` → offset de 7h respecto a Colombia → falsos positivos.
+
+**Fix arquitectónico:**
+1. `lib/timezone.js`: nueva función `parseBackendDate(str)` — mirror exacto del helper homónimo en `sistema_gestion/app/src/services/fecha.js`. Es el único Date-factory válido para strings que vienen del pool mysql2 (con `dateStrings:true`).
+2. `server.js cerrarJornadaAbandonada()`: reescrito. Todo el cálculo de tiempo pasa por SQL usando `NOW()`, `TIMESTAMPDIFF`, `DATE_FORMAT`, `DATE_ADD`. Cero `new Date()` para lógica temporal.
+3. `server.js`: 7 usos de `new Date(row.fecha_X)` migrados a `parseBackendDate()` (indicadorConfianza, `/iniciar` gap 6h, `/reabrir` ventana 1h, filtros de semana, etc.).
+4. Frontend `JornadaHeader.vue` + `JornadaDetallePopup.vue`: `import { parseBackendDate, TZ_NAME } from 'src/services/fecha'`. Todos los formateos usan `toLocaleString(..., { timeZone: TZ_NAME })` explícito. Edición de HH:MM se extrae por regex directa del string para ser inmune a TZ del browser.
+5. Jornada 45 de Deivy **reabierta** manualmente (UPDATE directo).
+
+**Verificación post-fix**: llamada manual al endpoint `/api/internal/jornadas/auto-cierre` desde VPS → `{ok:true, revisadas:2, cerradas:[]}` — cálculo correcto en TZ Colombia.
+
+**Regla reforzada** (ya estaba en CLAUDE.md como REGLA ABSOLUTA TIMEZONE y vigilada por `.githooks/pre-commit`): cero hardcode de offset. Todo por `lib/timezone.js` (Node) o `services/fecha.js` (frontend). El git hook bloquea commits con `-05:00`, `America/Bogota`, `CURDATE()`, `toISOString().slice(0,10)`, `new Date(\`...T...\`)` fuera de la whitelist.
+
+**Commits**: `abb2430` (fix auto-cierre), `35eb8d7` (migración masiva a parseBackendDate).
+
 ---
 
 ## Completado 2026-04-23 — Detalles de Producción + reporte de reales + validación (Sistema Gestión v2.8.5)
