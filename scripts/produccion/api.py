@@ -661,11 +661,16 @@ async def proxy_inventario(path: str, request: Request):
 def serve_frontend(path: str = ""):
     if not os.path.exists(STATIC_DIR):
         return {"ok": True, "msg": "API corriendo. Frontend no compilado aún."}
-    # Intentar archivo estático primero
+    # Intentar archivo estático primero (assets con hash → cache larga)
     if path and os.path.exists(os.path.join(STATIC_DIR, path)):
-        return FileResponse(os.path.join(STATIC_DIR, path))
-    # Fallback a index.html (SPA)
-    return FileResponse(os.path.join(STATIC_DIR, 'index.html'))
+        is_hashed_asset = path.startswith('assets/') and any(c in path for c in '-')
+        headers = {'Cache-Control': 'public, max-age=31536000, immutable'} if is_hashed_asset else {}
+        return FileResponse(os.path.join(STATIC_DIR, path), headers=headers)
+    # Fallback a index.html (SPA) — NO cache para que cada deploy invalide
+    return FileResponse(
+        os.path.join(STATIC_DIR, 'index.html'),
+        headers={'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    )
 
 
 if __name__ == '__main__':
