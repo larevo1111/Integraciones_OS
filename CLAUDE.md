@@ -151,6 +151,36 @@ Cambiar `APP_TIMEZONE` en `sistema_gestion/api/.env` y reiniciar el servicio. Fu
 
 Un git hook en `.githooks/pre-commit` bloquea commits con los patrones prohibidos.
 
+## ⚠️ REGLA ABSOLUTA — HELPERS
+
+**Si una función con el MISMO propósito aparece en 2+ archivos, extraerla a un helper.** Nunca "copio y refactorizo después" — la refactor después nunca llega.
+
+### Ubicaciones canónicas
+| Lenguaje / contexto | Carpeta |
+|---|---|
+| Node (scripts, APIs) | `lib/` |
+| Python (scripts pipeline) | `scripts/lib/` |
+| Frontend Sistema Gestión | `sistema_gestion/app/src/services/` · `composables/` · `utils/` |
+| Frontend ERP | `frontend/app/src/services/` · `composables/` · `utils/` |
+| Frontend ia-admin (proyecto Quasar separado) | `ia-admin/app/src/services/` |
+
+### Helpers existentes — reusar antes de reinventar
+- `lib/db_conn.js` / `scripts/lib/db_conn.py` — conexiones a BD (pools + SSH tunnel)
+- `lib/timezone.js` — fecha/hora Colombia (`localDate`, `parseHora`, `TZ_OFFSET`)
+- `sistema_gestion/app/src/services/fecha.js` — mismo helper en frontend Gestión
+- `ia-admin/app/src/services/fecha.js` — mismo helper en ia-admin
+- `sistema_gestion/app/src/services/numero.js` — formateo numérico (`fmtNum`)
+
+### Criterio para decidir si extraer
+- ✅ Extraer: misma lógica, mismo propósito, 2+ archivos (fetch con auth, formateo de fecha, parsing CSV, notificación Telegram, etc).
+- ❌ No extraer: código que se parece pero con propósito distinto, o lógica de un solo archivo aunque sea larga.
+
+### Test obligatorio
+Todo helper nuevo requiere tests en `tests/` (Node: `node --test`, Python: `pytest`). Sin tests, el helper no es un helper — es otro archivo más.
+
+### Los helpers NO se bypasan
+Igual que con BD y timezone: prohibido reimplementar un helper existente o usar la primitiva cruda (`fetch` directo, `new Date().toISOString()`, etc.) cuando hay helper disponible. Si el helper no cubre tu caso, extenderlo — no hacer una copia paralela.
+
 ## Convenciones del proyecto
 
 - Scripts en `scripts/` — corren con `node` o `python3` directamente en el host (NO docker exec)
