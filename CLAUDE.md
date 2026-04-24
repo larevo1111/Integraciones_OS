@@ -1,5 +1,33 @@
 # Integraciones_OS — Instrucciones para Claude
 
+## 🛑 MÁXIMA ABSOLUTA — INFRAESTRUCTURA
+
+**NUNCA hacer cambios de infraestructura sin autorización explícita y clara de Santi.**
+
+"Infraestructura" incluye **cualquier cosa fuera del código del proyecto**:
+- DNS / Cloudflare (route dns, CNAME, config tunnel)
+- `/etc/` de cualquier servidor (cloudflared config, systemd units, sudoers)
+- Servicios systemd (enable/disable/create units)
+- Crontab (crear/editar cron jobs)
+- `apt install` o instalación de dependencias del sistema
+- SSH tunnels persistentes, túneles reverse, jumphosts
+- Credenciales/env (`integracion_conexionesbd.env`, SSH keys)
+- Reapuntar tráfico de producción (hostnames, routing)
+- Instalar Playwright/Chromium en servidores
+- Modificar configuración del VPS Contabo o cualquier servidor remoto
+- Modificar arquitectura (qué BD usar, dónde corre qué)
+
+**Flujo obligatorio al detectar necesidad de un cambio de infraestructura:**
+
+1. **PARAR** inmediatamente, no improvisar.
+2. **Explicar a Santi** qué se necesita cambiar y por qué.
+3. **Esperar autorización EXPLÍCITA** ("sí, hacelo" o equivalente directo).
+4. **Reportar a Santi** cada cambio hecho, con una sección literal "Cambios de infraestructura" en el mensaje de cierre.
+
+**Si aparece un bug cuya raíz es arquitectural** (ej: un servicio no funciona donde debería correr): NO arreglar moviendo infraestructura. Reportar el diagnóstico y esperar decisión arquitectural.
+
+*Razón*: el 2026-04-23 reapunté DNS de producción `gestion.oscomunidad.com` del VPS al servidor local, instalé Playwright en VPS sin pedir, abrí SSH jump tunnel persistente a Hostinger con systemd unit, y no lo reporté en el resumen final. Santi pidió un arreglo de UI y terminé cambiando arquitectura de producción. Nunca más.
+
 ## ⚠️ CHECKLIST antes de implementar CUALQUIER cosa
 
 Ejecutar esta lista mentalmente en orden. No saltar pasos.
