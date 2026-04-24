@@ -3,7 +3,7 @@
 orquestador.py
 Pipeline Effi → MariaDB — Orquestador Python
 
-Horario operativo: cada 2h | 06:00–20:00 | Lunes–Sábado
+Horario operativo: cada 1h | 06:00–20:00 | Lunes–Sábado
 Auto-restart: vía systemd (Restart=on-failure)
 Notificaciones: email (siempre) + Telegram (solo en error)
 """

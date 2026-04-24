@@ -249,7 +249,7 @@ const conn = await mysql.createConnection({
 
 ## Actualización de datos
 
-El pipeline corre automáticamente cada 2h (Lun–Sab 06:00–20:00) vía systemd.
+El pipeline corre automáticamente cada 1h (Lun–Sab 06:00–20:00) vía systemd.
 
 ```bash
 # Forzar actualización manual completa (export + import)

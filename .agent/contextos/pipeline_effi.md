@@ -4,7 +4,7 @@
 ## Estado
 
 Pipeline completo activo. 18 pasos. Verificado 2026-03-11: 50/50 tablas OK, 487 contactos, 0 errores.
-Orquestador ejecuta cada 2h (Lun–Sab 06:00–20:00) vía systemd.
+Orquestador ejecuta cada 1h (Lun–Sab 06:00–20:00) vía systemd.
 
 ## Arquitectura de BDs
 

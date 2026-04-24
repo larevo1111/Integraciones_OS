@@ -1,12 +1,12 @@
 [Unit]
-Description=Ejecutar pipeline Effi cada 2 horas
+Description=Ejecutar pipeline Effi cada 1 hora
 Requires=effi-pipeline.service
 
 [Timer]
 # 5 min después del arranque del sistema
 OnBootSec=5min
-# Cada 2 horas desde la última ejecución
-OnUnitActiveSec=2h
+# Cada 1 hora desde la última ejecución
+OnUnitActiveSec=1h
 # Si se perdió una ejecución (equipo apagado), correr al reiniciar
 Persistent=true
 # Nombre del servicio a activar

@@ -283,7 +283,7 @@ Antes de hacer commit de cualquier cambio Python:
 | Archivo | Líneas | Responsabilidad |
 |---|---|---|
 | ia_mejora_continua.py | ~250 | Mejora continua (cron cada 6h) |
-| orquestador.py | ~200 | Pipeline Effi (cron cada 2h) |
+| orquestador.py | ~200 | Pipeline Effi (cron cada 1h) |
 
 ---
 
