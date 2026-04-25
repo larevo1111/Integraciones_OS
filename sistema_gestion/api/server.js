@@ -630,7 +630,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
   try {
     const [tareas] = await db.gestion.query(`
       SELECT
-        t.id, t.parent_id, t.empresa, t.titulo, t.estado, t.prioridad,
+        t.id, t.parent_id, t.empresa, t.titulo, t.descripcion, t.estado, t.prioridad,
         t.responsable, t.categoria_id,
         c.nombre AS categoria_nombre, c.color AS categoria_color, c.icono AS categoria_icono,
         t.proyecto_id,
@@ -712,7 +712,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
 
   try {
     const [tareasBase] = await db.gestion.query(`
-      SELECT t.id, t.parent_id, t.titulo, t.estado, t.prioridad, t.responsable,
+      SELECT t.id, t.parent_id, t.titulo, t.descripcion, t.estado, t.prioridad, t.responsable,
              t.categoria_id, c.nombre AS categoria_nombre, c.color AS categoria_color,
              t.proyecto_id, p.nombre AS proyecto_nombre, p.color AS proyecto_color,
              t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,

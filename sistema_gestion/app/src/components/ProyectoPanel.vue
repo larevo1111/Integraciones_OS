@@ -471,6 +471,10 @@ function onSubTareaActualizada(tareaActualizada) {
   // Actualizar en la lista de tareas vinculadas
   const idx = tareasVinculadas.value.findIndex(x => x.id === tareaActualizada.id)
   if (idx !== -1) tareasVinculadas.value[idx] = { ...tareasVinculadas.value[idx], ...tareaActualizada }
+  // Sincronizar la tarea abierta para que el TareaPanel embebido refleje el cambio
+  if (tareaAbierta.value?.id === tareaActualizada.id) {
+    tareaAbierta.value = { ...tareaAbierta.value, ...tareaActualizada }
+  }
 }
 
 const form = ref({
