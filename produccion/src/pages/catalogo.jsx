@@ -55,7 +55,7 @@ export function CatalogoPage() {
   }
 
   return (
-    <div className="p-5 max-w-[1400px] mx-auto">
+    <div className="px-3 py-4 sm:p-5 max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-[16px] font-semibold flex items-center gap-2"><BookOpen className="h-4 w-4" /> Catálogo</h1>

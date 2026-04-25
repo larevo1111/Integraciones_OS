@@ -111,7 +111,7 @@ export function RecetasPage() {
   const totalRecetas = stats.reduce((s, f) => s + (f.total || 0), 0)
 
   return (
-    <div className="p-5 max-w-[1400px] mx-auto">
+    <div className="px-3 py-4 sm:p-5 max-w-[1400px] mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-[16px] font-semibold flex items-center gap-2">

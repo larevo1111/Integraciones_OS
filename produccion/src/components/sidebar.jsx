@@ -31,7 +31,7 @@ const fmtFechaCorta = (yyyymmdd) => {
   return `${parseInt(d, 10)} ${MESES[parseInt(m, 10) - 1]} ${y}`
 }
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen = false, onCloseMobile }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(KEY_COLLAPSED) === '1')
@@ -77,8 +77,11 @@ export function Sidebar() {
     <>
       <aside
         className={cn(
-          "flex flex-col transition-[width] duration-200 shrink-0 border-r",
-          collapsed ? "w-12" : "w-56"
+          "flex flex-col transition-[width,transform] duration-200 shrink-0 border-r",
+          collapsed ? "w-12" : "w-56",
+          // Móvil: overlay fijo, oculto por defecto
+          "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-56 max-md:shadow-xl",
+          mobileOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full"
         )}
         style={{ background: 'var(--sb-bg)', borderColor: 'var(--border)' }}
       >
@@ -93,10 +96,10 @@ export function Sidebar() {
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          <NavItemN1 to="/" end icon={LayoutDashboard} label="Vista general" collapsed={collapsed} />
-          <NavItemN1 to="/solicitudes" icon={ClipboardList} label="Solicitudes" collapsed={collapsed} />
-          <NavItemN1 to="/calendario"  icon={Calendar}      label="Calendario"  collapsed={collapsed} />
-          <NavItemN1 to="/recetas"     icon={BookOpen}      label="Recetas"     collapsed={collapsed} />
+          <NavItemN1 to="/" end icon={LayoutDashboard} label="Vista general" collapsed={collapsed} onClick={onCloseMobile} />
+          <NavItemN1 to="/solicitudes" icon={ClipboardList} label="Solicitudes" collapsed={collapsed} onClick={onCloseMobile} />
+          <NavItemN1 to="/calendario"  icon={Calendar}      label="Calendario"  collapsed={collapsed} onClick={onCloseMobile} />
+          <NavItemN1 to="/recetas"     icon={BookOpen}      label="Recetas"     collapsed={collapsed} onClick={onCloseMobile} />
 
           {/* N1 — Inventarios (expandible con N2) */}
           <GroupHeader
@@ -109,7 +112,7 @@ export function Sidebar() {
           />
           {openGroups['Inventarios'] && !collapsed && (
             <div className="space-y-px">
-              <NavItemN2 to="/catalogo" label="Catálogo" />
+              <NavItemN2 to="/catalogo" label="Catálogo" onClick={onCloseMobile} />
               {/* N2 con panel flotante: Inventarios */}
               <NavItemN2Floating
                 ref={inventariosN2Ref}
@@ -121,7 +124,7 @@ export function Sidebar() {
             </div>
           )}
 
-          <NavItemN1 to="/config" icon={Settings} label="Configuración" collapsed={collapsed} />
+          <NavItemN1 to="/config" icon={Settings} label="Configuración" collapsed={collapsed} onClick={onCloseMobile} />
         </nav>
 
         {/* Footer */}
@@ -199,10 +202,11 @@ export function Sidebar() {
 
 // ── Subcomponentes ──
 
-function NavItemN1({ to, end, icon: Icon, label, collapsed }) {
+function NavItemN1({ to, end, icon: Icon, label, collapsed, onClick }) {
   return (
     <NavLink
       to={to} end={end}
+      onClick={onClick}
       className={cn("group flex items-center gap-2.5 h-7 rounded-md text-[13px] transition-colors cursor-pointer",
         collapsed && "justify-center")}
       style={({ isActive }) => ({
@@ -244,10 +248,11 @@ function GroupHeader({ icon: Icon, label, isOpen, onToggle, collapsed, isActive 
   )
 }
 
-function NavItemN2({ to, label }) {
+function NavItemN2({ to, label, onClick }) {
   return (
     <NavLink
       to={to}
+      onClick={onClick}
       className="flex items-center h-6 rounded-md text-[12px] transition-colors cursor-pointer"
       style={({ isActive }) => ({
         paddingLeft: 24, paddingRight: 8,

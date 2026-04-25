@@ -67,38 +67,35 @@ export function RecetaDetallePage() {
   const margenPct = ventaTotal ? (beneficio / ventaTotal * 100) : 0
 
   return (
-    <div className="p-5 max-w-[1200px] mx-auto">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="px-3 py-4 sm:p-5 max-w-[1200px] mx-auto">
+      <div className="flex items-center gap-2 mb-3">
         <Button variant="ghost" size="sm" onClick={() => navigate('/recetas')}>
           <ChevronLeft className="h-4 w-4" /> Volver
         </Button>
       </div>
 
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <h1 className="text-[18px] font-semibold">{r.nombre}</h1>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
-            cod <span className="font-mono">{r.cod_articulo}</span> · familia <span className="capitalize">{r.familia}</span> ·
-            patrón <span className="font-mono">{r.patron}</span>
-            {r.cantidad_lote_std ? <> · lote <span className="font-mono">{r.cantidad_lote_std} {r.unidad_producto}</span></> : null}
-          </p>
-          <div className="flex gap-2 mt-2">
-            <Badge variant={r.estado === 'validada' ? 'programado' : 'solicitado'}>{r.estado}</Badge>
-            <Badge variant="outline">{r.confianza}</Badge>
-            <Badge variant="outline">{r.n_ops_analizadas} OPs</Badge>
+      <div className="mb-5">
+        <h1 className="text-[16px] sm:text-[18px] font-semibold">{r.nombre}</h1>
+        <p className="text-[11px] sm:text-[12px] text-muted-foreground mt-0.5">
+          cod <span className="font-mono">{r.cod_articulo}</span> · <span className="capitalize">{r.familia}</span> · <span className="font-mono">{r.patron}</span>
+          {r.cantidad_lote_std ? <> · <span className="font-mono">{r.cantidad_lote_std} {r.unidad_producto}</span></> : null}
+        </p>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <Badge variant={r.estado === 'validada' ? 'programado' : 'solicitado'}>{r.estado}</Badge>
+          <Badge variant="outline">{r.confianza}</Badge>
+          <Badge variant="outline">{r.n_ops_analizadas} OPs</Badge>
+          <div className="flex gap-2 sm:ml-auto">
+            {r.estado !== 'validada' && (
+              <Button size="sm" onClick={validar} disabled={saving}>
+                <CheckCircle2 className="h-4 w-4" /> Validar
+              </Button>
+            )}
+            {r.estado === 'validada' && (
+              <Button variant="outline" size="sm" onClick={devolverBorrador} disabled={saving}>
+                <AlertCircle className="h-4 w-4" /> Borrador
+              </Button>
+            )}
           </div>
-        </div>
-        <div className="flex gap-2">
-          {r.estado !== 'validada' && (
-            <Button size="sm" onClick={validar} disabled={saving}>
-              <CheckCircle2 className="h-4 w-4" /> Validar
-            </Button>
-          )}
-          {r.estado === 'validada' && (
-            <Button variant="outline" size="sm" onClick={devolverBorrador} disabled={saving}>
-              <AlertCircle className="h-4 w-4" /> Devolver a borrador
-            </Button>
-          )}
         </div>
       </div>
 
@@ -112,7 +109,8 @@ export function RecetaDetallePage() {
 
       {/* Materiales */}
       <Seccion titulo="Materiales">
-        <table className="w-full text-[12px]">
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <table className="w-full text-[12px] min-w-[500px]">
           <thead className="text-muted-foreground border-b border-border">
             <tr><th className="text-left py-1.5">Cód</th><th className="text-left">Nombre</th><th className="text-right">Cantidad</th><th className="text-right">Costo unit</th><th className="text-right">Subtotal</th><th className="text-right">N OPs</th></tr>
           </thead>
@@ -132,11 +130,13 @@ export function RecetaDetallePage() {
             )}
           </tbody>
         </table>
+        </div>
       </Seccion>
 
       {/* Productos */}
       <Seccion titulo="Productos">
-        <table className="w-full text-[12px]">
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+        <table className="w-full text-[12px] min-w-[500px]">
           <thead className="text-muted-foreground border-b border-border">
             <tr><th className="text-left py-1.5">Cód</th><th className="text-left">Nombre</th><th className="text-right">Cantidad</th><th className="text-right">Precio min venta</th><th className="text-right">Subtotal</th></tr>
           </thead>
@@ -152,12 +152,14 @@ export function RecetaDetallePage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Seccion>
 
       {/* Costos de producción */}
       {r.costos?.length > 0 && (
         <Seccion titulo="Costos de producción">
-          <table className="w-full text-[12px]">
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <table className="w-full text-[12px] min-w-[400px]">
             <thead className="text-muted-foreground border-b border-border">
               <tr><th className="text-left py-1.5">Nombre</th><th className="text-right">Cantidad</th><th className="text-right">Costo unit</th><th className="text-right">Subtotal</th></tr>
             </thead>
@@ -172,6 +174,7 @@ export function RecetaDetallePage() {
               ))}
             </tbody>
           </table>
+          </div>
         </Seccion>
       )}
 

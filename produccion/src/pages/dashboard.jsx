@@ -22,7 +22,7 @@ export function DashboardPage() {
   ]
 
   return (
-    <div className="px-10 pt-10 pb-8 max-w-[1400px] mx-auto">
+    <div className="px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 max-w-[1400px] mx-auto">
       <div className="mb-7">
         <h1 className="text-[18px] font-semibold tracking-tight">Vista general</h1>
         <p className="text-[12px] text-muted-foreground mt-1">Resumen de solicitudes de producción</p>
