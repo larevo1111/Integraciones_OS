@@ -533,8 +533,12 @@ def stats_resumen():
 
 @app.get("/api/recetas")
 def listar_recetas(familia: Optional[str] = None, estado: Optional[str] = None,
-                   confianza: Optional[str] = None, q_str: Optional[str] = None):
-    """Lista las recetas del libro maestro con filtros opcionales."""
+                   confianza: Optional[str] = None, q_str: Optional[str] = None,
+                   tab: Optional[str] = None):
+    """Lista las recetas del libro maestro con filtros opcionales.
+    tab=activas: productos con al menos 1 OP vigente en 2026.
+    tab=antiguas: productos sin OP vigente en 2026 (o sin OPs).
+    """
     sql = """
         SELECT r.id, r.cod_articulo, r.nombre, r.familia, r.patron,
                r.cantidad_lote_std, r.unidad_producto, r.confianza, r.estado,
@@ -555,10 +559,46 @@ def listar_recetas(familia: Optional[str] = None, estado: Optional[str] = None,
         sql += " AND r.confianza = %s"
         params.append(confianza)
     if q_str:
-        sql += " AND (r.cod_articulo LIKE %s OR r.nombre LIKE %s)"
-        params.extend([f"%{q_str}%", f"%{q_str}%"])
+        # Buscar cada palabra por separado (AND): "miel 640" → nombre LIKE %miel% AND nombre LIKE %640%
+        words = q_str.strip().split()
+        for w in words:
+            sql += " AND (r.cod_articulo LIKE %s OR r.nombre LIKE %s)"
+            params.extend([f"%{w}%", f"%{w}%"])
     sql += " ORDER BY r.familia, r.cod_articulo"
-    return q(DB_PROD, sql, params)
+    recetas = q(DB_PROD, sql, params)
+
+    # Filtro por tab: cruzar con os_integracion para última fecha OP
+    if tab in ('activas', 'antiguas'):
+        cods = [r['cod_articulo'] for r in recetas]
+        if cods:
+            ph = ','.join(['%s'] * len(cods))
+            ops = q(DB_EFFI, f"""
+                SELECT ap.cod_articulo,
+                       MAX(e.fecha_de_creacion) AS ultima_op
+                FROM zeffi_articulos_producidos ap
+                JOIN zeffi_produccion_encabezados e ON e.id_orden = ap.id_orden
+                WHERE ap.cod_articulo IN ({ph})
+                  AND ap.vigencia = 'Orden vigente'
+                  AND e.vigencia = 'Vigente'
+                GROUP BY ap.cod_articulo
+            """, tuple(cods))
+            ultima_op = {r['cod_articulo']: r['ultima_op'] for r in ops}
+        else:
+            ultima_op = {}
+
+        filtradas = []
+        for r in recetas:
+            fecha = ultima_op.get(r['cod_articulo'])
+            es_activa = fecha and str(fecha) >= '2026-01-01'
+            if tab == 'activas' and es_activa:
+                r['ultima_op'] = str(fecha)
+                filtradas.append(r)
+            elif tab == 'antiguas' and not es_activa:
+                r['ultima_op'] = str(fecha) if fecha else None
+                filtradas.append(r)
+        return filtradas
+
+    return recetas
 
 
 @app.get("/api/recetas/{cod}")

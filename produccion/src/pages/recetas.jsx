@@ -1,12 +1,14 @@
 /**
- * RecetasPage — lista del libro de recetas con filtros por familia/estado/confianza.
+ * RecetasPage — lista del libro de recetas con pestañas Activas/Antiguas y búsqueda rápida.
  */
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router"
-import { BookOpen } from "lucide-react"
+import { BookOpen, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { OsDataTable } from "@/components/os-data-table"
 import { api } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 const FAMILIAS = [
   { value: "coberturas",  label: "Coberturas" },
@@ -32,25 +34,41 @@ const CONFIANZAS = [
   { value: "baja",  label: "Baja" },
 ]
 
+const TABS = [
+  { value: "activas",  label: "Activas 2026" },
+  { value: "antiguas", label: "Antiguas" },
+]
+
 export function RecetasPage() {
   const [rows, setRows] = useState([])
   const [stats, setStats] = useState([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState("activas")
+  const [search, setSearch] = useState("")
   const navigate = useNavigate()
 
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
+      const params = new URLSearchParams({ tab })
+      if (search.trim()) params.set('q_str', search.trim())
       const [recetas, resumen] = await Promise.all([
-        api.get('/api/recetas'),
+        api.get(`/api/recetas?${params}`),
         api.get('/api/recetas/stats/resumen'),
       ])
       setRows(recetas.map(r => ({ ...r })))
       setStats(resumen)
     } finally { setLoading(false) }
-  }, [])
+  }, [tab, search])
 
   useEffect(() => { cargar() }, [cargar])
+
+  // Debounce de búsqueda: recargar 400ms después de dejar de escribir
+  const [searchInput, setSearchInput] = useState("")
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 400)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const columns = [
     { key: 'cod_articulo', label: 'Cód',       visible: true, nowrap: true },
@@ -105,13 +123,42 @@ export function RecetasPage() {
         </div>
       </div>
 
+      {/* Búsqueda + Pestañas */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Buscar por nombre o código..."
+            className="pl-8 h-8 text-[12px]"
+          />
+        </div>
+        <div className="flex gap-1">
+          {TABS.map(t => (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className={cn(
+                "h-8 px-3 rounded-md text-[12px] font-medium transition-colors cursor-pointer",
+                tab === t.value
+                  ? "bg-primary/10 text-primary border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Resumen por familia */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-4 text-[11px]">
         {stats.map(s => (
           <div key={s.familia} className="border border-border rounded px-2 py-1.5">
             <div className="font-medium capitalize">{s.familia}</div>
             <div className="text-muted-foreground font-mono">
-              {s.validadas}/{s.total} ✓
+              {s.validadas}/{s.total}
             </div>
           </div>
         ))}
@@ -121,7 +168,7 @@ export function RecetasPage() {
         rows={rows}
         columns={columns}
         loading={loading}
-        title="Recetas"
+        title={tab === 'activas' ? 'Activas 2026' : 'Antiguas'}
         renderCell={renderCell}
         onRowClick={onRowClick}
         rowKey={(r) => r.cod_articulo}
