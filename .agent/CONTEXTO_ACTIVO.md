@@ -1,6 +1,56 @@
 # Contexto Activo — Integraciones OS
 **Actualizado**: 2026-04-24
 
+## Completado 2026-04-24 — Módulo "Órdenes de Producción" (Sistema Gestión v2.9.0)
+
+Nuevo módulo que replica el patrón de Proyectos pero para OPs. La OP es un "mini proyecto" que agrupa N tareas; los tiempos y consumos reales se consolidan **a nivel OP** (no tarea).
+
+**Schema BD `os_gestion` (VPS)**:
+- **Nuevas**: `g_categorias_produccion` (12 seeds: Alistamiento, Templado, Enmoldado, Empaque, Etiquetado, Sellado, Esterilización, Pasteurización, Encordonado, Loteado, Limpieza, Otra), `g_op_lineas` (materiales+productos con cantidad_real por OP), `g_op_tiempos` (snapshot segundos_totales por categoría al validar), `g_op_detalle` (obs_lote, sellos procesar/validar, op_anterior).
+- **g_tareas**: +`categoria_produccion_id INT NULL`, −5 columnas viejas (`tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min`, `id_op_original`).
+- **Drop**: tabla `g_tarea_produccion_lineas` (26 filas viejas descartadas por Q13).
+- **Cédulas cargadas en sis_usuarios** (master VPS): Santi 3506889, Jenifer 1128457413, Deivy 74084937, Laura 1017206760, Ricardo 3502398759.
+
+**Backend (server.js)**: 10 endpoints nuevos a nivel OP (`GET /categorias-produccion`, `GET /op`, `GET /op/:id/ficha`, `PUT /op/:id/detalle`, `PUT/POST/DELETE /op/:id/lineas/...`, `POST /op/:id/procesar` nivel≥3, `POST /op/:id/validar` nivel≥5). `GET /tareas` ahora acepta `?op_id=X` (match exacto) y devuelve `categoria_produccion_id/nombre`. Eliminados los 5 endpoints viejos `/tareas/:id/produccion/*`.
+
+**Flujo `/validar` (15 pasos)**: calcular tiempos vivos → anular OP original (Playwright) → crear OP nueva con reales → Validado → `UPDATE g_tareas SET id_op=<nueva>` → copiar `g_op_lineas` a la nueva → INSERT `g_op_detalle` con `op_anterior` → snapshot en `g_op_tiempos` por categoría. Observación nueva: `LOTE X · Validó: · Reportó: · Creada/Procesada/Validada · Tiempos: Templado 4h · ... · Obs orig: ...`.
+
+**Frontend**:
+- **`DetallesProduccion.vue`** reducido a solo-lectura + link "Editar en la OP".
+- **`OpPanel.vue` nuevo**: panel lateral 540px desktop / fullscreen mobile con 7 bloques (cabecera, materiales editables, productos editables, tiempos consolidados vivo/snapshot hh:mm:ss, tareas vinculadas click→abre TareaPanel, obs_lote, Procesar/Validar). Auto-sembra líneas desde Effi al abrir por primera vez.
+- **`OpTablePage.vue` nuevo** (ruta `/ops-tabla`): tabla OsDataTable con Estado (ordena Generada→Procesada→Validado→Anulada) · OP · Responsable · Artículos (compuesto) · Fecha · Vigencia. Click fila → OpPanel.
+- **Sidebar**: link "Órdenes de producción" en sección Tablas + sub-acordeón OP (50 items max) en Mis Tareas y Equipo que filtra tareas por `?op_id=X`.
+- **TareaPanel**: selector `categoria_produccion_id` (12 chips pill) visible solo si la tarea tiene OP vinculada.
+- **TareasPage**: soporta filtro `?op_id=X` en query.
+
+**Versión**: v2.8.7 → **v2.9.0** (bump en MainLayout).
+
+**Tests E2E con Chrome DevTools MCP**:
+- Login JWT inyectado ✓
+- /ops-tabla renderiza 500 OPs ✓
+- Click fila abre OpPanel con cabecera + chip Generada + 5 secciones + botones Procesar/Validar visibles para nivel 9 ✓
+- Input cantidad_real "7,45" (coma decimal) → BD guarda 7.450 ✓
+- Textarea obs_lote guarda en `g_op_detalle.observaciones_lote` vía UPSERT ✓
+- Sidebar acordeón "Órdenes de producción" → 50 items, click filtra tareas ✓
+- PUT `categoria_produccion_id` por tarea + GET retorna `categoria_produccion_nombre` ✓
+- Mobile 390x844 responsive ✓
+
+**Archivos nuevos/modificados**:
+- `sistema_gestion/api/migrations/2026-04-24_modulo_op.sql` (nuevo)
+- `sistema_gestion/app/src/components/OpPanel.vue` (nuevo)
+- `sistema_gestion/app/src/pages/OpTablePage.vue` (nuevo)
+- `sistema_gestion/app/src/router/routes.js` (+ ruta `/ops-tabla`)
+- `sistema_gestion/app/src/layouts/MainLayout.vue` (sub-acordeón OP + link Tablas + versión)
+- `sistema_gestion/app/src/components/DetallesProduccion.vue` (reducido a solo-lectura)
+- `sistema_gestion/app/src/components/TareaPanel.vue` (selector cat_producción)
+- `sistema_gestion/app/src/pages/TareasPage.vue` (filtro op_id)
+- `sistema_gestion/api/server.js` (+10 endpoints OP, -5 endpoints viejos, -SELECTs id_op_original)
+- `sistema_gestion/api/db.js` (no tocado en esta fase)
+
+**Plan completo**: [.agent/planes/completados/PLAN_MODULO_OP_GESTION_2026-04-24.md](planes/completados/PLAN_MODULO_OP_GESTION_2026-04-24.md).
+
+---
+
 ## Completado 2026-04-24 — Aislamiento de Hostinger: usuarios desde sos_master_erp (VPS)
 
 **Contexto**: Tras detectar y limpiar una intrusión (`maskedaltfivem@gmail.com`, ver `.agent/planes/activos/PLAN_MODULO_OP_GESTION_2026-04-24.md` §12), Santi decidió cortar la dependencia de Hostinger para validar usuarios. Hostinger queda aislado exclusivamente para el ERP Effi real (`u768061575_os_comunidad`).

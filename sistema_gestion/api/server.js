@@ -637,7 +637,7 @@ app.get('/api/gestion/tareas', async (req, res) => {
         p.nombre AS proyecto_nombre, p.color AS proyecto_color,
         t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
         t.fecha_inicio_real, t.fecha_fin_real,
-        t.id_op, t.id_op_original, t.id_remision, t.id_pedido, t.tiempo_estimado_min, t.notas,
+        t.id_op, t.id_remision, t.id_pedido, t.tiempo_estimado_min, t.notas,
         t.orden, t.usuario_creador, t.fecha_creacion, t.fecha_ult_modificacion,
         t.duracion_usuario_seg, t.duracion_cronometro_seg, t.duracion_sistema_seg,
         t.crono_inicio,
@@ -717,7 +717,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
              t.proyecto_id, p.nombre AS proyecto_nombre, p.color AS proyecto_color,
              t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
              t.fecha_inicio_real, t.fecha_fin_real,
-             t.id_op, t.id_op_original, t.id_remision, t.id_pedido,
+             t.id_op, t.id_remision, t.id_pedido,
              t.tiempo_estimado_min, t.notas,
              t.duracion_usuario_seg, t.duracion_cronometro_seg, t.duracion_sistema_seg,
              t.crono_inicio,
@@ -2005,388 +2005,9 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
 })
 
 
-// GET /api/gestion/tareas/:id/produccion — materiales + productos + tiempos
-// Si la tarea tiene id_op y no hay filas locales, siembra desde Effi.
-app.get('/api/gestion/tareas/:id/produccion', requireAuth, async (req, res) => {
-  const tareaId = parseInt(req.params.id, 10)
-  try {
-    const [[tarea]] = await db.gestion.query(
-      `SELECT id, id_op, tiempo_alistamiento_min, tiempo_produccion_min,
-              tiempo_empaque_min, tiempo_limpieza_min
-       FROM g_tareas WHERE id = ? AND empresa = ?`,
-      [tareaId, req.empresa]
-    )
-    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+// Endpoints viejos `/tareas/:id/produccion/{,tiempos,procesar,validar,lineas}` removidos 2026-04-24
+// Fueron reemplazados por endpoints a nivel OP (ver arriba). Frontend nuevo apunta a `/op/:id_op/*`.
 
-    const tiempos = {
-      alistamiento: tarea.tiempo_alistamiento_min,
-      produccion:   tarea.tiempo_produccion_min,
-      empaque:      tarea.tiempo_empaque_min,
-      limpieza:     tarea.tiempo_limpieza_min,
-    }
-
-    if (!tarea.id_op) {
-      return res.json({ ok: true, materiales: [], productos: [], tiempos, id_op: null })
-    }
-
-    // Cargar lo que Effi tiene hoy para esta OP
-    const [matsEffi] = await db.integracion.query(
-      `SELECT cod_material AS cod, descripcion_material AS descripcion, cantidad
-       FROM zeffi_materiales WHERE id_orden = ?`,
-      [tarea.id_op]
-    )
-    const [prodsEffi] = await db.integracion.query(
-      `SELECT cod_articulo AS cod, descripcion_articulo_producido AS descripcion, cantidad
-       FROM zeffi_articulos_producidos WHERE id_orden = ?`,
-      [tarea.id_op]
-    )
-    const codsEffi = new Set([
-      ...matsEffi.map(m => String(m.cod)),
-      ...prodsEffi.map(p => String(p.cod)),
-    ])
-
-    // ¿Las líneas existentes corresponden a la OP actual? (re-sembrar si OP cambió)
-    const [lineasPrev] = await db.gestion.query(
-      'SELECT id, cod_articulo, cantidad_real FROM g_tarea_produccion_lineas WHERE tarea_id = ?',
-      [tareaId]
-    )
-    const desajuste = lineasPrev.length > 0 &&
-      lineasPrev.some(l => !codsEffi.has(String(l.cod_articulo)))
-    const sinReales = lineasPrev.every(l => l.cantidad_real == null)
-
-    if (desajuste && sinReales) {
-      await db.gestion.query('DELETE FROM g_tarea_produccion_lineas WHERE tarea_id = ?', [tareaId])
-    }
-
-    // Siembra si no hay líneas (primera vez o borradas por desajuste)
-    const [[{ n }]] = await db.gestion.query(
-      'SELECT COUNT(*) AS n FROM g_tarea_produccion_lineas WHERE tarea_id = ?',
-      [tareaId]
-    )
-
-    if (n === 0) {
-      const toNum = v => {
-        if (v == null || v === '') return null
-        const n = Number(String(v).replace(',', '.'))
-        return Number.isFinite(n) ? n : null
-      }
-      const filas = [
-        ...matsEffi.map(m => ['material', m.cod, m.descripcion, toNum(m.cantidad)]),
-        ...prodsEffi.map(p => ['producto', p.cod, p.descripcion, toNum(p.cantidad)]),
-      ].filter(f => f[1])
-
-      if (filas.length) {
-        const values = filas.map(() => '(?, ?, ?, ?, ?)').join(',')
-        const params = []
-        for (const [tipo, cod, desc, cant] of filas) {
-          params.push(tareaId, tipo, cod, desc || '', cant)
-        }
-        await db.gestion.query(
-          `INSERT IGNORE INTO g_tarea_produccion_lineas
-             (tarea_id, tipo, cod_articulo, descripcion, cantidad_teorica)
-           VALUES ${values}`,
-          params
-        )
-      }
-    }
-
-    const [lineas] = await db.gestion.query(
-      `SELECT id, tipo, cod_articulo, descripcion, cantidad_teorica, cantidad_real
-       FROM g_tarea_produccion_lineas
-       WHERE tarea_id = ?
-       ORDER BY tipo, descripcion`,
-      [tareaId]
-    )
-
-    const codigos = [...new Set(lineas.map(l => l.cod_articulo))]
-    const unidades = await _lookupUnidades(codigos)
-
-    const materiales = [], productos = []
-    for (const l of lineas) {
-      const item = {
-        id: l.id,
-        cod_articulo: l.cod_articulo,
-        descripcion: l.descripcion,
-        unidad: unidades[l.cod_articulo] || '',
-        cantidad_teorica: l.cantidad_teorica == null ? null : Number(l.cantidad_teorica),
-        cantidad_real:    l.cantidad_real    == null ? null : Number(l.cantidad_real),
-      }
-      if (l.tipo === 'material') materiales.push(item)
-      else productos.push(item)
-    }
-
-    res.json({ ok: true, id_op: tarea.id_op, materiales, productos, tiempos })
-  } catch (e) {
-    console.error('[produccion GET]', e)
-    res.status(500).json({ error: e.message })
-  }
-})
-
-// PUT /api/gestion/tareas/:id/produccion/lineas/:lineaId — actualizar cantidad_real
-app.put('/api/gestion/tareas/:id/produccion/lineas/:lineaId', requireAuth, async (req, res) => {
-  const tareaId = parseInt(req.params.id, 10)
-  const lineaId = parseInt(req.params.lineaId, 10)
-  const { cantidad_real } = req.body
-  const valor = cantidad_real === null || cantidad_real === '' ? null : Number(cantidad_real)
-  if (valor !== null && !Number.isFinite(valor)) {
-    return res.status(400).json({ error: 'cantidad_real inválida' })
-  }
-  try {
-    const [[ok]] = await db.gestion.query(
-      `SELECT id FROM g_tareas WHERE id = ? AND empresa = ?`,
-      [tareaId, req.empresa]
-    )
-    if (!ok) return res.status(404).json({ error: 'Tarea no encontrada' })
-
-    const [r] = await db.gestion.query(
-      `UPDATE g_tarea_produccion_lineas
-       SET cantidad_real = ?, usuario_ult_modificacion = ?
-       WHERE id = ? AND tarea_id = ?`,
-      [valor, req.usuario.email, lineaId, tareaId]
-    )
-    if (!r.affectedRows) return res.status(404).json({ error: 'Línea no encontrada' })
-    res.json({ ok: true })
-  } catch (e) { res.status(500).json({ error: e.message }) }
-})
-
-// PUT /api/gestion/tareas/:id/produccion/tiempos — actualizar los 4 tiempos
-app.put('/api/gestion/tareas/:id/produccion/tiempos', requireAuth, async (req, res) => {
-  const tareaId = parseInt(req.params.id, 10)
-  const { alistamiento, produccion, empaque, limpieza } = req.body
-  const parse = v => (v === null || v === undefined || v === '') ? null : (Number.isFinite(Number(v)) ? Math.max(0, Math.floor(Number(v))) : undefined)
-  const a = parse(alistamiento), p = parse(produccion), e = parse(empaque), l = parse(limpieza)
-  if ([a, p, e, l].includes(undefined)) return res.status(400).json({ error: 'Valor de tiempo inválido' })
-  try {
-    const [r] = await db.gestion.query(
-      `UPDATE g_tareas
-       SET tiempo_alistamiento_min = ?, tiempo_produccion_min = ?,
-           tiempo_empaque_min = ?, tiempo_limpieza_min = ?,
-           usuario_ult_modificacion = ?
-       WHERE id = ? AND empresa = ?`,
-      [a, p, e, l, req.usuario.email, tareaId, req.empresa]
-    )
-    if (!r.affectedRows) return res.status(404).json({ error: 'Tarea no encontrada' })
-    res.json({ ok: true, tiempos: { alistamiento: a, produccion: p, empaque: e, limpieza: l } })
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
-// POST /api/gestion/tareas/:id/produccion/procesar — marca OP vinculada como "Procesada"
-// Permiso: usuario es responsable de la tarea, O su nivel > nivel del responsable.
-app.post('/api/gestion/tareas/:id/produccion/procesar', requireAuth, async (req, res) => {
-  if (!PLAYWRIGHT_OK) {
-    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
-  }
-  const tareaId = parseInt(req.params.id, 10)
-  try {
-    const [[tarea]] = await db.gestion.query(
-      `SELECT t.id, t.id_op, t.responsable,
-              GROUP_CONCAT(tr.email) AS responsables_csv
-       FROM g_tareas t
-       LEFT JOIN g_tareas_responsables tr ON tr.tarea_id = t.id
-       WHERE t.id = ? AND t.empresa = ?
-       GROUP BY t.id`,
-      [tareaId, req.empresa]
-    )
-    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
-    if (!tarea.id_op) return res.status(400).json({ error: 'La tarea no tiene OP vinculada' })
-
-    const responsables = (tarea.responsables_csv || '').split(',').filter(Boolean)
-    if (!responsables.length && tarea.responsable) responsables.push(tarea.responsable)
-
-    const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
-    const esResponsable = responsables.includes(req.usuario.email)
-    const nivelMax = responsables.reduce((m, e) => Math.max(m, nivelCache[e] || 1), 0)
-    if (!esResponsable && miNivel <= nivelMax) {
-      return res.status(403).json({ error: 'No tenés permisos para procesar esta OP (no sos responsable y tu nivel no supera al del responsable)' })
-    }
-
-    // Nombre del reportador — JWT ya trae nombre, evita dependencia de comunidad (Hostinger)
-    const nombreReportador = req.usuario.nombre || req.usuario.email
-    const observacion = `Reportó: ${nombreReportador} (OS Gestión)`
-
-    // Ejecutar script Playwright
-    const scriptPath = path.join(__dirname, '../../scripts/cambiar_estado_orden_produccion.js')
-    const resultado = await new Promise((resolve, reject) => {
-      execFile('node', [scriptPath, String(tarea.id_op), 'Procesada', observacion], {
-        timeout: 90000, cwd: path.dirname(scriptPath)
-      }, (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message))
-        resolve(stdout)
-      })
-    })
-
-    // Reflejar el nuevo estado en staging local (hasta que el próximo pipeline
-    // sincronice desde Effi). Sin esto el UI no muestra el cambio al instante.
-    try {
-      await db.integracion.query(
-        `UPDATE zeffi_produccion_encabezados SET estado = 'Procesada' WHERE id_orden = ?`,
-        [tarea.id_op]
-      )
-    } catch (upErr) { console.warn('[procesar] no se pudo actualizar staging:', upErr.message) }
-
-    res.json({ ok: true, id_op: tarea.id_op, estado: 'Procesada', observacion, log: resultado.slice(-500) })
-  } catch (e) {
-    console.error('[procesar OP]', e)
-    res.status(500).json({ error: e.message })
-  }
-})
-
-// POST /api/gestion/tareas/:id/produccion/validar — solo nivel >= 5
-// Flujo: anular OP original → crear OP nueva con cantidades reales → cambiar
-// estado a "Validado" → guardar id_op_original en g_tareas.
-// Retorna { id_op_anterior, id_op_nueva }. Demora 2-3 min (3 scripts Playwright).
-app.post('/api/gestion/tareas/:id/produccion/validar', requireAuth, async (req, res) => {
-  if (!PLAYWRIGHT_OK) {
-    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
-  }
-  const tareaId = parseInt(req.params.id, 10)
-  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
-  if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })
-
-  try {
-    const [[tarea]] = await db.gestion.query(
-      `SELECT id, id_op, responsable FROM g_tareas WHERE id = ? AND empresa = ?`,
-      [tareaId, req.empresa]
-    )
-    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
-    if (!tarea.id_op) return res.status(400).json({ error: 'La tarea no tiene OP vinculada' })
-
-    const idOpOriginal = String(tarea.id_op)
-
-    // 1. Datos de la OP original (metadata)
-    const [[op]] = await db.integracion.query(
-      `SELECT sucursal, bodega, id_encargado, id_tercero, activo_productivo,
-              fecha_inicial, fecha_final, observacion
-       FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1`,
-      [idOpOriginal]
-    )
-    if (!op) return res.status(400).json({ error: `OP ${idOpOriginal} no encontrada en staging` })
-
-    // 2. Líneas con cantidades reales
-    const [lineas] = await db.gestion.query(
-      `SELECT tipo, cod_articulo, descripcion, cantidad_teorica, cantidad_real
-       FROM g_tarea_produccion_lineas WHERE tarea_id = ?`,
-      [tareaId]
-    )
-    if (!lineas.length) return res.status(400).json({ error: 'No hay líneas de producción registradas para esta tarea' })
-
-    // 3. Costos originales por cod_articulo (para mantener)
-    const [matsCostos] = await db.integracion.query(
-      `SELECT cod_material AS cod, costo_ud FROM zeffi_materiales WHERE id_orden = ?`,
-      [idOpOriginal]
-    )
-    const [prodPrecios] = await db.integracion.query(
-      `SELECT cod_articulo AS cod, precio_minimo_ud FROM zeffi_articulos_producidos WHERE id_orden = ?`,
-      [idOpOriginal]
-    )
-    const costoPorCod   = Object.fromEntries(matsCostos.map(m => [String(m.cod), Number(String(m.costo_ud || '').replace(',', '.')) || 0]))
-    const precioPorCod  = Object.fromEntries(prodPrecios.map(p => [String(p.cod), Number(String(p.precio_minimo_ud || '').replace(',', '.')) || 0]))
-
-    // 4. Datos del validador + reportador — desde master (VPS)
-    let nombreValidador  = req.usuario.nombre || req.usuario.email
-    let nombreReportador = tarea.responsable || '?'
-    if (db.master) {
-      try {
-        const [[resp]] = tarea.responsable ? await db.master.query(
-          'SELECT nombre FROM sis_usuarios WHERE email = ?', [tarea.responsable]
-        ) : [[]]
-        if (resp?.nombre) nombreReportador = resp.nombre
-      } catch (e) { console.warn('[validar] master no disponible para nombre responsable:', e.message) }
-    }
-    const obsOriginal      = (op.observacion || '').replace(/\s+/g, ' ').trim()
-    const observacion      = `Validación OS · Reportó: ${nombreReportador} · Validó: ${nombreValidador}${obsOriginal ? ' · Obs OP orig: ' + obsOriginal.slice(0, 200) : ''}`
-
-    // 5. Construir JSON para import_orden_produccion.js
-    // Mapeo simple: sucursal "Principal" → 1, bodega "Principal" → 1. (Si hay otros, agregar aquí.)
-    const sucursalIdMap = { 'Principal': 1 }
-    const bodegaIdMap   = { 'Principal': 1 }
-    const sucursal_id = sucursalIdMap[op.sucursal] || 1
-    const bodega_id   = bodegaIdMap[op.bodega] || 1
-    const encargadoCC = String(op.id_encargado || '').replace(/^CC:\s*/, '').trim()
-    const terceroCC   = op.id_tercero ? String(op.id_tercero).replace(/^CC:\s*/, '').trim() : ''
-    const fechaInicio = String(op.fecha_inicial || '').slice(0, 10)
-    const fechaFin    = String(op.fecha_final   || '').slice(0, 10)
-
-    const jsonOp = {
-      sucursal_id, bodega_id,
-      fecha_inicio: fechaInicio, fecha_fin: fechaFin,
-      encargado: encargadoCC,
-      tercero: terceroCC,
-      activo_productivo_id: null,
-      observacion,
-      materiales: lineas.filter(l => l.tipo === 'material').map(l => ({
-        cod_articulo: l.cod_articulo,
-        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
-        costo: costoPorCod[l.cod_articulo] || 0,
-        lote: '', serie: '',
-      })),
-      articulos_producidos: lineas.filter(l => l.tipo === 'producto').map(l => ({
-        cod_articulo: l.cod_articulo,
-        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
-        precio: precioPorCod[l.cod_articulo] || 0,
-        lote: '', serie: '',
-      })),
-      otros_costos: [],
-    }
-
-    const jsonPath = `/tmp/op_validacion_${tareaId}_${Date.now()}.json`
-    fs.writeFileSync(jsonPath, JSON.stringify(jsonOp, null, 2))
-
-    // 6. Ejecutar 3 scripts secuencialmente
-    const scripts = path.join(__dirname, '../../scripts')
-    function ejecutar(args, timeoutMs) {
-      return new Promise((resolve, reject) => {
-        execFile('node', args, { timeout: timeoutMs, cwd: scripts }, (err, stdout, stderr) => {
-          if (err) return reject(new Error((stderr || err.message).slice(-800)))
-          resolve(stdout || '')
-        })
-      })
-    }
-
-    console.log(`[validar] tarea ${tareaId} — anular OP ${idOpOriginal}`)
-    await ejecutar([path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion], 120000)
-
-    console.log(`[validar] tarea ${tareaId} — crear OP nueva con reales`)
-    const stdoutCrear = await ejecutar([path.join(scripts, 'import_orden_produccion.js'), jsonPath], 180000)
-    const matchId = stdoutCrear.match(/OP_CREADA:(\d+)/)
-    if (!matchId) {
-      throw new Error('No se pudo capturar el ID de la nueva OP. Revisar logs.')
-    }
-    const idOpNueva = matchId[1]
-    console.log(`[validar] tarea ${tareaId} — OP nueva: ${idOpNueva}`)
-
-    await ejecutar([path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion], 90000)
-
-    // 7. Actualizar g_tareas
-    await db.gestion.query(
-      `UPDATE g_tareas SET id_op = ?, id_op_original = ?, usuario_ult_modificacion = ? WHERE id = ?`,
-      [idOpNueva, idOpOriginal, req.usuario.email, tareaId]
-    )
-
-    // 8. Reflejar en staging: nueva OP debe aparecer como Validado; vieja como Anulada.
-    try {
-      await db.integracion.query(
-        `UPDATE zeffi_produccion_encabezados SET estado = 'Anulada', vigencia = 'Anulada' WHERE id_orden = ?`,
-        [idOpOriginal]
-      )
-      // La nueva OP aún no está en staging (sync vía pipeline). Crearla mínima para que el UI la encuentre.
-      await db.integracion.query(
-        `INSERT IGNORE INTO zeffi_produccion_encabezados
-           (id_orden, sucursal, bodega, id_encargado, fecha_inicial, fecha_final, observacion, estado, vigencia)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'Validado', 'Vigente')`,
-        [idOpNueva, op.sucursal, op.bodega, op.id_encargado, op.fecha_inicial, op.fecha_final, observacion]
-      )
-    } catch (e) { console.warn('[validar] staging no actualizable:', e.message) }
-
-    // Limpieza
-    try { fs.unlinkSync(jsonPath) } catch (_) {}
-
-    res.json({ ok: true, id_op_anterior: idOpOriginal, id_op_nueva: idOpNueva, observacion })
-  } catch (e) {
-    console.error('[validar]', e)
-    res.status(500).json({ error: e.message })
-  }
-})
 
 // ─── REMISIONES ───────────────────────────────────────────────────
 
@@ -3715,9 +3336,22 @@ app.post('/api/gestion/upload', upload.single('file'), (req, res) => {
 })
 
 // ─── Fallback SPA ──────────────────────────────────────────────────
+// Vue Router usa history mode → cualquier ruta no-API debe servir index.html.
+// Busca primero la SPA copiada a public/, luego pwa/, luego spa/ del build.
 app.use((req, res) => {
-  const pwa = path.join(__dirname, '../app/dist/pwa/index.html')
-  if (fs.existsSync(pwa)) return res.sendFile(pwa)
+  // No interceptar rutas API ni assets
+  if (req.path.startsWith('/api/') || req.path.startsWith('/subidos/') ||
+      req.path.includes('.') ) {
+    return res.status(404).json({ error: 'Not found' })
+  }
+  const candidatos = [
+    path.join(__dirname, 'public/index.html'),
+    path.join(__dirname, '../app/dist/spa/index.html'),
+    path.join(__dirname, '../app/dist/pwa/index.html'),
+  ]
+  for (const p of candidatos) {
+    if (fs.existsSync(p)) return res.sendFile(p)
+  }
   res.status(404).json({ error: 'Frontend no desplegado aún' })
 })
 

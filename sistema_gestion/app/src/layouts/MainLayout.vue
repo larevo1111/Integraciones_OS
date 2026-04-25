@@ -95,6 +95,31 @@
                 </template>
               </div>
 
+              <!-- Órdenes de producción (mis tareas) -->
+              <div class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="toggleAcordeon('mis-ops')">
+                  <q-icon :name="acordeonAbierto['mis-ops'] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs" style="flex:1">Órdenes de producción</span>
+                  <span v-if="misOps.length" class="sidebar-count">{{ misOps.length }}</span>
+                </div>
+                <template v-if="acordeonAbierto['mis-ops']">
+                  <q-item
+                    v-for="o in misOps" :key="'mis-op-'+o.id_orden"
+                    clickable dense class="sidebar-project-item"
+                    :class="{ active: ruta === '/tareas' && String($route.query.op_id) === String(o.id_orden) }"
+                    :to="{ path: '/tareas', query: { op_id: o.id_orden } }"
+                    @click="cerrarDrawerMobile()"
+                  >
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: o.estado === 'Procesada' ? '#ffa726' : '#7c8ea8' }" />
+                    </q-item-section>
+                    <q-item-section class="sidebar-item-label">OP-{{ o.id_orden }}</q-item-section>
+                    <q-item-section side><span class="text-caption" style="color:var(--text-tertiary);font-size:10px">{{ o.estado }}</span></q-item-section>
+                  </q-item>
+                  <div v-if="!misOps.length && !cargandoOps" class="sidebar-empty">Sin OPs</div>
+                </template>
+              </div>
+
               <!-- Etiquetas (mis tareas) -->
               <div class="sidebar-sub-section">
                 <div class="sidebar-sub-header" @click="toggleAcordeon('mis-etiquetas')">
@@ -252,6 +277,31 @@
                 </template>
               </div>
 
+              <!-- Órdenes de producción (equipo) -->
+              <div class="sidebar-sub-section">
+                <div class="sidebar-sub-header" @click="toggleAcordeon('eq-ops')">
+                  <q-icon :name="acordeonAbierto['eq-ops'] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <span class="q-ml-xs" style="flex:1">Órdenes de producción</span>
+                  <span v-if="todasOps.length" class="sidebar-count">{{ todasOps.length }}</span>
+                </div>
+                <template v-if="acordeonAbierto['eq-ops']">
+                  <q-item
+                    v-for="o in todasOps" :key="'eq-op-'+o.id_orden"
+                    clickable dense class="sidebar-project-item"
+                    :class="{ active: ruta === '/equipo' && String($route.query.op_id) === String(o.id_orden) }"
+                    :to="{ path: '/equipo', query: { op_id: o.id_orden } }"
+                    @click="cerrarDrawerMobile()"
+                  >
+                    <q-item-section avatar class="sidebar-item-icon">
+                      <span class="proyecto-dot" :style="{ background: o.estado === 'Procesada' ? '#ffa726' : '#7c8ea8' }" />
+                    </q-item-section>
+                    <q-item-section class="sidebar-item-label">OP-{{ o.id_orden }}</q-item-section>
+                    <q-item-section side><span class="text-caption" style="color:var(--text-tertiary);font-size:10px">{{ o.estado }}</span></q-item-section>
+                  </q-item>
+                  <div v-if="!todasOps.length && !cargandoOps" class="sidebar-empty">Sin OPs</div>
+                </template>
+              </div>
+
               <!-- Etiquetas (equipo) -->
               <div class="sidebar-sub-section">
                 <div class="sidebar-sub-header" @click="toggleAcordeon('eq-etiquetas')">
@@ -366,6 +416,12 @@
 
           <!-- ═══ TABLAS ═══ -->
           <q-item-label v-if="!isMini" header class="sidebar-section-lbl">Tablas</q-item-label>
+
+          <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/ops-tabla' }" to="/ops-tabla" @click="cerrarDrawerMobile()">
+            <q-item-section avatar class="sidebar-item-icon"><q-icon name="precision_manufacturing" /></q-item-section>
+            <q-item-section v-if="!isMini" class="sidebar-item-label">Órdenes de producción</q-item-section>
+            <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Órdenes de producción</q-tooltip>
+          </q-item>
 
           <q-item clickable dense class="sidebar-item" :class="{ active: ruta === '/proyectos-tabla' }" to="/proyectos-tabla" @click="cerrarDrawerMobile()">
             <q-item-section avatar class="sidebar-item-icon"><q-icon name="folder_open" /></q-item-section>
@@ -547,7 +603,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.8.7'
+const APP_VERSION = 'v2.9.0'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -629,6 +685,15 @@ const mostrarCompletados  = ref(false)
 const cargandoProyectos   = ref(false)
 const proyectoHover       = ref(null)
 const etiquetaHover       = ref(null)
+
+// Órdenes de producción (Generada + Procesada) para sidebar
+const todasOps     = ref([])
+const cargandoOps  = ref(false)
+const misOps = computed(() => {
+  // OPs donde al menos una tarea del usuario actual está vinculada — calculado desde todosItems "tareas"? No,
+  // aquí no tenemos todas las tareas. Versión simple: mostrar todas las OPs (a futuro filtrar por backend).
+  return todasOps.value
+})
 const menuEtiqueta        = ref({ visible: false, etiqueta: null, style: {} })
 
 const panelVisible = ref(false)
@@ -661,6 +726,16 @@ async function cargarProyectos() {
     todosItems.value          = all.filter(p => !estadosCompletados.includes(p.estado) && p.estado !== 'Archivado' && p.estado !== 'Cerrada' && p.estado !== 'Cancelado' && p.estado !== 'Descartada')
     proyectosCompletados.value = all.filter(p => estadosCompletados.includes(p.estado))
   } catch {} finally { cargandoProyectos.value = false }
+}
+
+async function cargarOps() {
+  cargandoOps.value = true
+  try {
+    const r = await api('/api/gestion/op?estado=Generada,Procesada')
+    todasOps.value = (r.ops || []).slice(0, 50)  // cap razonable para sidebar
+  } catch (e) {
+    console.warn('[sidebar] no se pudieron cargar OPs:', e?.message)
+  } finally { cargandoOps.value = false }
 }
 
 async function cargarDatosPanel() {
@@ -841,6 +916,7 @@ onMounted(() => {
   if (auth.token) {
     cargarProyectos()
     cargarEtiquetas()
+    cargarOps()
   }
 })
 

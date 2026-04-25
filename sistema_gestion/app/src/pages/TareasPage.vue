@@ -766,6 +766,9 @@ const proyectoFiltro   = computed(() => proyectos.value.find(p => p.id === proye
 const etiquetaFiltroId = computed(() => route.query.etiqueta_id ? Number(route.query.etiqueta_id) : null)
 const etiquetaFiltro   = computed(() => etiquetas.value.find(e => e.id === etiquetaFiltroId.value) || null)
 
+// Filtro por OP (desde query param) — match exacto via backend ?op_id=X
+const opFiltroId = computed(() => route.query.op_id ? String(route.query.op_id) : null)
+
 // ── Valores iniciales heredados del filtro activo ──
 const defaultsFromFilters = computed(() => {
   const d = {}
@@ -1212,6 +1215,7 @@ watch(filtroActivo, () => cargarTareas())
 watch(calMesOffset, () => { if (filtroActivo.value === 'calendario') cargarTareas() })
 watch(() => route.query.proyecto_id, () => cargarTareas())
 watch(() => route.query.etiqueta_id, () => cargarTareas())
+watch(() => route.query.op_id,        () => cargarTareas())
 watch(() => props.soloMias, (val) => {
   if (val && agruparPor.value === 'responsable') agruparPor.value = 'categoria'
   cargarTareas()
@@ -1365,6 +1369,7 @@ async function cargarTareas() {
     // Filtros globales (se combinan con los chips de tiempo)
     if (proyectoFiltroId.value) params.set('proyecto_id', proyectoFiltroId.value)
     if (etiquetaFiltroId.value) params.set('etiquetas', etiquetaFiltroId.value)
+    if (opFiltroId.value)       params.set('op_id', opFiltroId.value)
 
     // Filtros de tiempo/personalizado (se aplican encima del proyecto)
     if (filtroActivo.value === 'personalizado' && filtroPersonalizado.value) {

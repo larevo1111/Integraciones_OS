@@ -18,13 +18,20 @@
           <div class="col text-body2">OP-{{ detalleOp.id_orden }} · {{ detalleOp.articulos }}</div>
           <q-badge v-if="detalleOp.estado" :class="estadoBadgeClass" :label="detalleOp.estado" />
         </div>
-        <div v-if="tarea.id_op_original" class="text-caption text-grey q-mt-xs">
-          OP orig: {{ tarea.id_op_original }}
+        <div class="row items-center q-mt-xs">
+          <q-btn
+            flat dense no-caps size="sm"
+            color="primary"
+            icon="edit"
+            label="Editar en la OP"
+            @click="abrirOp"
+          />
+          <q-space />
         </div>
       </div>
     </div>
 
-    <!-- Materiales + Productos -->
+    <!-- Materiales + Productos (solo lectura) -->
     <template v-if="tarea.id_op">
       <!-- Materiales -->
       <div v-if="materiales.length" class="q-pa-sm">
@@ -46,16 +53,10 @@
             {{ fmtNum(l.cantidad_teorica) }}
             <div class="text-caption text-grey">{{ l.unidad }}</div>
           </div>
-          <div class="col-3 text-right">
-            <q-input
-              dense filled hide-bottom-space
-              input-class="text-right text-weight-medium"
-              :model-value="formValor(l)"
-              :placeholder="fmtNum(l.cantidad_teorica)"
-              inputmode="decimal"
-              @update:model-value="v => onInput(l, v)"
-              @blur="guardarLinea(l)"
-            />
+          <div class="col-3 text-right text-weight-medium q-pt-xs">
+            <span :class="diffClass(l)">
+              {{ l.cantidad_real == null ? '—' : fmtNum(l.cantidad_real) }}
+            </span>
             <div v-if="diffText(l)" class="text-caption" :class="diffClass(l)">
               {{ diffText(l) }}
             </div>
@@ -83,16 +84,10 @@
             {{ fmtNum(l.cantidad_teorica) }}
             <div class="text-caption text-grey">{{ l.unidad }}</div>
           </div>
-          <div class="col-3 text-right">
-            <q-input
-              dense filled hide-bottom-space
-              input-class="text-right text-weight-medium"
-              :model-value="formValor(l)"
-              :placeholder="fmtNum(l.cantidad_teorica)"
-              inputmode="decimal"
-              @update:model-value="v => onInput(l, v)"
-              @blur="guardarLinea(l)"
-            />
+          <div class="col-3 text-right text-weight-medium q-pt-xs">
+            <span :class="diffClass(l)">
+              {{ l.cantidad_real == null ? '—' : fmtNum(l.cantidad_real) }}
+            </span>
             <div v-if="diffText(l)" class="text-caption" :class="diffClass(l)">
               {{ diffText(l) }}
             </div>
@@ -104,104 +99,25 @@
         Esta OP aún no tiene materiales ni artículos registrados en Effi.
       </div>
     </template>
-
-    <!-- Tiempos -->
-    <div class="q-pa-sm">
-      <div class="text-caption text-grey q-mb-xs">Tiempos de la actividad</div>
-      <div
-        v-for="t in TIEMPOS_DEF" :key="t.key"
-        class="row items-center dp-tiempo-fila"
-      >
-        <div class="col dp-tiempo-lbl">{{ t.label }}</div>
-        <q-input
-          dense filled hide-bottom-space
-          style="width: 70px"
-          input-class="text-right"
-          :model-value="tiempos[t.key] ?? ''"
-          placeholder="—"
-          inputmode="numeric"
-          @update:model-value="v => tiempos[t.key] = parseInt(v) || null"
-          @blur="guardarTiempos"
-        />
-        <span class="text-caption text-grey q-ml-xs" style="width:26px">min</span>
-      </div>
-      <q-separator class="q-my-xs" />
-      <div class="row items-center dp-tiempo-fila">
-        <div class="col dp-tiempo-lbl text-weight-medium">Total</div>
-        <div style="width:70px" class="text-right text-weight-medium">{{ totalTiempos }}</div>
-        <span class="text-caption text-grey q-ml-xs" style="width:26px">min</span>
-      </div>
-    </div>
-
-    <!-- Acciones sobre la OP (sutiles) -->
-    <div v-if="tarea.id_op && detalleOp" class="q-px-sm q-pb-sm row q-gutter-xs">
-      <q-btn
-        v-if="puedeProcesar"
-        flat dense no-caps size="sm"
-        color="warning"
-        icon="check_circle_outline"
-        label="Procesar"
-        :loading="procesando"
-        :disable="detalleOp.estado === 'Procesada' || detalleOp.estado === 'Validado'"
-        @click="marcarProcesada"
-      />
-      <q-btn
-        v-if="puedeValidar"
-        flat dense no-caps size="sm"
-        color="positive"
-        icon="verified"
-        label="Validar"
-        :loading="validando"
-        :disable="detalleOp.estado === 'Validado'"
-        @click="validarOp"
-      />
-    </div>
   </q-expansion-item>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
-import { useQuasar } from 'quasar'
+import { ref, computed, watch } from 'vue'
 import { api } from 'src/services/api'
-import { parseDecimal, fmtNum } from 'src/services/numero'
-import { useAuthStore } from 'src/stores/authStore'
+import { fmtNum, parseDecimal } from 'src/services/numero'
 import OpSelector from './OpSelector.vue'
-
-const $q = useQuasar()
-const auth = useAuthStore()
 
 const props = defineProps({
   tarea: { type: Object, required: true }
 })
-const emit = defineEmits(['actualizar-id-op', 'actualizada'])
-
-const TIEMPOS_DEF = [
-  { key: 'alistamiento', label: 'Alistamiento' },
-  { key: 'produccion',   label: 'Producción'  },
-  { key: 'empaque',      label: 'Empaque'     },
-  { key: 'limpieza',     label: 'Limpieza'    },
-]
+const emit = defineEmits(['actualizar-id-op', 'abrir-op'])
 
 const abierto    = ref(false)
 const cargando   = ref(false)
 const materiales = ref([])
 const productos  = ref([])
 const detalleOp  = ref(null)
-const tiempos    = reactive({ alistamiento: null, produccion: null, empaque: null, limpieza: null })
-const borrador   = reactive({})
-const procesando = ref(false)
-const validando  = ref(false)
-
-const miNivel = computed(() => auth.usuario?.nivel || 1)
-const esResponsable = computed(() => {
-  const r = props.tarea?.responsables || (props.tarea?.responsable ? [props.tarea.responsable] : [])
-  return r.includes(auth.usuario?.email)
-})
-const puedeProcesar = computed(() => {
-  // Responsable o nivel > responsable (simplificado: si es nivel alto, puede)
-  return esResponsable.value || miNivel.value >= 5
-})
-const puedeValidar = computed(() => miNivel.value >= 5)
 
 const estadoBadgeClass = computed(() => {
   const e = (detalleOp.value?.estado || '').toLowerCase()
@@ -220,19 +136,15 @@ async function cargar() {
   }
   cargando.value = true
   try {
-    const data = await api(`/api/gestion/tareas/${props.tarea.id}/produccion`)
+    // Leemos la ficha de la OP (nuevo endpoint, fuente de verdad a nivel OP).
+    const data = await api(`/api/gestion/op/${encodeURIComponent(props.tarea.id_op)}/ficha`)
     materiales.value = data.materiales || []
     productos.value  = data.productos  || []
-    tiempos.alistamiento = data.tiempos?.alistamiento ?? null
-    tiempos.produccion   = data.tiempos?.produccion   ?? null
-    tiempos.empaque      = data.tiempos?.empaque      ?? null
-    tiempos.limpieza     = data.tiempos?.limpieza     ?? null
-    for (const k of Object.keys(borrador)) delete borrador[k]
-    // Cargar descripción de la OP (una vez)
-    try {
-      const op = await api(`/api/gestion/op/${encodeURIComponent(props.tarea.id_op)}`)
-      detalleOp.value = op?.op || null
-    } catch { detalleOp.value = null }
+    detalleOp.value  = data.cabecera ? {
+      id_orden: data.cabecera.id_orden,
+      estado:   data.cabecera.estado,
+      articulos: [...(data.productos || [])].map(p => p.descripcion).filter(Boolean).join(' / ')
+    } : null
   } catch (e) {
     console.error('[DetallesProduccion] cargar:', e)
   } finally {
@@ -244,19 +156,12 @@ watch(abierto, v => { if (v) cargar() })
 watch(() => [props.tarea?.id, props.tarea?.id_op], () => { if (abierto.value) cargar() })
 
 function onChangeOp(val) { emit('actualizar-id-op', val) }
-
-function formValor(l) {
-  if (borrador[l.id] !== undefined) return borrador[l.id]
-  return l.cantidad_real == null ? '' : fmtNum(l.cantidad_real)
+function abrirOp() {
+  if (props.tarea.id_op) emit('abrir-op', props.tarea.id_op)
 }
-function onInput(l, valor) { borrador[l.id] = valor }
 
-function realNum(l) {
-  const v = parseDecimal(borrador[l.id] !== undefined ? borrador[l.id] : l.cantidad_real)
-  return v
-}
 function diffValor(l) {
-  const r = realNum(l)
+  const r = parseDecimal(l.cantidad_real)
   if (r == null) return null
   const teo = Number(l.cantidad_teorica) || 0
   const d = r - teo
@@ -271,82 +176,6 @@ function diffClass(l) {
   const d = diffValor(l)
   if (d == null) return ''
   return d > 0 ? 'text-positive' : 'text-negative'
-}
-
-async function guardarLinea(l) {
-  const raw = borrador[l.id]
-  if (raw === undefined) return
-  const valor = parseDecimal(raw)
-  if (valor === l.cantidad_real) { delete borrador[l.id]; return }
-  try {
-    await api(`/api/gestion/tareas/${props.tarea.id}/produccion/lineas/${l.id}`, {
-      method: 'PUT', body: JSON.stringify({ cantidad_real: valor })
-    })
-    l.cantidad_real = valor
-    delete borrador[l.id]
-  } catch (e) { console.error('[guardarLinea]', e) }
-}
-
-const totalTiempos = computed(() => TIEMPOS_DEF.reduce((s, t) => s + (parseInt(tiempos[t.key]) || 0), 0))
-
-let _tiemposTimeout = null
-function guardarTiempos() {
-  clearTimeout(_tiemposTimeout)
-  _tiemposTimeout = setTimeout(async () => {
-    try {
-      await api(`/api/gestion/tareas/${props.tarea.id}/produccion/tiempos`, {
-        method: 'PUT', body: JSON.stringify({
-          alistamiento: tiempos.alistamiento,
-          produccion:   tiempos.produccion,
-          empaque:      tiempos.empaque,
-          limpieza:     tiempos.limpieza,
-        })
-      })
-    } catch (e) { console.error('[guardarTiempos]', e) }
-  }, 300)
-}
-
-async function marcarProcesada() {
-  $q.dialog({
-    title: 'Marcar OP como procesada',
-    message: `Esto cambiará el estado de la OP ${props.tarea.id_op} a "Procesada" en Effi. El cambio puede tardar ~30-60 segundos.`,
-    cancel: true, persistent: false,
-    dark: true,
-    ok: { label: 'Procesar', color: 'warning' }
-  }).onOk(async () => {
-    procesando.value = true
-    try {
-      const r = await api(`/api/gestion/tareas/${props.tarea.id}/produccion/procesar`, { method: 'POST' })
-      $q.notify({ type: 'positive', message: `OP ${r.id_op} → Procesada`, position: 'top' })
-      await cargar()
-      emit('actualizada')
-    } catch (e) {
-      $q.notify({ type: 'negative', message: e.message || 'Error al procesar OP', position: 'top', timeout: 6000 })
-    } finally { procesando.value = false }
-  })
-}
-
-async function validarOp() {
-  $q.dialog({
-    title: 'Validar OP',
-    message: `Esto anulará la OP ${props.tarea.id_op}, creará una nueva con los valores reales reportados y la marcará como "Validado". Demora ~2-3 minutos. ¿Continuar?`,
-    cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true,
-    dark: true
-  }).onOk(async () => {
-    validando.value = true
-    $q.notify({ type: 'info', message: 'Validando OP… puede tardar 2-3 min.', position: 'top', timeout: 0, group: 'validar-prog' })
-    try {
-      const r = await api(`/api/gestion/tareas/${props.tarea.id}/produccion/validar`, { method: 'POST' })
-      $q.notify({ type: 'positive', message: `OP ${r.id_op_anterior} → anulada · OP ${r.id_op_nueva} → Validado`, position: 'top', timeout: 6000 })
-      emit('actualizada')
-      await cargar()
-    } catch (e) {
-      $q.notify({ type: 'negative', message: e.message || 'Error al validar OP', position: 'top', timeout: 8000 })
-    } finally {
-      $q.notify({ group: 'validar-prog', message: '', timeout: 1 })
-      validando.value = false
-    }
-  })
 }
 </script>
 
@@ -364,24 +193,4 @@ async function validarOp() {
 }
 .linea { border-bottom: 1px solid var(--border-subtle); }
 .linea:last-child { border-bottom: none; }
-
-.dp-tiempo-fila { padding: 2px 0; }
-.dp-tiempo-lbl  { font-size: 11px; color: var(--text-primary); }
-/* Inputs de tiempo aún más compactos */
-.dp-tiempo-fila :deep(.q-field--dense .q-field__control),
-.dp-tiempo-fila :deep(.q-field--dense .q-field__native) {
-  min-height: 26px !important;
-  height: 26px !important;
-}
-
-/* Forzar contraste de q-input en dark mode del proyecto (no usa body--dark de Quasar) */
-:deep(.q-field--filled .q-field__control) {
-  background: var(--bg-row-hover) !important;
-}
-:deep(.q-field--filled .q-field__control:before) { border-bottom-color: var(--border-default) !important; }
-:deep(.q-field__native),
-:deep(.q-field__input) {
-  color: var(--text-primary) !important;
-}
-:deep(.q-placeholder::placeholder) { color: var(--text-tertiary) !important; opacity: 1; }
 </style>

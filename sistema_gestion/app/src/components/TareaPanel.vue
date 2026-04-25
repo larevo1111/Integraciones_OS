@@ -66,12 +66,30 @@
         @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
       />
 
-      <!-- Detalles de producción: OP + materiales + productos + tiempos -->
+      <!-- Detalles de producción: OP + materiales + productos (solo lectura) -->
       <DetallesProduccion
         v-if="esProduccion"
         :tarea="tarea"
         @actualizar-id-op="val => actualizar('id_op', val)"
+        @abrir-op="id => $router.push({ path: '/ops-tabla', query: { op_id: id } })"
       />
+
+      <!-- Categoría de producción (visible solo si hay OP vinculada) -->
+      <div v-if="esProduccion && tarea.id_op" class="field-row">
+        <span class="field-label">Cat. producción</span>
+        <div style="flex:1;display:flex;flex-wrap:wrap;gap:4px">
+          <q-chip
+            v-for="cp in categoriasProduccion" :key="cp.id"
+            :color="tarea.categoria_produccion_id === cp.id ? 'primary' : ''"
+            :text-color="tarea.categoria_produccion_id === cp.id ? 'white' : 'grey-6'"
+            :outline="tarea.categoria_produccion_id !== cp.id"
+            size="sm" clickable dense
+            :label="cp.nombre"
+            style="font-size:11px;height:22px"
+            @click="actualizar('categoria_produccion_id', tarea.categoria_produccion_id === cp.id ? null : cp.id)"
+          />
+        </div>
+      </div>
 
 
       <!-- Remisión (solo Empaque) -->
@@ -387,7 +405,17 @@ function autoResizeTitulo() {
   el.style.height = el.scrollHeight + 'px'
 }
 watch(() => props.tarea?.id, () => nextTick(autoResizeTitulo))
-onMounted(() => nextTick(autoResizeTitulo))
+// Cargar catálogo de categorías de producción una vez
+const categoriasProduccion = ref([])
+async function _cargarCatProduccion() {
+  if (categoriasProduccion.value.length) return
+  try {
+    const r = await api('/api/gestion/categorias-produccion')
+    categoriasProduccion.value = r.categorias || []
+  } catch (e) { console.warn('[TareaPanel] cat producción:', e?.message) }
+}
+
+onMounted(() => { nextTick(autoResizeTitulo); _cargarCatProduccion() })
 
 // Cronómetro
 import { formatHHMMSS, calcDuracionVivo, calcDuracionSistema } from 'src/services/crono'
