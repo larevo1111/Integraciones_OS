@@ -93,7 +93,7 @@ def check_servicios(lista, log_fn=print):
     return lineas, fallos, acciones
 
 
-def _oc_responde(modelo, timeout=45):
+def _oc_responde(modelo, timeout=90):
     """Prueba un modelo OpenCode con pregunta SQL real. Retorna True si da texto útil."""
     rc, out, _ = _run(
         [OC_BIN, 'run', '--format', 'json', '-m', modelo,
