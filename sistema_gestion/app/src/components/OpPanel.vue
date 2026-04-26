@@ -482,7 +482,7 @@ function confirmarValidar() {
 }
 .op-panel {
   width: 540px; max-width: 100vw; height: 100%;
-  background: var(--bg-page); color: var(--text-primary);
+  background: var(--bg-card); color: var(--text-primary);
   display: flex; flex-direction: column;
   overflow: hidden; box-shadow: -2px 0 16px rgba(0,0,0,0.3);
 }
