@@ -184,10 +184,16 @@ class CompatRequest(BaseModel):
 
 @app.post("/api/produccion/compatibilidad")
 def api_compatibilidad(req: CompatRequest):
-    """Evalúa si una lista de productos puede programarse en una sola OP.
-    Devuelve {compatible, mp_granel_comun, productos[], razon}."""
+    """Evalúa compatibilidad para programar varias solicitudes en una sola OP.
+    Política actual: SIEMPRE compatible — Effi acepta múltiples productos por OP
+    y el preview suma materiales por receta. La info de mp_granel queda como
+    metadato informativo, pero no bloquea."""
     mod = _cargar_modulo("grupo_helper", "grupo_helper.py")
-    return mod.evaluar_compatibilidad(req.cods)
+    res = mod.evaluar_compatibilidad(req.cods)
+    res['compatible'] = True  # nunca bloquear
+    if not res.get('mp_granel_comun'):
+        res['razon'] = 'Productos con MP granel distintos — se permite igual (recetas se suman)'
+    return res
 
 
 class GrupoCreate(BaseModel):
@@ -220,12 +226,11 @@ def api_crear_grupo(data: GrupoCreate):
         if s['op_grupo_id']:
             raise HTTPException(400, f"Solicitud {s['id']} ya pertenece al grupo {s['op_grupo_id']}")
 
-    # 2) Validar compatibilidad
+    # 2) Calcular compatibilidad solo para metadata (mp_granel_comun)
+    #    No bloqueamos: el preview suma recetas y Effi acepta multi-producto.
     cods = [s['cod_articulo'] for s in sols]
     mod = _cargar_modulo("grupo_helper", "grupo_helper.py")
     compat = mod.evaluar_compatibilidad(cods)
-    if not compat['compatible']:
-        raise HTTPException(400, f"Productos no compatibles: {compat['razon']}")
 
     # 3) Crear grupo
     grupo_id = exe(DB_PROD, """

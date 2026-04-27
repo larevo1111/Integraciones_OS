@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react"
-import { X, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react"
+import { X, AlertTriangle, Loader2, CheckCircle2, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Combobox } from "@/components/ui/combobox"
 import { api } from "@/lib/api"
 
 /**
- * Diálogo Programar OP — flujo:
- *   1. Verifica compatibilidad (mismo granel)
- *   2. Carga preview editable de OP (materiales + productos + costos + totales)
- *   3. Cada celda editable; totales se recalculan
- *   4. Botón "Crear grupo" guarda en BD local de gestión + opcional crear OP en Effi
+ * Diálogo Programar OP — preview editable.
+ * - Suma recetas de todas las solicitudes (puede haber varias recetas distintas en una OP)
+ * - 3 tablas editables (productos, materiales, otros costos) — cada celda + agregar/quitar filas
+ * - Totales se recalculan en vivo
  */
-export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreated }) {
+export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulos, onCreated }) {
   const [compat, setCompat] = useState(null)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -33,25 +33,37 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
       .finally(() => setLoading(false))
   }, [open, solicitudes])
 
-  // Recalcula totales desde el state (cuando se edita)
-  const recalcTotales = (mats, prods, costos) => {
+  const recalc = (mats, prods, costos) => {
     const cm = mats.reduce((s, m) => s + (parseFloat(m.cantidad) || 0) * (parseFloat(m.costo) || 0), 0)
     const co = costos.reduce((s, c) => s + (parseFloat(c.cantidad) || 0) * (parseFloat(c.costo) || 0), 0)
     const v = prods.reduce((s, p) => s + (parseFloat(p.cantidad) || 0) * (parseFloat(p.precio) || 0), 0)
     return { costo_materiales: +cm.toFixed(2), costo_otros: +co.toFixed(2), costo_total: +(cm + co).toFixed(2), venta_total: +v.toFixed(2), beneficio: +(v - cm - co).toFixed(2) }
   }
+  const updateAll = (m, p, c) => setPreview({...preview, materiales: m, productos: p, otros_costos: c, totales: recalc(m, p, c)})
 
-  const setMat = (i, key, val) => {
-    const m = [...preview.materiales]; m[i] = {...m[i], [key]: val}
-    setPreview({...preview, materiales: m, totales: recalcTotales(m, preview.productos, preview.otros_costos)})
+  const setMat  = (i, k, v) => { const m = [...preview.materiales];   m[i] = {...m[i], [k]: v}; updateAll(m, preview.productos, preview.otros_costos) }
+  const setProd = (i, k, v) => { const p = [...preview.productos];    p[i] = {...p[i], [k]: v}; updateAll(preview.materiales, p, preview.otros_costos) }
+  const setCost = (i, k, v) => { const c = [...preview.otros_costos]; c[i] = {...c[i], [k]: v}; updateAll(preview.materiales, preview.productos, c) }
+
+  const removeMat  = i => updateAll(preview.materiales.filter((_, j) => j !== i), preview.productos, preview.otros_costos)
+  const removeProd = i => updateAll(preview.materiales, preview.productos.filter((_, j) => j !== i), preview.otros_costos)
+  const removeCost = i => updateAll(preview.materiales, preview.productos, preview.otros_costos.filter((_, j) => j !== i))
+
+  const addMat = (cod) => {
+    const a = articulos.find(x => x.value === cod)
+    if (!a) return
+    const m = [...preview.materiales, { cod, nombre: a.label.replace(/^\d+ — /, ''), cantidad: 1, costo: 0 }]
+    updateAll(m, preview.productos, preview.otros_costos)
   }
-  const setProd = (i, key, val) => {
-    const p = [...preview.productos]; p[i] = {...p[i], [key]: val}
-    setPreview({...preview, productos: p, totales: recalcTotales(preview.materiales, p, preview.otros_costos)})
+  const addProd = (cod) => {
+    const a = articulos.find(x => x.value === cod)
+    if (!a) return
+    const p = [...preview.productos, { cod, nombre: a.label.replace(/^\d+ — /, ''), cantidad: 1, precio: 0 }]
+    updateAll(preview.materiales, p, preview.otros_costos)
   }
-  const setCost = (i, key, val) => {
-    const c = [...preview.otros_costos]; c[i] = {...c[i], [key]: val}
-    setPreview({...preview, otros_costos: c, totales: recalcTotales(preview.materiales, preview.productos, c)})
+  const addCost = () => {
+    const c = [...preview.otros_costos, { tipo_costo_id: 13, nombre: 'M.O. HORA ORIGEN SILVESTRE', cantidad: 1, costo: 7000 }]
+    updateAll(preview.materiales, preview.productos, c)
   }
 
   const crear = async () => {
@@ -73,6 +85,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
   if (!open) return null
 
   const fmt = (n) => (Math.round(n)).toLocaleString('es-CO')
+  const opts = (articulos || []).map(a => ({ value: a.value, label: a.label }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={() => onOpenChange(false)}>
@@ -97,25 +110,26 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
             </div>
           )}
 
-          {compat && !compat.compatible && (
+          {compat && !compat.mp_granel_comun && preview && (
             <div className="flex items-start gap-2 p-3 rounded bg-amber-500/10 border border-amber-500/30">
               <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <div className="text-[13px]">
-                <div className="font-medium text-amber-500">No se pueden agrupar en una sola OP</div>
-                <div className="text-muted-foreground mt-0.5">{compat.razon}</div>
+              <div className="text-[12px] text-amber-500/90">
+                Productos con MP granel distintos — se permite igual, se suman las recetas.
               </div>
             </div>
           )}
 
-          {compat && compat.compatible && preview && (
+          {preview && (
             <>
               {/* Productos */}
               <div className="space-y-1.5">
-                <div className="text-[12px] font-semibold text-muted-foreground">PRODUCTOS A PRODUCIR</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[12px] font-semibold text-muted-foreground">PRODUCTOS A PRODUCIR</div>
+                </div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
                     <thead className="bg-muted/30 text-[11px]">
-                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Producto</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-2 py-1.5 text-right">Subtotal</th></tr>
+                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Producto</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-2 py-1.5 text-right">Subtotal</th><th className="w-8"></th></tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {preview.productos.map((p, i) => (
@@ -125,20 +139,26 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={p.cantidad} onChange={e => setProd(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={p.precio} onChange={e => setProd(i, 'precio', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(p.cantidad)||0) * (parseFloat(p.precio)||0))}</td>
+                          <td className="px-1 py-1"><button onClick={() => removeProd(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                <div className="pt-1">
+                  <Combobox value="" onChange={addProd} options={opts} placeholder="+ Agregar producto…" searchPlaceholder="Buscar producto..." />
+                </div>
               </div>
 
               {/* Materiales */}
               <div className="space-y-1.5">
-                <div className="text-[12px] font-semibold text-muted-foreground">MATERIALES</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[12px] font-semibold text-muted-foreground">MATERIALES</div>
+                </div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
                     <thead className="bg-muted/30 text-[11px]">
-                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Material</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Costo</th><th className="px-2 py-1.5 text-right">Subtotal</th></tr>
+                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Material</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Costo</th><th className="px-2 py-1.5 text-right">Subtotal</th><th className="w-8"></th></tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {preview.materiales.map((m, i) => (
@@ -148,20 +168,29 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={m.cantidad} onChange={e => setMat(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={m.costo} onChange={e => setMat(i, 'costo', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(m.cantidad)||0) * (parseFloat(m.costo)||0))}</td>
+                          <td className="px-1 py-1"><button onClick={() => removeMat(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                <div className="pt-1">
+                  <Combobox value="" onChange={addMat} options={opts} placeholder="+ Agregar material…" searchPlaceholder="Buscar material..." />
+                </div>
               </div>
 
               {/* Otros costos */}
               <div className="space-y-1.5">
-                <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
+                  <button onClick={addCost} className="flex items-center gap-1 text-[11px] text-primary hover:underline">
+                    <Plus className="h-3 w-3" /> Agregar M.O.
+                  </button>
+                </div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
                     <thead className="bg-muted/30 text-[11px]">
-                      <tr><th className="px-2 py-1.5 text-left">Tipo</th><th className="px-2 py-1.5 text-right">Horas</th><th className="px-2 py-1.5 text-right">$/Hora</th><th className="px-2 py-1.5 text-right">Subtotal</th></tr>
+                      <tr><th className="px-2 py-1.5 text-left">Tipo</th><th className="px-2 py-1.5 text-right">Horas</th><th className="px-2 py-1.5 text-right">$/Hora</th><th className="px-2 py-1.5 text-right">Subtotal</th><th className="w-8"></th></tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {preview.otros_costos.map((c, i) => (
@@ -170,6 +199,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={c.cantidad} onChange={e => setCost(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={c.costo} onChange={e => setCost(i, 'costo', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(c.cantidad)||0) * (parseFloat(c.costo)||0))}</td>
+                          <td className="px-1 py-1"><button onClick={() => removeCost(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -206,7 +236,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
 
         <div className="flex justify-end gap-2 px-4 sm:px-5 py-3 border-t border-border shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={creando}>Cancelar</Button>
-          <Button onClick={crear} disabled={!compat?.compatible || creando}>
+          <Button onClick={crear} disabled={creando || !preview}>
             {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creando…</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Crear grupo de OP</>}
           </Button>
         </div>

@@ -192,6 +192,7 @@ export function SolicitudesPage() {
         open={grupoDialogOpen}
         onOpenChange={setGrupoDialogOpen}
         solicitudes={seleccionadas}
+        articulos={articulos}
         onCreated={async () => { setSelectedIds([]); await cargar() }}
       />
     </div>
