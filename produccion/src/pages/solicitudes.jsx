@@ -68,6 +68,16 @@ export function SolicitudesPage() {
     await cargar()
   }
 
+  const eliminarSeleccionadas = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirm(`¿Eliminar ${selectedIds.length} solicitud${selectedIds.length === 1 ? '' : 'es'}?`)) return
+    for (const id of selectedIds) {
+      try { await api.del(`/api/solicitudes/${id}`) } catch (e) { console.warn(`No se pudo borrar #${id}:`, e.message) }
+    }
+    setSelectedIds([])
+    await cargar()
+  }
+
   const abrirNueva = () => { setSolicitudSel(null); setDetalleOpen(true) }
   const abrirDetalle = (row) => { setSolicitudSel(row); setDetalleOpen(true) }
 
@@ -146,10 +156,15 @@ export function SolicitudesPage() {
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <Button onClick={() => setGrupoDialogOpen(true)} disabled={selectedIds.length < 1}>
-            <Layers className="h-3.5 w-3.5" />
-            Programar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={eliminarSeleccionadas} disabled={selectedIds.length < 1} title="Eliminar seleccionadas">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button onClick={() => setGrupoDialogOpen(true)} disabled={selectedIds.length < 1}>
+              <Layers className="h-3.5 w-3.5" />
+              Programar
+            </Button>
+          </div>
         </div>
       )}
 
