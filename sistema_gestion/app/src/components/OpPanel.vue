@@ -617,5 +617,7 @@ function confirmarValidar() {
 
 @media (max-width: 768px) {
   .op-panel { width: 100vw; }
+  /* Espacio inferior para que el bottombar móvil no tape Procesar/Validar */
+  .op-body { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0)); }
 }
 </style>
