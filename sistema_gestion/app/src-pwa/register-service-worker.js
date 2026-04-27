@@ -18,13 +18,11 @@ register(process.env.SERVICE_WORKER_FILE, {
     console.log('[SW] Nueva versión descargando...')
   },
 
-  updated (registration) {
-    // Nueva versión disponible — recargar automáticamente
-    console.log('[SW] Nueva versión lista — recargando...')
-    if (registration.waiting) {
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' })
-    }
-    window.location.reload()
+  updated (/* registration */) {
+    // Nueva versión disponible — avisar al UI (banner) en lugar de auto-reload.
+    // El usuario decide cuándo aplicar (botón "Actualizar" del banner o sidebar).
+    console.log('[SW] Nueva versión lista — esperando confirmación del usuario')
+    window.dispatchEvent(new CustomEvent('sw-updated'))
   },
 
   offline () {

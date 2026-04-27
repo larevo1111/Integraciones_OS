@@ -465,6 +465,14 @@
           </q-tooltip>
         </q-item>
 
+        <q-item clickable dense class="sidebar-item" @click="forzarActualizacion">
+          <q-item-section avatar class="sidebar-item-icon">
+            <q-icon name="refresh" />
+          </q-item-section>
+          <q-item-section v-if="!isMini" class="sidebar-item-label">Actualizar app</q-item-section>
+          <q-tooltip v-if="isMini" anchor="center right" self="center left" :offset="[8, 0]">Actualizar app</q-tooltip>
+        </q-item>
+
         <q-item v-if="!isMini" dense class="sidebar-user" clickable @click="menuUsuario = !menuUsuario">
           <q-item-section avatar class="sidebar-item-icon">
             <q-avatar size="24px">
@@ -489,6 +497,16 @@
 
     <!-- ═══ PAGE CONTAINER ═══ -->
     <q-page-container>
+      <!-- Banner: hay nueva versión disponible -->
+      <Transition name="update-banner">
+        <div v-if="updateDisponible" class="update-banner" @click="aplicarActualizacion">
+          <q-icon name="system_update" size="18px" class="q-mr-sm" />
+          <span>Hay una nueva versión disponible</span>
+          <q-space />
+          <q-btn flat dense no-caps size="sm" label="Actualizar" color="white" />
+        </div>
+      </Transition>
+
       <q-page class="main-page">
         <!-- Jornada header — siempre visible -->
         <JornadaHeader />
@@ -603,7 +621,7 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 
-const APP_VERSION = 'v2.9.7'
+const APP_VERSION = 'v2.9.8'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -611,6 +629,39 @@ const drawerOpen       = ref(false)
 const miniState        = ref(false)
 const isMobile         = computed(() => $q.screen.lt.md)
 const isMini           = computed(() => miniState.value && !isMobile.value)
+
+// ─── Auto-update PWA: banner cuando hay nueva versión + botón manual ───
+const updateDisponible = ref(false)
+function _onSwUpdated() { updateDisponible.value = true }
+
+async function _limpiarYRecargar() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    if (reg) {
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+      await reg.unregister().catch(() => {})
+    }
+    if (typeof caches !== 'undefined') {
+      const keys = await caches.keys()
+      await Promise.all(keys.map(k => caches.delete(k)))
+    }
+  } catch (e) { console.warn('[update]', e) }
+  /* Reload con bypass de cache HTTP */
+  window.location.reload()
+}
+
+function aplicarActualizacion() { _limpiarYRecargar() }
+
+function forzarActualizacion() {
+  $q.dialog({
+    title: 'Actualizar app',
+    message: 'Se cerrará brevemente para cargar la última versión. ¿Continuar?',
+    cancel: 'Cancelar',
+    ok: { label: 'Actualizar', color: 'primary' },
+    persistent: false,
+    dark: true
+  }).onOk(() => _limpiarYRecargar())
+}
 
 // Cierra el drawer solo en móvil (en desktop se colapsa con el botón <>)
 function cerrarDrawerMobile() {
@@ -918,6 +969,7 @@ onMounted(() => {
     cargarEtiquetas()
     cargarOps()
   }
+  window.addEventListener('sw-updated', _onSwUpdated)
 })
 
 async function cargarEtiquetas() {
@@ -931,6 +983,21 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 </script>
 
 <style scoped>
+/* ─── Banner: nueva versión disponible ─── */
+.update-banner {
+  display: flex; align-items: center;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+.update-banner:hover { background: var(--accent-hover); }
+.update-banner-enter-active, .update-banner-leave-active { transition: all 200ms ease; }
+.update-banner-enter-from, .update-banner-leave-to { opacity: 0; transform: translateY(-100%); }
+
 /* ─── Sidebar drawer overrides ─── */
 .sidebar-drawer {
   background: var(--bg-sidebar) !important;
