@@ -412,118 +412,16 @@
     />
 
     <!-- Barra flotante multi-selección -->
-    <Teleport to="body">
-      <Transition name="multi-bar">
-        <div v-if="seleccionMultiIds.length" class="multi-bar">
-          <!-- Fila 1: close + count -->
-          <div class="multi-bar-row1">
-            <button class="multi-bar-close" @click="seleccionMultiIds = []" title="Cancelar selección">
-              <span class="material-icons" style="font-size:15px">close</span>
-            </button>
-            <span class="multi-bar-count">{{ seleccionMultiIds.length }} seleccionada{{ seleccionMultiIds.length !== 1 ? 's' : '' }}</span>
-            <div class="multi-bar-divider d-desktop-divider" />
-          </div>
-
-          <!-- Fila 2 (mobile) / misma línea (desktop): acciones -->
-          <div class="multi-bar-actions">
-            <!-- Fecha -->
-            <div style="position:relative">
-              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuFecha }" @click="cerrarMenusMulti('fecha')">
-                <span class="material-icons" style="font-size:14px">event</span>
-              </button>
-              <div v-if="multiMenuFecha" class="multi-bar-menu">
-                <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(0))">Hoy</div>
-                <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(1))">Mañana</div>
-                <div class="multi-menu-item" @click="aplicarFechaMulti(isoRelativo(2))">Pasado mañana</div>
-                <div class="multi-menu-sep" />
-                <input type="date" class="multi-date-input" @change="aplicarFechaMulti($event.target.value)" />
-                <div class="multi-menu-item" @click="aplicarFechaMulti(null)">Sin fecha</div>
-              </div>
-            </div>
-
-            <!-- Estado -->
-            <div style="position:relative">
-              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuEstado }" @click="cerrarMenusMulti('estado')">
-                <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
-              </button>
-              <div v-if="multiMenuEstado" class="multi-bar-menu">
-                <div v-for="e in ['Pendiente','En Progreso','Cancelada']" :key="e" class="multi-menu-item" @click="aplicarEstadoMulti(e)">{{ e }}</div>
-              </div>
-            </div>
-
-            <!-- Categoría -->
-            <div style="position:relative">
-              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuCategoria }" @click="cerrarMenusMulti('categoria')">
-                <span class="material-icons" style="font-size:14px">label</span> Cat.
-              </button>
-              <div v-if="multiMenuCategoria" class="multi-bar-menu multi-bar-menu-scroll">
-                <div v-for="c in categorias" :key="c.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarCategoriaMulti(c.id)">
-                  <span class="multi-dot" :style="{ background: c.color }" />
-                  {{ c.nombre.replace(/_/g, ' ') }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Proyecto -->
-            <div style="position:relative">
-              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuProyecto }" @click="cerrarMenusMulti('proyecto')">
-                <span class="material-icons" style="font-size:14px">folder</span> Proy.
-              </button>
-              <div v-if="multiMenuProyecto" class="multi-bar-menu multi-bar-menu-scroll">
-                <div v-for="p in proyectos" :key="p.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarProyectoMulti(p.id)">
-                  <span class="multi-dot" :style="{ background: p.color || '#607D8B' }" />
-                  {{ p.nombre }}
-                </div>
-                <div class="multi-menu-sep" />
-                <div class="multi-menu-item" @click="aplicarProyectoMulti(null)">Sin proyecto</div>
-              </div>
-            </div>
-
-            <!-- Etiquetas -->
-            <div style="position:relative">
-              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuEtiqueta }" @click="cerrarMenusMulti('etiqueta')">
-                <span class="material-icons" style="font-size:14px">sell</span>
-                <span class="d-desktop-only">Etiq.</span>
-              </button>
-              <div v-if="multiMenuEtiqueta" class="multi-bar-menu multi-bar-menu-scroll">
-                <div v-for="e in etiquetas" :key="e.id" class="multi-menu-item multi-menu-item-dot" @click="aplicarEtiquetaMulti(e.id)">
-                  <span class="multi-dot" :style="{ background: e.color || '#607D8B' }" />
-                  {{ e.nombre }}
-                </div>
-                <div class="multi-menu-sep" />
-                <form class="multi-menu-nueva-etiq" @submit.prevent="crearEtiquetaDesdeMulti">
-                  <input v-model="nuevaEtiquetaMulti" placeholder="Nueva etiqueta..." class="multi-menu-nueva-input" />
-                  <button type="submit" class="multi-menu-nueva-btn" :disabled="!nuevaEtiquetaMulti.trim()">
-                    <span class="material-icons" style="font-size:14px">add</span>
-                  </button>
-                </form>
-                <div class="multi-menu-sep" />
-                <div class="multi-menu-item" @click="quitarEtiquetasMulti">Quitar todas</div>
-              </div>
-            </div>
-
-            <!-- Responsable -->
-            <div style="position:relative">
-              <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': multiMenuResponsable }" @click="cerrarMenusMulti('responsable')">
-                <span class="material-icons" style="font-size:14px">person</span>
-              </button>
-              <div v-if="multiMenuResponsable" class="multi-bar-menu multi-bar-menu-scroll">
-                <div v-for="u in usuarios" :key="u.email" class="multi-menu-item" @click="aplicarResponsableMulti(u.email)">
-                  {{ u.nombre || u.email.split('@')[0] }}
-                </div>
-              </div>
-            </div>
-
-            <div class="multi-bar-divider" />
-
-            <!-- Eliminar -->
-            <button class="multi-bar-btn multi-bar-btn-danger" @click="eliminarMulti">
-              <span class="material-icons" style="font-size:14px">delete</span>
-            </button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <MultiActionBar
+      :count="seleccionMultiIds.length"
+      :categorias="categorias"
+      :proyectos="proyectos"
+      :etiquetas="etiquetas"
+      :usuarios="usuarios"
+      @cerrar="seleccionMultiIds = []"
+      @aplicar="onAplicarMulti"
+      @crear-etiqueta="onCrearEtiquetaMulti"
+    />
 
     <!-- Mini-modal: tiempo al completar tarea (HH:MM:SS) -->
     <Teleport to="body">
@@ -604,6 +502,7 @@ import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import ProyectoSelector     from 'src/components/ProyectoSelector.vue'
 import EtiquetasSelector    from 'src/components/EtiquetasSelector.vue'
 import FiltroPersonalizado  from 'src/components/FiltroPersonalizado.vue'
+import MultiActionBar       from 'src/components/MultiActionBar.vue'
 import { calcDuracionVivo } from 'src/services/crono'
 import Sortable             from 'sortablejs'
 
@@ -708,29 +607,6 @@ watch(qsQuery, (val) => {
 
 // Multi-selección
 const seleccionMultiIds = ref([])   // array de IDs seleccionados
-const multiMenuFecha     = ref(false)
-const multiMenuEstado    = ref(false)
-const multiMenuCategoria = ref(false)
-const multiMenuProyecto  = ref(false)
-const multiMenuEtiqueta    = ref(false)
-const multiMenuResponsable = ref(false)
-const nuevaEtiquetaMulti   = ref('')
-
-function cerrarMenusMulti(abrir) {
-  const yaAbierto = abrir === 'fecha' && multiMenuFecha.value
-    || abrir === 'estado' && multiMenuEstado.value
-    || abrir === 'categoria' && multiMenuCategoria.value
-    || abrir === 'proyecto' && multiMenuProyecto.value
-    || abrir === 'etiqueta' && multiMenuEtiqueta.value
-    || abrir === 'responsable' && multiMenuResponsable.value
-  multiMenuFecha.value       = !yaAbierto && abrir === 'fecha'
-  multiMenuEstado.value      = !yaAbierto && abrir === 'estado'
-  multiMenuCategoria.value   = !yaAbierto && abrir === 'categoria'
-  multiMenuProyecto.value    = !yaAbierto && abrir === 'proyecto'
-  multiMenuEtiqueta.value    = !yaAbierto && abrir === 'etiqueta'
-  multiMenuResponsable.value = !yaAbierto && abrir === 'responsable'
-}
-
 function isoRelativo(dias) {
   const d = new Date()
   d.setDate(d.getDate() + dias)
@@ -1475,14 +1351,12 @@ async function _postBulk(ids) {
 }
 
 async function aplicarFechaMulti(fecha) {
-  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   await _bulkPut(ids, { fecha_limite: fecha || null })
   await _postBulk(ids)
 }
 
 async function aplicarEstadoMulti(estado) {
-  cerrarMenusMulti(null)
   const endpoints = { 'En Progreso': 'iniciar', 'Cancelada': 'cancelar', 'Pendiente': 'revertir' }
   const endpoint = endpoints[estado]
   if (!endpoint) return  // 'Completada' no permitido
@@ -1494,36 +1368,42 @@ async function aplicarEstadoMulti(estado) {
 }
 
 async function aplicarCategoriaMulti(categoriaId) {
-  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   await _bulkPut(ids, { categoria_id: categoriaId })
   await _postBulk(ids)
 }
 
 async function aplicarProyectoMulti(proyectoId) {
-  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   await _bulkPut(ids, { proyecto_id: proyectoId })
   await _postBulk(ids)
 }
 
-async function crearEtiquetaDesdeMulti() {
-  const nombre = nuevaEtiquetaMulti.value.trim()
-  if (!nombre) return
+async function onCrearEtiquetaMulti(nombre) {
+  if (!nombre?.trim()) return
   try {
     const data = await api('/api/gestion/etiquetas', {
-      method: 'POST', body: JSON.stringify({ nombre })
+      method: 'POST', body: JSON.stringify({ nombre: nombre.trim() })
     })
     etiquetas.value.push(data.etiqueta)
-    nuevaEtiquetaMulti.value = ''
     await aplicarEtiquetaMulti(data.etiqueta.id)
   } catch (e) {
     console.error(e)
   }
 }
 
+function onAplicarMulti({ tipo, valor }) {
+  if (tipo === 'fecha')            return aplicarFechaMulti(valor)
+  if (tipo === 'estado')           return aplicarEstadoMulti(valor)
+  if (tipo === 'categoria')        return aplicarCategoriaMulti(valor)
+  if (tipo === 'proyecto')         return aplicarProyectoMulti(valor)
+  if (tipo === 'etiqueta')         return aplicarEtiquetaMulti(valor)
+  if (tipo === 'responsable')      return aplicarResponsableMulti(valor)
+  if (tipo === 'eliminar')         return eliminarMulti()
+  if (tipo === 'quitar-etiquetas') return quitarEtiquetasMulti()
+}
+
 async function aplicarEtiquetaMulti(etiquetaId) {
-  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   const allTareas = [...tareas.value, ...completadas.value]
   await Promise.all(ids.map(id => {
@@ -1538,14 +1418,12 @@ async function aplicarEtiquetaMulti(etiquetaId) {
 }
 
 async function quitarEtiquetasMulti() {
-  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   await _bulkPut(ids, { etiquetas: [] })
   await _postBulk(ids)
 }
 
 async function aplicarResponsableMulti(email) {
-  cerrarMenusMulti(null)
   const ids = [...seleccionMultiIds.value]
   const allTareas = [...tareas.value, ...completadas.value]
   await Promise.all(ids.map(id => {
@@ -1572,7 +1450,6 @@ async function eliminarMulti() {
 function onKeyDown(e) {
   if (e.key === 'Escape' && seleccionMultiIds.value.length > 0) {
     seleccionMultiIds.value = []
-    cerrarMenusMulti(null)
   }
 }
 
@@ -1581,7 +1458,6 @@ function onDocumentClick(e) {
   // Limpiar si el click no fue sobre una tarea ni sobre la barra flotante
   if (!e.target.closest('.tarea-item') && !e.target.closest('.multi-bar')) {
     seleccionMultiIds.value = []
-    cerrarMenusMulti(null)
   }
 }
 
@@ -1844,155 +1720,6 @@ onUnmounted(() => {
   cursor: pointer; transition: color 80ms;
 }
 .subtarea-add-row:hover { color: var(--accent); }
-
-/* ── Barra flotante multi-selección ── */
-.multi-bar {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: var(--bg-elevated, #1c1c1c);
-  border: 1px solid var(--border-subtle, #333);
-  border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
-  z-index: 500;
-  white-space: nowrap;
-  user-select: none;
-}
-.multi-bar-row1 {
-  display: contents;
-}
-.multi-bar-actions {
-  display: contents;
-}
-.multi-bar-count {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  padding: 0 4px;
-}
-.multi-bar-divider {
-  width: 1px; height: 16px;
-  background: var(--border-subtle);
-  flex-shrink: 0;
-  margin: 0 4px;
-}
-.multi-bar-close {
-  display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
-  border: none; border-radius: 50%;
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: all 80ms;
-  flex-shrink: 0;
-}
-.multi-bar-close:hover { background: var(--bg-hover); color: var(--text-secondary); }
-.multi-bar-btn {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 8px;
-  border: none; border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px; cursor: pointer;
-  transition: background 80ms, color 80ms;
-}
-.multi-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.multi-bar-btn-active { background: var(--bg-hover); color: var(--text-primary); }
-.multi-bar-btn-danger:hover { color: #ef4444; }
-
-/* Mobile: multi-bar en 2 filas */
-@media (max-width: 768px) {
-  .multi-bar {
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: calc(100vw - 32px);
-    /* bottombar móvil ~53px de alto + safe-area; dejar 12px de margen */
-    bottom: calc(65px + env(safe-area-inset-bottom, 0));
-    padding: 6px 8px;
-    gap: 2px;
-  }
-  .multi-bar-row1 {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    width: 100%;
-    justify-content: center;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 2px;
-  }
-  .multi-bar-actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    flex-wrap: nowrap;
-  }
-  .d-desktop-divider { display: none; }
-  .multi-bar-btn { padding: 4px 6px; font-size: 11px; }
-}
-.multi-bar-menu {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-elevated, #1c1c1c);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-  overflow: hidden;
-  min-width: 140px;
-  z-index: 10;
-}
-.multi-date-input {
-  display: block;
-  width: 100%;
-  padding: 7px 10px;
-  font-size: 12px;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  cursor: pointer;
-  box-sizing: border-box;
-}
-.multi-menu-item {
-  padding: 8px 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 80ms;
-}
-.multi-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-.multi-menu-item-dot { display: flex; align-items: center; gap: 6px; }
-.multi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.multi-menu-sep { height: 1px; background: var(--border-subtle); margin: 3px 0; }
-.multi-menu-nueva-etiq {
-  display: flex; align-items: center; gap: 4px; padding: 4px 8px;
-}
-.multi-menu-nueva-input {
-  flex: 1; min-width: 0; padding: 4px 8px; font-size: 12px;
-  background: var(--bg-card, #222); border: 1px solid var(--border-subtle);
-  border-radius: 5px; color: var(--text-primary); outline: none;
-}
-.multi-menu-nueva-input::placeholder { color: var(--text-tertiary); }
-.multi-menu-nueva-input:focus { border-color: var(--accent); }
-.multi-menu-nueva-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border: none; border-radius: 5px;
-  background: transparent; color: var(--text-tertiary); cursor: pointer;
-}
-.multi-menu-nueva-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--accent); }
-.multi-menu-nueva-btn:disabled { opacity: 0.3; cursor: default; }
-.multi-bar-menu-scroll { max-height: 200px; overflow-y: auto; }
-
-/* Animación entrada/salida */
-.multi-bar-enter-active, .multi-bar-leave-active { transition: all 180ms ease; }
-.multi-bar-enter-from, .multi-bar-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
 
 /* ─── CALENDARIO INLINE ─── */
 .cal-inline { flex-shrink: 0; padding: 0 12px 4px; border-bottom: 1px solid var(--border-subtle); }
