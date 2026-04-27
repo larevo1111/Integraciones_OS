@@ -180,18 +180,36 @@ Ejecutado con Chrome DevTools MCP en `localhost:9300` después del build de `v2.
 - Funciones eliminadas: 2 (`cerrarMenusMulti`, `crearEtiquetaDesdeMulti`)
 - Funciones agregadas: 2 (`onAplicarMulti` dispatcher 12 líneas, `onCrearEtiquetaMulti` 11 líneas)
 
-### Pendiente de testing manual (delegado al usuario)
+### Testing simulando al usuario completo (Chrome DevTools MCP)
 
-Estos casos requieren interacción usuario en producción y modificarían datos reales:
+Tras el commit inicial, ejecutado un segundo round usando 3 tareas test creadas vía API (IDs 766/767/768) y eliminadas al finalizar. Sin afectar datos reales.
 
-- Caso 6 — Fecha custom (date input)
-- Caso 7 — Cambio estado real (verificar endpoint iniciar/cancelar/revertir)
-- Caso 9 — Aplicar proyecto
-- Caso 13 — Crear etiqueta nueva con form (`onCrearEtiquetaMulti`)
-- Caso 14 — Cambio responsable
-- Caso 15 — Eliminar (con confirm)
-- Caso 16 — Mobile bottombar (validado en v2.9.6 con `bottom: calc(65px + env(safe-area-inset-bottom))`, mismo CSS aplica)
+| # | Caso | Resultado | Detalle verificado vía API |
+|---|---|---|---|
+| 4 | Fecha "Hoy" | ✅ | 3/3 tareas con fecha de hoy |
+| 5 | Sin fecha | ✅ | 3/3 tareas con `fecha_limite=null` |
+| 6 | Fecha custom (date input) | ✅ | 3/3 con fecha 2026-12-15 |
+| 7 | Estado → En Progreso | ✅ | 3/3 con estado "En Progreso" (revertido a Pendiente) |
+| 8 | Categoría | ✅ | 3/3 con categoria_id de la primera categoría |
+| 9 | Proyecto | ✅ | 3/3 con proyecto_id 48 |
+| 10 | Sin proyecto | ✅ | 3/3 con proyecto_id null |
+| 11 | Etiqueta existente | ✅ | 3/3 taggeadas con id 33 |
+| 12 | Quitar todas etiquetas | ✅ | 3/3 con `etiquetas=[]` (timing 3000ms) |
+| 13 | **Crear etiqueta nueva con form** (caso crítico — único cambio de lógica) | ✅ | Etiqueta "TEST-multibar-tag" creada (id 35) y aplicada a 3/3 tareas |
+| 14 | Responsable | ✅ | 3/3 con `amaragonzalez21valen@gmail.com` agregado a responsables (suma sin reemplazar) |
+| 15 | Eliminar con confirm | ✅ | 3/3 tareas eliminadas tras click + auto-accept del browser confirm |
+| 16 | Mobile bottombar (390x844 emulated) | ✅ | bar.bottom=787, footer.top=792.5, gap=5.5px, css `bottom: 65px` aplicado |
+
+### Limpieza post-testing
+
+- Tareas test (766/767/768) eliminadas por el propio test 15.
+- Etiqueta "TEST-multibar-tag" eliminada vía API DELETE.
+- Sin residuos en la BD.
 
 ### Conclusión
 
-El refactor pasa todos los criterios de éxito automáticos. El componente `MultiActionBar.vue` reemplaza la inline sin cambios visibles para el usuario. La mantenibilidad mejora: futuros fixes solo se aplican en un lugar.
+El refactor pasa **17/17 casos del plan**. El componente `MultiActionBar.vue` reemplaza la inline sin cambios visibles ni de comportamiento. La mantenibilidad mejora: futuros fixes solo se aplican en un lugar.
+
+### Nota técnica menor
+
+Timing del `_bulkPut` con N PUTs en paralelo: en algunos casos 1500ms no es suficiente para que la BD se actualice antes de la verificación. **No es bug del refactor** — comportamiento idéntico en versión inline previa. Para tests futuros usar timing >= 2500ms en operaciones bulk de N items.
