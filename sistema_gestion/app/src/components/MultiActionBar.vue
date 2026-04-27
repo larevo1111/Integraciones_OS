@@ -232,7 +232,8 @@ function isoRel(dias) {
     flex-wrap: wrap;
     justify-content: center;
     max-width: calc(100vw - 32px);
-    bottom: 16px;
+    /* bottombar móvil ~53px de alto + safe-area; dejar 12px de margen */
+    bottom: calc(65px + env(safe-area-inset-bottom, 0));
     padding: 6px 8px;
     gap: 2px;
   }

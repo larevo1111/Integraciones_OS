@@ -66,30 +66,64 @@
         @etiqueta-eliminada="id => { const i = etiquetas.findIndex(x => x.id === id); if (i !== -1) etiquetas.splice(i, 1) }"
       />
 
-      <!-- Detalles de producción: OP + materiales + productos (solo lectura) -->
+      <!-- OP vinculada: selector + caja con detalle (solo si categoría es Producción) -->
+      <div v-if="esProduccion" class="q-pa-sm q-gutter-y-sm">
+        <div class="text-caption text-grey">OP vinculada</div>
+        <OpSelector
+          :modelValue="tarea.id_op || ''"
+          @update:modelValue="val => actualizar('id_op', val)"
+        />
+        <div v-if="tarea.id_op && detalleOpCabecera" class="op-box q-pa-sm rounded-borders">
+          <div class="row items-center q-gutter-xs">
+            <div class="col text-body2">OP-{{ detalleOpCabecera.id_orden }} · {{ detalleOpCabecera.articulos }}</div>
+            <q-badge v-if="detalleOpCabecera.estado" :class="estadoOpBadgeClass" :label="detalleOpCabecera.estado" />
+          </div>
+          <div class="row items-center q-mt-xs">
+            <q-btn
+              flat dense no-caps size="sm"
+              color="primary"
+              icon="edit"
+              label="Editar en la OP"
+              @click="$router.push({ path: '/ops-tabla', query: { op_id: tarea.id_op } })"
+            />
+            <q-space />
+          </div>
+        </div>
+      </div>
+
+      <!-- Categoría de producción (chip único con dropdown — siempre que sea Producción) -->
+      <div v-if="esProduccion" class="field-row">
+        <span class="field-label">Cat. producción</span>
+        <div style="flex:1">
+          <q-chip
+            clickable dense
+            icon="category"
+            class="tf-chip"
+            :class="{ 'tf-chip-filled': catProduccionSeleccionada }"
+            :style="catProduccionSeleccionada ? { background: 'var(--accent-muted)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}"
+          >
+            <span>{{ catProduccionSeleccionada ? catProduccionSeleccionada.nombre : 'Cat. producción' }}</span>
+            <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+              <q-list dense style="min-width:180px;max-height:300px;overflow-y:auto">
+                <q-item
+                  v-for="cp in categoriasProduccion" :key="cp.id"
+                  clickable v-close-popup
+                  :active="tarea.categoria_produccion_id === cp.id"
+                  @click="actualizar('categoria_produccion_id', tarea.categoria_produccion_id === cp.id ? null : cp.id)"
+                >
+                  <q-item-section>{{ cp.nombre }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-chip>
+        </div>
+      </div>
+
+      <!-- Detalles de producción: materiales + productos (solo lectura) -->
       <DetallesProduccion
         v-if="esProduccion"
         :tarea="tarea"
-        @actualizar-id-op="val => actualizar('id_op', val)"
-        @abrir-op="id => $router.push({ path: '/ops-tabla', query: { op_id: id } })"
       />
-
-      <!-- Categoría de producción (visible solo si hay OP vinculada) -->
-      <div v-if="esProduccion && tarea.id_op" class="field-row">
-        <span class="field-label">Cat. producción</span>
-        <div style="flex:1;display:flex;flex-wrap:wrap;gap:4px">
-          <q-chip
-            v-for="cp in categoriasProduccion" :key="cp.id"
-            :color="tarea.categoria_produccion_id === cp.id ? 'primary' : ''"
-            :text-color="tarea.categoria_produccion_id === cp.id ? 'white' : 'grey-6'"
-            :outline="tarea.categoria_produccion_id !== cp.id"
-            size="sm" clickable dense
-            :label="cp.nombre"
-            style="font-size:11px;height:22px"
-            @click="actualizar('categoria_produccion_id', tarea.categoria_produccion_id === cp.id ? null : cp.id)"
-          />
-        </div>
-      </div>
 
 
       <!-- Remisión (solo Empaque) -->
@@ -281,6 +315,7 @@ import Cronometro           from './Cronometro.vue'
 import CronoDisplay         from './CronoDisplay.vue'
 import TareaMetaChips       from './TareaMetaChips.vue'
 import DetallesProduccion   from './DetallesProduccion.vue'
+import OpSelector           from './OpSelector.vue'
 import RemisionSelector     from './RemisionSelector.vue'
 import PedidoSelector       from './PedidoSelector.vue'
 import ToastUndo            from './ToastUndo.vue'
@@ -414,6 +449,29 @@ async function _cargarCatProduccion() {
     categoriasProduccion.value = r.categorias || []
   } catch (e) { console.warn('[TareaPanel] cat producción:', e?.message) }
 }
+
+const catProduccionSeleccionada = computed(() =>
+  categoriasProduccion.value.find(c => c.id === props.tarea?.categoria_produccion_id) || null
+)
+
+// Cabecera de la OP vinculada (solo para mostrar en la caja)
+const detalleOpCabecera = ref(null)
+const estadoOpBadgeClass = computed(() => {
+  const e = (detalleOpCabecera.value?.estado || '').toLowerCase()
+  if (e === 'validado')  return 'bg-positive text-white'
+  if (e === 'procesada') return 'bg-warning text-black'
+  if (e === 'anulada')   return 'bg-grey-7 text-white'
+  return 'bg-grey-5 text-black'
+})
+
+async function _cargarCabeceraOp() {
+  if (!props.tarea?.id_op) { detalleOpCabecera.value = null; return }
+  try {
+    const r = await api(`/api/gestion/op/${encodeURIComponent(props.tarea.id_op)}`)
+    detalleOpCabecera.value = r?.op || null
+  } catch (e) { detalleOpCabecera.value = null }
+}
+watch(() => props.tarea?.id_op, _cargarCabeceraOp, { immediate: true })
 
 onMounted(() => { nextTick(autoResizeTitulo); _cargarCatProduccion() })
 
@@ -582,6 +640,11 @@ function completar() {
 </script>
 
 <style scoped>
+.op-box {
+  background: var(--bg-row-hover);
+  color: var(--text-primary);
+  font-size: 12px;
+}
 .tarea-panel-titulo {
   flex: 1; min-width: 0; resize: none; overflow: hidden;
   background: transparent; border: none; outline: none;

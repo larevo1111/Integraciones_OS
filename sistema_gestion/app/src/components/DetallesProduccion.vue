@@ -1,36 +1,11 @@
 <template>
   <q-expansion-item
-    v-if="tarea?.id"
+    v-if="tarea?.id && tarea?.id_op"
     v-model="abierto"
     dense
     header-class="text-caption text-weight-medium"
     label="Detalles de producción"
   >
-    <!-- OP vinculada -->
-    <div class="q-pa-sm q-gutter-y-sm">
-      <div class="text-caption text-grey">OP vinculada</div>
-      <OpSelector
-        :modelValue="tarea.id_op || ''"
-        @update:modelValue="onChangeOp"
-      />
-      <div v-if="tarea.id_op && detalleOp" class="op-box q-pa-sm rounded-borders">
-        <div class="row items-center q-gutter-xs">
-          <div class="col text-body2">OP-{{ detalleOp.id_orden }} · {{ detalleOp.articulos }}</div>
-          <q-badge v-if="detalleOp.estado" :class="estadoBadgeClass" :label="detalleOp.estado" />
-        </div>
-        <div class="row items-center q-mt-xs">
-          <q-btn
-            flat dense no-caps size="sm"
-            color="primary"
-            icon="edit"
-            label="Editar en la OP"
-            @click="abrirOp"
-          />
-          <q-space />
-        </div>
-      </div>
-    </div>
-
     <!-- Materiales + Productos (solo lectura) -->
     <template v-if="tarea.id_op">
       <!-- Materiales -->
@@ -103,48 +78,30 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { api } from 'src/services/api'
 import { fmtNum, parseDecimal } from 'src/services/numero'
-import OpSelector from './OpSelector.vue'
 
 const props = defineProps({
   tarea: { type: Object, required: true }
 })
-const emit = defineEmits(['actualizar-id-op', 'abrir-op'])
 
 const abierto    = ref(false)
 const cargando   = ref(false)
 const materiales = ref([])
 const productos  = ref([])
-const detalleOp  = ref(null)
-
-const estadoBadgeClass = computed(() => {
-  const e = (detalleOp.value?.estado || '').toLowerCase()
-  if (e === 'validado')  return 'bg-positive text-white'
-  if (e === 'procesada') return 'bg-warning text-black'
-  if (e === 'anulada')   return 'bg-grey-7 text-white'
-  return 'bg-grey-5 text-black'  // Generada o desconocido
-})
 
 async function cargar() {
   if (!props.tarea?.id || !props.tarea.id_op) {
     materiales.value = []
     productos.value  = []
-    detalleOp.value  = null
     return
   }
   cargando.value = true
   try {
-    // Leemos la ficha de la OP (nuevo endpoint, fuente de verdad a nivel OP).
     const data = await api(`/api/gestion/op/${encodeURIComponent(props.tarea.id_op)}/ficha`)
     materiales.value = data.materiales || []
     productos.value  = data.productos  || []
-    detalleOp.value  = data.cabecera ? {
-      id_orden: data.cabecera.id_orden,
-      estado:   data.cabecera.estado,
-      articulos: [...(data.productos || [])].map(p => p.descripcion).filter(Boolean).join(' / ')
-    } : null
   } catch (e) {
     console.error('[DetallesProduccion] cargar:', e)
   } finally {
@@ -154,11 +111,6 @@ async function cargar() {
 
 watch(abierto, v => { if (v) cargar() })
 watch(() => [props.tarea?.id, props.tarea?.id_op], () => { if (abierto.value) cargar() })
-
-function onChangeOp(val) { emit('actualizar-id-op', val) }
-function abrirOp() {
-  if (props.tarea.id_op) emit('abrir-op', props.tarea.id_op)
-}
 
 function diffValor(l) {
   const r = parseDecimal(l.cantidad_real)
@@ -180,11 +132,6 @@ function diffClass(l) {
 </script>
 
 <style scoped>
-.op-box {
-  background: var(--bg-row-hover);
-  color: var(--text-primary);
-  font-size: 12px;
-}
 .dp-nombre {
   font-size: 11px;
   line-height: 1.3;

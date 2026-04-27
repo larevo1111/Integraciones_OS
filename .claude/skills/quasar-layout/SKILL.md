@@ -274,3 +274,51 @@ El teclado virtual (IME) de Android/iOS mantiene la composición activa durante 
 - `@blur="guardar()"` — causa race conditions con Enter
 - `el.blur(); el.value = ''` — rompe v-model y composición IME
 - `event.isComposing` checks — no funciona en todos los teclados móviles
+
+---
+
+## 12. Bottombar móvil — REGLA CRÍTICA (no tapar contenido)
+
+Sistema Gestión tiene un **`q-footer` móvil fijo** (`MainLayout.vue` con `class="bottom-tab-bar lt-md"`) con tabs de navegación: Tareas / Equipo / Jornadas / Proyectos / Más. **Alto efectivo: ~53px + `safe-area-inset-bottom`**, z-index 2000.
+
+**Cualquier elemento posicionado abajo en móvil queda tapado por ese bottombar si no se compensa.**
+
+Casos donde aplica:
+- Floating action bars (`position: fixed; bottom: …`) — ej. `MultiActionBar`
+- Botones de acción al final de un panel scrollable que ocupa 100vh — ej. `OpPanel`, `TareaPanel`
+- FABs (floating action buttons), banners de notificación pegados abajo
+- Modals tipo sheet que se abren desde abajo
+
+### Patrón CORRECTO
+
+**Si el elemento está fijado al fondo** (`position: fixed; bottom: …`):
+```scss
+@media (max-width: 768px) {
+  .mi-elemento {
+    /* bottombar ~53px + safe-area + 12px margen */
+    bottom: calc(65px + env(safe-area-inset-bottom, 0));
+  }
+}
+```
+
+**Si el elemento es un panel scrollable que ocupa 100vh** (Teleport a body, body overflow-y:auto):
+```scss
+@media (max-width: 768px) {
+  .mi-panel-body {
+    /* deja espacio abajo para que el último contenido no quede tapado */
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0));
+  }
+}
+```
+
+### NUNCA hacer:
+- `bottom: 16px` o `bottom: 24px` hardcoded para mobile FABs/bars — quedan tapados
+- Subir `z-index` por encima del footer (2000+) para "ganarle" — el contenido sigue cubriendo el footer pero el footer es navegación útil; mejor compensar la posición
+- Esconder el bottombar cuando se abre un panel — rompe la navegación
+
+### Casos resueltos (referencia)
+- `OpPanel.vue` — botones Procesar/Validar tapados (v2.9.4): `padding-bottom: calc(80px + env(safe-area-inset-bottom, 0))` en `.op-body` mobile
+- `MultiActionBar.vue` — bar de selección múltiple tapada: `bottom: calc(65px + env(safe-area-inset-bottom, 0))` en mobile
+
+### Aplicabilidad
+Esta regla aplica al **Sistema Gestión** (que tiene bottombar móvil). Otros módulos (ERP, ia-admin, Inventario) pueden tener o no bottombar — verificar `MainLayout.vue` del módulo antes de aplicar.
