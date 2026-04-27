@@ -77,23 +77,26 @@ export function InventariosLayoutPage() {
   // Aside abierto/cerrado (panelAbierto del Vue)
   const [panelAbierto, setPanelAbierto] = useState(true)
 
-  // Sync Effi state
+  // Sync Effi state — refresh completo (artículos + OPs)
   const [syncEstado, setSyncEstado] = useState('idle')
+  const [syncMensaje, setSyncMensaje] = useState('')
   const lanzarSync = async () => {
     if (syncEstado !== 'idle') return
-    setSyncEstado('exportando')
+    setSyncEstado('ejecutando'); setSyncMensaje('Iniciando…')
     try {
-      await api.post('/api/inventario/sync-effi/start', { fecha_inventario: fecha, usuario: auth.usuario?.email || '' })
-      // Polling simple: hasta que el estado vuelva a idle
+      await api.post('/api/refresh-effi', {})
       const poll = setInterval(async () => {
         try {
-          const s = await api.get('/api/inventario/sync-effi/estado')
+          const s = await api.get('/api/refresh-effi/estado')
           setSyncEstado(s.estado || 'idle')
-          if (!s.estado || s.estado === 'idle' || s.estado === 'ok' || s.estado === 'error') {
-            clearInterval(poll); setSyncEstado('idle'); cargarArticulos()
+          setSyncMensaje(s.mensaje || '')
+          if (s.estado === 'ok' || s.estado === 'error' || s.estado === 'idle') {
+            clearInterval(poll)
+            setTimeout(() => { setSyncEstado('idle'); setSyncMensaje('') }, 4000)
+            cargarArticulos()
           }
         } catch (_) { clearInterval(poll); setSyncEstado('idle') }
-      }, 2000)
+      }, 2500)
     } catch (e) {
       alert('Error sync: ' + e.message); setSyncEstado('idle')
     }
@@ -311,13 +314,13 @@ export function InventariosLayoutPage() {
             />
           </div>
           <button
-            className={`inv-btn-sync ${syncEstado === 'exportando' || syncEstado === 'importando' ? 'syncing' : ''}`}
-            disabled={syncEstado === 'exportando' || syncEstado === 'importando'}
+            className={`inv-btn-sync ${syncEstado === 'ejecutando' || syncEstado === 'iniciando' ? 'syncing' : ''}`}
+            disabled={syncEstado === 'ejecutando' || syncEstado === 'iniciando'}
             onClick={lanzarSync}
-            title="Actualizar catálogo de artículos desde Effi"
+            title="Actualizar artículos + OPs desde Effi"
           >
-            <span className={`material-icons ${syncEstado === 'exportando' || syncEstado === 'importando' ? 'spin' : ''}`} style={{ fontSize: 16 }}>sync</span>
-            <span>{syncEstado === 'exportando' ? 'Exportando…' : syncEstado === 'importando' ? 'Importando…' : 'Sync Effi'}</span>
+            <span className={`material-icons ${syncEstado === 'ejecutando' || syncEstado === 'iniciando' ? 'spin' : ''}`} style={{ fontSize: 16 }}>sync</span>
+            <span>{syncEstado === 'ejecutando' ? (syncMensaje || 'Sincronizando…') : syncEstado === 'ok' ? '✓ Listo' : syncEstado === 'error' ? '✗ Error' : 'Sync Effi'}</span>
           </button>
           <button className="inv-btn-scan" title="Escanear código de barras (próximamente)">
             <span className="material-icons" style={{ fontSize: 16 }}>qr_code_scanner</span>

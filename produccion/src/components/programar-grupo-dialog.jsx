@@ -1,29 +1,58 @@
 import { useEffect, useState } from "react"
-import { X, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react"
+import { X, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { api } from "@/lib/api"
 
 /**
- * Diálogo para programar varias solicitudes en una sola OP.
- * - Verifica compatibilidad (mismo granel) automáticamente
- * - Si compatibles, muestra botón "Crear grupo"
- * - Si no compatibles, muestra razón clara
+ * Diálogo Programar OP — flujo:
+ *   1. Verifica compatibilidad (mismo granel)
+ *   2. Carga preview editable de OP (materiales + productos + costos + totales)
+ *   3. Cada celda editable; totales se recalculan
+ *   4. Botón "Crear grupo" guarda en BD local de gestión + opcional crear OP en Effi
  */
 export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreated }) {
   const [compat, setCompat] = useState(null)
+  const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [creando, setCreando] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!open || solicitudes.length === 0) return
-    setLoading(true); setError(null); setCompat(null)
+    setLoading(true); setError(null); setCompat(null); setPreview(null)
     const cods = solicitudes.map(s => s.cod_articulo)
-    api.post('/api/produccion/compatibilidad', { cods })
-      .then(setCompat)
+    Promise.all([
+      api.post('/api/produccion/compatibilidad', { cods }),
+      api.post('/api/produccion/preview-op', {
+        items: solicitudes.map(s => ({ cod: s.cod_articulo, cantidad: parseFloat(s.cantidad) || 0 }))
+      }).catch(e => { setError('Preview: ' + e.message); return null })
+    ])
+      .then(([c, p]) => { setCompat(c); setPreview(p) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [open, solicitudes])
+
+  // Recalcula totales desde el state (cuando se edita)
+  const recalcTotales = (mats, prods, costos) => {
+    const cm = mats.reduce((s, m) => s + (parseFloat(m.cantidad) || 0) * (parseFloat(m.costo) || 0), 0)
+    const co = costos.reduce((s, c) => s + (parseFloat(c.cantidad) || 0) * (parseFloat(c.costo) || 0), 0)
+    const v = prods.reduce((s, p) => s + (parseFloat(p.cantidad) || 0) * (parseFloat(p.precio) || 0), 0)
+    return { costo_materiales: +cm.toFixed(2), costo_otros: +co.toFixed(2), costo_total: +(cm + co).toFixed(2), venta_total: +v.toFixed(2), beneficio: +(v - cm - co).toFixed(2) }
+  }
+
+  const setMat = (i, key, val) => {
+    const m = [...preview.materiales]; m[i] = {...m[i], [key]: val}
+    setPreview({...preview, materiales: m, totales: recalcTotales(m, preview.productos, preview.otros_costos)})
+  }
+  const setProd = (i, key, val) => {
+    const p = [...preview.productos]; p[i] = {...p[i], [key]: val}
+    setPreview({...preview, productos: p, totales: recalcTotales(preview.materiales, p, preview.otros_costos)})
+  }
+  const setCost = (i, key, val) => {
+    const c = [...preview.otros_costos]; c[i] = {...c[i], [key]: val}
+    setPreview({...preview, otros_costos: c, totales: recalcTotales(preview.materiales, preview.productos, c)})
+  }
 
   const crear = async () => {
     setCreando(true); setError(null)
@@ -43,50 +72,28 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
 
   if (!open) return null
 
+  const fmt = (n) => (Math.round(n)).toLocaleString('es-CO')
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => onOpenChange(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={() => onOpenChange(false)}>
       <div
-        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto"
+        className="bg-card border border-border rounded-lg shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-          <h2 className="text-[14px] font-semibold">Programar {solicitudes.length} solicitudes en una OP</h2>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border shrink-0">
+          <h2 className="text-[14px] font-semibold">
+            Programar {solicitudes.length} solicitud{solicitudes.length === 1 ? '' : 'es'} en una OP
+          </h2>
           <button onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
-          {/* Lista de solicitudes seleccionadas */}
-          <div className="space-y-1 text-[13px]">
-            {solicitudes.map(s => (
-              <div key={s.id} className="flex items-center gap-2">
-                <span className="font-mono text-muted-foreground text-[11px]">#{s.id}</span>
-                <span className="font-mono text-muted-foreground text-[11px]">{s.cod_articulo}</span>
-                <span className="flex-1 truncate">{s.nombre_articulo}</span>
-                <span className="font-mono">{s.cantidad}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Estado de compatibilidad */}
+        <div className="p-3 sm:p-5 space-y-4 overflow-auto flex-1">
           {loading && (
             <div className="flex items-center gap-2 p-3 rounded bg-muted/30">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <span className="text-[13px] text-muted-foreground">Verificando compatibilidad…</span>
-            </div>
-          )}
-
-          {compat && compat.compatible && (
-            <div className="flex items-start gap-2 p-3 rounded bg-emerald-500/10 border border-emerald-500/30">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-              <div className="text-[13px]">
-                <div className="font-medium text-emerald-500">Productos compatibles</div>
-                <div className="text-muted-foreground mt-0.5">
-                  Comparten la materia prima granel: <span className="font-mono">cod {compat.mp_granel_comun}</span>
-                  {compat.productos[0]?.mp_granel?.nombre && ` (${compat.productos[0].mp_granel.nombre})`}
-                </div>
-              </div>
+              <span className="text-[13px] text-muted-foreground">Cargando preview de OP…</span>
             </div>
           )}
 
@@ -100,19 +107,107 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, onCreate
             </div>
           )}
 
+          {compat && compat.compatible && preview && (
+            <>
+              {/* Productos */}
+              <div className="space-y-1.5">
+                <div className="text-[12px] font-semibold text-muted-foreground">PRODUCTOS A PRODUCIR</div>
+                <div className="border border-border rounded-md overflow-x-auto">
+                  <table className="w-full text-[12px]">
+                    <thead className="bg-muted/30 text-[11px]">
+                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Producto</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-2 py-1.5 text-right">Subtotal</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {preview.productos.map((p, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-1 font-mono text-[11px]">{p.cod}</td>
+                          <td className="px-2 py-1 truncate max-w-[200px]">{p.nombre}</td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={p.cantidad} onChange={e => setProd(i, 'cantidad', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={p.precio} onChange={e => setProd(i, 'precio', e.target.value)} /></td>
+                          <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(p.cantidad)||0) * (parseFloat(p.precio)||0))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Materiales */}
+              <div className="space-y-1.5">
+                <div className="text-[12px] font-semibold text-muted-foreground">MATERIALES</div>
+                <div className="border border-border rounded-md overflow-x-auto">
+                  <table className="w-full text-[12px]">
+                    <thead className="bg-muted/30 text-[11px]">
+                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Material</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Costo</th><th className="px-2 py-1.5 text-right">Subtotal</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {preview.materiales.map((m, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-1 font-mono text-[11px]">{m.cod}</td>
+                          <td className="px-2 py-1 truncate max-w-[220px]">{m.nombre}</td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={m.cantidad} onChange={e => setMat(i, 'cantidad', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={m.costo} onChange={e => setMat(i, 'costo', e.target.value)} /></td>
+                          <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(m.cantidad)||0) * (parseFloat(m.costo)||0))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Otros costos */}
+              <div className="space-y-1.5">
+                <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
+                <div className="border border-border rounded-md overflow-x-auto">
+                  <table className="w-full text-[12px]">
+                    <thead className="bg-muted/30 text-[11px]">
+                      <tr><th className="px-2 py-1.5 text-left">Tipo</th><th className="px-2 py-1.5 text-right">Horas</th><th className="px-2 py-1.5 text-right">$/Hora</th><th className="px-2 py-1.5 text-right">Subtotal</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {preview.otros_costos.map((c, i) => (
+                        <tr key={i}>
+                          <td className="px-2 py-1">{c.nombre}</td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={c.cantidad} onChange={e => setCost(i, 'cantidad', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={c.costo} onChange={e => setCost(i, 'costo', e.target.value)} /></td>
+                          <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(c.cantidad)||0) * (parseFloat(c.costo)||0))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Totales */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border">
+                <div className="text-center">
+                  <div className="text-[10px] text-muted-foreground uppercase">Costo total</div>
+                  <div className="font-semibold text-[14px]">${fmt(preview.totales.costo_total)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] text-muted-foreground uppercase">Venta total</div>
+                  <div className="font-semibold text-[14px]">${fmt(preview.totales.venta_total)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] text-muted-foreground uppercase">Beneficio</div>
+                  <div className={`font-semibold text-[14px] ${preview.totales.beneficio > 0 ? 'text-emerald-500' : 'text-destructive'}`}>${fmt(preview.totales.beneficio)}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] text-muted-foreground uppercase">Margen</div>
+                  <div className="font-semibold text-[14px]">{preview.totales.venta_total > 0 ? Math.round(preview.totales.beneficio * 100 / preview.totales.venta_total) : 0}%</div>
+                </div>
+              </div>
+            </>
+          )}
+
           {error && (
-            <div className="p-3 rounded bg-destructive/10 border border-destructive/30 text-[13px] text-destructive">
-              {error}
-            </div>
+            <div className="p-3 rounded bg-destructive/10 border border-destructive/30 text-[13px] text-destructive">{error}</div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={creando}>
-            Cancelar
-          </Button>
+        <div className="flex justify-end gap-2 px-4 sm:px-5 py-3 border-t border-border shrink-0">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={creando}>Cancelar</Button>
           <Button onClick={crear} disabled={!compat?.compatible || creando}>
-            {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creando…</> : 'Crear grupo de OP'}
+            {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creando…</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Crear grupo de OP</>}
           </Button>
         </div>
       </div>

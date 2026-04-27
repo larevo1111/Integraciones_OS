@@ -23,7 +23,7 @@ Validado con las OPs correctas 2191/2194/2195 (2026-04-22). Los valores que Effi
 
 | Campo del JSON | Tabla / columna | Notas |
 |---|---|---|
-| `materiales[].costo` | `zeffi_inventario.costo_manual` | Effi pre-llena con este valor. **Nunca** usar `costo_promedio` ni `ultimo_costo`. |
+| `materiales[].costo` | `zeffi_inventario.costo_manual` | Effi pre-llena con este valor. **Nunca** usar `costo_promedio` ni `ultimo_costo`. **Importante**: `costo_manual` se actualiza automáticamente en Effi cuando una OP se **procesa** y luego se **valida**. Es decir, el costo "vive" — un OP nueva con costo X puede dejar el catálogo con costo Y al validarse. Por eso conviene refrescar el catálogo (`export_inventario.js` + import) **antes** de armar OPs si pasaron varias validaciones recientes. |
 | `articulos_producidos[].precio` | Último `zeffi_articulos_producidos.precio_minimo_ud` del mismo cod en OPs vigentes | El catálogo `precio_minimo_de_venta` está en **0** para casi todo. Effi lo guarda internamente en una tabla que **no exportamos** pero el valor actual coincide siempre con la última OP vigente. |
 | `otros_costos[].costo` | Manual / acordado con Santi | Ej: mano de obra (REFINADO CACAO 24H CHOCOFRUTS) se paga por hora. |
 
@@ -223,6 +223,77 @@ Ejemplo:
 - Pedido: 50 puro + 30 mac + 30 maní + 11 alm + 15 nibs = 136 tabletas × 50g = 6.8 kg total
 - Inclusiones: 30×15g (mac) + 30×15g (mani) + 11×15g (alm) + 15×10g (nibs) = 1.215 kg
 - **Cobertura templada necesaria: 6.8 − 1.215 = 5.585 kg**
+
+---
+
+## 4.bis Recetas confirmadas — MIELES (post-renombrado catálogo 2026-04-27)
+
+El 2026-04-27 Santi renombró el catálogo en Effi creando **2 líneas claras de mieles** según origen del proveedor. Antes los productos se llamaban "Miel Os Vidrio NNNg" y eran ambiguos sobre la fuente; ahora cada producto declara su origen en el nombre.
+
+### Productos finales (post-rename)
+
+| Cod | Nombre actual | Línea | Precio venta |
+|---|---|---|---:|
+| 13 | Miel Os San Carlos 150 grs | SC | $7,930 |
+| 15 | Miel Os San Carlos 640 grs | SC | $21,324 |
+| 239 | Miel Os San Carlos 1000 grs | SC | $31,053 |
+| 347 | Miel OS Carmen 150 grs | Carmen | $7,000 |
+| 349 | Miel OS Carmen 640 grs | Carmen | $23,123 |
+| 350 | Miel OS Carmen 1000 grs | Carmen | $49,800 |
+
+### Materiales miel disponibles
+
+| Cod | Nombre | Costo/kg | Línea |
+|---|---|---:|---|
+| **373** | MIEL FILTRADA PASTEURIZADA SAN CARLOS x KILO | $23,000 | SC |
+| **586** | MIEL FILTRADA PASTEURIZADA - EL CARMEN x KILO | $22,000 | Carmen |
+| 60 | MIEL FILTRADA SAN CARLOS x KILO (no pasteurizada) | $22,000 | — (no se usa por defecto) |
+| 53 | MIEL SAN MIGUEL CRUDA x KILO | $16,000 | otra (otro proveedor) |
+
+### Receta canónica (1 unidad, escalable) — confirmada por Santi 2026-04-27
+
+**Ambas líneas usan los MISMOS envases esterilizados y MISMAS etiquetas genéricas. Solo cambia la miel.**
+
+| Presentación | Miel (kg) | Envase esterilizado | Etiqueta presentación | Etiqueta tapa |
+|---|---|---|---|---|
+| 150 grs | 0.150 kg miel | cod **553** (110cc esteril, $1,500) | cod **290** ($300) | cod **90** ($390) |
+| 640 grs | 0.640 kg miel | cod **555** (500cc esteril, $2,055) | cod **262** ($300) | cod **90** ($390) |
+| 1000 grs | 1.000 kg miel | cod **552** (750cc esteril, $2,705) | cod **263** ($300) | cod **90** ($390) |
+
+→ Línea SC usa miel **373**; línea Carmen usa miel **586**.
+
+**Heurística confirmada**: el peso del nombre = kg de miel por unidad (1:1). 13.45 kg miel para 6×1000g + 7×150g + 10×640g = (6.00 + 1.05 + 6.40).
+
+### M.O. para envasado mieles
+2h por OP de envasado mixto (validado en OPs 2202, 2204, 2214). `tipo_costo_id=13`.
+
+### Anti-patrones aprendidos en este renombrado
+❌ Producir cod 239 (San Carlos) con miel 586 (Carmen) — son líneas distintas, contamina nomenclatura. Usar 373 con SC, 586 con Carmen.
+❌ Asumir que envases esterilizados son solo para Carmen — Santi confirmó que ambas líneas los usan.
+❌ Asumir que etiquetas "CARMEN CRISTALIZADA" (cod 351/353/354) van con productos Carmen — esas son obsoletas, ahora se usan las genéricas (290/262/263) para ambas líneas.
+
+---
+
+## 4.ter Receta confirmada — CREMA DE MANÍ x KILO (cod 151)
+
+Validada con OPs 2028, 1941 (ratio 1:1 maní). OP 2111 fue anómala (1.45) — descartar.
+
+### Por kg de crema producida
+
+| Material | Cod | Cantidad | Costo/u | Subtotal |
+|---|---|---:|---:|---:|
+| MANI SIN CASCARA TOSTADO X KILO | 114 | 1.0000 kg | $17,000 | $17,000 |
+| Extracto de Vainilla en Miel OS x Kilo | 134 | 0.0386 kg | $73,725 | $2,846 |
+| SAL MARINA GRANO FINO SIN REFINAR X KG | 500 | 0.0072 kg | $8,900 | $64 |
+| Miel (default cod 586 Carmen filtrada) | 586 | 0.0771 kg | $22,000 | $1,696 |
+
+**Merma**: ~11% (1.123 kg input → 1 kg output). Es normal por molienda en caliente.
+
+**M.O. fija**: 2.5h por OP independiente del volumen (no escala con kg). `tipo_costo_id=13`.
+
+**Producto vendido**: cod **151** CREMA DE MANI OS X KILO @ $29,694/kg.
+
+**Confirmado por Santi 2026-04-27**: usar miel del Carmen (586) por defecto. Históricamente OPs 1941/2111 usaron cod 53 (San Miguel cruda); 2028 usó cod 373 (SC pasteurizada). Ahora canon = 586.
 
 ---
 

@@ -1,6 +1,6 @@
 """API FastAPI — Programación de Producción + Inventario unificado. Puerto 9600."""
-import os, sys, jwt
-from fastapi import FastAPI, HTTPException, Depends, Request
+import os, sys, jwt, subprocess
+from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -289,6 +289,121 @@ def api_eliminar_grupo(id: int):
     return {"ok": True}
 
 
+class PreviewItem(BaseModel):
+    cod: str
+    cantidad: float
+
+
+class PreviewRequest(BaseModel):
+    items: list[PreviewItem]
+
+
+@app.post("/api/produccion/preview-op")
+def api_preview_op(req: PreviewRequest):
+    """Genera preview editable de OP a partir de [{cod, cantidad}, ...].
+
+    Lee de prod_recetas (libro de recetas validado) y zeffi_inventario (costos actuales).
+    Estructura idéntica al JSON que consume import_orden_produccion.js."""
+    if not req.items:
+        raise HTTPException(400, "Sin items")
+
+    # Costos actuales del catálogo
+    cods_referencia = set([i.cod for i in req.items])
+
+    # Materiales agregados por cod
+    materiales_agg = {}  # cod_material -> {cod, nombre, cantidad}
+    productos_pl = []    # lista de productos a producir
+
+    for item in req.items:
+        # Receta del libro
+        recetas = q(DB_PROD, "SELECT id FROM prod_recetas WHERE cod_articulo = %s", (item.cod,))
+        if not recetas:
+            raise HTTPException(400, f"No hay receta validada para cod {item.cod}. Validá la receta primero en /recetas")
+        rid = recetas[0]['id']
+        mats = q(DB_PROD, """
+            SELECT cod_material, nombre, ratio_por_unidad
+            FROM prod_recetas_materiales WHERE receta_id = %s
+        """, (rid,))
+        for m in mats:
+            cod_m = m['cod_material']
+            qty = float(m['ratio_por_unidad']) * float(item.cantidad)
+            if cod_m not in materiales_agg:
+                materiales_agg[cod_m] = {'cod': cod_m, 'nombre': m['nombre'], 'cantidad': 0}
+                cods_referencia.add(cod_m)
+            materiales_agg[cod_m]['cantidad'] += qty
+
+        productos_pl.append({
+            'cod': item.cod,
+            'nombre': '',  # se completa abajo con catalogo
+            'cantidad': float(item.cantidad),
+            'precio': 0,
+        })
+
+    # Traer costo_manual actual desde catalogo (effi_data o VPS)
+    if cods_referencia:
+        ph = ','.join(['%s'] * len(cods_referencia))
+        cat = q(DB_EFFI, f"""
+            SELECT id AS cod, nombre, costo_manual
+            FROM zeffi_inventario WHERE id IN ({ph})
+        """, tuple(cods_referencia))
+        cat_map = {c['cod']: c for c in cat}
+    else:
+        cat_map = {}
+
+    # Materiales con costos actuales
+    materiales_out = []
+    costo_mat_total = 0
+    for m in materiales_agg.values():
+        info = cat_map.get(m['cod'], {})
+        costo = float(info.get('costo_manual') or 0)
+        cant = round(m['cantidad'], 4)
+        sub = round(cant * costo, 2)
+        costo_mat_total += sub
+        materiales_out.append({
+            'cod': m['cod'],
+            'nombre': info.get('nombre') or m['nombre'],
+            'cantidad': cant,
+            'costo': costo,
+            'subtotal': sub,
+        })
+
+    # Productos con precio sugerido (último precio_minimo_ud > 100)
+    venta_total = 0
+    for p in productos_pl:
+        info = cat_map.get(p['cod'], {})
+        p['nombre'] = info.get('nombre') or ''
+        # Buscar último precio en histórico
+        prec = q(DB_EFFI, """
+            SELECT SUBSTRING_INDEX(GROUP_CONCAT(precio_minimo_ud ORDER BY fecha_creacion DESC), ',', 1) AS p
+            FROM zeffi_articulos_producidos
+            WHERE cod_articulo = %s AND vigencia = 'Orden vigente'
+              AND CAST(REPLACE(precio_minimo_ud,',','') AS DECIMAL(18,4)) > 100
+        """, (p['cod'],))
+        if prec and prec[0]['p']:
+            # Effi devuelve "31053,00" o "31.053,00" → convertir a 31053.00
+            s = str(prec[0]['p']).replace('.', '').replace(',', '.')
+            try: p['precio'] = float(s)
+            except Exception: p['precio'] = 0
+        venta_total += p['precio'] * p['cantidad']
+
+    # Otros costos: M.O. HORA estándar 2h
+    otros_costos = [{'tipo_costo_id': 13, 'nombre': 'M.O. HORA ORIGEN SILVESTRE', 'cantidad': 2, 'costo': 7000}]
+    costo_otros = sum(c['cantidad'] * c['costo'] for c in otros_costos)
+
+    return {
+        'materiales': materiales_out,
+        'productos': productos_pl,
+        'otros_costos': otros_costos,
+        'totales': {
+            'costo_materiales': round(costo_mat_total, 2),
+            'costo_otros': round(costo_otros, 2),
+            'costo_total': round(costo_mat_total + costo_otros, 2),
+            'venta_total': round(venta_total, 2),
+            'beneficio': round(venta_total - costo_mat_total - costo_otros, 2),
+        },
+    }
+
+
 @app.post("/api/produccion/grupos/{id}/sugerir-receta")
 def api_sugerir_receta_grupo(id: int):
     """Sugiere receta combinada para un grupo: suma materiales granel + envases/etiquetas
@@ -391,17 +506,19 @@ class SolicitudUpdate(BaseModel):
 # ── Artículos (os_integracion VPS + inv_rangos en inventario_produccion_effi VPS) ──
 
 @app.get("/api/articulos")
-def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
-    """Lista artículos de Effi vigentes con tipo (MP/PP/PT/INS/etc) desde inv_rangos.
-    os_integracion e inv_rangos están ambas en VPS (BDs distintas), se hace merge en Python.
-    tipo: filtro opcional (PT, PP, MP). Si se omite, devuelve todos.
-    q: filtro de búsqueda por nombre o código.
+def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None,
+                     grupo_producto: Optional[str] = None):
+    """Lista artículos de Effi vigentes con tipo (MP/PP/PT/INS/etc) desde inv_rangos
+    y grupo_producto (Mieles, Chocolates, etc) desde catalogo_articulos.
+    Todas las BDs en VPS, merge en Python.
     """
-    # 1) Traer el mapa cod → {grupo, unidad} desde inv_rangos remoto (VPS)
+    # 1) Mapas desde VPS
     rangos_rows = q(DB_INV, "SELECT id_effi AS cod, grupo, unidad FROM inv_rangos")
     rangos_map = {r['cod']: r for r in rangos_rows}
+    grupos_rows = q(DB_EFFI, "SELECT cod_articulo AS cod, grupo_producto FROM catalogo_articulos")
+    grupos_map = {r['cod']: r['grupo_producto'] for r in grupos_rows}
 
-    # 2) Traer artículos de os_integracion VPS
+    # 2) Artículos de os_integracion VPS
     sql = """
         SELECT e.id AS cod, e.nombre,
                CAST(REPLACE(e.stock_bodega_principal_sucursal_principal,',','.') AS DECIMAL(12,2)) AS stock
@@ -413,7 +530,6 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
         sql += " AND (e.nombre LIKE %s OR e.id LIKE %s)"
         params += [f'%{q_str}%', f'%{q_str}%']
     sql += " ORDER BY e.nombre LIMIT 500"
-
     rows = q(DB_EFFI, sql, params)
 
     # 3) Merge en Python
@@ -421,14 +537,33 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None):
     for r in rows:
         info = rangos_map.get(r['cod'], {})
         tipo_art = info.get('grupo') or ''
-        if tipo and tipo_art != tipo:
-            continue
+        gp = grupos_map.get(r['cod']) or ''
+        if tipo and tipo_art != tipo: continue
+        if grupo_producto and gp != grupo_producto: continue
         out.append({
             'cod': r['cod'], 'nombre': r['nombre'],
             'tipo': tipo_art, 'unidad': info.get('unidad') or '',
+            'grupo_producto': gp,
             'stock': float(r['stock']) if r['stock'] is not None else 0,
         })
     return out
+
+
+@app.get("/api/articulos/grupos")
+def listar_grupos():
+    """Lista grupos de productos distintos con N° de presentaciones vigentes.
+    Fuente: catalogo_articulos.grupo_producto + zeffi_inventario.vigencia (ambos VPS)."""
+    rows = q(DB_EFFI, """
+        SELECT c.grupo_producto AS grupo, COUNT(*) AS n_presentaciones
+        FROM catalogo_articulos c
+        JOIN zeffi_inventario e ON e.id = c.cod_articulo
+        WHERE c.grupo_producto IS NOT NULL AND c.grupo_producto != ''
+          AND e.vigencia = 'Vigente'
+        GROUP BY c.grupo_producto
+        HAVING n_presentaciones >= 1
+        ORDER BY c.grupo_producto
+    """)
+    return rows
 
 
 # ── Solicitudes CRUD ──────────────────────────────────────
@@ -668,6 +803,70 @@ def actualizar_receta(cod: str, data: RecetaPatch, usuario=Depends(require_auth)
 
 import httpx
 
+# ── Refresh Effi (catálogo + OPs completas) ──────────────────────────
+# Estado en memoria del proceso (se reinicia con cada restart del servicio).
+refresh_effi_status = {"estado": "idle", "mensaje": "", "paso": "", "timestamp": None}
+REFRESH_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'refresh_effi_produccion.py')
+
+
+def _refresh_effi_task():
+    """Ejecuta el script orquestador en subprocess y va capturando progreso JSON línea por línea."""
+    refresh_effi_status["estado"] = "ejecutando"
+    refresh_effi_status["mensaje"] = "Iniciando..."
+    refresh_effi_status["paso"] = "inicio"
+    refresh_effi_status["timestamp"] = datetime.now().isoformat()
+    try:
+        proc = subprocess.Popen(
+            ['python3', REFRESH_SCRIPT],
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..',
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1
+        )
+        for line in proc.stdout:
+            line = line.strip()
+            if not line: continue
+            try:
+                evt = _json.loads(line)
+                refresh_effi_status["paso"] = evt.get("paso", "")
+                refresh_effi_status["mensaje"] = evt.get("msg", "")
+                refresh_effi_status["timestamp"] = datetime.now().isoformat()
+            except Exception:
+                refresh_effi_status["mensaje"] = line[-200:]
+        proc.wait(timeout=900)
+        if proc.returncode != 0:
+            err = (proc.stderr.read() or '')[-300:]
+            refresh_effi_status["estado"] = "error"
+            refresh_effi_status["mensaje"] = err or "Falló sin mensaje"
+        else:
+            refresh_effi_status["estado"] = "ok"
+            refresh_effi_status["mensaje"] = "Refresh completo: 5 tablas actualizadas en local + VPS"
+        refresh_effi_status["timestamp"] = datetime.now().isoformat()
+    except subprocess.TimeoutExpired:
+        refresh_effi_status["estado"] = "error"
+        refresh_effi_status["mensaje"] = "Timeout 15min — refresh incompleto"
+    except Exception as e:
+        refresh_effi_status["estado"] = "error"
+        refresh_effi_status["mensaje"] = str(e)[:300]
+
+
+@app.post("/api/refresh-effi")
+def refresh_effi(background_tasks: BackgroundTasks):
+    """Lanza export + import de inventario + OPs en background."""
+    if refresh_effi_status["estado"] == "ejecutando":
+        raise HTTPException(409, "Ya hay un refresh en curso")
+    refresh_effi_status["estado"] = "iniciando"
+    refresh_effi_status["mensaje"] = "Lanzando proceso..."
+    refresh_effi_status["timestamp"] = datetime.now().isoformat()
+    background_tasks.add_task(_refresh_effi_task)
+    return {"ok": True, "mensaje": "Refresh iniciado"}
+
+
+@app.get("/api/refresh-effi/estado")
+def refresh_effi_estado():
+    """Estado actual del refresh."""
+    return refresh_effi_status
+
+
+# ── Proxy a API de inventario físico ──────────────────────────
 INVENTARIO_API_BASE = os.environ.get('INVENTARIO_API_BASE', 'http://localhost:9401')
 _http_client = httpx.Client(timeout=60.0)
 

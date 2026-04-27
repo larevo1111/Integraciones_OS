@@ -56,6 +56,7 @@ export function SolicitudesPage() {
       subtitle: `Stock: ${a.stock}${a.unidad ? ' ' + a.unidad : ''}`,
       badge: a.tipo,
       tipo: a.tipo,
+      grupo_producto: a.grupo_producto || '',
     })))
   }, [])
 
@@ -127,7 +128,7 @@ export function SolicitudesPage() {
         <div>
           <h1 className="text-[16px] sm:text-[18px] font-semibold tracking-tight">Solicitudes de Producción</h1>
           <p className="text-[11px] sm:text-[12px] text-muted-foreground mt-1 hidden sm:block">
-            Selecciona varias para programarlas en una sola OP, o click en una fila para ver el detalle
+            Selecciona una o varias para programar la OP, o click en una fila para ver el detalle
           </p>
         </div>
         <Button onClick={abrirNueva} className="shrink-0 self-start sm:self-auto" size="sm">
@@ -145,9 +146,9 @@ export function SolicitudesPage() {
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <Button onClick={() => setGrupoDialogOpen(true)} disabled={selectedIds.length < 2}>
+          <Button onClick={() => setGrupoDialogOpen(true)} disabled={selectedIds.length < 1}>
             <Layers className="h-3.5 w-3.5" />
-            Programar juntas
+            Programar
           </Button>
         </div>
       )}
