@@ -347,6 +347,10 @@ body {
 .estado-circle.cancelada { border-color: var(--text-tertiary); background: var(--text-tertiary); }
 .estado-circle.cancelada::after { content: '×'; font-size: 10px; color: var(--bg-app); font-weight: 700; }
 
+/* Light mode: el borde blanco translúcido es invisible sobre fondo blanco */
+[data-theme="light"] .estado-circle,
+[data-theme="light"] .estado-circle.pendiente { border-color: rgba(0,0,0,0.45); }
+
 /* Círculo de subtarea — más pequeño que padre para diferenciarla */
 .is-subtarea .estado-circle {
   width: 12px; height: 12px;
