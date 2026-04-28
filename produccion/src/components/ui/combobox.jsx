@@ -3,7 +3,7 @@ import * as Popover from "@radix-ui/react-popover"
 import { Check, ChevronDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function Combobox({ value, onChange, options, placeholder = "Seleccionar...", searchPlaceholder = "Buscar...", variant = "default" }) {
+export function Combobox({ value, onChange, options, placeholder = "Seleccionar...", searchPlaceholder = "Buscar...", variant = "default", triggerClassName = "" }) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
 
@@ -32,10 +32,13 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
         ) : (
           <button
             type="button"
-            className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+            className={cn(
+              "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer",
+              triggerClassName
+            )}
           >
             <span className={cn("truncate text-left", !selected && "text-muted-foreground")}>
-              {selected ? selected.label : placeholder}
+              {selected ? (selected.nombre || selected.label) : placeholder}
             </span>
             <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
           </button>

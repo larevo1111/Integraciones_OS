@@ -100,6 +100,10 @@ export function SolicitudesPage() {
   ]
 
   const renderCell = (row, col, value) => {
+    if (col.key === 'nombre_articulo') {
+      // Quitar prefix "NN — " si quedó del guardado antiguo (cod ya está en columna Cód)
+      return value ? value.replace(/^\d+\s*—\s*/, '') : '—'
+    }
     if (col.key === 'estado') {
       const label = ESTADOS.find(e => e.value === value)?.label || value
       return <Badge variant={value}>{label}</Badge>
