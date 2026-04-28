@@ -700,9 +700,10 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None,
     grupos_map = {r['cod']: r['grupo_producto'] for r in grupos_rows}
 
     # 2) Artículos de os_integracion VPS
+    # Stock = total empresa (consolidado todas las bodegas), no bodega principal aislada
     sql = """
         SELECT e.id AS cod, e.nombre, e.costo_manual,
-               CAST(REPLACE(e.stock_bodega_principal_sucursal_principal,',','.') AS DECIMAL(12,2)) AS stock
+               CAST(REPLACE(e.stock_total_empresa,',','.') AS DECIMAL(12,2)) AS stock
         FROM zeffi_inventario e
         WHERE e.vigencia = 'Vigente'
     """
