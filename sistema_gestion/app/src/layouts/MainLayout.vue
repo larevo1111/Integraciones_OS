@@ -57,115 +57,113 @@
               </template>
 
               <!-- Subitems Mis Tareas -->
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo" class="sidebar-sub-section">
-                <div class="sidebar-sub-header" @click="toggleAcordeon('mis-'+sec.tipo)">
-                  <q-icon :name="acordeonAbierto['mis-'+sec.tipo] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <span class="q-ml-xs" style="flex:1">{{ sec.label }}</span>
-                  <span v-if="misItemsPorTipo(sec.tipo).length" class="sidebar-count">{{ misItemsPorTipo(sec.tipo).length }}</span>
-                  <q-btn flat dense round size="xs" icon="add" class="sidebar-add-btn" @click.stop="abrirPanel(sec.tipo)" />
+              <SidebarSubSeccion
+                v-for="sec in SECCIONES_SIDEBAR" :key="'mis-'+sec.tipo"
+                :label="sec.label"
+                :count="misItemsPorTipo(sec.tipo).length"
+                :abierto="!!acordeonAbierto['mis-'+sec.tipo]"
+                :popover-mode="popoverMode"
+                add-accion
+                @toggle="toggleAcordeon('mis-'+sec.tipo)"
+                @add="abrirPanel(sec.tipo)"
+              >
+                <q-item
+                  v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id"
+                  clickable dense
+                  class="sidebar-project-item"
+                  :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
+                  :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
+                  @click="cerrarDrawerMobile()"
+                  @mouseenter="proyectoHover = p.id"
+                  @mouseleave="proyectoHover = null"
+                >
+                  <q-item-section avatar class="sidebar-item-icon">
+                    <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
+                  </q-item-section>
+                  <q-item-section class="sidebar-item-label">{{ p.nombre }}</q-item-section>
+                  <q-item-section side v-if="p.tareas_pendientes && proyectoHover !== p.id">
+                    <span class="sidebar-count">{{ p.tareas_pendientes }}</span>
+                  </q-item-section>
+                  <q-item-section side v-if="proyectoHover === p.id" class="sidebar-hover-actions">
+                    <div class="row no-wrap items-center">
+                      <q-btn flat dense round size="xs" icon="check_circle_outline" @click.prevent.stop="completarItem(p)" />
+                      <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuProyecto($event, p)" />
+                    </div>
+                  </q-item-section>
+                </q-item>
+                <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty">
+                  Sin {{ sec.label.toLowerCase() }}
                 </div>
-                <template v-if="acordeonAbierto['mis-'+sec.tipo]">
-                  <q-item
-                    v-for="p in misItemsPorTipo(sec.tipo)" :key="p.id"
-                    clickable dense
-                    class="sidebar-project-item"
-                    :class="{ active: ruta === '/tareas' && String($route.query.proyecto_id) === String(p.id) }"
-                    :to="{ path: '/tareas', query: { proyecto_id: p.id } }"
-                    @click="cerrarDrawerMobile()"
-                    @mouseenter="proyectoHover = p.id"
-                    @mouseleave="proyectoHover = null"
-                  >
-                    <q-item-section avatar class="sidebar-item-icon">
-                      <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
-                    </q-item-section>
-                    <q-item-section class="sidebar-item-label">{{ p.nombre }}</q-item-section>
-                    <q-item-section side v-if="p.tareas_pendientes && proyectoHover !== p.id">
-                      <span class="sidebar-count">{{ p.tareas_pendientes }}</span>
-                    </q-item-section>
-                    <q-item-section side v-if="proyectoHover === p.id" class="sidebar-hover-actions">
-                      <div class="row no-wrap items-center">
-                        <q-btn flat dense round size="xs" icon="check_circle_outline" @click.prevent.stop="completarItem(p)" />
-                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuProyecto($event, p)" />
-                      </div>
-                    </q-item-section>
-                  </q-item>
-                  <div v-if="!misItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty">
-                    Sin {{ sec.label.toLowerCase() }}
-                  </div>
-                </template>
-              </div>
+              </SidebarSubSeccion>
 
               <!-- Órdenes de producción (mis tareas) -->
-              <div class="sidebar-sub-section">
-                <div class="sidebar-sub-header" @click="toggleAcordeon('mis-ops')">
-                  <q-icon :name="acordeonAbierto['mis-ops'] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <span class="q-ml-xs" style="flex:1">Órdenes de producción</span>
-                  <span v-if="misOps.length" class="sidebar-count">{{ misOps.length }}</span>
-                </div>
-                <template v-if="acordeonAbierto['mis-ops']">
-                  <q-item
-                    v-for="o in misOps" :key="'mis-op-'+o.id_orden"
-                    clickable dense class="sidebar-project-item"
-                    :class="{ active: ruta === '/tareas' && String($route.query.op_id) === String(o.id_orden) }"
-                    :to="{ path: '/tareas', query: { op_id: o.id_orden } }"
-                    @click="cerrarDrawerMobile()"
-                  >
-                    <q-item-section avatar class="sidebar-item-icon">
-                      <span class="proyecto-dot" :style="{ background: o.estado === 'Procesada' ? '#ffa726' : '#7c8ea8' }" />
-                    </q-item-section>
-                    <q-item-section class="sidebar-item-label">OP-{{ o.id_orden }}</q-item-section>
-                    <q-item-section side><span class="text-caption" style="color:var(--text-tertiary);font-size:10px">{{ o.estado }}</span></q-item-section>
-                  </q-item>
-                  <div v-if="!misOps.length && !cargandoOps" class="sidebar-empty">Sin OPs</div>
-                </template>
-              </div>
+              <SidebarSubSeccion
+                label="Órdenes de producción"
+                :count="misOps.length"
+                :abierto="!!acordeonAbierto['mis-ops']"
+                :popover-mode="popoverMode"
+                @toggle="toggleAcordeon('mis-ops')"
+              >
+                <q-item
+                  v-for="o in misOps" :key="'mis-op-'+o.id_orden"
+                  clickable dense class="sidebar-project-item"
+                  :class="{ active: ruta === '/tareas' && String($route.query.op_id) === String(o.id_orden) }"
+                  :to="{ path: '/tareas', query: { op_id: o.id_orden } }"
+                  @click="cerrarDrawerMobile()"
+                >
+                  <q-item-section avatar class="sidebar-item-icon">
+                    <span class="proyecto-dot" :style="{ background: o.estado === 'Procesada' ? '#ffa726' : '#7c8ea8' }" />
+                  </q-item-section>
+                  <q-item-section class="sidebar-item-label">OP-{{ o.id_orden }}</q-item-section>
+                  <q-item-section side><span class="text-caption" style="color:var(--text-tertiary);font-size:10px">{{ o.estado }}</span></q-item-section>
+                </q-item>
+                <div v-if="!misOps.length && !cargandoOps" class="sidebar-empty">Sin OPs</div>
+              </SidebarSubSeccion>
 
               <!-- Etiquetas (mis tareas) -->
-              <div class="sidebar-sub-section">
-                <div class="sidebar-sub-header" @click="toggleAcordeon('mis-etiquetas')">
-                  <q-icon :name="acordeonAbierto['mis-etiquetas'] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <span class="q-ml-xs" style="flex:1">Etiquetas</span>
-                  <span v-if="misEtiquetasCount" class="sidebar-count">{{ misEtiquetasCount }}</span>
-                </div>
-                <template v-if="acordeonAbierto['mis-etiquetas']">
-                  <q-item
-                    v-for="e in etiquetasGlobal" :key="e.id"
-                    v-show="e.mis_tareas_total"
-                    clickable dense
-                    class="sidebar-project-item"
-                    :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }"
-                    :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
-                    @click="cerrarDrawerMobile()"
-                    @mouseenter="etiquetaHover = e.id"
-                    @mouseleave="etiquetaHover = null"
-                  >
-                    <q-item-section avatar class="sidebar-item-icon">
-                      <span class="proyecto-dot" :style="{ background: e.color || '#888' }" />
+              <SidebarSubSeccion
+                label="Etiquetas"
+                :count="misEtiquetasCount"
+                :abierto="!!acordeonAbierto['mis-etiquetas']"
+                :popover-mode="popoverMode"
+                @toggle="toggleAcordeon('mis-etiquetas')"
+              >
+                <q-item
+                  v-for="e in etiquetasGlobal" :key="e.id"
+                  v-show="e.mis_tareas_total"
+                  clickable dense
+                  class="sidebar-project-item"
+                  :class="{ active: ruta === '/tareas' && String($route.query.etiqueta_id) === String(e.id) }"
+                  :to="{ path: '/tareas', query: { etiqueta_id: e.id } }"
+                  @click="cerrarDrawerMobile()"
+                  @mouseenter="etiquetaHover = e.id"
+                  @mouseleave="etiquetaHover = null"
+                >
+                  <q-item-section avatar class="sidebar-item-icon">
+                    <span class="proyecto-dot" :style="{ background: e.color || '#888' }" />
+                  </q-item-section>
+                  <q-item-section v-if="etiquetaEditandoId === e.id" class="sidebar-item-label" @click.prevent.stop>
+                    <div class="etiqueta-edit-row">
+                      <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                      <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                        <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
+                      </form>
+                      <q-btn flat dense round size="xs" icon="check" color="positive" @click.prevent.stop="guardarEtiquetaEdit(e)" />
+                      <q-btn flat dense round size="xs" icon="close" @click.prevent.stop="etiquetaEditandoId = null" />
+                    </div>
+                  </q-item-section>
+                  <template v-else>
+                    <q-item-section class="sidebar-item-label">{{ e.nombre }}</q-item-section>
+                    <q-item-section side v-if="e.mis_tareas_pendientes && etiquetaHover !== e.id">
+                      <span class="sidebar-count">{{ e.mis_tareas_pendientes }}</span>
                     </q-item-section>
-                    <!-- Edición inline -->
-                    <q-item-section v-if="etiquetaEditandoId === e.id" class="sidebar-item-label" @click.prevent.stop>
-                      <div class="etiqueta-edit-row">
-                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
-                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
-                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
-                        </form>
-                        <q-btn flat dense round size="xs" icon="check" color="positive" @click.prevent.stop="guardarEtiquetaEdit(e)" />
-                        <q-btn flat dense round size="xs" icon="close" @click.prevent.stop="etiquetaEditandoId = null" />
-                      </div>
+                    <q-item-section side v-if="etiquetaHover === e.id">
+                      <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuEtiqueta($event, e)" />
                     </q-item-section>
-                    <template v-else>
-                      <q-item-section class="sidebar-item-label">{{ e.nombre }}</q-item-section>
-                      <q-item-section side v-if="e.mis_tareas_pendientes && etiquetaHover !== e.id">
-                        <span class="sidebar-count">{{ e.mis_tareas_pendientes }}</span>
-                      </q-item-section>
-                      <q-item-section side v-if="etiquetaHover === e.id">
-                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuEtiqueta($event, e)" />
-                      </q-item-section>
-                    </template>
-                  </q-item>
-                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty">Sin etiquetas</div>
-                </template>
-              </div>
+                  </template>
+                </q-item>
+                <div v-if="!etiquetasGlobal.length" class="sidebar-empty">Sin etiquetas</div>
+              </SidebarSubSeccion>
             </q-expansion-item>
           </template>
 
@@ -239,114 +237,113 @@
               </template>
 
               <!-- Subitems Equipo -->
-              <div v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo" class="sidebar-sub-section">
-                <div class="sidebar-sub-header" @click="toggleAcordeon('eq-'+sec.tipo)">
-                  <q-icon :name="acordeonAbierto['eq-'+sec.tipo] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <span class="q-ml-xs" style="flex:1">{{ sec.label }}</span>
-                  <span v-if="equipoItemsPorTipo(sec.tipo).length" class="sidebar-count">{{ equipoItemsPorTipo(sec.tipo).length }}</span>
-                  <q-btn flat dense round size="xs" icon="add" class="sidebar-add-btn" @click.stop="abrirPanel(sec.tipo)" />
+              <SidebarSubSeccion
+                v-for="sec in SECCIONES_SIDEBAR" :key="'eq-'+sec.tipo"
+                :label="sec.label"
+                :count="equipoItemsPorTipo(sec.tipo).length"
+                :abierto="!!acordeonAbierto['eq-'+sec.tipo]"
+                :popover-mode="popoverMode"
+                add-accion
+                @toggle="toggleAcordeon('eq-'+sec.tipo)"
+                @add="abrirPanel(sec.tipo)"
+              >
+                <q-item
+                  v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id"
+                  clickable dense
+                  class="sidebar-project-item"
+                  :class="{ active: ruta === '/equipo' && String($route.query.proyecto_id) === String(p.id) }"
+                  :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
+                  @click="cerrarDrawerMobile()"
+                  @mouseenter="proyectoHover = p.id"
+                  @mouseleave="proyectoHover = null"
+                >
+                  <q-item-section avatar class="sidebar-item-icon">
+                    <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
+                  </q-item-section>
+                  <q-item-section class="sidebar-item-label">{{ p.nombre }}</q-item-section>
+                  <q-item-section side v-if="p.tareas_pendientes && proyectoHover !== p.id">
+                    <span class="sidebar-count">{{ p.tareas_pendientes }}</span>
+                  </q-item-section>
+                  <q-item-section side v-if="proyectoHover === p.id" class="sidebar-hover-actions">
+                    <div class="row no-wrap items-center">
+                      <q-btn flat dense round size="xs" icon="check_circle_outline" @click.prevent.stop="completarItem(p)" />
+                      <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuProyecto($event, p)" />
+                    </div>
+                  </q-item-section>
+                </q-item>
+                <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty">
+                  Sin {{ sec.label.toLowerCase() }}
                 </div>
-                <template v-if="acordeonAbierto['eq-'+sec.tipo]">
-                  <q-item
-                    v-for="p in equipoItemsPorTipo(sec.tipo)" :key="p.id"
-                    clickable dense
-                    class="sidebar-project-item"
-                    :class="{ active: ruta === '/equipo' && String($route.query.proyecto_id) === String(p.id) }"
-                    :to="{ path: '/equipo', query: { proyecto_id: p.id } }"
-                    @click="cerrarDrawerMobile()"
-                    @mouseenter="proyectoHover = p.id"
-                    @mouseleave="proyectoHover = null"
-                  >
-                    <q-item-section avatar class="sidebar-item-icon">
-                      <span class="proyecto-dot" :style="{ background: p.color || '#607D8B' }" />
-                    </q-item-section>
-                    <q-item-section class="sidebar-item-label">{{ p.nombre }}</q-item-section>
-                    <q-item-section side v-if="p.tareas_pendientes && proyectoHover !== p.id">
-                      <span class="sidebar-count">{{ p.tareas_pendientes }}</span>
-                    </q-item-section>
-                    <q-item-section side v-if="proyectoHover === p.id" class="sidebar-hover-actions">
-                      <div class="row no-wrap items-center">
-                        <q-btn flat dense round size="xs" icon="check_circle_outline" @click.prevent.stop="completarItem(p)" />
-                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuProyecto($event, p)" />
-                      </div>
-                    </q-item-section>
-                  </q-item>
-                  <div v-if="!equipoItemsPorTipo(sec.tipo).length && !cargandoProyectos" class="sidebar-empty">
-                    Sin {{ sec.label.toLowerCase() }}
-                  </div>
-                </template>
-              </div>
+              </SidebarSubSeccion>
 
               <!-- Órdenes de producción (equipo) -->
-              <div class="sidebar-sub-section">
-                <div class="sidebar-sub-header" @click="toggleAcordeon('eq-ops')">
-                  <q-icon :name="acordeonAbierto['eq-ops'] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <span class="q-ml-xs" style="flex:1">Órdenes de producción</span>
-                  <span v-if="todasOps.length" class="sidebar-count">{{ todasOps.length }}</span>
-                </div>
-                <template v-if="acordeonAbierto['eq-ops']">
-                  <q-item
-                    v-for="o in todasOps" :key="'eq-op-'+o.id_orden"
-                    clickable dense class="sidebar-project-item"
-                    :class="{ active: ruta === '/equipo' && String($route.query.op_id) === String(o.id_orden) }"
-                    :to="{ path: '/equipo', query: { op_id: o.id_orden } }"
-                    @click="cerrarDrawerMobile()"
-                  >
-                    <q-item-section avatar class="sidebar-item-icon">
-                      <span class="proyecto-dot" :style="{ background: o.estado === 'Procesada' ? '#ffa726' : '#7c8ea8' }" />
-                    </q-item-section>
-                    <q-item-section class="sidebar-item-label">OP-{{ o.id_orden }}</q-item-section>
-                    <q-item-section side><span class="text-caption" style="color:var(--text-tertiary);font-size:10px">{{ o.estado }}</span></q-item-section>
-                  </q-item>
-                  <div v-if="!todasOps.length && !cargandoOps" class="sidebar-empty">Sin OPs</div>
-                </template>
-              </div>
+              <SidebarSubSeccion
+                label="Órdenes de producción"
+                :count="todasOps.length"
+                :abierto="!!acordeonAbierto['eq-ops']"
+                :popover-mode="popoverMode"
+                @toggle="toggleAcordeon('eq-ops')"
+              >
+                <q-item
+                  v-for="o in todasOps" :key="'eq-op-'+o.id_orden"
+                  clickable dense class="sidebar-project-item"
+                  :class="{ active: ruta === '/equipo' && String($route.query.op_id) === String(o.id_orden) }"
+                  :to="{ path: '/equipo', query: { op_id: o.id_orden } }"
+                  @click="cerrarDrawerMobile()"
+                >
+                  <q-item-section avatar class="sidebar-item-icon">
+                    <span class="proyecto-dot" :style="{ background: o.estado === 'Procesada' ? '#ffa726' : '#7c8ea8' }" />
+                  </q-item-section>
+                  <q-item-section class="sidebar-item-label">OP-{{ o.id_orden }}</q-item-section>
+                  <q-item-section side><span class="text-caption" style="color:var(--text-tertiary);font-size:10px">{{ o.estado }}</span></q-item-section>
+                </q-item>
+                <div v-if="!todasOps.length && !cargandoOps" class="sidebar-empty">Sin OPs</div>
+              </SidebarSubSeccion>
 
               <!-- Etiquetas (equipo) -->
-              <div class="sidebar-sub-section">
-                <div class="sidebar-sub-header" @click="toggleAcordeon('eq-etiquetas')">
-                  <q-icon :name="acordeonAbierto['eq-etiquetas'] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <span class="q-ml-xs" style="flex:1">Etiquetas</span>
-                  <span v-if="eqEtiquetasCount" class="sidebar-count">{{ eqEtiquetasCount }}</span>
-                </div>
-                <template v-if="acordeonAbierto['eq-etiquetas']">
-                  <q-item
-                    v-for="e in etiquetasGlobal" :key="e.id"
-                    v-show="e.tareas_total"
-                    clickable dense
-                    class="sidebar-project-item"
-                    :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }"
-                    :to="{ path: '/equipo', query: { etiqueta_id: e.id } }"
-                    @click="cerrarDrawerMobile()"
-                    @mouseenter="etiquetaHover = e.id"
-                    @mouseleave="etiquetaHover = null"
-                  >
-                    <q-item-section avatar class="sidebar-item-icon">
-                      <span class="proyecto-dot" :style="{ background: e.color || '#888' }" />
+              <SidebarSubSeccion
+                label="Etiquetas"
+                :count="eqEtiquetasCount"
+                :abierto="!!acordeonAbierto['eq-etiquetas']"
+                :popover-mode="popoverMode"
+                @toggle="toggleAcordeon('eq-etiquetas')"
+              >
+                <q-item
+                  v-for="e in etiquetasGlobal" :key="e.id"
+                  v-show="e.tareas_total"
+                  clickable dense
+                  class="sidebar-project-item"
+                  :class="{ active: ruta === '/equipo' && String($route.query.etiqueta_id) === String(e.id) }"
+                  :to="{ path: '/equipo', query: { etiqueta_id: e.id } }"
+                  @click="cerrarDrawerMobile()"
+                  @mouseenter="etiquetaHover = e.id"
+                  @mouseleave="etiquetaHover = null"
+                >
+                  <q-item-section avatar class="sidebar-item-icon">
+                    <span class="proyecto-dot" :style="{ background: e.color || '#888' }" />
+                  </q-item-section>
+                  <q-item-section v-if="etiquetaEditandoId === e.id" class="sidebar-item-label" @click.prevent.stop>
+                    <div class="etiqueta-edit-row">
+                      <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
+                      <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
+                        <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
+                      </form>
+                      <q-btn flat dense round size="xs" icon="check" color="positive" @click.prevent.stop="guardarEtiquetaEdit(e)" />
+                      <q-btn flat dense round size="xs" icon="close" @click.prevent.stop="etiquetaEditandoId = null" />
+                    </div>
+                  </q-item-section>
+                  <template v-else>
+                    <q-item-section class="sidebar-item-label">{{ e.nombre }}</q-item-section>
+                    <q-item-section side v-if="e.tareas_pendientes && etiquetaHover !== e.id">
+                      <span class="sidebar-count">{{ e.tareas_pendientes }}</span>
                     </q-item-section>
-                    <q-item-section v-if="etiquetaEditandoId === e.id" class="sidebar-item-label" @click.prevent.stop>
-                      <div class="etiqueta-edit-row">
-                        <input type="color" class="etiqueta-edit-color" :value="e.color || '#888888'" @input="etiquetaEditColor = $event.target.value" />
-                        <form @submit.prevent="guardarEtiquetaEdit(e)" style="flex:1;min-width:0">
-                          <input class="etiqueta-edit-input" :value="e.nombre" @keydown.escape="etiquetaEditandoId = null" ref="etiquetaInputRef" />
-                        </form>
-                        <q-btn flat dense round size="xs" icon="check" color="positive" @click.prevent.stop="guardarEtiquetaEdit(e)" />
-                        <q-btn flat dense round size="xs" icon="close" @click.prevent.stop="etiquetaEditandoId = null" />
-                      </div>
+                    <q-item-section side v-if="etiquetaHover === e.id">
+                      <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuEtiqueta($event, e)" />
                     </q-item-section>
-                    <template v-else>
-                      <q-item-section class="sidebar-item-label">{{ e.nombre }}</q-item-section>
-                      <q-item-section side v-if="e.tareas_pendientes && etiquetaHover !== e.id">
-                        <span class="sidebar-count">{{ e.tareas_pendientes }}</span>
-                      </q-item-section>
-                      <q-item-section side v-if="etiquetaHover === e.id">
-                        <q-btn flat dense round size="xs" icon="more_vert" @click.prevent.stop="abrirMenuEtiqueta($event, e)" />
-                      </q-item-section>
-                    </template>
-                  </q-item>
-                  <div v-if="!etiquetasGlobal.length" class="sidebar-empty">Sin etiquetas</div>
-                </template>
-              </div>
+                  </template>
+                </q-item>
+                <div v-if="!etiquetasGlobal.length" class="sidebar-empty">Sin etiquetas</div>
+              </SidebarSubSeccion>
 
               <!-- Completados -->
               <div v-if="proyectosCompletados.length" class="sidebar-sub-section">
@@ -620,8 +617,9 @@ import { api } from 'src/services/api'
 import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
+import SidebarSubSeccion from 'src/components/SidebarSubSeccion.vue'
 
-const APP_VERSION = 'v2.9.9'
+const APP_VERSION = 'v2.10.0'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -629,6 +627,8 @@ const drawerOpen       = ref(false)
 const miniState        = ref(false)
 const isMobile         = computed(() => $q.screen.lt.md)
 const isMini           = computed(() => miniState.value && !isMobile.value)
+// Popover mode: sidebar desktop full (no mini, no mobile) → nivel 3 sale en menú flotante
+const popoverMode      = computed(() => !isMini.value && !isMobile.value)
 
 // ─── Auto-update PWA: banner cuando hay nueva versión + botón manual ───
 const updateDisponible = ref(false)

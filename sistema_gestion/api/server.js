@@ -16,7 +16,7 @@ const fs       = require('fs')
 const crypto   = require('crypto')
 const jwt      = require('jsonwebtoken')
 const multer   = require('multer')
-const { execFile } = require('child_process')
+const { execFile, spawn } = require('child_process')
 const db      = require('./db')
 
 // ─── Upload config ─────────────────────────────────────────────────
@@ -1471,6 +1471,60 @@ app.get('/api/gestion/op', async (req, res) => {
     console.error('[GET /op]', e)
     res.status(500).json({ error: e.message })
   }
+})
+
+// POST /api/gestion/op/sync — sincroniza OPs + inventario desde Effi (Playwright + import + sync VPS)
+// Stream Server-Sent Events con el progreso del script Python refresh_effi_produccion.py.
+const SYNC_LOCK = '/tmp/sync_ops_effi.lock'
+const SYNC_LOCK_MAX_AGE_MS = 10 * 60 * 1000  // 10 min: lock más viejo se considera huérfano
+
+app.post('/api/gestion/op/sync', requireAuth, (req, res) => {
+  // Verificar lock
+  if (fs.existsSync(SYNC_LOCK)) {
+    const age = Date.now() - fs.statSync(SYNC_LOCK).mtimeMs
+    if (age < SYNC_LOCK_MAX_AGE_MS) {
+      return res.status(409).json({ error: 'Sincronización ya en curso. Esperá a que termine.' })
+    }
+    try { fs.unlinkSync(SYNC_LOCK) } catch {}
+  }
+  fs.writeFileSync(SYNC_LOCK, String(Date.now()))
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  const repoRoot = path.resolve(__dirname, '..', '..')
+  const py = spawn('python3', ['scripts/refresh_effi_produccion.py'], { cwd: repoRoot })
+
+  let buf = ''
+  py.stdout.on('data', chunk => {
+    buf += chunk.toString()
+    const lines = buf.split('\n')
+    buf = lines.pop()
+    for (const line of lines) {
+      const t = line.trim()
+      if (!t) continue
+      res.write(`data: ${t}\n\n`)
+    }
+  })
+  py.stderr.on('data', d => console.error('[op/sync]', d.toString().trim()))
+
+  const finalizar = (ok, code) => {
+    try { fs.unlinkSync(SYNC_LOCK) } catch {}
+    try {
+      res.write(`event: end\ndata: ${JSON.stringify({ ok, code })}\n\n`)
+      res.end()
+    } catch {}
+  }
+  py.on('close', code => finalizar(code === 0, code))
+  py.on('error', err => {
+    console.error('[op/sync] spawn error:', err)
+    finalizar(false, -1)
+  })
+  // Si el cliente cierra la conexión, el proceso Python continúa hasta terminar.
+  req.on('close', () => { /* no-op intencional */ })
 })
 
 // GET /api/gestion/op/:id_op/ficha — detalle completo

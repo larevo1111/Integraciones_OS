@@ -17,6 +17,15 @@
         >
           <template #prepend><q-icon name="search" size="14px" /></template>
         </q-input>
+        <q-btn
+          flat dense no-caps size="sm"
+          :disable="sincronizando"
+          @click="sincronizarEffi"
+          class="q-ml-sm"
+        >
+          <span class="material-icons q-mr-xs" :class="{ 'spin-ico': sincronizando }" style="font-size:14px">sync</span>
+          {{ sincronizando ? 'Sincronizando…' : 'Sincronizar Effi' }}
+        </q-btn>
       </template>
       <template #cell-estado="{ value }">
         <span :style="`display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:${ESTADO_COLOR[value]||'#78909C'}20;color:${ESTADO_COLOR[value]||'#78909C'}`">
@@ -50,10 +59,14 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useQuasar } from 'quasar'
 import { api } from 'src/services/api'
+import { useAuthStore } from 'src/stores/authStore'
 import OsDataTable from 'src/components/OsDataTable.vue'
 import OpPanel from 'src/components/OpPanel.vue'
 
+const $q = useQuasar()
+const auth = useAuthStore()
 const route = useRoute()
 const ops = ref([])
 const cargando = ref(false)
@@ -61,6 +74,7 @@ const qInput = ref('')
 const panelIdOp = ref(null)
 const usuarios = ref([])
 const categorias = ref([])
+const sincronizando = ref(false)
 
 const ESTADO_COLOR = {
   Generada:  '#7c8ea8',
@@ -109,6 +123,74 @@ function fmtFechaCorta(s) {
     ' ' + d.toTimeString().slice(0, 5)
 }
 
+async function sincronizarEffi() {
+  $q.dialog({
+    title: 'Sincronizar OPs e inventario',
+    message: 'Ejecuta export desde Effi (Playwright) + import + sync. Tarda ~2-3 min. ¿Continuar?',
+    cancel: 'Cancelar',
+    ok: { label: 'Sincronizar', color: 'primary' },
+    persistent: false,
+    dark: true
+  }).onOk(_ejecutarSincronizacion)
+}
+
+async function _ejecutarSincronizacion() {
+  sincronizando.value = true
+  const notif = $q.notify({
+    type: 'ongoing', message: 'Sincronizando OPs e inventario…',
+    caption: 'Iniciando…', position: 'top', timeout: 0, group: 'sync-ops'
+  })
+  let okFinal = false, errMsg = null
+  try {
+    const resp = await fetch('/api/gestion/op/sync', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + auth.token }
+    })
+    if (resp.status === 409) {
+      const d = await resp.json().catch(() => ({}))
+      throw new Error(d.error || 'Sync ya en curso')
+    }
+    if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const blocks = buf.split('\n\n')
+      buf = blocks.pop()
+      for (const block of blocks) {
+        if (!block.trim()) continue
+        const eventLine = block.split('\n').find(l => l.startsWith('event: ')) || ''
+        const dataLine = block.split('\n').find(l => l.startsWith('data: ')) || ''
+        if (!dataLine) continue
+        let data = null
+        try { data = JSON.parse(dataLine.slice(6)) } catch {}
+        if (eventLine.includes('end')) {
+          okFinal = !!data?.ok
+        } else if (data?.msg) {
+          $q.notify({
+            type: 'ongoing', message: 'Sincronizando OPs e inventario…',
+            caption: data.msg.slice(0, 120), position: 'top', timeout: 0, group: 'sync-ops'
+          })
+        }
+      }
+    }
+  } catch (e) {
+    errMsg = e.message || String(e)
+  } finally {
+    $q.notify({ group: 'sync-ops', message: '', timeout: 1 })
+    sincronizando.value = false
+  }
+  if (okFinal) {
+    $q.notify({ type: 'positive', message: '✅ OPs e inventario actualizados desde Effi', position: 'top', timeout: 4000 })
+    await cargar()
+  } else {
+    $q.notify({ type: 'negative', message: errMsg || 'Error en la sincronización', position: 'top', timeout: 6000 })
+  }
+}
+
 // Si entra con ?op_id=X en query → abrir directamente esa OP
 watch(() => route.query.op_id, (id) => {
   if (id) panelIdOp.value = String(id)
@@ -138,4 +220,6 @@ onMounted(async () => {
   overflow: hidden;
   font-size: 12px;
 }
+.spin-ico { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
