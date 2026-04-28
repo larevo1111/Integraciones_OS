@@ -557,6 +557,18 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None,
     return out
 
 
+@app.get("/api/produccion/tipos-costo")
+def listar_tipos_costo():
+    """Catálogo de tipos de costo de producción (zeffi_costos_produccion VPS)."""
+    rows = q(DB_EFFI, """
+        SELECT id AS tipo_costo_id, nombre
+        FROM zeffi_costos_produccion
+        WHERE vigencia='Vigente'
+        ORDER BY CAST(id AS UNSIGNED)
+    """)
+    return rows
+
+
 @app.get("/api/articulos/grupos")
 def listar_grupos():
     """Lista grupos de productos distintos con N° de presentaciones vigentes.

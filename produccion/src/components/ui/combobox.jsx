@@ -3,7 +3,7 @@ import * as Popover from "@radix-ui/react-popover"
 import { Check, ChevronDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function Combobox({ value, onChange, options, placeholder = "Seleccionar...", searchPlaceholder = "Buscar..." }) {
+export function Combobox({ value, onChange, options, placeholder = "Seleccionar...", searchPlaceholder = "Buscar...", variant = "default" }) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
 
@@ -24,12 +24,20 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
       <Popover.Trigger asChild>
         <button
           type="button"
-          className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          className={cn(
+            "flex h-9 w-full items-center justify-between rounded-md px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer",
+            variant === "add"
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-primary"
+              : "border border-input bg-transparent"
+          )}
         >
-          <span className={cn("truncate text-left", !selected && "text-muted-foreground")}>
+          <span className={cn(
+            "truncate text-left",
+            variant === "default" && !selected && "text-muted-foreground"
+          )}>
             {selected ? selected.label : placeholder}
           </span>
-          <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+          <ChevronDown className={cn("h-4 w-4 shrink-0 ml-2", variant === "add" ? "opacity-90" : "opacity-50")} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

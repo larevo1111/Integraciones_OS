@@ -17,6 +17,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const [loading, setLoading] = useState(false)
   const [creando, setCreando] = useState(false)
   const [error, setError] = useState(null)
+  const [tiposCosto, setTiposCosto] = useState([])
 
   useEffect(() => {
     if (!open || solicitudes.length === 0) return
@@ -31,7 +32,10 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
       .then(([c, p]) => { setCompat(c); setPreview(p) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [open, solicitudes])
+    if (tiposCosto.length === 0) {
+      api.get('/api/produccion/tipos-costo').then(setTiposCosto).catch(() => {})
+    }
+  }, [open, solicitudes, tiposCosto.length])
 
   const recalc = (mats, prods, costos) => {
     const cm = mats.reduce((s, m) => s + (parseFloat(m.cantidad) || 0) * (parseFloat(m.costo) || 0), 0)
@@ -76,8 +80,15 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
     const p = [...preview.productos, { cod, nombre: a.label.replace(/^\d+ — /, ''), cantidad: 1, precio: 0 }]
     updateAll(preview.materiales, p, preview.otros_costos)
   }
-  const addCost = () => {
-    const c = [...preview.otros_costos, { tipo_costo_id: 13, nombre: 'M.O. HORA ORIGEN SILVESTRE', cantidad: 1, costo: 7000 }]
+  const addCost = (tipoIdStr) => {
+    const t = tiposCosto.find(x => String(x.tipo_costo_id) === String(tipoIdStr))
+    if (!t) return
+    const c = [...preview.otros_costos, {
+      tipo_costo_id: parseInt(t.tipo_costo_id),
+      nombre: t.nombre,
+      cantidad: 1,
+      costo: t.tipo_costo_id == 13 ? 7000 : 0,
+    }]
     updateAll(preview.materiales, preview.productos, c)
   }
 
@@ -101,6 +112,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
 
   const fmt = (n) => (Math.round(n)).toLocaleString('es-CO')
   const opts = (articulos || []).map(a => ({ value: a.value, label: a.label }))
+  const optsCosto = tiposCosto.map(t => ({ value: String(t.tipo_costo_id), label: `${t.tipo_costo_id} — ${t.nombre}` }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={() => onOpenChange(false)}>
@@ -164,7 +176,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                   </table>
                 </div>
                 <div className="pt-1">
-                  <Combobox value="" onChange={addProd} options={opts} placeholder="+ Agregar producto…" searchPlaceholder="Buscar producto..." />
+                  <Combobox value="" onChange={addProd} options={opts} placeholder="+ Agregar producto" searchPlaceholder="Buscar producto..." variant="add" />
                 </div>
               </div>
 
@@ -196,18 +208,13 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                   </table>
                 </div>
                 <div className="pt-1">
-                  <Combobox value="" onChange={addMat} options={opts} placeholder="+ Agregar material…" searchPlaceholder="Buscar material..." />
+                  <Combobox value="" onChange={addMat} options={opts} placeholder="+ Agregar material" searchPlaceholder="Buscar material..." variant="add" />
                 </div>
               </div>
 
               {/* Otros costos */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
-                  <button onClick={addCost} className="flex items-center gap-1 text-[11px] text-primary hover:underline">
-                    <Plus className="h-3 w-3" /> Agregar M.O.
-                  </button>
-                </div>
+                <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
                     <thead className="bg-muted/30 text-[11px]">
@@ -216,7 +223,14 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                     <tbody className="divide-y divide-border">
                       {preview.otros_costos.map((c, i) => (
                         <tr key={i}>
-                          <td className="px-2 py-1">{c.nombre}</td>
+                          <td className="px-2 py-1 max-w-[260px]">
+                            <Combobox value={String(c.tipo_costo_id || '')} onChange={(v) => {
+                              const t = tiposCosto.find(x => String(x.tipo_costo_id) === v); if (!t) return
+                              const arr = [...preview.otros_costos]
+                              arr[i] = { ...arr[i], tipo_costo_id: parseInt(t.tipo_costo_id), nombre: t.nombre }
+                              updateAll(preview.materiales, preview.productos, arr)
+                            }} options={optsCosto} placeholder={c.nombre || 'Seleccionar tipo…'} searchPlaceholder="Buscar tipo..." />
+                          </td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={c.cantidad} onChange={e => setCost(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={c.costo} onChange={e => setCost(i, 'costo', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(c.cantidad)||0) * (parseFloat(c.costo)||0))}</td>
@@ -225,6 +239,9 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="pt-1">
+                  <Combobox value="" onChange={addCost} options={optsCosto} placeholder="+ Agregar costo" searchPlaceholder="Buscar tipo de costo..." variant="add" />
                 </div>
               </div>
 
