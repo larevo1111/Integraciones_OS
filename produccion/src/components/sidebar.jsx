@@ -14,7 +14,7 @@ import {
   ClipboardList, LayoutDashboard, Calendar, BookOpen, Settings,
   ChevronsLeft, ChevronsRight, Sun, Moon, ChevronRight, LogOut,
   Package, Boxes, Plus, Calendar as CalIcon,
-  Lock, LockOpen, ShieldCheck, RotateCcw, Trash2,
+  Lock, LockOpen, ShieldCheck, RotateCcw, Trash2, RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/lib/theme"
@@ -184,6 +184,7 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }) {
               active: currentFecha === f.fecha_inventario,
               onClick: () => setFloatingOpen(false),
               actionsMenu: [
+                { label: 'Calcular teórico',  icon: RefreshCw,    onClick: () => { setFloatingOpen(false); navigate(`/inventarios/${f.fecha_inventario}?accion=calcular-teorico`) } },
                 { label: 'Cerrar conteo',     icon: Lock,         onClick: () => { setFloatingOpen(false); navigate(`/inventarios/${f.fecha_inventario}?accion=cerrar-conteo`) } },
                 { label: 'Reabrir conteo',    icon: LockOpen,     onClick: () => { setFloatingOpen(false); navigate(`/inventarios/${f.fecha_inventario}?accion=reabrir-conteo`) } },
                 { label: 'Cerrar inventario', icon: ShieldCheck,  onClick: () => { setFloatingOpen(false); navigate(`/inventarios/${f.fecha_inventario}?accion=cerrar-inv`) }, variant: 'warn' },

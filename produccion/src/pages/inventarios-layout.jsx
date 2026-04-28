@@ -137,10 +137,12 @@ export function InventariosLayoutPage() {
     if (!accion || !fecha) return
     const validas = ['cerrar-conteo', 'reabrir-conteo', 'cerrar-inv', 'reiniciar', 'eliminar']
     if (validas.includes(accion)) setModalAbierto(accion)
+    if (accion === 'calcular-teorico') calcularTeorico()  // sin modal, ejecuta directo
     // limpiar el query param para no reabrir al refrescar
     const next = new URLSearchParams(searchParams)
     next.delete('accion')
     setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, fecha, setSearchParams])
 
   // Cargar artículos cuando cambian fecha + bodega + filtro
