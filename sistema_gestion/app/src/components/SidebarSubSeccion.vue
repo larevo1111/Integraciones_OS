@@ -6,7 +6,7 @@
       :class="{ 'sub-header-active': popoverMode && abiertoPopover }"
       @click="onHeaderClick"
     >
-      <span class="sub-header-label" style="flex:1">{{ label }}</span>
+      <span class="q-ml-xs" style="flex:1">{{ label }}</span>
       <span v-if="count" class="sidebar-count">{{ count }}</span>
       <q-btn v-if="addAccion" flat dense round size="xs" icon="add" class="sidebar-add-btn" @click.stop="$emit('add')" />
       <q-icon :name="iconExpand" size="14px" class="sub-header-chevron" />
@@ -65,8 +65,19 @@ function onHeaderClick() {
 </script>
 
 <style scoped>
+/* Header: replicar 1:1 los estilos originales del MainLayout (no tocar tamaño/sangría) */
 .sidebar-sub-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* padding-left: 12 (original) + 18 (compensa el q-icon 14px + gap 4px que estaba al inicio) */
+  padding: 5px 12px 5px 30px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 4px;
   cursor: pointer;
+  user-select: none;
   transition: background 80ms, color 80ms;
 }
 .sidebar-sub-header:hover {
@@ -77,10 +88,8 @@ function onHeaderClick() {
   background: var(--bg-row-hover);
   color: var(--text-primary);
 }
-.sub-header-label { color: inherit; }
 .sub-header-chevron {
   color: var(--text-tertiary);
-  margin-left: 4px;
   flex-shrink: 0;
 }
 .sub-header-active .sub-header-chevron { color: var(--accent); }
