@@ -303,6 +303,77 @@ class PreviewRequest(BaseModel):
     items: list[PreviewItem]
 
 
+class CrearOpRequest(BaseModel):
+    solicitudes_ids: list[int]
+    materiales: list[dict]    # [{cod, cantidad, costo, lote?}]
+    productos: list[dict]     # [{cod, cantidad, precio, lote?}]
+    otros_costos: list[dict]  # [{tipo_costo_id, cantidad, costo}]
+    encargado: str = "74084937"
+    observacion: str = ""
+
+
+@app.post("/api/produccion/crear-op-effi")
+def api_crear_op_effi(req: CrearOpRequest):
+    """Crea la OP en Effi (Playwright) + actualiza solicitudes a 'programado' con op_effi."""
+    import tempfile, json as _j
+    from datetime import date as _date
+    if not req.materiales or not req.productos:
+        raise HTTPException(400, "Falta materiales o productos")
+    if not req.solicitudes_ids:
+        raise HTTPException(400, "Falta solicitudes_ids")
+
+    hoy = _date.today().isoformat()
+    obs = req.observacion or f"OP solicitudes #{','.join(map(str, req.solicitudes_ids))}"
+    payload = {
+        "sucursal_id": 1, "bodega_id": 1,
+        "fecha_inicio": hoy, "fecha_fin": hoy,
+        "encargado": req.encargado, "tercero": "", "observacion": obs,
+        "materiales": [
+            {"cod_articulo": str(m['cod']), "cantidad": float(m['cantidad'] or 0),
+             "costo": int(float(m.get('costo') or 0)), "lote": m.get('lote', ''), "serie": m.get('serie', '')}
+            for m in req.materiales if float(m.get('cantidad') or 0) > 0
+        ],
+        "articulos_producidos": [
+            {"cod_articulo": str(p['cod']), "cantidad": float(p['cantidad'] or 0),
+             "precio": int(float(p.get('precio') or 0)), "lote": p.get('lote', ''), "serie": p.get('serie', '')}
+            for p in req.productos if float(p.get('cantidad') or 0) > 0
+        ],
+        "otros_costos": [
+            {"tipo_costo_id": int(c.get('tipo_costo_id') or 13),
+             "cantidad": float(c.get('cantidad') or 0), "costo": int(float(c.get('costo') or 0))}
+            for c in req.otros_costos if float(c.get('cantidad') or 0) > 0
+        ],
+    }
+    fd, path = tempfile.mkstemp(suffix='.json', prefix='op_', dir='/tmp')
+    with os.fdopen(fd, 'w') as f:
+        _j.dump(payload, f, ensure_ascii=False, indent=2)
+
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..'
+    proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', path],
+                          cwd=repo, capture_output=True, text=True, timeout=300)
+    if proc.returncode != 0:
+        raise HTTPException(500, f"Script falló: {proc.stderr[-300:] or proc.stdout[-300:]}")
+
+    # Buscar OP_CREADA:NNNN en el output
+    op_id = None
+    for line in (proc.stdout or '').splitlines():
+        if line.startswith('OP_CREADA:'):
+            try: op_id = int(line.split(':')[1].strip())
+            except Exception: pass
+    if not op_id:
+        raise HTTPException(500, "OP creada pero no se pudo capturar el ID")
+
+    # Actualizar solicitudes
+    ph = ','.join(['%s'] * len(req.solicitudes_ids))
+    exe(DB_PROD, f"""
+        UPDATE prod_solicitudes
+        SET estado='programado', op_effi=%s, fecha_programada=COALESCE(fecha_programada, %s)
+        WHERE id IN ({ph})
+    """, tuple([str(op_id), hoy, *req.solicitudes_ids]))
+
+    return {"ok": True, "op_id": op_id, "json_path": path}
+
+
 @app.post("/api/produccion/preview-op")
 def api_preview_op(req: PreviewRequest):
     """Genera preview editable de OP a partir de [{cod, cantidad}, ...].

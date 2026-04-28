@@ -95,11 +95,13 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const crear = async () => {
     setCreando(true); setError(null)
     try {
-      const grupo = await api.post('/api/produccion/grupos', {
+      const r = await api.post('/api/produccion/crear-op-effi', {
         solicitudes_ids: solicitudes.map(s => s.id),
-        creado_por: 'Jenifer',
+        materiales: preview.materiales,
+        productos: preview.productos,
+        otros_costos: preview.otros_costos,
       })
-      onCreated?.(grupo)
+      onCreated?.(r)
       onOpenChange(false)
     } catch (e) {
       setError(e.message)
@@ -134,15 +136,6 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
             <div className="flex items-center gap-2 p-3 rounded bg-muted/30">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="text-[13px] text-muted-foreground">Cargando preview de OP…</span>
-            </div>
-          )}
-
-          {compat && !compat.mp_granel_comun && preview && (
-            <div className="flex items-start gap-2 p-3 rounded bg-amber-500/10 border border-amber-500/30">
-              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <div className="text-[12px] text-amber-500/90">
-                Productos con MP granel distintos — se permite igual, se suman las recetas.
-              </div>
             </div>
           )}
 
@@ -274,7 +267,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
         <div className="flex justify-end gap-2 px-4 sm:px-5 py-3 border-t border-border shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={creando}>Cancelar</Button>
           <Button onClick={crear} disabled={creando || !preview}>
-            {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creando…</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Crear grupo de OP</>}
+            {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creando OP en Effi (~60s)…</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Crear OP</>}
           </Button>
         </div>
       </div>
