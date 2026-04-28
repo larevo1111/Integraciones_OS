@@ -525,7 +525,7 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None,
 
     # 2) Artículos de os_integracion VPS
     sql = """
-        SELECT e.id AS cod, e.nombre,
+        SELECT e.id AS cod, e.nombre, e.costo_manual,
                CAST(REPLACE(e.stock_bodega_principal_sucursal_principal,',','.') AS DECIMAL(12,2)) AS stock
         FROM zeffi_inventario e
         WHERE e.vigencia = 'Vigente'
@@ -545,11 +545,14 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None,
         gp = grupos_map.get(r['cod']) or ''
         if tipo and tipo_art != tipo: continue
         if grupo_producto and gp != grupo_producto: continue
+        try: costo = float(r.get('costo_manual') or 0)
+        except Exception: costo = 0
         out.append({
             'cod': r['cod'], 'nombre': r['nombre'],
             'tipo': tipo_art, 'unidad': info.get('unidad') or '',
             'grupo_producto': gp,
             'stock': float(r['stock']) if r['stock'] is not None else 0,
+            'costo_manual': costo,
         })
     return out
 

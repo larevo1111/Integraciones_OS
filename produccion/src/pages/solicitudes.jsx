@@ -57,6 +57,8 @@ export function SolicitudesPage() {
       badge: a.tipo,
       tipo: a.tipo,
       grupo_producto: a.grupo_producto || '',
+      nombre: a.nombre,
+      costo_manual: a.costo_manual || 0,
     })))
   }, [])
 

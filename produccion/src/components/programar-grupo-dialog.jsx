@@ -45,6 +45,21 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const setProd = (i, k, v) => { const p = [...preview.productos];    p[i] = {...p[i], [k]: v}; updateAll(preview.materiales, p, preview.otros_costos) }
   const setCost = (i, k, v) => { const c = [...preview.otros_costos]; c[i] = {...c[i], [k]: v}; updateAll(preview.materiales, preview.productos, c) }
 
+  // Cambio de artículo en una fila: actualiza cod + nombre + costo (materiales) o precio (productos)
+  const cambiarMatArticulo = (i, nuevoCod) => {
+    const a = articulos.find(x => x.value === nuevoCod); if (!a) return
+    const m = [...preview.materiales]
+    m[i] = { ...m[i], cod: nuevoCod, nombre: a.nombre, costo: a.costo_manual || 0 }
+    updateAll(m, preview.productos, preview.otros_costos)
+  }
+  const cambiarProdArticulo = (i, nuevoCod) => {
+    const a = articulos.find(x => x.value === nuevoCod); if (!a) return
+    const p = [...preview.productos]
+    // Para productos no hay precio en /api/articulos, dejamos el actual; si nuevo, queda 0
+    p[i] = { ...p[i], cod: nuevoCod, nombre: a.nombre }
+    updateAll(preview.materiales, p, preview.otros_costos)
+  }
+
   const removeMat  = i => updateAll(preview.materiales.filter((_, j) => j !== i), preview.productos, preview.otros_costos)
   const removeProd = i => updateAll(preview.materiales, preview.productos.filter((_, j) => j !== i), preview.otros_costos)
   const removeCost = i => updateAll(preview.materiales, preview.productos, preview.otros_costos.filter((_, j) => j !== i))
@@ -135,7 +150,10 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                       {preview.productos.map((p, i) => (
                         <tr key={i}>
                           <td className="px-2 py-1 font-mono text-[11px]">{p.cod}</td>
-                          <td className="px-2 py-1 truncate max-w-[200px]">{p.nombre}</td>
+                          <td className="px-2 py-1 max-w-[240px]">
+                            <Combobox value={p.cod} onChange={(c) => cambiarProdArticulo(i, c)} options={opts}
+                              placeholder={p.nombre || 'Seleccionar…'} searchPlaceholder="Buscar producto..." />
+                          </td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={p.cantidad} onChange={e => setProd(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={p.precio} onChange={e => setProd(i, 'precio', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(p.cantidad)||0) * (parseFloat(p.precio)||0))}</td>
@@ -164,7 +182,10 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                       {preview.materiales.map((m, i) => (
                         <tr key={i}>
                           <td className="px-2 py-1 font-mono text-[11px]">{m.cod}</td>
-                          <td className="px-2 py-1 truncate max-w-[220px]">{m.nombre}</td>
+                          <td className="px-2 py-1 max-w-[260px]">
+                            <Combobox value={m.cod} onChange={(c) => cambiarMatArticulo(i, c)} options={opts}
+                              placeholder={m.nombre || 'Seleccionar…'} searchPlaceholder="Buscar material..." />
+                          </td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={m.cantidad} onChange={e => setMat(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={m.costo} onChange={e => setMat(i, 'costo', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(m.cantidad)||0) * (parseFloat(m.costo)||0))}</td>
