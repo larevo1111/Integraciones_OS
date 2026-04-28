@@ -166,10 +166,22 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   border-radius: 8px;
   padding: 10px 0;
   margin-left: 4px;
-  z-index: 30;
+  /* z-index: 60 → debe ir sobre sidebar mobile (z-50) y backdrop (z-40) */
+  z-index: 60;
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 0 0 1px rgba(255,255,255,.02);
   animation: fsub-in 140ms cubic-bezier(.4,0,.2,1);
+}
+/* En móvil: ocupar más espacio (no solo 220px) y posicionarse al lado del sidebar mobile (224px) */
+@media (max-width: 768px) {
+  .floating-submenu {
+    top: 60px;
+    left: 232px !important;
+    right: 8px;
+    width: auto;
+    max-width: calc(100vw - 240px);
+    max-height: 80vh;
+  }
 }
 @keyframes fsub-in {
   from { opacity: 0; transform: translateX(-6px); }
@@ -260,7 +272,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   border: 1px solid var(--border, rgba(255,255,255,.07));
   border-radius: 8px;
   padding: 4px;
-  z-index: 40;
+  z-index: 70;
   box-shadow: 0 8px 24px rgba(0,0,0,.24), 0 0 0 1px rgba(255,255,255,.02);
   animation: fsub-in 120ms cubic-bezier(.4,0,.2,1);
 }
