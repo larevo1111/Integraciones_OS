@@ -176,6 +176,37 @@ async function buscarTercero(page, inputNombreId, idBusqueda) {
 (async () => {
   const { browser, page } = await getPage();
 
+  // === SPY MODE (opt-in via SPY_REQUESTS=1) ===
+  // Captura todas las requests POST a effi.com.co (excluye telemetría New Relic)
+  // y las guarda en /tmp/espia_op_full.json al finalizar. Sirve para investigar
+  // el endpoint POST directo y reemplazar Playwright a futuro.
+  const SPY = process.env.SPY_REQUESTS === '1';
+  const _spyReqs = [];
+  if (SPY) {
+    const _fs = require('fs');
+    page.on('request', req => {
+      const u = req.url();
+      if (u.includes('effi.com.co') && req.method() !== 'GET' && !u.includes('bam.nr')) {
+        _spyReqs.push({ method: req.method(), url: u, headers: req.headers(), post_data: req.postData() });
+      }
+    });
+    page.on('response', async r => {
+      const u = r.url();
+      if (u.includes('effi.com.co') && r.request().method() !== 'GET' && !u.includes('bam.nr')) {
+        try {
+          const idx = _spyReqs.length - 1;
+          if (idx >= 0 && _spyReqs[idx].url === u) {
+            _spyReqs[idx].response_status = r.status();
+            _spyReqs[idx].response_body = (await r.text()).substring(0, 2000);
+          }
+        } catch {}
+      }
+    });
+    process.on('exit', () => {
+      try { _fs.writeFileSync('/tmp/espia_op_full.json', JSON.stringify(_spyReqs, null, 2)); } catch {}
+    });
+  }
+
   try {
     console.log('🔄 Navegando a Órdenes de producción...');
     await page.goto(EFFI_URL, { waitUntil: 'networkidle', timeout: 30000 });

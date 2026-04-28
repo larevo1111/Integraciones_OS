@@ -103,6 +103,8 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
       })
       onCreated?.(r)
       onOpenChange(false)
+      // Notif simple: backend devuelve {mensaje, historico_id}
+      if (r?.mensaje) setTimeout(() => alert(r.mensaje), 100)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -267,7 +269,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
         <div className="flex justify-end gap-2 px-4 sm:px-5 py-3 border-t border-border shrink-0">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={creando}>Cancelar</Button>
           <Button onClick={crear} disabled={creando || !preview}>
-            {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creando OP en Effi (~60s)…</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Crear OP</>}
+            {creando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Lanzando…</> : <><CheckCircle2 className="h-3.5 w-3.5" /> Crear OP</>}
           </Button>
         </div>
       </div>

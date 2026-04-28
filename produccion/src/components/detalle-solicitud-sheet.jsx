@@ -18,6 +18,7 @@ const TIPOS_FILTRO = [
 
 const ESTADOS = [
   { value: "solicitado", label: "Solicitado" },
+  { value: "programando", label: "Programando…" },
   { value: "programado", label: "Programado" },
   { value: "en_produccion", label: "En producción" },
   { value: "producido", label: "Producido" },
@@ -138,7 +139,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col sm:!max-w-[480px]">
+      <SheetContent className="flex flex-col sm:!max-w-[680px]">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <SheetTitle>{esNueva ? 'Nueva solicitud' : `Solicitud #${solicitud.id}`}</SheetTitle>
@@ -234,6 +235,9 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
                   options={articulosFiltrados}
                   placeholder="Buscar y seleccionar..."
                   searchPlaceholder="Escribir nombre o código..."
+                  showCode
+                  multiline
+                  triggerClassName="!text-[11px]"
                 />
                 {articulo && <p className="text-xs text-muted-foreground pt-1">{articulo.subtitle}</p>}
               </div>

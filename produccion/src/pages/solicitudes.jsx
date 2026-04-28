@@ -9,6 +9,7 @@ import { api } from "@/lib/api"
 
 const ESTADOS = [
   { value: "solicitado", label: "Solicitado" },
+  { value: "programando", label: "Programando…" },
   { value: "programado", label: "Programado" },
   { value: "en_produccion", label: "En producción" },
   { value: "producido", label: "Producido" },
@@ -63,6 +64,14 @@ export function SolicitudesPage() {
   }, [])
 
   useEffect(() => { cargar(); cargarArticulos() }, [cargar, cargarArticulos])
+
+  // Auto-refresh cada 5s mientras haya solicitudes en estado 'programando' (OP en background)
+  useEffect(() => {
+    const hayProgramando = solicitudes.some(s => s.estado === 'programando')
+    if (!hayProgramando) return
+    const t = setInterval(() => cargar(), 5000)
+    return () => clearInterval(t)
+  }, [solicitudes, cargar])
 
   const eliminar = async (id) => {
     if (!confirm('¿Eliminar esta solicitud?')) return

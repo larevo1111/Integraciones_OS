@@ -179,9 +179,11 @@ def listar_articulos(fecha: str, bodega: Optional[str] = None, filtro: Optional[
         sql += " AND c.estado = 'contado' AND c.diferencia != 0"
 
     if busqueda:
-        sql += " AND (c.nombre LIKE %s OR c.id_effi LIKE %s OR c.cod_barras LIKE %s)"
-        like = f"%{busqueda}%"
-        params.extend([like, like, like])
+        # Búsqueda por palabras separadas con AND (regla CLAUDE.md §Quicksearch)
+        for w in busqueda.strip().split():
+            sql += " AND (c.nombre LIKE %s OR c.id_effi LIKE %s OR c.cod_barras LIKE %s)"
+            like = f"%{w}%"
+            params.extend([like, like, like])
 
     sql += " ORDER BY c.categoria, c.nombre"
     rows = db_query(DB_INV, sql, params)

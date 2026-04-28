@@ -3,18 +3,19 @@ import * as Popover from "@radix-ui/react-popover"
 import { Check, ChevronDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function Combobox({ value, onChange, options, placeholder = "Seleccionar...", searchPlaceholder = "Buscar...", variant = "default", triggerClassName = "" }) {
+export function Combobox({ value, onChange, options, placeholder = "Seleccionar...", searchPlaceholder = "Buscar...", variant = "default", triggerClassName = "", showCode = false, multiline = false }) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
 
   const filtered = React.useMemo(() => {
     const s = search.toLowerCase().trim()
     if (!s) return options.slice(0, 50)
-    return options.filter(o =>
-      (o.label || '').toLowerCase().includes(s) ||
-      (o.value || '').toLowerCase().includes(s) ||
-      (o.subtitle || '').toLowerCase().includes(s)
-    ).slice(0, 50)
+    // Búsqueda por palabras separadas con AND (regla CLAUDE.md §Quicksearch)
+    const words = s.split(/\s+/)
+    return options.filter(o => {
+      const text = `${o.label || ''} ${o.value || ''} ${o.subtitle || ''}`.toLowerCase()
+      return words.every(w => text.includes(w))
+    }).slice(0, 50)
   }, [options, search])
 
   const selected = options.find(o => o.value === value)
@@ -33,12 +34,17 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
           <button
             type="button"
             className={cn(
-              "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer",
+              "flex w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer",
+              multiline ? "min-h-9 py-1.5" : "h-9",
               triggerClassName
             )}
           >
-            <span className={cn("truncate text-left", !selected && "text-muted-foreground")}>
-              {selected ? (selected.nombre || selected.label) : placeholder}
+            <span className={cn(
+              "text-left flex-1",
+              multiline ? "whitespace-normal break-words leading-tight" : "truncate",
+              !selected && "text-muted-foreground"
+            )}>
+              {selected ? (showCode ? selected.label : (selected.nombre || selected.label)) : placeholder}
             </span>
             <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
           </button>
@@ -74,12 +80,12 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value, opt); setOpen(false); setSearch("") }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-left hover:bg-accent cursor-pointer"
+                className="flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-[13px] text-left hover:bg-accent cursor-pointer"
               >
-                <Check className={cn("h-4 w-4 shrink-0", opt.value === value ? "opacity-100" : "opacity-0")} />
+                <Check className={cn("h-4 w-4 shrink-0 mt-0.5", opt.value === value ? "opacity-100" : "opacity-0")} />
                 <div className="flex-1 min-w-0">
-                  <div className="truncate">{opt.label}</div>
-                  {opt.subtitle && <div className="text-[11px] text-muted-foreground truncate">{opt.subtitle}</div>}
+                  <div className={multiline ? "whitespace-normal break-words leading-tight" : "truncate"}>{opt.label}</div>
+                  {opt.subtitle && <div className={cn("text-[11px] text-muted-foreground", multiline ? "whitespace-normal break-words" : "truncate")}>{opt.subtitle}</div>}
                 </div>
                 {opt.badge && (
                   <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{opt.badge}</span>

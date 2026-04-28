@@ -256,6 +256,51 @@ Cuando Claude Code corre sin supervisión directa (cron, scripts `claude_trainer
 - **Mantenerlo SIMPLE. Estructura primero con componentes Quasar, detalles después.**
 - Skill completo con patrones y tablas: `.claude/skills/quasar-layout/SKILL.md`
 
+## ⚠️ REGLA ABSOLUTA — Quicksearch / Búsquedas por palabras separadas
+
+**TODAS las búsquedas (quicksearch, autocompletes, filtros LIKE) deben hacer match por palabras separadas con AND, NO por string contiguo.**
+
+### Por qué
+Una búsqueda "cobertura templada" debe encontrar "Cobertura Chocolate 73% Templada" (porque contiene ambas palabras). Si se usa `LIKE '%cobertura templada%'`, NO matchea porque las palabras no están contiguas.
+
+### Patrón correcto (SQL)
+```python
+# Backend (Python/FastAPI)
+if q_str:
+    words = q_str.strip().split()
+    for w in words:
+        sql += " AND (nombre LIKE %s OR cod LIKE %s)"
+        params.extend([f'%{w}%', f'%{w}%'])
+```
+
+```js
+// Backend (Node)
+if (q) {
+  const words = q.trim().split(/\s+/);
+  for (const w of words) {
+    sql += ` AND (nombre LIKE ? OR cod LIKE ?)`;
+    params.push(`%${w}%`, `%${w}%`);
+  }
+}
+```
+
+### Patrón correcto (frontend filter en memoria)
+```js
+const filtered = items.filter(it => {
+  const text = `${it.cod} ${it.nombre}`.toLowerCase();
+  return q.trim().toLowerCase().split(/\s+/).every(w => text.includes(w));
+});
+```
+
+### PROHIBIDO
+- `nombre LIKE '%${q}%'` con `q` que tenga espacios (rompe búsqueda multi-palabra)
+- `text.includes(q)` con `q` multi-palabra
+- `nombre LIKE '%${q.replace(' ', '%')}%'` (orden matter, no es real AND)
+
+### Aplica a
+Todos los endpoints `q`/`q_str`/`search`/`busqueda`, todos los filtros de Combobox, todos los inputs de búsqueda en cualquier app del repo (produccion/, sistema_gestion/, frontend/, ia-admin/, inventario/).
+
+
 ## ⚠️ REGLA ABSOLUTA — Inputs + Enter (Móvil / IME)
 
 **NUNCA usar `@keydown.enter` ni `@keyup.enter` en inputs.** El IME del teclado móvil corta la última palabra.

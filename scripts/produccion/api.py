@@ -325,12 +325,70 @@ def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list)
     return f"{parte_prods} - {parte_usr} - {parte_sols}"[:250]  # Effi puede truncar
 
 
+def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: list, json_path: str):
+    """Tarea en background: ejecuta Playwright + UPDATE histórico + UPDATE solicitudes."""
+    import json as _j, time as _time
+    from datetime import date as _date
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..'
+    t0 = _time.time()
+    sol_ids_str = ','.join(map(str, solicitudes_ids))
+    hoy = _date.today().isoformat()
+    try:
+        proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', json_path],
+                              cwd=repo, capture_output=True, text=True, timeout=300)
+        duracion = int(_time.time() - t0)
+        log_full = (proc.stdout or '') + ('\n--- STDERR ---\n' + proc.stderr if proc.stderr else '')
+
+        if proc.returncode != 0:
+            err = (proc.stderr or '')[-500:] or 'returncode != 0'
+            exe(DB_PROD, "UPDATE prod_ops_creadas SET log_creacion=%s, duracion_seg=%s, estado='error', error=%s WHERE id=%s",
+                (log_full, duracion, err, historico_id))
+            # Devolver solicitudes al estado 'solicitado'
+            ph = ','.join(['%s'] * len(solicitudes_ids))
+            exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
+                tuple(solicitudes_ids))
+            return
+
+        # Buscar OP_CREADA:NNNN
+        op_id = None
+        for line in (proc.stdout or '').splitlines():
+            if line.startswith('OP_CREADA:'):
+                try: op_id = int(line.split(':')[1].strip())
+                except Exception: pass
+
+        if not op_id:
+            exe(DB_PROD, "UPDATE prod_ops_creadas SET log_creacion=%s, duracion_seg=%s, estado='error', error=%s WHERE id=%s",
+                (log_full, duracion, 'No OP_CREADA en stdout', historico_id))
+            ph = ','.join(['%s'] * len(solicitudes_ids))
+            exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
+                tuple(solicitudes_ids))
+            return
+
+        # Éxito: actualizar histórico + solicitudes
+        exe(DB_PROD, "UPDATE prod_ops_creadas SET op_effi=%s, log_creacion=%s, duracion_seg=%s, estado='ok' WHERE id=%s",
+            (str(op_id), log_full, duracion, historico_id))
+        ph = ','.join(['%s'] * len(solicitudes_ids))
+        exe(DB_PROD, f"""
+            UPDATE prod_solicitudes
+            SET estado='programado', op_effi=%s, fecha_programada=COALESCE(fecha_programada, %s)
+            WHERE id IN ({ph})
+        """, tuple([str(op_id), hoy, *solicitudes_ids]))
+    except Exception as e:
+        duracion = int(_time.time() - t0)
+        exe(DB_PROD, "UPDATE prod_ops_creadas SET duracion_seg=%s, estado='error', error=%s WHERE id=%s",
+            (duracion, str(e)[:500], historico_id))
+        ph = ','.join(['%s'] * len(solicitudes_ids))
+        exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
+            tuple(solicitudes_ids))
+
+
 @app.post("/api/produccion/crear-op-effi")
-def api_crear_op_effi(req: CrearOpRequest, usuario=Depends(require_auth)):
-    """Crea la OP en Effi (Playwright) + actualiza solicitudes a 'programado' con op_effi.
-    Registra en prod_ops_creadas (histórico con payload, log, duración).
+def api_crear_op_effi(req: CrearOpRequest, background_tasks: BackgroundTasks, usuario=Depends(require_auth)):
+    """Crea OP en Effi en BACKGROUND (no bloquea). Devuelve inmediato con historico_id.
+    El frontend puede cerrar el dialog y seguir trabajando.
+    Estado consultable vía GET /api/produccion/ops-historico/{id}.
     """
-    import tempfile, json as _j, time as _time
+    import tempfile, json as _j
     from datetime import date as _date
     if not req.materiales or not req.productos:
         raise HTTPException(400, "Falta materiales o productos")
@@ -339,7 +397,6 @@ def api_crear_op_effi(req: CrearOpRequest, usuario=Depends(require_auth)):
 
     hoy = _date.today().isoformat()
     nombre_user = usuario.get('nombre') or usuario.get('email', '?')
-
     obs = req.observacion or _construir_observacion(req.productos, nombre_user, req.solicitudes_ids)
 
     payload = {
@@ -366,50 +423,22 @@ def api_crear_op_effi(req: CrearOpRequest, usuario=Depends(require_auth)):
     with os.fdopen(fd, 'w') as f:
         _j.dump(payload, f, ensure_ascii=False, indent=2)
 
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..'
-    t0 = _time.time()
-    proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', path],
-                          cwd=repo, capture_output=True, text=True, timeout=300)
-    duracion = int(_time.time() - t0)
-    log_full = (proc.stdout or '') + ('\n--- STDERR ---\n' + proc.stderr if proc.stderr else '')
     sol_ids_str = ','.join(map(str, req.solicitudes_ids))
 
-    if proc.returncode != 0:
-        # Registrar fallo en histórico
-        exe(DB_PROD, """
-            INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, log_creacion, duracion_seg, estado, error)
-            VALUES (NULL, %s, %s, %s, %s, %s, 'error', %s)
-        """, (nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False), log_full, duracion, (proc.stderr or '')[-500:]))
-        raise HTTPException(500, f"Script falló: {(proc.stderr or proc.stdout)[-300:]}")
+    # 1) Crear entry en histórico con estado='ejecutando'
+    historico_id = exe(DB_PROD, """
+        INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, estado)
+        VALUES (NULL, %s, %s, %s, 'ejecutando')
+    """, (nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False)))
 
-    # Buscar OP_CREADA:NNNN
-    op_id = None
-    for line in (proc.stdout or '').splitlines():
-        if line.startswith('OP_CREADA:'):
-            try: op_id = int(line.split(':')[1].strip())
-            except Exception: pass
-    if not op_id:
-        exe(DB_PROD, """
-            INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, log_creacion, duracion_seg, estado, error)
-            VALUES (NULL, %s, %s, %s, %s, %s, 'error', %s)
-        """, (nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False), log_full, duracion, 'No OP_CREADA en stdout'))
-        raise HTTPException(500, "OP creada pero no se pudo capturar el ID")
-
-    # Actualizar solicitudes
+    # 2) Marcar solicitudes como 'programando' (estado intermedio visible)
     ph = ','.join(['%s'] * len(req.solicitudes_ids))
-    exe(DB_PROD, f"""
-        UPDATE prod_solicitudes
-        SET estado='programado', op_effi=%s, fecha_programada=COALESCE(fecha_programada, %s)
-        WHERE id IN ({ph})
-    """, tuple([str(op_id), hoy, *req.solicitudes_ids]))
+    exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='programando' WHERE id IN ({ph})", tuple(req.solicitudes_ids))
 
-    # Registrar en histórico (éxito)
-    exe(DB_PROD, """
-        INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, log_creacion, duracion_seg, estado)
-        VALUES (%s, %s, %s, %s, %s, %s, 'ok')
-    """, (str(op_id), nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False), log_full, duracion))
+    # 3) Lanzar Playwright en background
+    background_tasks.add_task(_ejecutar_op_background, historico_id, payload, req.solicitudes_ids, path)
 
-    return {"ok": True, "op_id": op_id, "duracion_seg": duracion, "observacion": obs}
+    return {"ok": True, "historico_id": historico_id, "mensaje": "OP en proceso (~60s). Podés seguir trabajando.", "estado": "ejecutando"}
 
 
 @app.get("/api/produccion/ops-historico")
@@ -659,8 +688,10 @@ def listar_articulos(tipo: Optional[str] = None, q_str: Optional[str] = None,
     """
     params = []
     if q_str:
-        sql += " AND (e.nombre LIKE %s OR e.id LIKE %s)"
-        params += [f'%{q_str}%', f'%{q_str}%']
+        # Búsqueda por palabras separadas con AND (regla CLAUDE.md §Quicksearch)
+        for w in q_str.strip().split():
+            sql += " AND (e.nombre LIKE %s OR e.id LIKE %s)"
+            params += [f'%{w}%', f'%{w}%']
     sql += " ORDER BY e.nombre LIMIT 500"
     rows = q(DB_EFFI, sql, params)
 
