@@ -1143,6 +1143,52 @@ def listar_costos(fecha: str):
     return result
 
 
+@app.get("/api/inventario/resumen-por-tipo")
+def resumen_por_tipo(fecha: str):
+    """Agregado por grupo (PT, PP, MP, INS, DS, NM, DES, SIN) — para tab Resumen.
+    Suma cantidades y valoriza con costo_manual de cada artículo.
+    """
+    rows = db_query(DB_INV, """
+        SELECT COALESCE(r.grupo, '') AS grupo,
+               COALESCE(c.inventario_teorico, 0) AS teorico,
+               COALESCE(c.inventario_fisico, 0)  AS fisico,
+               COALESCE(c.diferencia, 0)         AS diferencia,
+               COALESCE(c.costo_manual, 0)       AS costo_manual
+        FROM inv_conteos c
+        LEFT JOIN inv_rangos r ON r.id_effi = c.id_effi
+        WHERE c.fecha_inventario = %s AND c.excluido = 0
+    """, (fecha,))
+
+    grupos = {}
+    for r in rows:
+        g = (r['grupo'] or '').strip() or 'SIN'
+        teorico = float(r['teorico'] or 0)
+        fisico  = float(r['fisico'] or 0)
+        dif     = float(r['diferencia'] or 0)
+        costo   = float(r['costo_manual'] or 0)
+        if g not in grupos:
+            grupos[g] = {
+                'grupo': g, 'n_articulos': 0,
+                'total_teorico': 0.0, 'total_fisico': 0.0, 'total_diferencia': 0.0,
+                'val_teorico': 0.0, 'val_fisico': 0.0, 'impacto': 0.0,
+            }
+        grupos[g]['n_articulos']     += 1
+        grupos[g]['total_teorico']   += teorico
+        grupos[g]['total_fisico']    += fisico
+        grupos[g]['total_diferencia'] += dif
+        grupos[g]['val_teorico']     += teorico * costo
+        grupos[g]['val_fisico']      += fisico  * costo
+        grupos[g]['impacto']         += dif     * costo
+
+    for g in grupos.values():
+        for k in ('total_teorico', 'total_fisico', 'total_diferencia',
+                  'val_teorico', 'val_fisico', 'impacto'):
+            g[k] = round(g[k], 2)
+
+    orden = ['MP', 'INS', 'PP', 'PT', 'DS', 'DES', 'NM', 'SIN']
+    return sorted(grupos.values(), key=lambda x: orden.index(x['grupo']) if x['grupo'] in orden else 99)
+
+
 @app.get("/api/inventario/gestion")
 def listar_gestion(fecha: str, severidad: Optional[str] = None, estado: Optional[str] = None,
                    grupo: Optional[str] = None, bodega: Optional[str] = None, solo_diferencias: bool = True):

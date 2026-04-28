@@ -6,16 +6,23 @@
  *  - al clicar fuera
  *  - al presionar ESC
  *  - al navegar a otra ruta (el padre debe manejar onClose)
+ *
+ * Items soportan opcionalmente un menú de acciones (3 puntos verticales)
+ * que abre un sub-popover con opciones rápidas.
  */
 import { useEffect, useRef, useState } from "react"
 import { NavLink } from "react-router"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, MoreVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
  * groups: array de
- *   { title?: string, items: [{ to, label, onClick, icon, rightSlot }] }
- * Cada grupo se renderiza con separador superior.
+ *   { title?: string, items: [{ to, label, onClick, icon, rightSlot, actionsMenu? }] }
+ *
+ * actionsMenu (opcional por item):
+ *   [{ label, icon, onClick, variant?: 'default'|'warn'|'danger', disabled?: bool }]
+ *   Si está presente, se renderiza un botón ⋮ a la derecha del item.
+ *   Items con disabled:true se omiten (filtrar antes vs renderizar gris ya).
  */
 export function FloatingSubmenu({
   open, onClose, groups = [],
@@ -23,6 +30,7 @@ export function FloatingSubmenu({
   title = null,
 }) {
   const panelRef = useRef(null)
+  const [openActions, setOpenActions] = useState(null) // { groupIdx, itemIdx } | null
 
   // Cerrar al clicar fuera
   useEffect(() => {
@@ -33,7 +41,7 @@ export function FloatingSubmenu({
       if (anchorRef?.current?.contains(e.target)) return
       onClose?.()
     }
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    const onKey = (e) => { if (e.key === 'Escape') { setOpenActions(null); onClose?.() } }
     document.addEventListener('mousedown', onDocClick)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -41,6 +49,9 @@ export function FloatingSubmenu({
       document.removeEventListener('keydown', onKey)
     }
   }, [open, onClose, anchorRef])
+
+  // Resetear actions al cerrar el panel
+  useEffect(() => { if (!open) setOpenActions(null) }, [open])
 
   // Calcular posición izquierda = borde derecho del sidebar (anchorRef → aside)
   const [leftPos, setLeftPos] = useState(224)
@@ -69,7 +80,15 @@ export function FloatingSubmenu({
         <div key={gi} className={cn("floating-submenu-group", gi > 0 && "with-separator")}>
           {g.title && <div className="floating-submenu-group-title">{g.title}</div>}
           {g.items.map((item, ii) => (
-            <FloatingItem key={ii} {...item} />
+            <FloatingItem
+              key={ii}
+              {...item}
+              actionsOpen={openActions?.groupIdx === gi && openActions?.itemIdx === ii}
+              onToggleActions={() => setOpenActions(prev =>
+                prev?.groupIdx === gi && prev?.itemIdx === ii ? null : { groupIdx: gi, itemIdx: ii }
+              )}
+              onCloseActions={() => setOpenActions(null)}
+            />
           ))}
         </div>
       ))}
@@ -77,25 +96,101 @@ export function FloatingSubmenu({
   )
 }
 
-function FloatingItem({ to, label, onClick, icon: Icon, rightSlot, active, monospace }) {
+function FloatingItem({
+  to, label, onClick, icon: Icon, rightSlot, active, monospace,
+  actionsMenu, actionsOpen, onToggleActions, onCloseActions,
+}) {
+  const hasActions = Array.isArray(actionsMenu) && actionsMenu.length > 0
+
   const content = (isActive) => (
     <>
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
       <span className={cn("truncate flex-1", monospace && "floating-submenu-mono")}>{label}</span>
-      {rightSlot !== undefined ? rightSlot : <ChevronRight className="h-3 w-3 shrink-0 floating-submenu-chev" strokeWidth={1.75} />}
+      {hasActions ? null
+        : (rightSlot !== undefined ? rightSlot : <ChevronRight className="h-3 w-3 shrink-0 floating-submenu-chev" strokeWidth={1.75} />)}
     </>
   )
+
+  // Botón ⋮ + sub-popover
+  const actionsBtn = hasActions && (
+    <span className="floating-submenu-actions-wrap">
+      <button
+        type="button"
+        className={cn("floating-submenu-actions-btn", actionsOpen && "open")}
+        title="Acciones"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleActions?.() }}
+      >
+        <MoreVertical className="h-3.5 w-3.5" strokeWidth={1.75} />
+      </button>
+      {actionsOpen && (
+        <ActionsPopover actions={actionsMenu} onClose={onCloseActions} />
+      )}
+    </span>
+  )
+
   if (to) {
     return (
-      <NavLink to={to} onClick={onClick}
-               className={({ isActive }) => cn("floating-submenu-item", (active ?? isActive) && "active")}>
-        {({ isActive }) => content(active ?? isActive)}
-      </NavLink>
+      <div className="floating-submenu-row">
+        <NavLink
+          to={to} onClick={onClick}
+          className={({ isActive }) => cn("floating-submenu-item", (active ?? isActive) && "active", hasActions && "with-actions")}
+        >
+          {({ isActive }) => content(active ?? isActive)}
+        </NavLink>
+        {actionsBtn}
+      </div>
     )
   }
   return (
-    <button className={cn("floating-submenu-item", active && "active")} onClick={onClick}>
-      {content(!!active)}
-    </button>
+    <div className="floating-submenu-row">
+      <button
+        className={cn("floating-submenu-item", active && "active", hasActions && "with-actions")}
+        onClick={onClick}
+      >
+        {content(!!active)}
+      </button>
+      {actionsBtn}
+    </div>
+  )
+}
+
+function ActionsPopover({ actions, onClose }) {
+  const popRef = useRef(null)
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!popRef.current) return
+      if (popRef.current.contains(e.target)) return
+      // Cerrar también si se clickea fuera (incluyendo el ⋮ — el toggle ya maneja eso)
+      onClose?.()
+    }
+    // setTimeout para no atrapar el click que abrió el popover
+    const t = setTimeout(() => document.addEventListener('mousedown', onDocClick), 0)
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', onDocClick) }
+  }, [onClose])
+
+  return (
+    <div ref={popRef} className="floating-submenu-actions-pop" role="menu">
+      {actions.map((a, i) => (
+        <button
+          key={i}
+          type="button"
+          disabled={a.disabled}
+          className={cn(
+            "floating-submenu-actions-item",
+            a.variant === 'warn' && "is-warn",
+            a.variant === 'danger' && "is-danger",
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (a.disabled) return
+            onClose?.()
+            a.onClick?.()
+          }}
+        >
+          {a.icon && <a.icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
+          <span className="truncate">{a.label}</span>
+        </button>
+      ))}
+    </div>
   )
 }

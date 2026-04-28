@@ -3,7 +3,7 @@
  * Estructura: aside (lista fechas) + contenido (header + toolbar + tabs + vista).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 import "@/styles/inventario.css"
 import { api } from "@/lib/api"
 import { auth } from "@/lib/auth"
@@ -16,6 +16,7 @@ import { AsignarModal } from "@/components/inventario/asignar-modal"
 import { AgregarModal } from "@/components/inventario/agregar-modal"
 import { VistaGestion } from "@/components/inventario/vista-gestion"
 import { VistaCostos } from "@/components/inventario/vista-costos"
+import { VistaResumen } from "@/components/inventario/vista-resumen"
 
 const FILTROS_BASE = [
   { key: 'todos',     label: 'Todos' },
@@ -33,6 +34,7 @@ const PERMISO_DEFAULT = {
 export function InventariosLayoutPage() {
   const navigate = useNavigate()
   const { fecha: fechaParam } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Estado base
   const [fechas, setFechas] = useState([])
@@ -128,6 +130,18 @@ export function InventariosLayoutPage() {
     api.get(`/api/inventario/estado-cierre?fecha=${fecha}`).then(setEstadoCierre).catch(console.error)
     api.get(`/api/inventario/teorico/estado?fecha=${fecha}`).then(setEstadoTeorico).catch(() => setEstadoTeorico(null))
   }, [fecha])
+
+  // Abrir modal automáticamente si viene ?accion=... (desde el sidebar)
+  useEffect(() => {
+    const accion = searchParams.get('accion')
+    if (!accion || !fecha) return
+    const validas = ['cerrar-conteo', 'reabrir-conteo', 'cerrar-inv', 'reiniciar', 'eliminar']
+    if (validas.includes(accion)) setModalAbierto(accion)
+    // limpiar el query param para no reabrir al refrescar
+    const next = new URLSearchParams(searchParams)
+    next.delete('accion')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, fecha, setSearchParams])
 
   // Cargar artículos cuando cambian fecha + bodega + filtro
   const cargarArticulos = useCallback(async () => {
@@ -340,6 +354,9 @@ export function InventariosLayoutPage() {
             <button className={`inv-tab ${vistaActiva === 'costos' ? 'active' : ''}`} onClick={() => setVistaActiva('costos')}>
               <span className="material-icons" style={{ fontSize: 15 }}>attach_money</span> Costos
             </button>
+            <button className={`inv-tab ${vistaActiva === 'resumen' ? 'active' : ''}`} onClick={() => setVistaActiva('resumen')}>
+              <span className="material-icons" style={{ fontSize: 15 }}>pie_chart</span> Resumen
+            </button>
           </div>
         )}
 
@@ -392,6 +409,8 @@ export function InventariosLayoutPage() {
         {vistaActiva === 'gestion' && <VistaGestion fecha={fecha} />}
 
         {vistaActiva === 'costos' && <VistaCostos fecha={fecha} />}
+
+        {vistaActiva === 'resumen' && <VistaResumen fecha={fecha} />}
       </div>
 
       {/* MODALES */}

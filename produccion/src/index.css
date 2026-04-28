@@ -223,3 +223,70 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   font-size: 12px;
   letter-spacing: -.01em;
 }
+
+/* ─── Item con menú de acciones (⋮) ─── */
+.floating-submenu-row {
+  position: relative;
+  display: flex; align-items: center;
+}
+.floating-submenu-row .floating-submenu-item.with-actions {
+  padding-right: 4px;
+}
+.floating-submenu-actions-wrap {
+  position: relative;
+  display: inline-flex; align-items: center;
+}
+.floating-submenu-actions-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: var(--radius-sm, 4px);
+  border: none; background: transparent;
+  color: var(--text-tertiary, #6b6f76);
+  cursor: pointer;
+  transition: background var(--transition, 120ms), color var(--transition, 120ms);
+  margin-right: 4px;
+}
+.floating-submenu-actions-btn:hover,
+.floating-submenu-actions-btn.open {
+  background: var(--bg-hover, #17181a);
+  color: var(--text, #f7f8f8);
+}
+.floating-submenu-actions-pop {
+  position: absolute;
+  top: 100%; right: 0;
+  margin-top: 4px;
+  min-width: 180px;
+  background: var(--bg-elevated, #101113);
+  border: 1px solid var(--border, rgba(255,255,255,.07));
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 40;
+  box-shadow: 0 8px 24px rgba(0,0,0,.24), 0 0 0 1px rgba(255,255,255,.02);
+  animation: fsub-in 120ms cubic-bezier(.4,0,.2,1);
+}
+.floating-submenu-actions-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 12.5px; font-weight: 400; text-align: left;
+  color: var(--text-secondary, #a8adb6);
+  background: transparent; border: none;
+  cursor: pointer;
+  transition: background var(--transition, 120ms), color var(--transition, 120ms);
+}
+.floating-submenu-actions-item:hover:not(:disabled) {
+  background: var(--bg-hover, #17181a);
+  color: var(--text, #f7f8f8);
+}
+.floating-submenu-actions-item:disabled {
+  opacity: .4; cursor: not-allowed;
+}
+.floating-submenu-actions-item.is-warn { color: #f59e0b; }
+.floating-submenu-actions-item.is-warn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, .10); color: #fbbf24;
+}
+.floating-submenu-actions-item.is-danger { color: #ef4444; }
+.floating-submenu-actions-item.is-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, .10); color: #f87171;
+}
