@@ -22,29 +22,33 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex h-9 w-full items-center justify-between rounded-md px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer",
-            variant === "add"
-              ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-primary"
-              : "border border-input bg-transparent"
-          )}
-        >
-          <span className={cn(
-            "truncate text-left",
-            variant === "default" && !selected && "text-muted-foreground"
-          )}>
-            {selected ? selected.label : placeholder}
-          </span>
-          <ChevronDown className={cn("h-4 w-4 shrink-0 ml-2", variant === "add" ? "opacity-90" : "opacity-50")} />
-        </button>
+        {variant === "link" ? (
+          <button
+            type="button"
+            className="flex items-center gap-1 text-[11px] text-primary hover:underline cursor-pointer"
+          >
+            + {placeholder}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          >
+            <span className={cn("truncate text-left", !selected && "text-muted-foreground")}>
+              {selected ? selected.label : placeholder}
+            </span>
+            <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+          </button>
+        )}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          className="z-50 w-[var(--radix-popover-trigger-width)] max-w-none rounded-md border bg-card shadow-lg"
+          className={cn(
+            "z-50 max-w-none rounded-md border bg-card shadow-lg",
+            variant === "link" ? "w-80" : "w-[var(--radix-popover-trigger-width)]"
+          )}
           sideOffset={4}
-          align="start"
+          align={variant === "link" ? "end" : "start"}
         >
           <div className="flex items-center border-b px-3 py-2 gap-2">
             <Search className="h-4 w-4 opacity-50 shrink-0" />

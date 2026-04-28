@@ -152,6 +152,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <div className="text-[12px] font-semibold text-muted-foreground">PRODUCTOS A PRODUCIR</div>
+                  <Combobox value="" onChange={addProd} options={opts} placeholder="Agregar producto" searchPlaceholder="Buscar producto..." variant="link" />
                 </div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
@@ -175,15 +176,13 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                     </tbody>
                   </table>
                 </div>
-                <div className="pt-1">
-                  <Combobox value="" onChange={addProd} options={opts} placeholder="+ Agregar producto" searchPlaceholder="Buscar producto..." variant="add" />
-                </div>
               </div>
 
               {/* Materiales */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <div className="text-[12px] font-semibold text-muted-foreground">MATERIALES</div>
+                  <Combobox value="" onChange={addMat} options={opts} placeholder="Agregar material" searchPlaceholder="Buscar material..." variant="link" />
                 </div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
@@ -207,14 +206,14 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                     </tbody>
                   </table>
                 </div>
-                <div className="pt-1">
-                  <Combobox value="" onChange={addMat} options={opts} placeholder="+ Agregar material" searchPlaceholder="Buscar material..." variant="add" />
-                </div>
               </div>
 
               {/* Otros costos */}
               <div className="space-y-1.5">
-                <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-[12px] font-semibold text-muted-foreground">OTROS COSTOS</div>
+                  <Combobox value="" onChange={addCost} options={optsCosto} placeholder="Agregar costo" searchPlaceholder="Buscar tipo de costo..." variant="link" />
+                </div>
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
                     <thead className="bg-muted/30 text-[11px]">
@@ -239,9 +238,6 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                       ))}
                     </tbody>
                   </table>
-                </div>
-                <div className="pt-1">
-                  <Combobox value="" onChange={addCost} options={optsCosto} placeholder="+ Agregar costo" searchPlaceholder="Buscar tipo de costo..." variant="add" />
                 </div>
               </div>
 
