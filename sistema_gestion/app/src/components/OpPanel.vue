@@ -187,8 +187,65 @@
             <!-- ── BLOQUE 5: TAREAS VINCULADAS ────────────────── -->
             <div class="op-section">
               <div class="op-section-title">Tareas vinculadas ({{ ficha.tareas_vinculadas.length }})</div>
-              <div v-if="!ficha.tareas_vinculadas.length" class="op-empty">Sin tareas asignadas a esta OP</div>
-              <ul v-else class="op-tareas">
+
+              <!-- Quickadd tarea (igual que ProyectoPanel) -->
+              <form class="quickadd-row" :class="{ activo: mostrarFormTarea }" @submit.prevent="crearTareaEnOp">
+                <span class="material-icons quickadd-plus">add</span>
+                <input
+                  v-model="nuevaTareaTitulo"
+                  class="quickadd-input"
+                  placeholder="Agregar una tarea..."
+                  @focus="mostrarFormTarea = true"
+                  @keydown.escape="mostrarFormTarea = false; nuevaTareaTitulo = ''"
+                />
+                <template v-if="mostrarFormTarea">
+                  <button type="submit" class="btn-icon" :disabled="!nuevaTareaTitulo.trim()" title="Agregar">
+                    <span class="material-icons" style="font-size:18px;color:var(--accent)">check</span>
+                  </button>
+                  <button type="button" class="btn-icon" @click="mostrarFormTarea = false; nuevaTareaTitulo = ''" title="Cancelar">
+                    <span class="material-icons" style="font-size:18px">close</span>
+                  </button>
+                </template>
+              </form>
+              <template v-if="mostrarFormTarea">
+                <div class="quickadd-extra">
+                  <q-chip
+                    clickable dense
+                    icon="category"
+                    class="tf-chip"
+                    :class="{ 'tf-chip-filled': catProdSeleccionada }"
+                    :style="catProdSeleccionada ? { background: 'var(--accent-muted)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}"
+                  >
+                    <span>{{ catProdSeleccionada ? catProdSeleccionada.nombre : 'Cat. producción' }}</span>
+                    <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+                      <q-list dense style="min-width:180px;max-height:300px;overflow-y:auto">
+                        <q-item
+                          v-for="cp in categoriasProduccion" :key="cp.id"
+                          clickable v-close-popup
+                          :active="nuevaTareaCatProdId === cp.id"
+                          @click="nuevaTareaCatProdId = nuevaTareaCatProdId === cp.id ? null : cp.id"
+                        >
+                          <q-item-section>{{ cp.nombre }}</q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-menu>
+                  </q-chip>
+                  <ResponsablesSelector
+                    :single="false"
+                    :model-value="nuevaTareaResponsables"
+                    :usuarios="usuarios"
+                    @update:model-value="v => nuevaTareaResponsables = v"
+                  />
+                  <EtiquetasSelector
+                    v-model="nuevaTareaEtiquetas"
+                    :etiquetas="etiquetasGlobal"
+                  />
+                  <input type="date" v-model="nuevaTareaFecha" class="quickadd-date" />
+                </div>
+              </template>
+
+              <div v-if="!ficha.tareas_vinculadas.length && !mostrarFormTarea" class="op-empty">Sin tareas asignadas a esta OP</div>
+              <ul v-if="ficha.tareas_vinculadas.length" class="op-tareas">
                 <li v-for="t in ficha.tareas_vinculadas" :key="t.id" class="op-tarea" @click="abrirTarea(t)">
                   <div class="op-tarea-row1">
                     <span class="op-tarea-titulo">{{ t.titulo }}</span>
@@ -266,7 +323,10 @@ import { useQuasar } from 'quasar'
 import { api } from 'src/services/api'
 import { fmtNum, parseDecimal } from 'src/services/numero'
 import { useAuthStore } from 'src/stores/authStore'
+import { crearTarea } from 'src/composables/useTareas'
 import TareaPanel from './TareaPanel.vue'
+import ResponsablesSelector from './ResponsablesSelector.vue'
+import EtiquetasSelector from './EtiquetasSelector.vue'
 
 const $q  = useQuasar()
 const auth = useAuthStore()
@@ -287,6 +347,20 @@ const procesando  = ref(false)
 const validando   = ref(false)
 const dialogNuevaLinea = ref(false)
 const nuevaLinea = reactive({ tipo: 'material', cod_articulo: '', descripcion: '', unidad: '', cantidad_real: '' })
+
+// Quickadd tarea vinculada a esta OP
+const categoriasProduccion = ref([])
+const etiquetasGlobal      = ref([])
+const mostrarFormTarea     = ref(false)
+const nuevaTareaTitulo     = ref('')
+const nuevaTareaCatProdId  = ref(null)
+const nuevaTareaResponsables = ref(auth.usuario?.email ? [auth.usuario.email] : [])
+const nuevaTareaEtiquetas  = ref([])
+const nuevaTareaFecha      = ref('')
+
+const catProdSeleccionada = computed(() =>
+  categoriasProduccion.value.find(c => c.id === nuevaTareaCatProdId.value) || null
+)
 
 const miNivel = computed(() => auth.usuario?.nivel || 1)
 const puedeProcesar = computed(() => miNivel.value >= 3)
@@ -321,8 +395,50 @@ async function cargar() {
   } finally { cargando.value = false }
 }
 
+async function cargarCatalogosQuickadd() {
+  if (categoriasProduccion.value.length && etiquetasGlobal.value.length) return
+  try {
+    const [cp, et] = await Promise.all([
+      api('/api/gestion/categorias-produccion').catch(() => ({})),
+      api('/api/gestion/etiquetas').catch(() => ({})),
+    ])
+    categoriasProduccion.value = cp.categorias || []
+    etiquetasGlobal.value      = et.etiquetas  || []
+  } catch (e) { console.warn('[OpPanel] catálogos quickadd:', e?.message) }
+}
+
+async function crearTareaEnOp() {
+  const titulo = nuevaTareaTitulo.value.trim()
+  if (!titulo) return
+  const catProduccion = props.categorias.find(c => c.es_produccion) || props.categorias.find(c => /produccion/i.test(c.nombre || ''))
+  if (!catProduccion) {
+    $q.notify({ type: 'negative', message: 'No se encontró la categoría Producción', position: 'top' })
+    return
+  }
+  try {
+    await crearTarea({
+      titulo,
+      categoria_id: catProduccion.id,
+      categoria_produccion_id: nuevaTareaCatProdId.value,
+      id_op: String(props.idOp),
+      responsables: nuevaTareaResponsables.value,
+      etiquetas: nuevaTareaEtiquetas.value,
+      fecha_limite: nuevaTareaFecha.value || null
+    })
+    nuevaTareaTitulo.value = ''
+    nuevaTareaCatProdId.value = null
+    nuevaTareaResponsables.value = auth.usuario?.email ? [auth.usuario.email] : []
+    nuevaTareaEtiquetas.value = []
+    nuevaTareaFecha.value = ''
+    mostrarFormTarea.value = false
+    await cargar()
+  } catch (e) {
+    $q.notify({ type: 'negative', message: 'Error creando tarea: ' + (e.message || e), position: 'top' })
+  }
+}
+
 watch(() => props.idOp, cargar)
-onMounted(cargar)
+onMounted(() => { cargar(); cargarCatalogosQuickadd() })
 
 function fmtFecha(s) {
   if (!s) return '—'
