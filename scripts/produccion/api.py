@@ -326,60 +326,80 @@ def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list)
 
 
 def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: list, json_path: str):
-    """Tarea en background: ejecuta Playwright + UPDATE histórico + UPDATE solicitudes."""
-    import json as _j, time as _time
+    """Tarea en background: intenta POST directo (rápido ~1s), si falla cae a Playwright (~60-90s).
+    Actualiza prod_ops_creadas + prod_solicitudes según resultado.
+    """
+    import json as _j, time as _time, io as _io
+    from contextlib import redirect_stdout, redirect_stderr
     from datetime import date as _date
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..'
     t0 = _time.time()
     sol_ids_str = ','.join(map(str, solicitudes_ids))
     hoy = _date.today().isoformat()
-    try:
-        proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', json_path],
-                              cwd=repo, capture_output=True, text=True, timeout=300)
+    op_id = None
+    log_buffer = []
+    metodo = 'post_directo'
+
+    def _marcar_error(err_msg, log_extra=''):
         duracion = int(_time.time() - t0)
-        log_full = (proc.stdout or '') + ('\n--- STDERR ---\n' + proc.stderr if proc.stderr else '')
-
-        if proc.returncode != 0:
-            err = (proc.stderr or '')[-500:] or 'returncode != 0'
-            exe(DB_PROD, "UPDATE prod_ops_creadas SET log_creacion=%s, duracion_seg=%s, estado='error', error=%s WHERE id=%s",
-                (log_full, duracion, err, historico_id))
-            # Devolver solicitudes al estado 'solicitado'
-            ph = ','.join(['%s'] * len(solicitudes_ids))
-            exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
-                tuple(solicitudes_ids))
-            return
-
-        # Buscar OP_CREADA:NNNN
-        op_id = None
-        for line in (proc.stdout or '').splitlines():
-            if line.startswith('OP_CREADA:'):
-                try: op_id = int(line.split(':')[1].strip())
-                except Exception: pass
-
-        if not op_id:
-            exe(DB_PROD, "UPDATE prod_ops_creadas SET log_creacion=%s, duracion_seg=%s, estado='error', error=%s WHERE id=%s",
-                (log_full, duracion, 'No OP_CREADA en stdout', historico_id))
-            ph = ','.join(['%s'] * len(solicitudes_ids))
-            exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
-                tuple(solicitudes_ids))
-            return
-
-        # Éxito: actualizar histórico + solicitudes
-        exe(DB_PROD, "UPDATE prod_ops_creadas SET op_effi=%s, log_creacion=%s, duracion_seg=%s, estado='ok' WHERE id=%s",
-            (str(op_id), log_full, duracion, historico_id))
-        ph = ','.join(['%s'] * len(solicitudes_ids))
-        exe(DB_PROD, f"""
-            UPDATE prod_solicitudes
-            SET estado='programado', op_effi=%s, fecha_programada=COALESCE(fecha_programada, %s)
-            WHERE id IN ({ph})
-        """, tuple([str(op_id), hoy, *solicitudes_ids]))
-    except Exception as e:
-        duracion = int(_time.time() - t0)
-        exe(DB_PROD, "UPDATE prod_ops_creadas SET duracion_seg=%s, estado='error', error=%s WHERE id=%s",
-            (duracion, str(e)[:500], historico_id))
+        log_full = '\n'.join(log_buffer) + ('\n--- STDERR ---\n' + log_extra if log_extra else '')
+        exe(DB_PROD, "UPDATE prod_ops_creadas SET log_creacion=%s, duracion_seg=%s, estado='error', error=%s WHERE id=%s",
+            (log_full, duracion, err_msg[:500], historico_id))
         ph = ','.join(['%s'] * len(solicitudes_ids))
         exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
             tuple(solicitudes_ids))
+
+    # ── INTENTO 1: POST directo (rápido) ──────────────────────────────────
+    try:
+        sys.path.insert(0, repo + '/scripts')
+        from import_orden_produccion_post import crear_op as crear_op_post
+        log_buffer.append('[POST DIRECTO] Iniciando...')
+        # Capturar stdout del módulo POST
+        buf = _io.StringIO()
+        with redirect_stdout(buf), redirect_stderr(buf):
+            op_id = crear_op_post(json_path)
+        log_buffer.append(buf.getvalue())
+        log_buffer.append(f'[POST DIRECTO] OP creada: {op_id} en {int(_time.time()-t0)}s')
+    except Exception as e:
+        log_buffer.append(f'[POST DIRECTO] FALLÓ: {e}')
+        log_buffer.append('[FALLBACK] Intentando con Playwright...')
+        op_id = None
+        # ── INTENTO 2: Playwright (fallback) ─────────────────────────────
+        try:
+            proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', json_path],
+                                  cwd=repo, capture_output=True, text=True, timeout=300)
+            log_buffer.append(proc.stdout or '')
+            if proc.stderr: log_buffer.append('--- STDERR ---\n' + proc.stderr)
+            metodo = 'playwright'
+            if proc.returncode != 0:
+                _marcar_error(f'Ambos métodos fallaron. Playwright stderr: {(proc.stderr or "")[-200:]}', '\n'.join(log_buffer))
+                return
+            for line in (proc.stdout or '').splitlines():
+                if line.startswith('OP_CREADA:'):
+                    try: op_id = int(line.split(':')[1].strip())
+                    except Exception: pass
+            if not op_id:
+                _marcar_error('Playwright OK pero no se pudo capturar OP_CREADA', '\n'.join(log_buffer))
+                return
+        except Exception as e2:
+            _marcar_error(f'Ambos métodos fallaron. {e2}', '\n'.join(log_buffer))
+            return
+
+    if not op_id:
+        _marcar_error('No se obtuvo op_id', '\n'.join(log_buffer))
+        return
+
+    # Éxito: actualizar histórico + solicitudes
+    duracion = int(_time.time() - t0)
+    log_full = '\n'.join(log_buffer) + f'\n[FINAL] método={metodo}, op_id={op_id}, duración={duracion}s'
+    exe(DB_PROD, "UPDATE prod_ops_creadas SET op_effi=%s, log_creacion=%s, duracion_seg=%s, estado='ok' WHERE id=%s",
+        (str(op_id), log_full, duracion, historico_id))
+    ph = ','.join(['%s'] * len(solicitudes_ids))
+    exe(DB_PROD, f"""
+        UPDATE prod_solicitudes
+        SET estado='programado', op_effi=%s, fecha_programada=COALESCE(fecha_programada, %s)
+        WHERE id IN ({ph})
+    """, tuple([str(op_id), hoy, *solicitudes_ids]))
 
 
 @app.post("/api/produccion/crear-op-effi")

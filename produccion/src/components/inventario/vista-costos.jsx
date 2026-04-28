@@ -1,10 +1,9 @@
 /**
  * VistaCostos — Tab "Costos" del inventario.
- * Tabla con valorización: costo_manual, cantidades, valores teórico/físico, impacto.
- *
- * GET /api/inventario/costos?fecha=
+ * Refactor: usa OsDataTable (mismo objeto que solicitudes) — scroll, sort, filtros, export incluidos.
  */
 import { useEffect, useState, useMemo } from "react"
+import { OsDataTable } from "@/components/os-data-table"
 import { api } from "@/lib/api"
 
 const fmtNum = (n) => n == null ? '—' : (Math.round(n * 100) / 100).toLocaleString('es-CO')
@@ -13,7 +12,6 @@ const fmtMoney = (n) => n == null ? '$0' : '$' + Math.round(n).toLocaleString('e
 export function VistaCostos({ fecha }) {
   const [rows, setRows] = useState([])
   const [cargando, setCargando] = useState(false)
-  const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
     if (!fecha) return
@@ -24,100 +22,71 @@ export function VistaCostos({ fecha }) {
       .finally(() => setCargando(false))
   }, [fecha])
 
-  const filtradas = useMemo(() => {
-    if (!busqueda.trim()) return rows
-    // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
-    const words = busqueda.trim().toLowerCase().split(/\s+/)
-    return rows.filter(r => {
-      const t = `${r.nombre || ''} ${r.id_effi || ''}`.toLowerCase()
-      return words.every(w => t.includes(w))
-    })
-  }, [rows, busqueda])
+  const totales = useMemo(() => rows.reduce((acc, r) => ({
+    val_teorico: acc.val_teorico + (Number(r.valor_teorico) || 0),
+    val_fisico:  acc.val_fisico  + (Number(r.valor_fisico)  || 0),
+    impacto:     acc.impacto     + (Number(r.impacto)       || 0),
+  }), { val_teorico: 0, val_fisico: 0, impacto: 0 }), [rows])
 
-  const totales = useMemo(() => {
-    return filtradas.reduce((acc, r) => ({
-      val_teorico: acc.val_teorico + (Number(r.valor_teorico) || 0),
-      val_fisico:  acc.val_fisico  + (Number(r.valor_fisico)  || 0),
-      impacto:     acc.impacto     + (Number(r.impacto)       || 0),
-    }), { val_teorico: 0, val_fisico: 0, impacto: 0 })
-  }, [filtradas])
+  const columns = [
+    { key: 'id_effi',       label: 'Cód',           visible: true, nowrap: true },
+    { key: 'nombre',        label: 'Artículo',      visible: true },
+    { key: 'categoria',     label: 'Categoría',     visible: true, nowrap: true },
+    { key: 'grupo',         label: 'Tipo',          visible: true, nowrap: true },
+    { key: 'costo_manual',  label: 'Costo Unit.',   visible: true, numeric: true, nowrap: true },
+    { key: 'teorico',       label: 'Cant. Teórica', visible: true, numeric: true, nowrap: true },
+    { key: 'fisico',        label: 'Cant. Física',  visible: true, numeric: true, nowrap: true },
+    { key: 'diferencia',    label: 'Diferencia',    visible: true, numeric: true, nowrap: true },
+    { key: 'valor_teorico', label: 'Val. Teórico',  visible: true, numeric: true, nowrap: true },
+    { key: 'valor_fisico',  label: 'Val. Físico',   visible: true, numeric: true, nowrap: true },
+    { key: 'impacto',       label: 'Impacto $',     visible: true, numeric: true, nowrap: true },
+  ]
+
+  const renderCell = (row, col, value) => {
+    if (['costo_manual', 'valor_teorico', 'valor_fisico'].includes(col.key)) return fmtMoney(value)
+    if (col.key === 'impacto') {
+      const v = Number(value) || 0
+      return <span className={v < 0 ? 'text-destructive font-semibold' : 'text-emerald-500 font-semibold'}>{fmtMoney(v)}</span>
+    }
+    if (col.key === 'diferencia') {
+      const v = Number(value)
+      if (isNaN(v)) return '—'
+      const sign = v > 0 ? '+' : ''
+      return <span className="font-semibold">{sign}{fmtNum(v)}</span>
+    }
+    if (['teorico', 'fisico'].includes(col.key)) return fmtNum(value)
+    if (col.key === 'grupo') return value ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{value}</span> : '—'
+    if (col.key === 'categoria') return value || '—'
+    return value
+  }
 
   if (!fecha) return null
 
   return (
-    <div className="costos-container">
-      {/* Header al estilo OsDataTable del Vue: título + contador + filtro */}
-      <div className="costos-header">
-        <div className="costos-titulo">
-          <span style={{ fontWeight: 600 }}>Valorización de Inventario</span>
-          <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontSize: 12 }}>{filtradas.length}</span>
+    <div className="px-3 py-3 sm:px-5 sm:py-4">
+      {/* Totales arriba */}
+      <div className="flex flex-wrap gap-3 mb-3 text-[12px]">
+        <div className="px-3 py-1.5 rounded bg-muted/40">
+          <span className="text-muted-foreground">Val. Teórico: </span>
+          <span className="font-semibold">{fmtMoney(totales.val_teorico)}</span>
         </div>
-        <div style={{ marginLeft: 16, flex: 1, maxWidth: 360 }}>
-          <div className="inv-search-box" style={{ width: '100%' }}>
-            <span className="material-icons inv-search-icon">search</span>
-            <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-                   className="inv-search-input" type="text"
-                   placeholder="Filtrar por nombre o código..." />
-          </div>
+        <div className="px-3 py-1.5 rounded bg-muted/40">
+          <span className="text-muted-foreground">Val. Físico: </span>
+          <span className="font-semibold">{fmtMoney(totales.val_fisico)}</span>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 16, fontSize: 12, alignItems: 'center' }}>
-          <span><strong style={{ color: 'var(--text-tertiary)' }}>Val. Teórico:</strong> {fmtMoney(totales.val_teorico)}</span>
-          <span><strong style={{ color: 'var(--text-tertiary)' }}>Val. Físico:</strong> {fmtMoney(totales.val_fisico)}</span>
-          <span style={{ color: totales.impacto < 0 ? 'var(--color-error)' : 'var(--accent)' }}>
-            <strong>Impacto:</strong> {fmtMoney(totales.impacto)}
-          </span>
+        <div className={`px-3 py-1.5 rounded ${totales.impacto < 0 ? 'bg-destructive/10' : 'bg-emerald-500/10'}`}>
+          <span className="text-muted-foreground">Impacto: </span>
+          <span className={`font-semibold ${totales.impacto < 0 ? 'text-destructive' : 'text-emerald-500'}`}>{fmtMoney(totales.impacto)}</span>
         </div>
       </div>
 
-      {cargando && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)' }}>Cargando…</div>}
-
-      {!cargando && (
-        <div className="inv-table-wrap" style={{ marginTop: 8 }}>
-          <table className="inv-table">
-            <thead>
-              <tr>
-                <th>Cód</th>
-                <th>Artículo</th>
-                <th>Categoría</th>
-                <th>Tipo</th>
-                <th style={{ textAlign: 'right' }}>Costo Unit.</th>
-                <th style={{ textAlign: 'right' }}>Cant. Teórica</th>
-                <th style={{ textAlign: 'right' }}>Cant. Física</th>
-                <th style={{ textAlign: 'right' }}>Diferencia</th>
-                <th style={{ textAlign: 'right' }}>Val. Teórico</th>
-                <th style={{ textAlign: 'right' }}>Val. Físico</th>
-                <th style={{ textAlign: 'right' }}>Impacto $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.map(r => (
-                <tr key={r.id}>
-                  <td>{r.id_effi}</td>
-                  <td>{r.nombre}</td>
-                  <td>{r.categoria || '—'}</td>
-                  <td><span className="grupo-chip">{r.grupo || '—'}</span></td>
-                  <td style={{ textAlign: 'right' }}>{fmtMoney(r.costo_manual)}</td>
-                  <td style={{ textAlign: 'right' }}>{fmtNum(r.teorico)}</td>
-                  <td style={{ textAlign: 'right' }}>{fmtNum(r.fisico)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                    {r.diferencia != null ? (r.diferencia > 0 ? '+' : '') + fmtNum(r.diferencia) : '—'}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>{fmtMoney(r.valor_teorico)}</td>
-                  <td style={{ textAlign: 'right' }}>{fmtMoney(r.valor_fisico)}</td>
-                  <td style={{ textAlign: 'right', color: (r.impacto || 0) < 0 ? 'var(--color-error)' : 'var(--accent)' }}>
-                    {fmtMoney(r.impacto)}
-                  </td>
-                </tr>
-              ))}
-              {!filtradas.length && (
-                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 20, color: 'var(--text-tertiary)' }}>
-                  Sin datos
-                </td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <OsDataTable
+        rows={rows}
+        columns={columns}
+        loading={cargando}
+        title="Valorización"
+        renderCell={renderCell}
+      />
     </div>
   )
 }
