@@ -65,6 +65,13 @@ export function SolicitudesPage() {
 
   useEffect(() => { cargar(); cargarArticulos() }, [cargar, cargarArticulos])
 
+  // Refrescar al terminar Sync Effi global (botón sidebar)
+  useEffect(() => {
+    const h = () => { cargar(); cargarArticulos() }
+    window.addEventListener('effi-synced', h)
+    return () => window.removeEventListener('effi-synced', h)
+  }, [cargar, cargarArticulos])
+
   // Auto-refresh cada 5s mientras haya solicitudes en estado 'programando' (OP en background)
   useEffect(() => {
     const hayProgramando = solicitudes.some(s => s.estado === 'programando')

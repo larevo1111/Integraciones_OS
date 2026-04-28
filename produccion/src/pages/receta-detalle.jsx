@@ -53,6 +53,13 @@ export function RecetaDetallePage() {
 
   useEffect(() => { cargar() }, [cargar])
 
+  // Refrescar al terminar Sync Effi global
+  useEffect(() => {
+    const h = () => cargar()
+    window.addEventListener('effi-synced', h)
+    return () => window.removeEventListener('effi-synced', h)
+  }, [cargar])
+
   useEffect(() => {
     api.get('/api/articulos').then(d => setArticulos(d.map(a => ({
       value: a.cod, label: `${a.cod} — ${a.nombre}`, nombre: a.nombre, costo_manual: a.costo_manual,

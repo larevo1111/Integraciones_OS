@@ -121,6 +121,14 @@ export function InventariosLayoutPage() {
   }, [fecha, fechaParam, navigate])
 
   useEffect(() => { cargarFechas() }, [cargarFechas])
+
+  // Refrescar al terminar Sync Effi global (botón sidebar)
+  useEffect(() => {
+    const h = () => { cargarFechas(); if (fecha) cargarArticulos() }
+    window.addEventListener('effi-synced', h)
+    return () => window.removeEventListener('effi-synced', h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargarFechas, fecha])
   useEffect(() => { if (fechaParam) setFecha(fechaParam) }, [fechaParam])
 
   // Cargar bodegas + estado cierre cuando cambia fecha

@@ -57,6 +57,31 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }) {
       .catch(() => setFechas([]))
   }, [location.pathname])
 
+  // Sync Effi global (artículos + OPs) — visible en todas las vistas
+  const [syncEstado, setSyncEstado] = useState('idle')
+  const [syncMensaje, setSyncMensaje] = useState('')
+  const lanzarSync = async () => {
+    if (syncEstado !== 'idle') return
+    setSyncEstado('ejecutando'); setSyncMensaje('Iniciando…')
+    try {
+      await api.post('/api/refresh-effi', {})
+      const poll = setInterval(async () => {
+        try {
+          const s = await api.get('/api/refresh-effi/estado')
+          setSyncEstado(s.estado || 'idle')
+          setSyncMensaje(s.mensaje || '')
+          if (s.estado === 'ok' || s.estado === 'error' || s.estado === 'idle') {
+            clearInterval(poll)
+            window.dispatchEvent(new CustomEvent('effi-synced'))
+            setTimeout(() => { setSyncEstado('idle'); setSyncMensaje('') }, 4000)
+          }
+        } catch (_) { clearInterval(poll); setSyncEstado('idle') }
+      }, 2500)
+    } catch (e) {
+      alert('Error sync: ' + e.message); setSyncEstado('idle')
+    }
+  }
+
   // Cerrar floating cuando la ruta cambia a algo no-inventarios
   useEffect(() => {
     if (!location.pathname.startsWith('/inventarios')) setFloatingOpen(false)
@@ -130,6 +155,29 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }) {
 
         {/* Footer */}
         <div className="px-1.5 pb-2 space-y-px border-t pt-2" style={{ borderColor: 'var(--border)' }}>
+          {/* Sync Effi global */}
+          <button
+            onClick={lanzarSync}
+            disabled={syncEstado === 'ejecutando' || syncEstado === 'iniciando'}
+            className={cn(
+              "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors disabled:opacity-60 cursor-pointer",
+              collapsed ? "justify-center" : "",
+              syncEstado === 'ok' ? "text-emerald-500" : syncEstado === 'error' ? "text-red-500" : ""
+            )}
+            style={{ color: syncEstado === 'idle' ? 'var(--text-secondary)' : undefined, background: 'transparent' }}
+            title={collapsed ? (syncEstado === 'ejecutando' ? syncMensaje : 'Sincronizar Effi') : undefined}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", (syncEstado === 'ejecutando' || syncEstado === 'iniciando') && "animate-spin")} />
+            {!collapsed && (
+              <span className="truncate">
+                {syncEstado === 'ejecutando' ? (syncMensaje || 'Sincronizando…')
+                  : syncEstado === 'ok' ? '✓ Effi sincronizado'
+                  : syncEstado === 'error' ? '✗ Error sync'
+                  : 'Sync Effi'}
+              </span>
+            )}
+          </button>
+
           {auth.usuario && (
             <div className={cn("flex items-center gap-2 px-2 py-1.5 rounded-md", collapsed && "justify-center")}
                  title={collapsed ? auth.usuario.nombre : undefined}>

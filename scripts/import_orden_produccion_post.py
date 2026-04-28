@@ -157,9 +157,18 @@ def crear_op(json_path):
             ('costo[]', _formato_coma(c['costo'])),
         ]
 
-    # max id_orden ANTES (para detectar el creado)
-    print('🔄 Consultando MAX(id_orden) antes...')
-    # Esto requiere consultar BD effi_data — más simple: lo capturamos del response
+    # MAX antes del POST: scrapear data-id de la página de listado
+    import re as _re
+    def _max_op_effi():
+        rr = s.get('https://effi.com.co/app/orden_produccion', timeout=15)
+        ids = _re.findall(r'data-id[\"=]+(\d+)', rr.text)
+        if not ids: return 0
+        return max(int(x) for x in ids)
+
+    print('🔄 Consultando MAX(id_orden) en Effi antes del POST...')
+    max_antes = _max_op_effi()
+    print(f'   MAX antes: {max_antes}')
+
     print(f'🚀 POST a /app/orden_produccion/crear ({len(payload)} fields)...')
     import time as _t
     t0 = _t.time()
@@ -169,19 +178,14 @@ def crear_op(json_path):
     print(f'   Response (200 chars): {r.text[:200]!r}')
     r.raise_for_status()
 
-    # Para obtener el id de la OP creada, consultamos MAX(id_orden) desde BD effi_data local
-    sys.path.insert(0, str(REPO / 'scripts'))
-    from lib import cfg_integracion
-    import pymysql
-    cnx = pymysql.connect(**cfg_integracion(dict_cursor=False))
-    cur = cnx.cursor()
-    cur.execute("SELECT MAX(CAST(id_orden AS UNSIGNED)) FROM zeffi_produccion_encabezados")
-    max_id = cur.fetchone()[0]
-    cnx.close()
-    # OJO: el max_id puede ser viejo (depende del último refresh). Lo más seguro: el siguiente al actual.
-    # Pero mejor: consultamos vía endpoint Effi otra cosa, o aceptamos el approx.
-    print(f'OP_CREADA_APROX:{max_id} (verificar con SELECT MAX en próximo refresh Effi)')
-    return max_id
+    # MAX después del POST → ese es el id de la OP recién creada
+    print('🔄 Consultando MAX(id_orden) en Effi tras el POST...')
+    max_despues = _max_op_effi()
+    print(f'   MAX después: {max_despues}')
+    if max_despues <= max_antes:
+        raise RuntimeError(f'POST no creó OP nueva (max antes={max_antes}, después={max_despues})')
+    print(f'OP_CREADA:{max_despues}')
+    return max_despues
 
 
 if __name__ == '__main__':
