@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime, timedelta
 import pymysql
 import urllib.request, urllib.parse, json as _json
@@ -993,6 +993,72 @@ def actualizar_receta(cod: str, data: RecetaPatch, usuario=Depends(require_auth)
         raise HTTPException(400, "Sin campos para actualizar")
     params.append(cod)
     exe(DB_PROD, f"UPDATE prod_recetas SET {', '.join(sets)} WHERE cod_articulo=%s", params)
+    return {"ok": True}
+
+
+class RecetaMaterialIn(BaseModel):
+    cod_material: str
+    nombre: str
+    cantidad_por_lote: float
+    costo_unit_snapshot: float = 0
+
+
+class RecetaCostoIn(BaseModel):
+    tipo_costo_id: int
+    nombre: str
+    cantidad_por_lote: float
+    costo_unit: float = 0
+
+
+class RecetaProductoIn(BaseModel):
+    cod_articulo: str
+    nombre: str
+    cantidad_por_lote: float
+    precio_min_venta_snapshot: float = 0
+    es_principal: bool = False
+
+
+class RecetaFullIn(BaseModel):
+    materiales: List[RecetaMaterialIn]
+    costos: List[RecetaCostoIn]
+    productos: List[RecetaProductoIn]
+
+
+@app.put("/api/recetas/{cod}/full")
+def actualizar_receta_full(cod: str, data: RecetaFullIn, usuario=Depends(require_auth)):
+    """Reescribe materiales, costos y productos de una receta (DELETE + INSERT)."""
+    rec = q(DB_PROD, "SELECT id FROM prod_recetas WHERE cod_articulo=%s", (cod,))
+    if not rec:
+        raise HTTPException(404, f"Receta no encontrada para cod={cod}")
+    rid = rec[0]['id']
+
+    # Wipe
+    exe(DB_PROD, "DELETE FROM prod_recetas_materiales WHERE receta_id=%s", (rid,))
+    exe(DB_PROD, "DELETE FROM prod_recetas_costos WHERE receta_id=%s", (rid,))
+    exe(DB_PROD, "DELETE FROM prod_recetas_productos WHERE receta_id=%s", (rid,))
+
+    for m in data.materiales:
+        exe(DB_PROD, """INSERT INTO prod_recetas_materiales
+            (receta_id, cod_material, nombre, cantidad_por_lote, ratio_por_unidad,
+             costo_unit_snapshot, n_ops_aparece)
+            VALUES (%s, %s, %s, %s, %s, %s, 0)""",
+            (rid, m.cod_material, m.nombre, m.cantidad_por_lote, m.cantidad_por_lote, m.costo_unit_snapshot))
+
+    for c in data.costos:
+        exe(DB_PROD, """INSERT INTO prod_recetas_costos
+            (receta_id, tipo_costo_id, nombre, cantidad_por_lote, costo_unit)
+            VALUES (%s, %s, %s, %s, %s)""",
+            (rid, c.tipo_costo_id, c.nombre, c.cantidad_por_lote, c.costo_unit))
+
+    for p in data.productos:
+        exe(DB_PROD, """INSERT INTO prod_recetas_productos
+            (receta_id, cod_articulo, nombre, es_principal, cantidad_por_lote, ratio_por_unidad,
+             precio_min_venta_snapshot, n_ops_aparece)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 0)""",
+            (rid, p.cod_articulo, p.nombre, 1 if p.es_principal else 0,
+             p.cantidad_por_lote, p.cantidad_por_lote, p.precio_min_venta_snapshot))
+
+    exe(DB_PROD, "UPDATE prod_recetas SET updated_at=NOW() WHERE id=%s", (rid,))
     return {"ok": True}
 
 
