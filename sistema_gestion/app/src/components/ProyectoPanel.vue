@@ -43,6 +43,7 @@
               :etiquetas="etiquetas"
               @cerrar="cerrarSubTarea"
               @actualizada="onSubTareaActualizada"
+              @eliminar="eliminarSubTarea"
               @crear-item="() => {}"
               @abrir-padre="() => {}"
             />
@@ -215,23 +216,21 @@
               </template>
             </form>
             <template v-if="mostrarFormTarea">
-              <div class="quickadd-cats">
+              <div class="quickadd-extra">
                 <span v-if="nuevaTareaIALoading" style="display:inline-flex;align-items:center;margin-right:4px">
                   <span class="material-icons" style="font-size:12px;color:var(--accent);animation:spin 1s linear infinite">autorenew</span>
                 </span>
-                <button
-                  v-for="c in categorias"
-                  :key="c.id"
-                  type="button"
-                  class="cat-chip"
-                  :class="{ selected: nuevaTareaCatId === c.id }"
-                  @click="nuevaTareaCatId = c.id; ntChipClickCount++"
-                >
-                  <span class="cat-dot" :style="{ background: c.color }"></span>
-                  {{ c.nombre.replace(/_/g, ' ') }}
-                </button>
-              </div>
-              <div class="quickadd-extra">
+                <CategoriaSelector
+                  :model-value="nuevaTareaCatId"
+                  :categorias="categorias"
+                  @update:model-value="v => { nuevaTareaCatId = v; ntChipClickCount++ }"
+                />
+                <ResponsablesSelector
+                  :single="false"
+                  :model-value="nuevaTareaResponsables"
+                  :usuarios="usuarios"
+                  @update:model-value="v => nuevaTareaResponsables = v"
+                />
                 <EtiquetasSelector
                   v-model="nuevaTareaEtiquetas"
                   :etiquetas="etiquetas"
@@ -400,12 +399,13 @@ async function cargarProyectos() {
 }
 
 // Crear tarea desde proyecto
-const mostrarFormTarea    = ref(false)
-const nuevaTareaTitulo    = ref('')
-const nuevaTareaCatId     = ref(null)
-const nuevaTareaIALoading = ref(false)
-const nuevaTareaEtiquetas = ref([])
-const nuevaTareaFecha     = ref('')
+const mostrarFormTarea     = ref(false)
+const nuevaTareaTitulo     = ref('')
+const nuevaTareaCatId      = ref(null)
+const nuevaTareaIALoading  = ref(false)
+const nuevaTareaEtiquetas  = ref([])
+const nuevaTareaFecha      = ref('')
+const nuevaTareaResponsables = ref(auth.usuario?.email ? [auth.usuario.email] : [])
 let ntChipClickCount = 0
 
 async function ntSugerirSiNecesario() {
@@ -439,6 +439,7 @@ async function crearTareaEnProyecto() {
     titulo,
     proyecto_id: props.item.id,
     categoria_id: catId,
+    responsables: nuevaTareaResponsables.value,
     etiquetas: nuevaTareaEtiquetas.value,
     fecha_limite: nuevaTareaFecha.value || null
   }
@@ -449,6 +450,7 @@ async function crearTareaEnProyecto() {
     ntChipClickCount = 0
     nuevaTareaEtiquetas.value = []
     nuevaTareaFecha.value = ''
+    nuevaTareaResponsables.value = auth.usuario?.email ? [auth.usuario.email] : []
     mostrarFormTarea.value = false
     await cargarTareas()
     recargarSidebar()
@@ -475,6 +477,16 @@ function onSubTareaActualizada(tareaActualizada) {
   if (tareaAbierta.value?.id === tareaActualizada.id) {
     tareaAbierta.value = { ...tareaAbierta.value, ...tareaActualizada }
   }
+}
+
+async function eliminarSubTarea(tarea) {
+  if (!confirm(`¿Eliminar "${tarea.titulo}"?`)) return
+  try {
+    await api(`/api/gestion/tareas/${tarea.id}`, { method: 'DELETE' })
+    tareasVinculadas.value = tareasVinculadas.value.filter(t => t.id !== tarea.id)
+    tareaAbierta.value = null
+    recargarSidebar()
+  } catch (e) { console.error(e) }
 }
 
 const form = ref({

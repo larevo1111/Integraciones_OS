@@ -619,7 +619,7 @@ import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 import SidebarSubSeccion from 'src/components/SidebarSubSeccion.vue'
 
-const APP_VERSION = 'v2.10.6'
+const APP_VERSION = 'v2.10.8'
 const $q = useQuasar()
 
 // ─── Layout state ───
