@@ -391,20 +391,20 @@ function openColPopup(key) {
 // Cada filtro: { op: string, val: string, val2: string, selected: Array }
 const columnFilters = ref({})
 
-function getFilterOp(key) { return columnFilters.value[key]?.op || 'eq' }
+function getFilterOp(key) { return columnFilters.value[key]?.op || 'contains' }
 function getFilterVal(key) { return columnFilters.value[key]?.val || '' }
 function getFilterVal2(key) { return columnFilters.value[key]?.val2 || '' }
 
 function setFilterOp(key, op) {
-  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '' }
+  const curr = columnFilters.value[key] || { op: 'contains', val: '', val2: '' }
   columnFilters.value = { ...columnFilters.value, [key]: { ...curr, op } }
 }
 function setFilterVal(key, val) {
-  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '' }
+  const curr = columnFilters.value[key] || { op: 'contains', val: '', val2: '' }
   columnFilters.value = { ...columnFilters.value, [key]: { ...curr, val } }
 }
 function setFilterVal2(key, val2) {
-  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '' }
+  const curr = columnFilters.value[key] || { op: 'contains', val: '', val2: '' }
   columnFilters.value = { ...columnFilters.value, [key]: { ...curr, val2 } }
 }
 
@@ -419,7 +419,7 @@ function isOptionSelected(key, value) {
   return (columnFilters.value[key]?.selected || []).includes(value)
 }
 function toggleOption(key, value) {
-  const curr = columnFilters.value[key] || { op: 'eq', val: '', val2: '', selected: [] }
+  const curr = columnFilters.value[key] || { op: 'contains', val: '', val2: '', selected: [] }
   const selected = [...(curr.selected || [])]
   const idx = selected.indexOf(value)
   if (idx === -1) selected.push(value)

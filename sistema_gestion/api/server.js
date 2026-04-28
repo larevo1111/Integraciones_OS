@@ -1442,7 +1442,7 @@ app.get('/api/gestion/op', async (req, res) => {
                e.id_encargado, e.fecha_inicial, e.fecha_final, e.fecha_de_creacion
       ORDER BY FIELD(e.estado, 'Generada', 'Procesada', 'Validado', 'Anulada'),
                e.fecha_de_creacion DESC
-      LIMIT 500
+      LIMIT 5000
     `, params)
 
     // Enriquecer con detalle de Gestión (procesado_por, validado_por, op_anterior)
