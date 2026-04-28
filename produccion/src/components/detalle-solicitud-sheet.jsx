@@ -188,7 +188,7 @@ export function DetalleSolicitudSheet({ open, onOpenChange, solicitud, articulos
                       <div key={p.value} className="flex items-center gap-2 px-3 py-2">
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] truncate">{p.label}</div>
-                          <div className="text-[11px] text-muted-foreground font-mono">{p.value}</div>
+                          <div className="text-[11px] text-muted-foreground">{p.subtitle || '—'}</div>
                         </div>
                         <Input
                           type="text" inputMode="decimal"
