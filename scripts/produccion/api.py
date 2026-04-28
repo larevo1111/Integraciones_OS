@@ -312,10 +312,25 @@ class CrearOpRequest(BaseModel):
     observacion: str = ""
 
 
+def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list) -> str:
+    """Formato: 'Producto1, Producto2 - Usr: Nombre - Op Solicitudes #69,68'."""
+    nombres = []
+    for p in productos:
+        if float(p.get('cantidad') or 0) <= 0: continue
+        n = p.get('nombre', '').strip()
+        if n: nombres.append(n)
+    parte_prods = ', '.join(nombres) if nombres else '(sin productos)'
+    parte_usr = f"Usr: {usuario}" if usuario else "Usr: ?"
+    parte_sols = f"Op Solicitudes #{','.join(map(str, solicitudes_ids))}"
+    return f"{parte_prods} - {parte_usr} - {parte_sols}"[:250]  # Effi puede truncar
+
+
 @app.post("/api/produccion/crear-op-effi")
-def api_crear_op_effi(req: CrearOpRequest):
-    """Crea la OP en Effi (Playwright) + actualiza solicitudes a 'programado' con op_effi."""
-    import tempfile, json as _j
+def api_crear_op_effi(req: CrearOpRequest, usuario=Depends(require_auth)):
+    """Crea la OP en Effi (Playwright) + actualiza solicitudes a 'programado' con op_effi.
+    Registra en prod_ops_creadas (histórico con payload, log, duración).
+    """
+    import tempfile, json as _j, time as _time
     from datetime import date as _date
     if not req.materiales or not req.productos:
         raise HTTPException(400, "Falta materiales o productos")
@@ -323,7 +338,10 @@ def api_crear_op_effi(req: CrearOpRequest):
         raise HTTPException(400, "Falta solicitudes_ids")
 
     hoy = _date.today().isoformat()
-    obs = req.observacion or f"OP solicitudes #{','.join(map(str, req.solicitudes_ids))}"
+    nombre_user = usuario.get('nombre') or usuario.get('email', '?')
+
+    obs = req.observacion or _construir_observacion(req.productos, nombre_user, req.solicitudes_ids)
+
     payload = {
         "sucursal_id": 1, "bodega_id": 1,
         "fecha_inicio": hoy, "fecha_fin": hoy,
@@ -349,18 +367,32 @@ def api_crear_op_effi(req: CrearOpRequest):
         _j.dump(payload, f, ensure_ascii=False, indent=2)
 
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..'
+    t0 = _time.time()
     proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', path],
                           cwd=repo, capture_output=True, text=True, timeout=300)
-    if proc.returncode != 0:
-        raise HTTPException(500, f"Script falló: {proc.stderr[-300:] or proc.stdout[-300:]}")
+    duracion = int(_time.time() - t0)
+    log_full = (proc.stdout or '') + ('\n--- STDERR ---\n' + proc.stderr if proc.stderr else '')
+    sol_ids_str = ','.join(map(str, req.solicitudes_ids))
 
-    # Buscar OP_CREADA:NNNN en el output
+    if proc.returncode != 0:
+        # Registrar fallo en histórico
+        exe(DB_PROD, """
+            INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, log_creacion, duracion_seg, estado, error)
+            VALUES (NULL, %s, %s, %s, %s, %s, 'error', %s)
+        """, (nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False), log_full, duracion, (proc.stderr or '')[-500:]))
+        raise HTTPException(500, f"Script falló: {(proc.stderr or proc.stdout)[-300:]}")
+
+    # Buscar OP_CREADA:NNNN
     op_id = None
     for line in (proc.stdout or '').splitlines():
         if line.startswith('OP_CREADA:'):
             try: op_id = int(line.split(':')[1].strip())
             except Exception: pass
     if not op_id:
+        exe(DB_PROD, """
+            INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, log_creacion, duracion_seg, estado, error)
+            VALUES (NULL, %s, %s, %s, %s, %s, 'error', %s)
+        """, (nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False), log_full, duracion, 'No OP_CREADA en stdout'))
         raise HTTPException(500, "OP creada pero no se pudo capturar el ID")
 
     # Actualizar solicitudes
@@ -371,7 +403,31 @@ def api_crear_op_effi(req: CrearOpRequest):
         WHERE id IN ({ph})
     """, tuple([str(op_id), hoy, *req.solicitudes_ids]))
 
-    return {"ok": True, "op_id": op_id, "json_path": path}
+    # Registrar en histórico (éxito)
+    exe(DB_PROD, """
+        INSERT INTO prod_ops_creadas (op_effi, usuario, solicitudes_ids, payload_json, log_creacion, duracion_seg, estado)
+        VALUES (%s, %s, %s, %s, %s, %s, 'ok')
+    """, (str(op_id), nombre_user, sol_ids_str, _j.dumps(payload, ensure_ascii=False), log_full, duracion))
+
+    return {"ok": True, "op_id": op_id, "duracion_seg": duracion, "observacion": obs}
+
+
+@app.get("/api/produccion/ops-historico")
+def api_ops_historico(limit: int = 50, usuario=Depends(require_auth)):
+    """Lista del histórico de OPs creadas desde la app."""
+    rows = q(DB_PROD, """
+        SELECT id, op_effi, fecha_creacion, usuario, solicitudes_ids, duracion_seg, estado, error
+        FROM prod_ops_creadas ORDER BY id DESC LIMIT %s
+    """, (limit,))
+    return rows
+
+
+@app.get("/api/produccion/ops-historico/{id}")
+def api_ops_historico_detalle(id: int, usuario=Depends(require_auth)):
+    """Detalle completo de una entrada del histórico (incluye payload + log)."""
+    rows = q(DB_PROD, "SELECT * FROM prod_ops_creadas WHERE id=%s", (id,))
+    if not rows: raise HTTPException(404, "No encontrado")
+    return rows[0]
 
 
 @app.post("/api/produccion/preview-op")
