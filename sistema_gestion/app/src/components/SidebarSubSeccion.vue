@@ -3,13 +3,17 @@
     <div
       ref="headerEl"
       class="sidebar-sub-header"
-      :class="{ 'sub-header-active': popoverMode && abiertoPopover }"
+      :class="{
+        'sub-header-active': popoverMode && abiertoPopover,
+        'sub-header-popover': popoverMode
+      }"
       @click="onHeaderClick"
     >
+      <q-icon v-if="!popoverMode" :name="abierto ? 'expand_more' : 'chevron_right'" size="14px" />
       <span class="q-ml-xs" style="flex:1">{{ label }}</span>
       <span v-if="count" class="sidebar-count">{{ count }}</span>
       <q-btn v-if="addAccion" flat dense round size="xs" icon="add" class="sidebar-add-btn" @click.stop="$emit('add')" />
-      <q-icon :name="iconExpand" size="14px" class="sub-header-chevron" />
+      <q-icon v-if="popoverMode" name="chevron_right" size="14px" class="sub-header-chevron" />
     </div>
 
     <q-menu
@@ -37,7 +41,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps({
   label:       { type: String,  default: '' },
@@ -47,10 +51,6 @@ const props = defineProps({
   addAccion:   { type: Boolean, default: false }
 })
 const emit = defineEmits(['toggle', 'add'])
-
-const iconExpand = computed(() =>
-  props.popoverMode ? 'chevron_right' : (props.abierto ? 'expand_more' : 'chevron_right')
-)
 
 const headerEl = ref(null)
 const abiertoPopover = ref(false)
@@ -70,8 +70,7 @@ function onHeaderClick() {
   display: flex;
   align-items: center;
   gap: 4px;
-  /* padding-left: 12 (original) + 18 (compensa el q-icon 14px + gap 4px que estaba al inicio) */
-  padding: 5px 12px 5px 30px;
+  padding: 5px 12px;  /* idéntico al global original — mobile/no-popover queda intacto */
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -80,6 +79,9 @@ function onHeaderClick() {
   user-select: none;
   transition: background 80ms, color 80ms;
 }
+/* Solo en popover mode (desktop full): compensar el q-icon eliminado de la izquierda
+   con padding-left extra para que el label arranque en la misma posición visual */
+.sub-header-popover { padding-left: 30px; }
 .sidebar-sub-header:hover {
   background: var(--bg-row-hover);
   color: var(--text-primary);
