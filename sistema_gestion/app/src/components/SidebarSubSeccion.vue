@@ -21,8 +21,9 @@
       :target="headerEl"
       v-model="abiertoPopover"
       no-parent-event
-      anchor="top right" self="top left"
-      :offset="[8, 0]"
+      :anchor="anchor"
+      :self="selfAnchor"
+      :offset="menuOffset"
       class="sidebar-popover"
     >
       <q-list dense class="sidebar-popover-list">
@@ -41,7 +42,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useQuasar } from 'quasar'
+
+const $q = useQuasar()
 
 const props = defineProps({
   label:       { type: String,  default: '' },
@@ -54,6 +58,13 @@ const emit = defineEmits(['toggle', 'add'])
 
 const headerEl = ref(null)
 const abiertoPopover = ref(false)
+
+// En desktop el popover abre lateral (a la derecha del header);
+// en mobile abre vertical (debajo del header) para no salirse del viewport.
+const isMobileScreen = computed(() => $q.screen.lt.md)
+const anchor       = computed(() => isMobileScreen.value ? 'bottom left'  : 'top right')
+const selfAnchor   = computed(() => isMobileScreen.value ? 'top left'     : 'top left')
+const menuOffset   = computed(() => isMobileScreen.value ? [0, 4]         : [8, 0])
 
 function onHeaderClick() {
   if (props.popoverMode) {

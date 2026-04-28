@@ -619,7 +619,7 @@ import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 import SidebarSubSeccion from 'src/components/SidebarSubSeccion.vue'
 
-const APP_VERSION = 'v2.10.4'
+const APP_VERSION = 'v2.10.6'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -627,8 +627,9 @@ const drawerOpen       = ref(false)
 const miniState        = ref(false)
 const isMobile         = computed(() => $q.screen.lt.md)
 const isMini           = computed(() => miniState.value && !isMobile.value)
-// Popover mode: sidebar desktop full (no mini, no mobile) → nivel 3 sale en menú flotante
-const popoverMode      = computed(() => !isMini.value && !isMobile.value)
+// Popover mode: nivel 3 sale en menú flotante en todos los modos (mobile + desktop full).
+// Excepción: mini-mode (sidebar 64px) tiene su propio popover en el q-item del nivel 1.
+const popoverMode      = computed(() => !isMini.value)
 
 // ─── Auto-update PWA: banner cuando hay nueva versión + botón manual ───
 const updateDisponible = ref(false)
