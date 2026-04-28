@@ -147,6 +147,8 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }) {
                 isFloatingOpen={floatingOpen}
                 onClick={handleClickInventariosN2}
               />
+              <NavItemN2 to="/inconsistencias" label="Inconsistencias" onClick={onCloseMobile} />
+              <NavItemN2 to="/historico-ajustes" label="Histórico ajustes" onClick={onCloseMobile} />
             </div>
           )}
 

@@ -12,6 +12,9 @@ import { InventariosLayoutPage } from "@/pages/inventarios-layout"
 import { CatalogoPage } from "@/pages/catalogo"
 import { RecetasPage } from "@/pages/recetas"
 import { RecetaDetallePage } from "@/pages/receta-detalle"
+import { HistoricoAjustesPage } from "@/pages/historico-ajustes"
+import { InconsistenciasPage } from "@/pages/inconsistencias"
+import { InconsistenciaDetallePage } from "@/pages/inconsistencia-detalle"
 import { Calendar, Settings } from "lucide-react"
 
 const GOOGLE_CLIENT_ID = "290093919454-j2l1el0p624v65cada556pdc3r2gm6k7.apps.googleusercontent.com"
@@ -30,6 +33,11 @@ function AppRoutes() {
         {/* Inventarios: flyout de fechas + vista completa por fecha */}
         <Route path="/inventarios" element={<InventariosLayoutPage />} />
         <Route path="/inventarios/:fecha" element={<InventariosLayoutPage />} />
+
+        {/* Histórico de ajustes y análisis de inconsistencias */}
+        <Route path="/historico-ajustes" element={<HistoricoAjustesPage />} />
+        <Route path="/inconsistencias" element={<InconsistenciasPage />} />
+        <Route path="/inconsistencias/:id" element={<InconsistenciaDetallePage />} />
 
         {/* Catálogo de productos (nuevo) */}
         <Route path="/catalogo" element={<CatalogoPage />} />

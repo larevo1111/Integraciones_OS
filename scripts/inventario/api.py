@@ -1587,6 +1587,50 @@ def sync_effi_estado():
     return sync_effi_status
 
 
+# ─── Histórico de ajustes e inconsistencias ──────────────────────────
+
+@app.get("/api/inventario/historico-ajustes")
+def listar_ajustes_historico(fecha: Optional[str] = None, cod: Optional[str] = None,
+                             bodega: Optional[str] = None, limit: int = 200):
+    sql = "SELECT * FROM inv_ajustes_historico WHERE 1=1"
+    params = []
+    if fecha: sql += " AND fecha=%s"; params.append(fecha)
+    if cod:   sql += " AND id_effi=%s"; params.append(cod)
+    if bodega: sql += " AND bodega LIKE %s"; params.append(f'%{bodega}%')
+    sql += " ORDER BY created_at DESC LIMIT %s"; params.append(limit)
+    return db_query(DB_INV, sql, tuple(params))
+
+
+@app.get("/api/inventario/inconsistencias")
+def listar_inconsistencias(fecha: Optional[str] = None, cod: Optional[str] = None,
+                           bodega: Optional[str] = None, limit: int = 200):
+    sql = """SELECT a.*,
+             (SELECT COUNT(*) FROM inv_ajustes_historico h WHERE h.analisis_id=a.id) AS n_ajustes
+             FROM inv_analisis_inconsistencias a WHERE 1=1"""
+    params = []
+    if fecha: sql += " AND a.fecha=%s"; params.append(fecha)
+    if cod:   sql += " AND a.id_effi=%s"; params.append(cod)
+    if bodega: sql += " AND a.bodega LIKE %s"; params.append(f'%{bodega}%')
+    sql += " ORDER BY a.created_at DESC LIMIT %s"; params.append(limit)
+    return db_query(DB_INV, sql, tuple(params))
+
+
+@app.get("/api/inventario/inconsistencias/{id}")
+def detalle_inconsistencia(id: int):
+    rows = db_query(DB_INV, "SELECT * FROM inv_analisis_inconsistencias WHERE id=%s", (id,))
+    if not rows:
+        raise HTTPException(404, "Análisis no encontrado")
+    a = rows[0]
+    a['ajustes'] = db_query(DB_INV, "SELECT * FROM inv_ajustes_historico WHERE analisis_id=%s ORDER BY created_at", (id,))
+    # Cargar contenido del .md si existe
+    if a.get('archivo_md'):
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        md_path = os.path.join(repo, 'analisis_de_inventario', str(a['fecha']), a['archivo_md'])
+        if os.path.isfile(md_path):
+            with open(md_path) as f: a['contenido_md'] = f.read()
+    return a
+
+
 # Servir frontend estático (después de todas las rutas /api/)
 if os.path.isdir(STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
