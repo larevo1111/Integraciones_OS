@@ -66,8 +66,15 @@ export function AgregarModal({ open, fecha, bodega, onClose, onChange }) {
 
   if (!open) return null
 
+  // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
   const excluidosFiltrados = busquedaExc
-    ? excluidos.filter(e => (e.nombre || '').toLowerCase().includes(busquedaExc.toLowerCase()))
+    ? (() => {
+        const words = busquedaExc.toLowerCase().trim().split(/\s+/)
+        return excluidos.filter(e => {
+          const t = (e.nombre || '').toLowerCase()
+          return words.every(w => t.includes(w))
+        })
+      })()
     : excluidos
 
   const agregarDeCatalogo = async (art) => {

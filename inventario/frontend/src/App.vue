@@ -1959,8 +1959,12 @@ async function cargarExcluidos() {
 
 const excluidosFiltrados = computed(() => {
   if (!busquedaExcluidos.value) return excluidos.value
-  const q = busquedaExcluidos.value.toLowerCase()
-  return excluidos.value.filter(e => e.nombre.toLowerCase().includes(q))
+  // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
+  const words = busquedaExcluidos.value.toLowerCase().trim().split(/\s+/)
+  return excluidos.value.filter(e => {
+    const t = (e.nombre || '').toLowerCase()
+    return words.every(w => t.includes(w))
+  })
 })
 
 async function reactivarExcluido(art) {

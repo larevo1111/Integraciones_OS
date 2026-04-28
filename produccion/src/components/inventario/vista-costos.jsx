@@ -26,8 +26,12 @@ export function VistaCostos({ fecha }) {
 
   const filtradas = useMemo(() => {
     if (!busqueda.trim()) return rows
-    const q = busqueda.trim().toLowerCase()
-    return rows.filter(r => (r.nombre || '').toLowerCase().includes(q) || (r.id_effi || '').toLowerCase().includes(q))
+    // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
+    const words = busqueda.trim().toLowerCase().split(/\s+/)
+    return rows.filter(r => {
+      const t = `${r.nombre || ''} ${r.id_effi || ''}`.toLowerCase()
+      return words.every(w => t.includes(w))
+    })
   }, [rows, busqueda])
 
   const totales = useMemo(() => {

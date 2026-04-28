@@ -99,8 +99,12 @@ const gruposFiltrados = computed(() => {
   for (const sec of SECCIONES) {
     let items = proyectosData.value.filter(p => (p.tipo || 'proyecto') === sec.tipo)
     if (busqueda.value) {
-      const q = busqueda.value.toLowerCase()
-      items = items.filter(p => p.nombre.toLowerCase().includes(q))
+      // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
+      const words = busqueda.value.toLowerCase().trim().split(/\s+/)
+      items = items.filter(p => {
+        const t = (p.nombre || '').toLowerCase()
+        return words.every(w => t.includes(w))
+      })
     }
     result[sec.tipo] = items
   }

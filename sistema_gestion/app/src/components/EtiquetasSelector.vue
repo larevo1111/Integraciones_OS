@@ -117,7 +117,12 @@ const etiquetasData = computed(() => {
 const seleccionadas = computed(() => etiquetasData.value.filter(e => props.modelValue.includes(e.id)))
 const etiquetasFiltradas = computed(() => {
   if (!busqueda.value) return etiquetasData.value
-  return etiquetasData.value.filter(e => e.nombre.toLowerCase().includes(busqueda.value.toLowerCase()))
+  // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
+  const words = busqueda.value.toLowerCase().trim().split(/\s+/)
+  return etiquetasData.value.filter(e => {
+    const t = (e.nombre || '').toLowerCase()
+    return words.every(w => t.includes(w))
+  })
 })
 const coincidenciaExacta = computed(() =>
   etiquetasData.value.some(e => e.nombre.toLowerCase() === busqueda.value.toLowerCase())

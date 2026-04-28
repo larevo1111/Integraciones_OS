@@ -71,7 +71,12 @@ const usuariosData = computed(() => props.usuarios !== null ? props.usuarios : l
 const seleccionados = computed(() => usuariosData.value.filter(u => props.modelValue.includes(u.email)))
 const usuariosFiltrados = computed(() => {
   if (!busqueda.value) return usuariosData.value
-  return usuariosData.value.filter(u => u.nombre.toLowerCase().includes(busqueda.value.toLowerCase()))
+  // Multi-palabra AND (regla CLAUDE.md §Quicksearch)
+  const words = busqueda.value.toLowerCase().trim().split(/\s+/)
+  return usuariosData.value.filter(u => {
+    const t = (u.nombre || '').toLowerCase()
+    return words.every(w => t.includes(w))
+  })
 })
 
 async function cargarUsuarios() {
