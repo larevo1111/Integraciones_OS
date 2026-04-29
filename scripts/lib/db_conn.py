@@ -223,9 +223,17 @@ def cfg_master(dict_cursor=True):
 def _cfg_remota_dict(prefijo, dict_cursor):
     t = abrir_tunel(prefijo)
     db = cfg_remota_db(prefijo)
+    if t is None:
+        # Modo direct: BD en mismo servidor que la app, sin SSH tunnel.
+        ssh = cfg_remota_ssh(prefijo)
+        host = ssh['remote_host'] or '127.0.0.1'
+        port = ssh['remote_port'] or 3306
+    else:
+        host = '127.0.0.1'
+        port = t.local_bind_port
     cfg = {
-        'host': '127.0.0.1',
-        'port': t.local_bind_port if t else db['remote_port'],
+        'host': host,
+        'port': port,
         'user': db['user'],
         'password': db['password'],
         'database': db['database'],
