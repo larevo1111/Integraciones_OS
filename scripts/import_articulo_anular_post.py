@@ -101,25 +101,27 @@ def scrapear_mapa_codigos(s, max_pages=30):
 
 
 def anular_articulo(s, codigo, session_empresa, session_usuario, descripcion='', dry_run=False):
-    """POSTea anulación de un artículo. `codigo` es el token cifrado URL-encoded."""
-    # El codigo viene URL-encoded del HTML. requests lo re-encode si paseamos string raw,
-    # entonces lo des-encodamos primero para evitar doble encoding.
-    codigo_raw = urllib.parse.unquote(codigo)
+    """POSTea anulación de un artículo. `codigo` es el token cifrado tal como viene del HTML
+    (URL-encoded — Effi lo espera ASÍ, NO desencodeado; requests al hacer form-urlencode
+    deja `%3D%3D` literal en el payload final, que es lo que Effi necesita)."""
     payload = {
-        'codigo': codigo_raw,
+        'codigo': codigo,  # ← TAL CUAL del HTML (con %3D%3D)
         'session_empresa': session_empresa,
         'session_usuario': session_usuario,
     }
     if dry_run:
-        print(f'  [DRY-RUN] POST /app/articulo/anular | codigo={codigo_raw[:30]}... | {descripcion}')
+        print(f'  [DRY-RUN] POST /app/articulo/anular | codigo={codigo[:30]}... | {descripcion}')
         return {'ok': True, 'dry_run': True}
     t0 = time.time()
     r = s.post(f'{EFFI_BASE}/app/articulo/anular', data=payload, timeout=30)
     dur = time.time() - t0
+    body = r.text[:300]
+    # Effi devuelve HTTP 200 incluso en error; el OK real es el body == 'OK'
+    real_ok = (r.status_code == 200) and ('OK' in body[:10] and 'Error' not in body)
     return {
-        'ok': r.status_code == 200,
+        'ok': real_ok,
         'status': r.status_code,
-        'response': r.text[:300],
+        'response': body,
         'duracion': round(dur, 2),
     }
 

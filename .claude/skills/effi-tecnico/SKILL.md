@@ -81,22 +81,39 @@ s.headers.update({
 Implementación: [scripts/import_orden_produccion_post.py](scripts/import_orden_produccion_post.py).
 
 ### POST /app/articulo/anular ⭐ (depuración masiva)
-Anula (marca como No Vigente) un artículo del catálogo. Reversible vía "Reactivar" en UI.
+Anula (marca No Vigente) un artículo. Reversible vía "Reactivar" en UI.
 
-**Solo 3 campos** form-urlencoded:
-| Campo | Tipo | Notas |
-|---|---|---|
-| `codigo` | str | **Token cifrado** por backend, NO el id real. Ver §13 abajo |
-| `session_empresa` | str | `12355` |
-| `session_usuario` | str | `origensilvestre.col@gmail.com` |
+**3 campos** form-urlencoded:
+| Campo | Notas |
+|---|---|
+| `codigo` | **Token cifrado URL-encoded** del HTML (`%3D%3D` literal, NO desencodear). Ver §13 |
+| `session_empresa` | `12355` |
+| `session_usuario` | `origensilvestre.col@gmail.com` |
 
-Implementado en: `scripts/import_articulo_anular_post.py` — soporta cods sueltos o CSV, tiene `--dry-run`.
+⚠️ **Importante**: Effi devuelve `HTTP 200` SIEMPRE. El éxito real es `body == "OK"`. Cualquier otra respuesta (típicamente "Error en los parámetros internos recibidos") indica fallo.
+
+Script: `scripts/import_articulo_anular_post.py` — cods sueltos / `--csv` / `--dry-run` / `--delay`. Reusa session.json. Auto re-scrapea tokens (que se invalidan tras cada anulación de la misma página).
 
 ### POST /app/articulo/crear
-Crea artículo nuevo. Form `form_CART` con **71 campos** (descripcion, referencia, sucursal, t_articulo, categoria, marca, c_barras[], gestion_stock, p_costo, p_min_venta, tarifa_precio[]/p_venta[], cuentas contables, etc.). Sin `id`.
+Crea artículo nuevo. Form `form_CART`, ~47 campos efectivos.
+
+**Campos mínimos**: `descripcion` (nombre), `t_articulo` (1=MP/2=PP/3=PT/4=Servicio/5=Activo), `categoria`, `sucursal=1`, `p_costo`. El resto son defaults (`marca=default`, cuentas contables=`default`, checkboxes=`on` si aplica). 4 tarifas estándar (`tarifa_precio[]`=13/15/16/19 con `p_venta[]` vacíos OK).
+
+Response: HTTP 200 con body `"OK"` (no devuelve el id). Para obtener el id: scrape `/app/articulo` filtrando por `data-descripcion="<nombre>"` (los nuevos quedan al final).
+
+Script: `scripts/import_articulo_crear_post.py` — CLI `--nombre/--tipo/--categoria/--costo` o `--json`.
 
 ### POST /app/articulo/modificar_articulo
-Modifica artículo existente. Mismo form que Crear + **2 hidden extra**: `id=<id_real>` (no cifrado) + `session_empresa` + `session_usuario`. 73 campos totales.
+Modifica artículo existente. Form similar a Crear + **3 campos extra**: `id` (real, no cifrado), `session_empresa`, `session_usuario`. Effi NO autorrellena el form al abrir el modal — JS lee los `data-*` del link `.modificar` y los inserta en el form.
+
+**Estrategia POST directo**: scrape el `<a class="modificar">` del cod específico, extraer TODOS los `data-*` (38 campos: descripcion, referencia, t_articulo, categoria, sucursal, marca, p_costo, p_costo_promedio, p_min_venta, stock_minimo/optimo, compras/ventas/descuento/alquiler/mandato, cuentas contables, costo_inicial/valor_residual/valor_depreciado/vida_util_meses, fecha_*, observacion_activo_fijo, url_video, descripcion_detallada, valor/porcentaje/numero/texto_ref), mapear `data-X` → `name="X"` del form, aplicar cambios parciales del usuario, POST.
+
+⚠️ Detalles importantes:
+- **Checkboxes** (`gestion_stock`, `compras`, `ventas`, `descuento`, `alquiler`, `mandato`): el data viene como `"1"` o `"0"`. Effi quiere `"on"` si activo o **omitir el campo** si inactivo (no `"0"` ni `""`).
+- **Selects vacíos**: usar `"default"` (no `""`) para `marca`, `cuenta_contable_*`.
+- **HTML entities**: los `data-*` vienen HTML-encoded (`&quot;`, `&amp;`) — decodear antes de mandar.
+
+Script: `scripts/import_articulo_modificar_post.py` — `--cod N --nombre X --costo Y` (cambio parcial) o `--json` (override).
 
 ### Otros endpoints internos
 | Endpoint | Método | Uso |
