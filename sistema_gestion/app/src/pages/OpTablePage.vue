@@ -136,7 +136,8 @@ async function sincronizarEffi() {
 
 async function _ejecutarSincronizacion() {
   sincronizando.value = true
-  const notif = $q.notify({
+  // Guardar siempre la función dismiss del notify ongoing actual para poder cerrarlo después.
+  let dismissNotif = $q.notify({
     type: 'ongoing', message: 'Sincronizando OPs e inventario…',
     caption: 'Iniciando…', position: 'top', timeout: 0, group: 'sync-ops'
   })
@@ -170,7 +171,7 @@ async function _ejecutarSincronizacion() {
         if (eventLine.includes('end')) {
           okFinal = !!data?.ok
         } else if (data?.msg) {
-          $q.notify({
+          dismissNotif = $q.notify({
             type: 'ongoing', message: 'Sincronizando OPs e inventario…',
             caption: data.msg.slice(0, 120), position: 'top', timeout: 0, group: 'sync-ops'
           })
@@ -180,7 +181,8 @@ async function _ejecutarSincronizacion() {
   } catch (e) {
     errMsg = e.message || String(e)
   } finally {
-    $q.notify({ group: 'sync-ops', message: '', timeout: 1 })
+    // Cerrar el notify "ongoing" explícitamente con la función dismiss que devuelve Quasar.
+    try { dismissNotif?.() } catch {}
     sincronizando.value = false
   }
   if (okFinal) {
