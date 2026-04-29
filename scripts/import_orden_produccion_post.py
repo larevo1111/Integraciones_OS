@@ -18,7 +18,9 @@ SESSION_FILE = REPO / 'scripts' / 'session.json'
 # Sesión Playwright → cookies para requests
 def _cargar_cookies():
     if not SESSION_FILE.exists():
-        raise SystemExit(f'❌ No existe {SESSION_FILE}. Generar con scripts/session.js')
+        # RuntimeError (no SystemExit) para que el wrapper _ejecutar_op_background
+        # lo capture con `except Exception` y caiga al fallback Playwright.
+        raise RuntimeError(f'No existe {SESSION_FILE}. Generar con scripts/session.js')
     state = json.loads(SESSION_FILE.read_text())
     return {c['name']: c['value'] for c in state.get('cookies', [])
             if 'effi.com.co' in c.get('domain', '') or c.get('domain', '').endswith('effi.com.co')}
@@ -42,7 +44,7 @@ def crear_session_http():
     s = requests.Session()
     cookies = _cargar_cookies()
     if not cookies:
-        raise SystemExit('❌ Sin cookies de sesión Effi en session.json')
+        raise RuntimeError('Sin cookies de sesión Effi en session.json')
     s.cookies.update(cookies)
     s.headers.update({
         'X-Requested-With': 'XMLHttpRequest',
@@ -77,9 +79,9 @@ def resolver_encargado_id(cc):
 
 def get_session_info(s):
     """Obtiene session_empresa y session_usuario navegando a la página."""
-    r = s.get('https://effi.com.co/app/orden_produccion', timeout=15)
-    if r.status_code != 200 or '/ingreso' in r.url:
-        raise SystemExit('❌ Sesión expirada — regenerar con scripts/session.js')
+    r = s.get('https://effi.com.co/app/orden_produccion', timeout=15, allow_redirects=False)
+    if r.status_code != 200 or '/ingreso' in r.headers.get('Location', '') or '/ingreso' in r.url:
+        raise RuntimeError('Sesión Effi expirada — regenerar con `cd scripts && node -e \'require("./session.js").getPage().then(({browser})=>browser.close())\'`')
     html = r.text
     emp_m = re.search(r'name=["\']session_empresa["\'][^>]*value=["\'](\d+)["\']', html) or \
             re.search(r'value=["\'](\d+)["\'][^>]*name=["\']session_empresa["\']', html)
