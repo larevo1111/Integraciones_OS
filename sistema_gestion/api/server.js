@@ -867,7 +867,7 @@ app.get('/api/gestion/sugerir-categoria', requireAuth, async (req, res) => {
 
     const body = JSON.stringify({
       prompt: titulo,
-      contexto: 'Clasificador de tareas de Origen Silvestre — empresa de producción y venta de chocolate artesanal, miel, propóleo y productos orgánicos. Pistas: Produccion (fabricar, procesar, empacar), Ventas (clientes, pedidos, despachos, precios, cotizar), Reuniones (reunión, informe semanal/mensual), Compras (comprar, insumos, proveedores), Pagos (pagar, descargar pagos, factura proveedor, transferencia), Cartera (cobrar, cartera, saldo cliente), Administrativo (trámites, documentos, INVIMA). Elegí la categoría más apropiada. Si no encaja claramente, elegí Varios.',
+      contexto: 'Clasificador de tareas de Origen Silvestre — empresa de producción y venta de chocolate artesanal, miel, propóleo y productos orgánicos. Pistas: Produccion (fabricar, procesar, empacar), Ventas (clientes, pedidos, despachos, precios, cotizar), Reuniones e informes (reunión, informe semanal/mensual, reportes), Compras (comprar, insumos, proveedores), Pagos (pagar, descargar pagos, factura proveedor, transferencia), Cartera (cobrar, cartera, saldo cliente), Administrativo (trámites, documentos, INVIMA), Desarrollo de producto (probar nueva fórmula, prototipar, experimentar receta, validar producto nuevo, muestra piloto, I+D, investigación). Elegí la categoría más apropiada. Si no encaja claramente, elegí Varios.',
       modelo: 'groq-llama',
       tipo_respuesta: 'enum',
       opciones: nombres,
