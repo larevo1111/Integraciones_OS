@@ -51,6 +51,38 @@
               <OpSelector v-model="form.id_op" />
             </div>
 
+            <!-- Cat. producción (solo si categoría = Producción) -->
+            <div v-if="categoriaSeleccionada?.es_produccion" class="input-group">
+              <label class="input-label">Cat. producción</label>
+              <q-chip
+                clickable dense
+                icon="category"
+                class="tf-chip"
+                :class="{ 'tf-chip-filled': catProdSeleccionada }"
+                :style="catProdSeleccionada ? { background: 'var(--accent-muted)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}"
+              >
+                <span>{{ catProdSeleccionada ? catProdSeleccionada.nombre : 'Cat. producción' }}</span>
+                <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
+                  <q-list dense style="min-width:180px;max-height:300px;overflow-y:auto">
+                    <q-item
+                      v-for="cp in categoriasProduccion" :key="cp.id"
+                      clickable v-close-popup
+                      :active="form.categoria_produccion_id === cp.id"
+                      @click="form.categoria_produccion_id = form.categoria_produccion_id === cp.id ? null : cp.id"
+                    >
+                      <q-item-section>{{ cp.nombre }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </q-chip>
+            </div>
+
+            <!-- Detalles producción (solo si categoría = Producción y hay OP) -->
+            <DetallesProduccion
+              v-if="categoriaSeleccionada?.es_produccion && form.id_op"
+              :tarea="form"
+            />
+
             <!-- Remisión + Pedido (solo si categoría es empaque) -->
             <div v-if="categoriaSeleccionada?.es_empaque" class="input-group">
               <label class="input-label">Remisión</label>
@@ -105,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, inject } from 'vue'
+import { ref, computed, watch, nextTick, inject, onMounted } from 'vue'
 import { api } from 'src/services/api'
 import { crearTarea, sugerirCategoria } from 'src/composables/useTareas'
 import { useAuthStore } from 'src/stores/authStore'
@@ -113,6 +145,7 @@ import OpSelector           from 'src/components/OpSelector.vue'
 import RemisionSelector     from 'src/components/RemisionSelector.vue'
 import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import TareaMetaChips       from 'src/components/TareaMetaChips.vue'
+import DetallesProduccion   from 'src/components/DetallesProduccion.vue'
 
 const props = defineProps({
   modelValue:  Boolean,
@@ -161,10 +194,22 @@ function onDragEnd() {
 }
 
 const form = ref({
-  titulo: '', descripcion: '', categoria_id: null, proyecto_id: null,
+  titulo: '', descripcion: '', categoria_id: null, categoria_produccion_id: null, proyecto_id: null,
   prioridad: 'Media',
   responsables: auth.usuario?.email ? [auth.usuario.email] : [],
   fecha_limite: '', id_op: '', id_remision: '', id_pedido: '', etiquetas: []
+})
+
+// Catálogo de categorías de producción (sub-categorías cuando la principal es Producción)
+const categoriasProduccion = ref([])
+const catProdSeleccionada = computed(() =>
+  categoriasProduccion.value.find(c => c.id === form.value.categoria_produccion_id) || null
+)
+onMounted(async () => {
+  try {
+    const r = await api('/api/gestion/categorias-produccion')
+    categoriasProduccion.value = r.categorias || []
+  } catch {}
 })
 
 const iaLoading   = ref(false)
@@ -200,6 +245,7 @@ watch(() => props.modelValue, async (val) => {
       titulo:       props.tareaEditar.titulo || '',
       descripcion:  props.tareaEditar.descripcion || '',
       categoria_id: props.tareaEditar.categoria_id,
+      categoria_produccion_id: props.tareaEditar.categoria_produccion_id || null,
       proyecto_id:  props.tareaEditar.proyecto_id || null,
       prioridad:    props.tareaEditar.prioridad || 'Media',
       responsables: existingResp,
@@ -215,6 +261,7 @@ watch(() => props.modelValue, async (val) => {
     form.value = {
       titulo: '', descripcion: '',
       categoria_id: d.categoria_id || props.categorias[0]?.id || null,
+      categoria_produccion_id: d.categoria_produccion_id || null,
       proyecto_id: d.proyecto_id || null,
       prioridad: d.prioridad || 'Media',
       responsables: d.responsables || defaultResp,

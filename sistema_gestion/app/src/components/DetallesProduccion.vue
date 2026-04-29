@@ -1,6 +1,6 @@
 <template>
   <q-expansion-item
-    v-if="tarea?.id && tarea?.id_op"
+    v-if="tarea?.id_op"
     v-model="abierto"
     dense
     header-class="text-caption text-weight-medium"
@@ -92,7 +92,7 @@ const materiales = ref([])
 const productos  = ref([])
 
 async function cargar() {
-  if (!props.tarea?.id || !props.tarea.id_op) {
+  if (!props.tarea?.id_op) {
     materiales.value = []
     productos.value  = []
     return
@@ -110,7 +110,7 @@ async function cargar() {
 }
 
 watch(abierto, v => { if (v) cargar() })
-watch(() => [props.tarea?.id, props.tarea?.id_op], () => { if (abierto.value) cargar() })
+watch(() => props.tarea?.id_op, () => { if (abierto.value) cargar() })
 
 function diffValor(l) {
   const r = parseDecimal(l.cantidad_real)
