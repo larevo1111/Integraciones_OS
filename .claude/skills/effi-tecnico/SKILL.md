@@ -80,6 +80,24 @@ s.headers.update({
 
 Implementación: [scripts/import_orden_produccion_post.py](scripts/import_orden_produccion_post.py).
 
+### POST /app/articulo/anular ⭐ (depuración masiva)
+Anula (marca como No Vigente) un artículo del catálogo. Reversible vía "Reactivar" en UI.
+
+**Solo 3 campos** form-urlencoded:
+| Campo | Tipo | Notas |
+|---|---|---|
+| `codigo` | str | **Token cifrado** por backend, NO el id real. Ver §13 abajo |
+| `session_empresa` | str | `12355` |
+| `session_usuario` | str | `origensilvestre.col@gmail.com` |
+
+Implementado en: `scripts/import_articulo_anular_post.py` — soporta cods sueltos o CSV, tiene `--dry-run`.
+
+### POST /app/articulo/crear
+Crea artículo nuevo. Form `form_CART` con **71 campos** (descripcion, referencia, sucursal, t_articulo, categoria, marca, c_barras[], gestion_stock, p_costo, p_min_venta, tarifa_precio[]/p_venta[], cuentas contables, etc.). Sin `id`.
+
+### POST /app/articulo/modificar_articulo
+Modifica artículo existente. Mismo form que Crear + **2 hidden extra**: `id=<id_real>` (no cifrado) + `session_empresa` + `session_usuario`. 73 campos totales.
+
 ### Otros endpoints internos
 | Endpoint | Método | Uso |
 |---|---|---|
@@ -89,6 +107,19 @@ Implementación: [scripts/import_orden_produccion_post.py](scripts/import_orden_
 | `/app/orden_produccion/llena_costos_produccion` | POST | Catálogo de tipos de costo |
 
 **Nota**: `llena_tercero_buscar` ignora el `busqueda` y devuelve los primeros 50 terceros. Para resolver CC → ID hay que paginar manualmente o cachear.
+
+### §13 Tokens cifrados de artículo (campo `codigo`)
+Los endpoints `/app/articulo/{anular,modificar_articulo,duplicar}` y `/app/articulo/adjuntar_manifiesto` esperan un **token cifrado** (no el id real). Effi lo cifra en backend con sal/clave que no tenemos — **no se puede generar localmente**.
+
+**Cómo obtenerlo**: scrape de `/app/articulo` (paginado por `?page=N`, 50 artículos por página). Cada fila tiene:
+```html
+<a class="modificar" data-codigo="ITwenwlQRDqJVdis4gg3Pw==" data-id="4" ...>
+<a class="anular"    data-codigo="ITwenwlQRDqJVdis4gg3Pw==" ...>
+```
+
+Regex Python: `re.findall(r'class="modificar"[^>]+data-codigo="([^"]+)"[^>]+data-id="(\d+)"', html)`
+
+El token viene URL-encoded (`%3D%3D` = `==`). Antes de POSTear, des-encodear con `urllib.parse.unquote()`. Para 492 artículos requiere ~10 GETs (1 por página).
 
 ---
 
