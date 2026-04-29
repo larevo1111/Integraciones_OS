@@ -28,6 +28,7 @@ export function RecetaDetallePage() {
   const [costos, setCostos] = useState([])
   const [prods, setProds] = useState([])
   const [puntos, setPuntos] = useState([])
+  const [unidades, setUnidades] = useState([])
   const [dirty, setDirty] = useState(false)
 
   const cargar = useCallback(async () => {
@@ -74,6 +75,7 @@ export function RecetaDetallePage() {
       value: a.cod, label: `${a.cod} — ${a.nombre}`, nombre: a.nombre, costo_manual: a.costo_manual,
     })))).catch(() => {})
     api.get('/api/produccion/tipos-costo').then(setTiposCosto).catch(() => {})
+    api.get('/api/produccion/unidades').then(setUnidades).catch(() => {})
   }, [])
 
   const opts = articulos
@@ -387,8 +389,12 @@ export function RecetaDetallePage() {
                     </select>
                   </td>
                   <td className="px-2 py-1">
-                    <Input className="h-7 text-[12px] w-20" placeholder="°C, min..." disabled={p.tipo !== 'numerico'}
-                      value={p.unidad || ''} onChange={e => setPunto(i, 'unidad', e.target.value)} />
+                    {p.tipo === 'numerico' ? (
+                      <Combobox value={p.unidad || ''} onChange={(v) => setPunto(i, 'unidad', v)}
+                        options={unidades.map(u => ({ value: u.simbolo, label: `${u.simbolo} — ${u.nombre || u.categoria}` }))}
+                        placeholder="—" searchPlaceholder="Buscar unidad..."
+                        triggerClassName="!text-[11px] h-7 w-24" />
+                    ) : <span className="text-muted-foreground/40 text-[11px]">—</span>}
                   </td>
                   <td className="px-2 py-1">
                     <Input className="h-7 text-[12px] w-32" placeholder="Termómetro, gramera..." list={`instr-${i}`}

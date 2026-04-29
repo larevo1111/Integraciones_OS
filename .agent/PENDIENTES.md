@@ -87,5 +87,19 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 
 ---
 
+### [P3] Sincronización maestra de unidades Hostinger → local
+**Categoría**: estandarización
+**Detectado**: 2026-04-29 por Claude
+**Contexto**: Tabla `prod_unidades_medida` (en `inventario_produccion_effi` VPS) se pobló el 29-abr con 22 filas copiadas one-shot desde `u768061575_os_comunidad.costos_unidades` (Hostinger) + 13 filas locales (temperatura, pH, °Brix, ppm, UFC, etc. que Hostinger no tiene). Si Hostinger agrega/edita unidades, la tabla local queda desactualizada.
+**Riesgo si no se hace**: divergencia de catálogos; un usuario puede agregar una unidad nueva en Hostinger ERP y no aparecer en producción/recetas (o viceversa).
+**Acción propuesta**:
+- Crear `scripts/sync_unidades_hostinger.py` que copie `costos_unidades` → `prod_unidades_medida` (UPSERT por `simbolo`, marcar `origen='hostinger'`, no tocar las `origen='local'`)
+- Programar via cron 1x/día (alineado con pipeline Effi)
+- Para cualquier unidad agregada localmente que después aparezca también en Hostinger: actualizar `origen='hostinger'` y mantener
+**Archivos involucrados**: `scripts/sync_unidades_hostinger.py` (nuevo), tabla `prod_unidades_medida`
+**Estimado**: M (45 min)
+
+---
+
 ## ✅ Resueltos
 *(Items movidos aquí al cerrarse, con fecha y commit)*

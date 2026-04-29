@@ -812,6 +812,18 @@ def listar_tipos_costo():
     return rows
 
 
+@app.get("/api/produccion/unidades")
+def listar_unidades():
+    """Maestra de unidades de medida — espejo de Hostinger.costos_unidades + complementos
+    locales para puntos críticos (temperatura, pH, °Brix, etc.)."""
+    return q(DB_PROD, """
+        SELECT id, simbolo, nombre, categoria, factor, origen
+        FROM prod_unidades_medida
+        WHERE activo=1
+        ORDER BY categoria, simbolo
+    """)
+
+
 @app.get("/api/articulos/grupos")
 def listar_grupos():
     """Lista grupos de productos distintos con N° de presentaciones vigentes.
