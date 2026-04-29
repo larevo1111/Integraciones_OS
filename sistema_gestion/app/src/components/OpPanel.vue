@@ -209,27 +209,10 @@
               </form>
               <template v-if="mostrarFormTarea">
                 <div class="quickadd-extra">
-                  <q-chip
-                    clickable dense
-                    icon="category"
-                    class="tf-chip"
-                    :class="{ 'tf-chip-filled': catProdSeleccionada }"
-                    :style="catProdSeleccionada ? { background: 'var(--accent-muted)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}"
-                  >
-                    <span>{{ catProdSeleccionada ? catProdSeleccionada.nombre : 'Cat. producción' }}</span>
-                    <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-                      <q-list dense style="min-width:180px;max-height:300px;overflow-y:auto">
-                        <q-item
-                          v-for="cp in categoriasProduccion" :key="cp.id"
-                          clickable v-close-popup
-                          :active="nuevaTareaCatProdId === cp.id"
-                          @click="nuevaTareaCatProdId = nuevaTareaCatProdId === cp.id ? null : cp.id"
-                        >
-                          <q-item-section>{{ cp.nombre }}</q-item-section>
-                        </q-item>
-                      </q-list>
-                    </q-menu>
-                  </q-chip>
+                  <CatProduccionSelector
+                    v-model="nuevaTareaCatProdId"
+                    :categorias="categoriasProduccion"
+                  />
                   <ResponsablesSelector
                     :single="false"
                     :model-value="nuevaTareaResponsables"
@@ -327,6 +310,7 @@ import { crearTarea } from 'src/composables/useTareas'
 import TareaPanel from './TareaPanel.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import EtiquetasSelector from './EtiquetasSelector.vue'
+import CatProduccionSelector from './CatProduccionSelector.vue'
 
 const $q  = useQuasar()
 const auth = useAuthStore()
@@ -357,10 +341,6 @@ const nuevaTareaCatProdId  = ref(null)
 const nuevaTareaResponsables = ref(auth.usuario?.email ? [auth.usuario.email] : [])
 const nuevaTareaEtiquetas  = ref([])
 const nuevaTareaFecha      = ref('')
-
-const catProdSeleccionada = computed(() =>
-  categoriasProduccion.value.find(c => c.id === nuevaTareaCatProdId.value) || null
-)
 
 const miNivel = computed(() => auth.usuario?.nivel || 1)
 const puedeProcesar = computed(() => miNivel.value >= 3)

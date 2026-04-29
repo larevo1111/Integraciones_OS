@@ -95,27 +95,11 @@
       <div v-if="esProduccion" class="field-row">
         <span class="field-label">Cat. producción</span>
         <div style="flex:1">
-          <q-chip
-            clickable dense
-            icon="category"
-            class="tf-chip"
-            :class="{ 'tf-chip-filled': catProduccionSeleccionada }"
-            :style="catProduccionSeleccionada ? { background: 'var(--accent-muted)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}"
-          >
-            <span>{{ catProduccionSeleccionada ? catProduccionSeleccionada.nombre : 'Cat. producción' }}</span>
-            <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-              <q-list dense style="min-width:180px;max-height:300px;overflow-y:auto">
-                <q-item
-                  v-for="cp in categoriasProduccion" :key="cp.id"
-                  clickable v-close-popup
-                  :active="tarea.categoria_produccion_id === cp.id"
-                  @click="actualizar('categoria_produccion_id', tarea.categoria_produccion_id === cp.id ? null : cp.id)"
-                >
-                  <q-item-section>{{ cp.nombre }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </q-chip>
+          <CatProduccionSelector
+            :model-value="tarea.categoria_produccion_id"
+            :categorias="categoriasProduccion"
+            @update:model-value="val => actualizar('categoria_produccion_id', val)"
+          />
         </div>
       </div>
 
@@ -315,6 +299,7 @@ import Cronometro           from './Cronometro.vue'
 import CronoDisplay         from './CronoDisplay.vue'
 import TareaMetaChips       from './TareaMetaChips.vue'
 import DetallesProduccion   from './DetallesProduccion.vue'
+import CatProduccionSelector from './CatProduccionSelector.vue'
 import OpSelector           from './OpSelector.vue'
 import RemisionSelector     from './RemisionSelector.vue'
 import PedidoSelector       from './PedidoSelector.vue'
@@ -449,10 +434,6 @@ async function _cargarCatProduccion() {
     categoriasProduccion.value = r.categorias || []
   } catch (e) { console.warn('[TareaPanel] cat producción:', e?.message) }
 }
-
-const catProduccionSeleccionada = computed(() =>
-  categoriasProduccion.value.find(c => c.id === props.tarea?.categoria_produccion_id) || null
-)
 
 // Cabecera de la OP vinculada (solo para mostrar en la caja)
 const detalleOpCabecera = ref(null)

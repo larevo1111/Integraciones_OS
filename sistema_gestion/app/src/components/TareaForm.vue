@@ -54,27 +54,10 @@
             <!-- Cat. producción (solo si categoría = Producción) -->
             <div v-if="categoriaSeleccionada?.es_produccion" class="input-group">
               <label class="input-label">Cat. producción</label>
-              <q-chip
-                clickable dense
-                icon="category"
-                class="tf-chip"
-                :class="{ 'tf-chip-filled': catProdSeleccionada }"
-                :style="catProdSeleccionada ? { background: 'var(--accent-muted)', borderColor: 'var(--accent)', color: 'var(--accent)' } : {}"
-              >
-                <span>{{ catProdSeleccionada ? catProdSeleccionada.nombre : 'Cat. producción' }}</span>
-                <q-menu class="tf-menu" anchor="top middle" self="bottom middle" :offset="[0, 6]">
-                  <q-list dense style="min-width:180px;max-height:300px;overflow-y:auto">
-                    <q-item
-                      v-for="cp in categoriasProduccion" :key="cp.id"
-                      clickable v-close-popup
-                      :active="form.categoria_produccion_id === cp.id"
-                      @click="form.categoria_produccion_id = form.categoria_produccion_id === cp.id ? null : cp.id"
-                    >
-                      <q-item-section>{{ cp.nombre }}</q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-chip>
+              <CatProduccionSelector
+                v-model="form.categoria_produccion_id"
+                :categorias="categoriasProduccion"
+              />
             </div>
 
             <!-- Detalles producción (solo si categoría = Producción y hay OP) -->
@@ -146,6 +129,7 @@ import RemisionSelector     from 'src/components/RemisionSelector.vue'
 import PedidoSelector       from 'src/components/PedidoSelector.vue'
 import TareaMetaChips       from 'src/components/TareaMetaChips.vue'
 import DetallesProduccion   from 'src/components/DetallesProduccion.vue'
+import CatProduccionSelector from 'src/components/CatProduccionSelector.vue'
 
 const props = defineProps({
   modelValue:  Boolean,
@@ -202,9 +186,6 @@ const form = ref({
 
 // Catálogo de categorías de producción (sub-categorías cuando la principal es Producción)
 const categoriasProduccion = ref([])
-const catProdSeleccionada = computed(() =>
-  categoriasProduccion.value.find(c => c.id === form.value.categoria_produccion_id) || null
-)
 onMounted(async () => {
   try {
     const r = await api('/api/gestion/categorias-produccion')
