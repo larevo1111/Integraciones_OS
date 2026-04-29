@@ -45,6 +45,28 @@
               @blur="tfSugerirSiNecesario"
             />
 
+            <!-- Fila de chips compartida (categoría general + prioridad + etiquetas + fecha + responsables + proyecto) -->
+            <TareaMetaChips
+              :categoria-id="form.categoria_id"
+              :prioridad="form.prioridad"
+              :etiquetas="form.etiquetas"
+              :fecha-limite="form.fecha_limite"
+              :responsables="form.responsables"
+              :proyecto-id="form.proyecto_id"
+              :categorias="categorias"
+              :etiquetas-disponibles="etiquetas"
+              :usuarios="usuarios"
+              :proyectos="proyectos"
+              :ia-loading="iaLoading"
+              @update:categoria-id="val => { form.categoria_id = val; tfChipClickCount++ }"
+              @update:prioridad="val => form.prioridad = val"
+              @update:etiquetas="val => form.etiquetas = val"
+              @update:fecha-limite="val => form.fecha_limite = val"
+              @update:responsables="val => form.responsables = val"
+              @update:proyecto-id="val => form.proyecto_id = val"
+              @crear-item="tipo => abrirPanelItem(tipo)"
+            />
+
             <!-- OP Effi (solo si categoría es producción) -->
             <div v-if="categoriaSeleccionada?.es_produccion" class="input-group">
               <label class="input-label">OP Effi</label>
@@ -75,28 +97,6 @@
               <label class="input-label">Pedido</label>
               <PedidoSelector v-model="form.id_pedido" />
             </div>
-
-            <!-- Fila de chips compartida -->
-            <TareaMetaChips
-              :categoria-id="form.categoria_id"
-              :prioridad="form.prioridad"
-              :etiquetas="form.etiquetas"
-              :fecha-limite="form.fecha_limite"
-              :responsables="form.responsables"
-              :proyecto-id="form.proyecto_id"
-              :categorias="categorias"
-              :etiquetas-disponibles="etiquetas"
-              :usuarios="usuarios"
-              :proyectos="proyectos"
-              :ia-loading="iaLoading"
-              @update:categoria-id="val => { form.categoria_id = val; tfChipClickCount++ }"
-              @update:prioridad="val => form.prioridad = val"
-              @update:etiquetas="val => form.etiquetas = val"
-              @update:fecha-limite="val => form.fecha_limite = val"
-              @update:responsables="val => form.responsables = val"
-              @update:proyecto-id="val => form.proyecto_id = val"
-              @crear-item="tipo => abrirPanelItem(tipo)"
-            />
 
             <!-- Descripción -->
             <div class="input-group">

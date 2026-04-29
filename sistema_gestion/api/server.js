@@ -1618,7 +1618,7 @@ app.get('/api/gestion/op/:id_op/ficha', requireAuth, async (req, res) => {
     } else {
       const [vivo] = await db.gestion.query(
         `SELECT cp.nombre AS categoria, cp.id AS categoria_id,
-                COALESCE(SUM(t.duracion_cronometro_seg), 0) AS segundos
+                COALESCE(SUM(t.duracion_usuario_seg), 0) AS segundos
          FROM g_tareas t
          JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
          WHERE t.id_op = ? AND t.empresa = ?
@@ -1867,7 +1867,7 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
     // 4. Tiempos consolidados (modo vivo — aún no hay snapshot para la nueva OP)
     const [tiemposVivos] = await db.gestion.query(
       `SELECT cp.id AS categoria_produccion_id, cp.nombre AS categoria,
-              COALESCE(SUM(t.duracion_cronometro_seg), 0) AS segundos
+              COALESCE(SUM(t.duracion_usuario_seg), 0) AS segundos
        FROM g_tareas t
        JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
        WHERE t.id_op = ? AND t.empresa = ?
