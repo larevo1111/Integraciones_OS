@@ -134,16 +134,35 @@ def api_auth_me(usuario=Depends(require_auth)):
 
 @app.get("/api/produccion/encargados")
 def listar_encargados():
-    """Usuarios activos con cédula registrada — candidatos a ser responsable de OP en Effi."""
+    """Usuarios activos con cédula que SON empleados vigentes en Effi
+    (única condición para ser responsable de OP). Cruza sis_usuarios (master)
+    con zeffi_empleados (os_integracion VPS) por número de identificación."""
     from lib import master
+    # 1) sis_usuarios activos con CC
     with master(dict_cursor=True) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT email, nombre, numero_identificacion AS cc, nivel_global AS nivel "
-                "FROM sis_usuarios WHERE estado='activo' AND numero_identificacion IS NOT NULL "
-                "ORDER BY nivel_global DESC, nombre"
+                "FROM sis_usuarios WHERE estado='activo' AND numero_identificacion IS NOT NULL"
             )
-            return cur.fetchall()
+            usuarios = cur.fetchall()
+    if not usuarios:
+        return []
+    # 2) Cruzar con empleados vigentes en Effi
+    ccs = [u['cc'] for u in usuarios]
+    ph = ','.join(['%s'] * len(ccs))
+    empleados_effi = q(DB_EFFI,
+        f"SELECT numero_de_identificacion AS cc, codigo AS effi_id, nombre_completo "
+        f"FROM zeffi_empleados WHERE vigencia='Vigente' AND numero_de_identificacion IN ({ph})",
+        tuple(ccs))
+    map_effi = {e['cc']: e['effi_id'] for e in empleados_effi}
+    # 3) Solo retornar los que están en ambas
+    out = []
+    for u in usuarios:
+        if u['cc'] in map_effi:
+            out.append({**u, 'effi_id': map_effi[u['cc']]})
+    out.sort(key=lambda x: (-x['nivel'], x['nombre']))
+    return out
 
 
 def _resolve_db(tag):

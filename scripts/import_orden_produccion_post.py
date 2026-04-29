@@ -54,30 +54,25 @@ def crear_session_http():
     return s
 
 
-# Mapeo CC/NIT → ID interno Effi (resuelto vía espía Playwright OP 2219).
-# Si Effi cambia ID interno, regenerar con: SPY_REQUESTS=1 node scripts/import_orden_produccion.js ...
+# Mapeo CC/NIT → ID interno Effi.
+# Resuelto desde zeffi_empleados.codigo (sync via pipeline Effi).
+# Si Effi cambia un ID, refrescar y reconsultar la tabla.
 MAPEO_ENCARGADOS = {
-    '74084937': '536',     # Deivy Andres Gonzalez Gutierrez
-    # '1017206760': '???', # Laura — agregar cuando se sepa
-    # '1128457413': '???', # Jenifer Alexandra Cano Garcia
+    '74084937':   '536',  # Deivy Andres Gonzalez Gutierrez
+    '1128457413': '165',  # Jenifer Alexandra Cano Garcia
+    '3506889':    '213',  # Santiago Sierra
+    # Laura Marcela (1017206760) NO está como empleada en Effi — solo cliente
 }
 
 
-def resolver_encargado_id(s, cc):
-    """CC → ID interno. Primero cache, sino busca paginando todos los terceros."""
+def resolver_encargado_id(cc):
+    """CC → ID interno. Solo desde MAPEO_ENCARGADOS (cache estático).
+    Si no está mapeado, lanza RuntimeError para que el wrapper caiga al fallback Playwright,
+    que sí sabe resolverlo via modal #modalBuscarTercero."""
     cc = str(cc)
     if cc in MAPEO_ENCARGADOS:
         return MAPEO_ENCARGADOS[cc]
-    # Fallback: paginar todos los terceros buscando por CC
-    for offset in range(0, 2000, 50):
-        r = s.post('https://effi.com.co/app/tercero/tercero/llena_tercero_buscar',
-                   data={'busqueda': cc, 'inicio': offset, 'cantidad': 50}, timeout=15)
-        rows = re.findall(r'<tr data-codigo="(\d+)"[^>]*>(.*?)</tr>', r.text, re.DOTALL)
-        if not rows: break
-        for cod_interno, contenido in rows:
-            if cc in contenido:
-                return cod_interno
-    raise SystemExit(f'❌ CC={cc} no encontrado. Agregar a MAPEO_ENCARGADOS.')
+    raise RuntimeError(f'CC={cc} no está en MAPEO_ENCARGADOS — cae al fallback Playwright')
 
 
 def get_session_info(s):
@@ -103,7 +98,7 @@ def crear_op(json_path):
     print(f'   session_empresa={session_empresa}, session_usuario={session_usuario}')
 
     print(f'🔄 Resolviendo encargado CC={data["encargado"]}...')
-    encargado_id = resolver_encargado_id(s, data['encargado'])
+    encargado_id = resolver_encargado_id(data['encargado'])
     print(f'   ID interno: {encargado_id}')
 
     # Calcular totales
