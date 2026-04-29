@@ -363,8 +363,11 @@ class CrearOpRequest(BaseModel):
     observacion: str = ""
 
 
-def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list) -> str:
-    """Formato: 'Producto1, Producto2 - Usr: Nombre - Op Solicitudes #69,68'."""
+def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list, obs_extra: str = '') -> str:
+    """Arma la observación que va a Effi en 2 partes:
+       Línea 1 (rigor, auto): 'Producto1, Producto2 - Usr: Nombre - Op Solicitudes #69,68'
+       Línea 2+ (opcional): observaciones del usuario / receta (vienen del textarea del preview)
+    """
     nombres = []
     for p in productos:
         if float(p.get('cantidad') or 0) <= 0: continue
@@ -373,7 +376,10 @@ def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list)
     parte_prods = ', '.join(nombres) if nombres else '(sin productos)'
     parte_usr = f"Usr: {usuario}" if usuario else "Usr: ?"
     parte_sols = f"Op Solicitudes #{','.join(map(str, solicitudes_ids))}"
-    return f"{parte_prods} - {parte_usr} - {parte_sols}"[:250]  # Effi puede truncar
+    rigor = f"{parte_prods} - {parte_usr} - {parte_sols}"
+    extra = (obs_extra or '').strip()
+    full = f"{rigor}\n{extra}" if extra else rigor
+    return full[:1000]  # Effi puede truncar; subimos el límite respecto a 250 anterior
 
 
 def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: list, json_path: str):
@@ -468,7 +474,9 @@ def api_crear_op_effi(req: CrearOpRequest, background_tasks: BackgroundTasks, us
 
     hoy = _date.today().isoformat()
     nombre_user = usuario.get('nombre') or usuario.get('email', '?')
-    obs = req.observacion or _construir_observacion(req.productos, nombre_user, req.solicitudes_ids)
+    # Línea de rigor (auto) SIEMPRE va; lo del textarea del usuario va abajo (puede venir
+    # precargado con observaciones_op de las recetas y editado por el usuario).
+    obs = _construir_observacion(req.productos, nombre_user, req.solicitudes_ids, req.observacion or '')
 
     payload = {
         "sucursal_id": 1, "bodega_id": 1,
@@ -545,13 +553,17 @@ def api_preview_op(req: PreviewRequest):
     # Materiales agregados por cod
     materiales_agg = {}  # cod_material -> {cod, nombre, cantidad}
     productos_pl = []    # lista de productos a producir
+    observaciones_recetas = []  # observaciones_op de cada receta usada (para precarga del textarea)
 
     for item in req.items:
         # Receta del libro
-        recetas = q(DB_PROD, "SELECT id FROM prod_recetas WHERE cod_articulo = %s", (item.cod,))
+        recetas = q(DB_PROD, "SELECT id, observaciones_op FROM prod_recetas WHERE cod_articulo = %s", (item.cod,))
         if not recetas:
             raise HTTPException(400, f"No hay receta validada para cod {item.cod}. Validá la receta primero en /recetas")
         rid = recetas[0]['id']
+        obs_rec = (recetas[0].get('observaciones_op') or '').strip()
+        if obs_rec and obs_rec not in observaciones_recetas:
+            observaciones_recetas.append(obs_rec)
         mats = q(DB_PROD, """
             SELECT cod_material, nombre, ratio_por_unidad
             FROM prod_recetas_materiales WHERE receta_id = %s
@@ -626,6 +638,7 @@ def api_preview_op(req: PreviewRequest):
         'materiales': materiales_out,
         'productos': productos_pl,
         'otros_costos': otros_costos,
+        'observaciones_default': '\n'.join(observaciones_recetas),  # precarga textarea preview
         'totales': {
             'costo_materiales': round(costo_mat_total, 2),
             'costo_otros': round(costo_otros, 2),
@@ -1022,11 +1035,12 @@ class RecetaPatch(BaseModel):
     estado: Optional[str] = None
     confianza: Optional[str] = None
     notas_analisis: Optional[str] = None
+    observaciones_op: Optional[str] = None
 
 
 @app.patch("/api/recetas/{cod}")
 def actualizar_receta(cod: str, data: RecetaPatch, usuario=Depends(require_auth)):
-    """Permite actualizar estado/confianza/notas desde la UI."""
+    """Permite actualizar estado/confianza/notas/observaciones_op desde la UI."""
     sets = []
     params = []
     if data.estado:
@@ -1040,6 +1054,9 @@ def actualizar_receta(cod: str, data: RecetaPatch, usuario=Depends(require_auth)
     if data.notas_analisis is not None:
         sets.append("notas_analisis=%s")
         params.append(data.notas_analisis)
+    if data.observaciones_op is not None:
+        sets.append("observaciones_op=%s")
+        params.append(data.observaciones_op)
     if not sets:
         raise HTTPException(400, "Sin campos para actualizar")
     params.append(cod)

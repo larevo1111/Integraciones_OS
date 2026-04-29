@@ -21,6 +21,7 @@ export function RecetaDetallePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [notas, setNotas] = useState('')
+  const [obsOp, setObsOp] = useState('')
   const [articulos, setArticulos] = useState([])
   const [tiposCosto, setTiposCosto] = useState([])
   const [mats, setMats] = useState([])
@@ -34,6 +35,7 @@ export function RecetaDetallePage() {
       const data = await api.get(`/api/recetas/${cod}`)
       setR(data)
       setNotas(data.notas_analisis || '')
+      setObsOp(data.observaciones_op || '')
       setMats((data.materiales || []).map(m => ({
         cod_material: m.cod_material, nombre: m.nombre,
         cantidad_por_lote: m.cantidad_por_lote, costo_unit_snapshot: m.costo_unit_snapshot,
@@ -140,6 +142,7 @@ export function RecetaDetallePage() {
   const validar = () => patch({ estado: 'validada' })
   const devolverBorrador = () => patch({ estado: 'borrador' })
   const guardarNotas = () => patch({ notas_analisis: notas })
+  const guardarObsOp = () => patch({ observaciones_op: obsOp })
 
   if (loading) return <div className="p-5 text-muted-foreground">Cargando receta {cod}…</div>
   if (!r) return <div className="p-5 text-red-500">Receta no encontrada para cod={cod}</div>
@@ -220,7 +223,7 @@ export function RecetaDetallePage() {
               {mats.map((m, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1 font-mono text-[12px]">{m.cod_material}</td>
-                  <td className="px-2 py-1 md:min-w-[420px]">
+                  <td className="px-2 py-1 max-w-[140px] sm:max-w-none md:min-w-[420px]">
                     <Combobox value={String(m.cod_material)} onChange={(c) => cambiarMat(i, c)} options={opts}
                       placeholder={m.nombre || 'Seleccionar…'} searchPlaceholder="Buscar material..."
                       triggerClassName="!text-[10px] h-7" />
@@ -260,7 +263,7 @@ export function RecetaDetallePage() {
               {prods.map((p, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1 font-mono text-[12px]">{p.es_principal && '★ '}{p.cod_articulo}</td>
-                  <td className="px-2 py-1 md:min-w-[420px]">
+                  <td className="px-2 py-1 max-w-[140px] sm:max-w-none md:min-w-[420px]">
                     <Combobox value={String(p.cod_articulo)} onChange={(c) => cambiarProd(i, c)} options={opts}
                       placeholder={p.nombre || 'Seleccionar…'} searchPlaceholder="Buscar producto..."
                       triggerClassName="!text-[10px] h-7" />
@@ -303,7 +306,7 @@ export function RecetaDetallePage() {
             <tbody className="divide-y divide-border">
               {costos.map((c, i) => (
                 <tr key={i}>
-                  <td className="px-2 py-1 md:min-w-[420px]">
+                  <td className="px-2 py-1 max-w-[140px] sm:max-w-none md:min-w-[420px]">
                     <Combobox value={String(c.tipo_costo_id)} onChange={(v) => cambiarCost(i, v)} options={optsCosto}
                       placeholder={c.nombre || 'Seleccionar…'} searchPlaceholder="Buscar tipo..."
                       triggerClassName="!text-[10px] h-7" />
@@ -319,6 +322,22 @@ export function RecetaDetallePage() {
               )}
             </tbody>
           </table>
+        </div>
+      </Seccion>
+
+      {/* Observaciones para Effi (texto fijo que precarga el preview de OP) */}
+      <Seccion titulo="Observaciones para Effi">
+        <textarea
+          value={obsOp}
+          onChange={(e) => setObsOp(e.target.value)}
+          placeholder="Texto que se inyecta en la observación de la OP en Effi cada vez que se programa este producto. Ej: Templar a 45°C, sellar al vacío"
+          className="w-full min-h-[80px] bg-background border border-border rounded p-2 text-[12px]"
+        />
+        <div className="flex items-center justify-between mt-2">
+          <div className="text-[11px] text-muted-foreground">Editable; el usuario puede ajustarlo en cada OP.</div>
+          <Button size="sm" variant="outline" onClick={guardarObsOp} disabled={saving || obsOp === (r.observaciones_op || '')}>
+            Guardar observaciones
+          </Button>
         </div>
       </Seccion>
 

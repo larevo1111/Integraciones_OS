@@ -20,10 +20,11 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const [tiposCosto, setTiposCosto] = useState([])
   const [encargados, setEncargados] = useState([])
   const [encargadoCC, setEncargadoCC] = useState('')
+  const [observacion, setObservacion] = useState('')
 
   useEffect(() => {
     if (!open || solicitudes.length === 0) return
-    setLoading(true); setError(null); setCompat(null); setPreview(null)
+    setLoading(true); setError(null); setCompat(null); setPreview(null); setObservacion('')
     const cods = solicitudes.map(s => s.cod_articulo)
     Promise.all([
       api.post('/api/produccion/compatibilidad', { cods }),
@@ -31,7 +32,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
         items: solicitudes.map(s => ({ cod: s.cod_articulo, cantidad: parseFloat(s.cantidad) || 0 }))
       }).catch(e => { setError('Preview: ' + e.message); return null })
     ])
-      .then(([c, p]) => { setCompat(c); setPreview(p) })
+      .then(([c, p]) => { setCompat(c); setPreview(p); setObservacion(p?.observaciones_default || '') })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
     if (tiposCosto.length === 0) {
@@ -112,6 +113,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
         productos: preview.productos,
         otros_costos: preview.otros_costos,
         encargado: encargadoCC || undefined,
+        observacion: observacion || '',
       })
       onCreated?.(r)
       onOpenChange(false)
@@ -261,6 +263,20 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* Observaciones (precargado con observaciones_op de las recetas usadas) */}
+              <div className="space-y-1.5">
+                <div className="text-[12px] font-semibold text-muted-foreground">OBSERVACIONES</div>
+                <textarea
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.target.value)}
+                  placeholder="Texto que se incluye en la observación de la OP en Effi (después de la línea con productos / usuario / solicitudes)"
+                  className="w-full min-h-[60px] bg-background border border-border rounded p-2 text-[12px]"
+                />
+                <div className="text-[10px] text-muted-foreground">
+                  Precargado desde la receta. Editable. Effi recibe: <span className="font-mono">[línea rigor auto] + [esto]</span>
                 </div>
               </div>
 
