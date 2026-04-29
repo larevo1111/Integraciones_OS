@@ -97,7 +97,7 @@
                     <td class="t-right">
                       <input
                         type="text" inputmode="decimal"
-                        class="op-input-num"
+                        class="op-input-cell"
                         :value="formValor(l)"
                         :placeholder="fmtNum(l.cantidad_teorica)"
                         @input="e => borrador[l.id] = e.target.value"
@@ -141,7 +141,7 @@
                     <td class="t-right">
                       <input
                         type="text" inputmode="decimal"
-                        class="op-input-num"
+                        class="op-input-cell"
                         :value="formValor(l)"
                         :placeholder="fmtNum(l.cantidad_teorica)"
                         @input="e => borrador[l.id] = e.target.value"
@@ -692,7 +692,7 @@ function confirmarValidar() {
   background: rgba(0,0,0,0.45); display: flex; justify-content: flex-end;
 }
 .op-panel {
-  width: 540px; max-width: 100vw; height: 100%;
+  width: 648px; max-width: 100vw; height: 100%;
   background: var(--bg-card); color: var(--text-primary);
   display: flex; flex-direction: column;
   overflow: hidden; box-shadow: -2px 0 16px rgba(0,0,0,0.3);
@@ -744,6 +744,16 @@ function confirmarValidar() {
   font-size: 12px; text-align: right;
 }
 .op-input-num:focus { outline: 2px solid var(--accent); }
+
+/* Input dentro de tabla — alineado al borde derecho del header (sin border/padding horizontal) */
+.op-input-cell {
+  width: 80px; padding: 4px 0; margin: 0;
+  background: var(--bg-row-hover); color: var(--text-primary);
+  border: none; border-radius: 3px;
+  font-size: 12px; text-align: right; font-family: inherit;
+}
+.op-input-cell:hover { background: var(--bg-card); }
+.op-input-cell:focus { outline: 1.5px solid var(--accent); outline-offset: -1.5px; background: var(--bg-card); }
 
 .tiempo-edit-row {
   display: inline-flex; align-items: center; gap: 4px;
