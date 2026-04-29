@@ -107,9 +107,11 @@ def abrir_tunel(prefijo):
         if _tunel_vivo(_tuneles[P]):
             return _tuneles[P]
         # Tunel zombie: stopped o transport caído. Cerrar y reabrir.
-        try: _tuneles[P].stop()
-        except Exception: pass
-        del _tuneles[P]
+        # Usamos pop(default=None) para evitar KeyError en concurrencia (FastAPI thread pool).
+        viejo = _tuneles.pop(P, None)
+        if viejo is not None:
+            try: viejo.stop()
+            except Exception: pass
     s = cfg_remota_ssh(P)
     t = SSHTunnelForwarder(
         (s['host'], s['port']),
