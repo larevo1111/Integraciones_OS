@@ -205,14 +205,26 @@
                         </select>
                       </td>
                       <td class="t-right">
-                        <input
-                          type="text" inputmode="numeric"
-                          class="op-input-num text-mono"
-                          style="width:90px"
-                          :value="segHHMMSS(t.segundos)"
-                          @input="onTiempoInput(idx, $event.target.value)"
-                          placeholder="HH:MM:SS"
-                        />
+                        <span class="tiempo-edit-row">
+                          <input
+                            type="number" inputmode="numeric" min="0"
+                            class="op-input-num text-mono"
+                            style="width:46px"
+                            :value="Math.floor((t.segundos || 0) / 3600)"
+                            @input="onTiempoH(idx, $event.target.value)"
+                            placeholder="0"
+                          />
+                          <span class="t-sep">h</span>
+                          <input
+                            type="number" inputmode="numeric" min="0" max="59"
+                            class="op-input-num text-mono"
+                            style="width:46px"
+                            :value="Math.floor(((t.segundos || 0) % 3600) / 60)"
+                            @input="onTiempoM(idx, $event.target.value)"
+                            placeholder="0"
+                          />
+                          <span class="t-sep">m</span>
+                        </span>
                       </td>
                       <td class="t-right">
                         <button class="btn-icon-mini" @click="eliminarTiempoFila(idx)" title="Eliminar">
@@ -425,15 +437,15 @@ function agregarTiempoFila() {
 function eliminarTiempoFila(idx) {
   tiemposEdit.value.splice(idx, 1)
 }
-function parseHHMMSS(str) {
-  if (!str) return 0
-  const parts = String(str).split(':').map(p => parseInt(p) || 0)
-  if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2]
-  if (parts.length === 2) return parts[0]*60 + parts[1]
-  return parts[0] || 0
+function onTiempoH(idx, valor) {
+  const h = Math.max(0, parseInt(valor) || 0)
+  const m = Math.floor(((tiemposEdit.value[idx].segundos || 0) % 3600) / 60)
+  tiemposEdit.value[idx].segundos = h * 3600 + m * 60
 }
-function onTiempoInput(idx, valor) {
-  tiemposEdit.value[idx].segundos = parseHHMMSS(valor)
+function onTiempoM(idx, valor) {
+  const m = Math.max(0, Math.min(59, parseInt(valor) || 0))
+  const h = Math.floor((tiemposEdit.value[idx].segundos || 0) / 3600)
+  tiemposEdit.value[idx].segundos = h * 3600 + m * 60
 }
 async function guardarTiempos() {
   guardandoTiempos.value = true
@@ -732,6 +744,14 @@ function confirmarValidar() {
   font-size: 12px; text-align: right;
 }
 .op-input-num:focus { outline: 2px solid var(--accent); }
+
+.tiempo-edit-row {
+  display: inline-flex; align-items: center; gap: 4px;
+  justify-content: flex-end;
+}
+.tiempo-edit-row .t-sep {
+  font-size: 11px; color: var(--text-tertiary); margin: 0 2px;
+}
 
 .badge-no-prev {
   display: inline-block; margin-left: 4px;
