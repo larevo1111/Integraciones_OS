@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Combobox } from "@/components/ui/combobox"
 import { api } from "@/lib/api"
+import { auth } from "@/lib/auth"
 
 /**
  * Diálogo Programar OP — preview editable.
@@ -18,6 +19,8 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const [creando, setCreando] = useState(false)
   const [error, setError] = useState(null)
   const [tiposCosto, setTiposCosto] = useState([])
+  const [encargados, setEncargados] = useState([])
+  const [encargadoCC, setEncargadoCC] = useState('')
 
   useEffect(() => {
     if (!open || solicitudes.length === 0) return
@@ -35,7 +38,16 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
     if (tiposCosto.length === 0) {
       api.get('/api/produccion/tipos-costo').then(setTiposCosto).catch(() => {})
     }
-  }, [open, solicitudes, tiposCosto.length])
+    if (encargados.length === 0) {
+      api.get('/api/produccion/encargados').then(list => {
+        setEncargados(list || [])
+        // Default: usuario logueado si está en la lista, sino el primero
+        const myEmail = auth.usuario?.email
+        const me = (list || []).find(e => e.email === myEmail)
+        setEncargadoCC(me?.cc || list?.[0]?.cc || '')
+      }).catch(() => {})
+    }
+  }, [open, solicitudes, tiposCosto.length, encargados.length])
 
   const recalc = (mats, prods, costos) => {
     const cm = mats.reduce((s, m) => s + (parseFloat(m.cantidad) || 0) * (parseFloat(m.costo) || 0), 0)
@@ -100,6 +112,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
         materiales: preview.materiales,
         productos: preview.productos,
         otros_costos: preview.otros_costos,
+        encargado: encargadoCC || undefined,
       })
       onCreated?.(r)
       onOpenChange(false)
@@ -117,6 +130,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const fmt = (n) => (Math.round(n)).toLocaleString('es-CO')
   const opts = (articulos || []).map(a => ({ value: a.value, label: a.label, nombre: a.nombre }))
   const optsCosto = tiposCosto.map(t => ({ value: String(t.tipo_costo_id), label: `${t.tipo_costo_id} — ${t.nombre}`, nombre: t.nombre }))
+  const optsEncargado = encargados.map(e => ({ value: e.cc, label: e.nombre }))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={() => onOpenChange(false)}>
@@ -134,6 +148,18 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
         </div>
 
         <div className="p-3 sm:p-5 space-y-4 overflow-auto flex-1">
+          {/* Responsable de la OP */}
+          <div className="flex items-center gap-3">
+            <label className="text-[12px] font-semibold text-muted-foreground uppercase shrink-0">Responsable</label>
+            <div className="flex-1 max-w-xs">
+              <Combobox value={encargadoCC} onChange={setEncargadoCC}
+                options={optsEncargado}
+                placeholder="Seleccionar responsable…"
+                searchPlaceholder="Buscar responsable..."
+                triggerClassName="h-8 text-[12px]" />
+            </div>
+          </div>
+
           {loading && (
             <div className="flex items-center gap-2 p-3 rounded bg-muted/30">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

@@ -132,6 +132,20 @@ def api_auth_me(usuario=Depends(require_auth)):
     return {'ok': True, 'usuario': usuario}
 
 
+@app.get("/api/produccion/encargados")
+def listar_encargados():
+    """Usuarios activos con cédula registrada — candidatos a ser responsable de OP en Effi."""
+    from lib import master
+    with master(dict_cursor=True) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT email, nombre, numero_identificacion AS cc, nivel_global AS nivel "
+                "FROM sis_usuarios WHERE estado='activo' AND numero_identificacion IS NOT NULL "
+                "ORDER BY nivel_global DESC, nombre"
+            )
+            return cur.fetchall()
+
+
 def _resolve_db(tag):
     if tag == 'INV':  return cfg_inventario(dict_cursor=True)
     if tag == 'EFFI': return cfg_integracion(dict_cursor=True)
