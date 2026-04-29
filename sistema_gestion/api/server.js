@@ -1844,15 +1844,71 @@ app.delete('/api/gestion/op/:id_op/lineas/:lineaId', requireAuth, async (req, re
   try {
     const [r] = await db.gestion.query(
       `DELETE FROM g_op_lineas
-       WHERE id = ? AND empresa = ? AND id_op = ? AND es_no_previsto = 1`,
+       WHERE id = ? AND empresa = ? AND id_op = ?`,
       [lineaId, req.empresa, idOp]
     )
-    if (!r.affectedRows) return res.status(400).json({ error: 'Línea no encontrada o no es no-prevista' })
+    if (!r.affectedRows) return res.status(404).json({ error: 'Línea no encontrada' })
     res.json({ ok: true })
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// POST /api/gestion/op/:id_op/procesar — cambia estado OP a Procesada en Effi
+// ─── Background Jobs (procesar + validar) ────────────────────────
+// Helpers compartidos: marcan estado en g_op_jobs y disparan los scripts
+// Playwright fire-and-forget. Cada endpoint devuelve {jobId} inmediato.
+
+async function _jobMarcar(jobId, estado, datos = {}) {
+  const campos = []
+  const params = []
+  campos.push('estado = ?'); params.push(estado)
+  if (estado === 'en_progreso' || estado === 'exitoso' || estado === 'fallido') {
+    if (estado !== 'en_progreso') { campos.push('finished_at = NOW()') }
+  }
+  if (datos.resultado !== undefined) { campos.push('resultado_json = ?'); params.push(JSON.stringify(datos.resultado)) }
+  if (datos.error    !== undefined)  { campos.push('error_msg = ?');     params.push(String(datos.error).slice(0, 4000)) }
+  params.push(jobId)
+  await db.gestion.query(`UPDATE g_op_jobs SET ${campos.join(', ')} WHERE id = ?`, params)
+}
+
+function _ejecutarPlaywright(args, timeoutMs, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile('node', args, { timeout: timeoutMs, cwd }, (err, stdout, stderr) => {
+      if (err) return reject(new Error((stderr || err.message).slice(-800)))
+      resolve(stdout || '')
+    })
+  })
+}
+
+async function _jobProcesar(jobId, idOp, empresa, usuario) {
+  try {
+    await _jobMarcar(jobId, 'en_progreso')
+    const nombre = usuario.nombre || usuario.email
+    const observacion = `Procesado por ${nombre} (OS Gestión)`
+    const scriptsDir = path.join(__dirname, '../../scripts')
+    const scriptPath = path.join(scriptsDir, 'cambiar_estado_orden_produccion.js')
+
+    await _ejecutarPlaywright([scriptPath, idOp, 'Procesada', observacion], 90000, scriptsDir)
+
+    await db.gestion.query(
+      `INSERT INTO g_op_detalle (id_op, empresa, procesado_por, procesado_en)
+       VALUES (?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE procesado_por = VALUES(procesado_por),
+                               procesado_en  = VALUES(procesado_en)`,
+      [idOp, empresa, usuario.email]
+    )
+    try {
+      await db.integracion.query(
+        `UPDATE zeffi_produccion_encabezados SET estado = 'Procesada' WHERE id_orden = ?`, [idOp]
+      )
+    } catch (e) { console.warn('[op/procesar] staging no actualizable:', e.message) }
+
+    await _jobMarcar(jobId, 'exitoso', { resultado: { id_op: idOp, estado: 'Procesada' } })
+  } catch (e) {
+    console.error(`[job ${jobId}/procesar OP ${idOp}]`, e)
+    await _jobMarcar(jobId, 'fallido', { error: e.message }).catch(() => {})
+  }
+}
+
+// POST /api/gestion/op/:id_op/procesar — dispara job background, devuelve jobId
 // Permisos: nivel >= 3.
 app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
   if (!PLAYWRIGHT_OK) {
@@ -1862,7 +1918,6 @@ app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
   const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
   if (miNivel < 3) return res.status(403).json({ error: 'Procesar requiere nivel >= 3' })
   try {
-    // Verificar OP existe y estado actual
     const [[op]] = await db.integracion.query(
       'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOp]
     )
@@ -1870,37 +1925,23 @@ app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
     if (op.estado === 'Procesada' || op.estado === 'Validado') {
       return res.status(400).json({ error: `OP ya está en estado ${op.estado}` })
     }
-
-    const nombre = req.usuario.nombre || req.usuario.email
-    const observacion = `Procesado por ${nombre} (OS Gestión)`
-
-    const scriptPath = path.join(__dirname, '../../scripts/cambiar_estado_orden_produccion.js')
-    await new Promise((resolve, reject) => {
-      execFile('node', [scriptPath, idOp, 'Procesada', observacion], {
-        timeout: 90000, cwd: path.join(__dirname, '../../scripts')
-      }, (err, stdout, stderr) => {
-        if (err) return reject(new Error((stderr || err.message).slice(-500)))
-        resolve(stdout || '')
-      })
-    })
-
-    // Sellos en g_op_detalle
-    await db.gestion.query(
-      `INSERT INTO g_op_detalle (id_op, empresa, procesado_por, procesado_en)
-       VALUES (?, ?, ?, NOW())
-       ON DUPLICATE KEY UPDATE procesado_por = VALUES(procesado_por),
-                               procesado_en  = VALUES(procesado_en)`,
-      [idOp, req.empresa, req.usuario.email]
+    // ¿Job activo? Devolver el existente
+    const [[activo]] = await db.gestion.query(
+      `SELECT id, tipo, estado FROM g_op_jobs
+       WHERE empresa = ? AND id_op = ? AND estado IN ('pendiente','en_progreso')
+       ORDER BY id DESC LIMIT 1`,
+      [req.empresa, idOp]
     )
+    if (activo) return res.json({ ok: true, jobId: activo.id, tipo: activo.tipo, estado: activo.estado, reanudado: true })
 
-    // Reflejar en staging
-    try {
-      await db.integracion.query(
-        `UPDATE zeffi_produccion_encabezados SET estado = 'Procesada' WHERE id_orden = ?`, [idOp]
-      )
-    } catch (e) { console.warn('[op/procesar] staging no actualizable:', e.message) }
-
-    res.json({ ok: true, id_op: idOp, estado: 'Procesada', procesado_por: req.usuario.email })
+    const [r] = await db.gestion.query(
+      `INSERT INTO g_op_jobs (empresa, id_op, tipo, estado, usuario_email)
+       VALUES (?, ?, 'procesar', 'pendiente', ?)`,
+      [req.empresa, idOp, req.usuario.email]
+    )
+    const jobId = r.insertId
+    setImmediate(() => _jobProcesar(jobId, idOp, req.empresa, req.usuario))
+    res.json({ ok: true, jobId, tipo: 'procesar', estado: 'pendiente' })
   } catch (e) {
     console.error('[POST /op/:id/procesar]', e)
     res.status(500).json({ error: e.message })
@@ -1919,15 +1960,10 @@ app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
 //   9. Snapshot de tiempos: INSERT g_op_tiempos (id_nueva, categoria, segundos) por cada categoría > 0.
 //  10. Reflejar en staging (original Anulada, nueva Validado).
 // Permisos: nivel >= 5.
-app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
-  if (!PLAYWRIGHT_OK) {
-    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
-  }
-  const idOpOriginal = String(req.params.id_op)
-  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
-  if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })
-
+async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
   try {
+    await _jobMarcar(jobId, 'en_progreso')
+    const req = { empresa, usuario }  // shim para minimizar cambios al cuerpo migrado
     // 1. Metadata OP original
     const [[op]] = await db.integracion.query(
       `SELECT sucursal, bodega, id_encargado, nombre_encargado, id_tercero, activo_productivo,
@@ -1935,8 +1971,8 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
        FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1`,
       [idOpOriginal]
     )
-    if (!op) return res.status(404).json({ error: `OP ${idOpOriginal} no encontrada en Effi` })
-    if (op.estado === 'Validado') return res.status(400).json({ error: 'OP ya validada' })
+    if (!op) throw new Error(`OP ${idOpOriginal} no encontrada en Effi`)
+    if (op.estado === 'Validado') throw new Error('OP ya validada')
 
     // 2. Líneas actuales con cantidades reales
     const [lineas] = await db.gestion.query(
@@ -1944,7 +1980,7 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
        FROM g_op_lineas WHERE empresa = ? AND id_op = ?`,
       [req.empresa, idOpOriginal]
     )
-    if (!lineas.length) return res.status(400).json({ error: 'No hay líneas registradas para esta OP. Cargá cantidades reales primero.' })
+    if (!lineas.length) throw new Error('No hay líneas registradas para esta OP. Cargá cantidades reales primero.')
 
     // 3. Detalle local (obs_lote + procesado_en)
     const [[det]] = await db.gestion.query(
@@ -2136,18 +2172,95 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
 
     try { fs.unlinkSync(jsonPath) } catch (_) {}
 
-    res.json({
-      ok: true,
+    await _jobMarcar(jobId, 'exitoso', { resultado: {
       id_op_anterior: idOpOriginal,
       id_op_nueva: idOpNueva,
       tareas_migradas: updTareas.affectedRows,
       tiempos_snapshot: tiemposVivos.length,
       observacion
-    })
+    }})
+  } catch (e) {
+    console.error(`[job ${jobId}/validar OP ${idOpOriginal}]`, e)
+    await _jobMarcar(jobId, 'fallido', { error: e.message }).catch(() => {})
+  }
+}
+
+// POST /api/gestion/op/:id_op/validar — dispara job background, devuelve jobId.
+// Permisos: nivel >= 5.
+app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
+  if (!PLAYWRIGHT_OK) {
+    return res.status(503).json({ error: 'Este servidor no tiene Playwright disponible. Reintenta en unos segundos.', retry: true })
+  }
+  const idOpOriginal = String(req.params.id_op)
+  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+  if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })
+  try {
+    const [[op]] = await db.integracion.query(
+      'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOpOriginal]
+    )
+    if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
+    if (op.estado === 'Validado') return res.status(400).json({ error: 'OP ya validada' })
+
+    const [[activo]] = await db.gestion.query(
+      `SELECT id, tipo, estado FROM g_op_jobs
+       WHERE empresa = ? AND id_op = ? AND estado IN ('pendiente','en_progreso')
+       ORDER BY id DESC LIMIT 1`,
+      [req.empresa, idOpOriginal]
+    )
+    if (activo) return res.json({ ok: true, jobId: activo.id, tipo: activo.tipo, estado: activo.estado, reanudado: true })
+
+    const [r] = await db.gestion.query(
+      `INSERT INTO g_op_jobs (empresa, id_op, tipo, estado, usuario_email)
+       VALUES (?, ?, 'validar', 'pendiente', ?)`,
+      [req.empresa, idOpOriginal, req.usuario.email]
+    )
+    const jobId = r.insertId
+    setImmediate(() => _jobValidar(jobId, idOpOriginal, req.empresa, req.usuario))
+    res.json({ ok: true, jobId, tipo: 'validar', estado: 'pendiente' })
   } catch (e) {
     console.error('[POST /op/:id/validar]', e)
     res.status(500).json({ error: e.message })
   }
+})
+
+// GET /api/gestion/op/jobs/:jobId — consultar estado del job
+app.get('/api/gestion/op/jobs/:jobId', requireAuth, async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10)
+  if (!jobId) return res.status(400).json({ error: 'jobId inválido' })
+  try {
+    const [[job]] = await db.gestion.query(
+      `SELECT id, id_op, tipo, estado, started_at, finished_at,
+              resultado_json, error_msg, usuario_email
+       FROM g_op_jobs WHERE id = ? AND empresa = ?`,
+      [jobId, req.empresa]
+    )
+    if (!job) return res.status(404).json({ error: 'Job no encontrado' })
+    let resultado = null
+    if (job.resultado_json) {
+      try { resultado = JSON.parse(job.resultado_json) } catch { resultado = null }
+    }
+    res.json({
+      jobId: job.id, idOp: job.id_op, tipo: job.tipo, estado: job.estado,
+      startedAt: job.started_at, finishedAt: job.finished_at,
+      resultado, error: job.error_msg, usuario: job.usuario_email
+    })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// GET /api/gestion/op/:id_op/job-activo — devuelve último job pendiente/en_progreso de esta OP
+app.get('/api/gestion/op/:id_op/job-activo', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  try {
+    const [[job]] = await db.gestion.query(
+      `SELECT id, tipo, estado, started_at, usuario_email
+       FROM g_op_jobs
+       WHERE empresa = ? AND id_op = ? AND estado IN ('pendiente','en_progreso')
+       ORDER BY id DESC LIMIT 1`,
+      [req.empresa, idOp]
+    )
+    if (!job) return res.json({ activo: null })
+    res.json({ activo: { jobId: job.id, tipo: job.tipo, estado: job.estado, startedAt: job.started_at, usuario: job.usuario_email } })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 

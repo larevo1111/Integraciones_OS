@@ -105,8 +105,8 @@
                       />
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.costo_unit) }}</td>
-                    <td v-if="puedeAgregar && l.es_no_previsto" class="t-right">
-                      <button class="btn-icon-mini" @click="eliminarLinea(l)" title="Eliminar línea no prevista">
+                    <td v-if="puedeAgregar" class="t-right">
+                      <button class="btn-icon-mini" @click="eliminarLinea(l)" :title="l.es_no_previsto ? 'Eliminar línea no prevista' : 'Eliminar línea (no se enviará a Effi)'">
                         <span class="material-icons" style="font-size:14px">delete_outline</span>
                       </button>
                     </td>
@@ -149,8 +149,8 @@
                       />
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.precio_unit) }}</td>
-                    <td v-if="puedeAgregar && l.es_no_previsto" class="t-right">
-                      <button class="btn-icon-mini" @click="eliminarLinea(l)" title="Eliminar línea no prevista">
+                    <td v-if="puedeAgregar" class="t-right">
+                      <button class="btn-icon-mini" @click="eliminarLinea(l)" :title="l.es_no_previsto ? 'Eliminar línea no prevista' : 'Eliminar línea (no se enviará a Effi)'">
                         <span class="material-icons" style="font-size:14px">delete_outline</span>
                       </button>
                     </td>
@@ -377,7 +377,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'src/services/api'
 import { fmtNum, parseDecimal } from 'src/services/numero'
@@ -502,6 +502,7 @@ async function cargar() {
     ficha.value = r
     obsLote.value = r.detalle?.observaciones_lote || ''
     Object.keys(borrador).forEach(k => delete borrador[k])
+    if (!jobActivo.value) checarJobActivo()
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Error cargando OP: ' + (e.message || e), position: 'top' })
   } finally { cargando.value = false }
@@ -549,7 +550,7 @@ async function crearTareaEnOp() {
   }
 }
 
-watch(() => props.idOp, cargar)
+watch(() => props.idOp, () => { _limpiarJob(); cargar() })
 onMounted(() => { cargar(); cargarCatalogosQuickadd() })
 
 function fmtFecha(s) {
@@ -666,51 +667,101 @@ function onTareaActualizada(t) {
   cargar()
 }
 
+// ─── Background jobs (procesar / validar) ────────────────────────
+// Pollea el estado del job hasta que termine. Notify persistente mientras corre.
+const jobActivo = ref(null)
+let _pollTimer = null
+let _dismissJob = null
+
+function _limpiarJob() {
+  if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null }
+  if (_dismissJob) { _dismissJob(); _dismissJob = null }
+  jobActivo.value = null
+  procesando.value = false
+  validando.value = false
+}
+
+async function _pollearJob(jobId) {
+  try {
+    const r = await api(`/api/gestion/op/jobs/${jobId}`)
+    jobActivo.value = { jobId: r.jobId, tipo: r.tipo, estado: r.estado }
+    if (r.estado === 'exitoso') {
+      _limpiarJob()
+      if (r.tipo === 'validar' && r.resultado?.id_op_nueva) {
+        $q.notify({ type: 'positive', message: `OP ${r.resultado.id_op_anterior} → Anulada · OP ${r.resultado.id_op_nueva} → Validado`, position: 'top', timeout: 6000 })
+        emit('actualizada', r.resultado.id_op_nueva)
+      } else {
+        $q.notify({ type: 'positive', message: `OP ${props.idOp} → ${r.tipo === 'procesar' ? 'Procesada' : 'Validada'}`, position: 'top', timeout: 5000 })
+        await cargar(); emit('actualizada')
+      }
+      return
+    }
+    if (r.estado === 'fallido') {
+      _limpiarJob()
+      $q.notify({ type: 'negative', message: r.error || 'Error en la operación', position: 'top', timeout: 9000, multiLine: true })
+      await cargar()
+      return
+    }
+    _pollTimer = setTimeout(() => _pollearJob(jobId), 3000)
+  } catch (e) {
+    _pollTimer = setTimeout(() => _pollearJob(jobId), 5000)
+  }
+}
+
+function _iniciarPolling(jobId, tipo) {
+  if (_pollTimer || _dismissJob) _limpiarJob()
+  jobActivo.value = { jobId, tipo, estado: 'pendiente' }
+  if (tipo === 'procesar') procesando.value = true
+  else if (tipo === 'validar') validando.value = true
+  const label = tipo === 'procesar' ? 'Procesando' : 'Validando'
+  _dismissJob = $q.notify({
+    type: 'ongoing', position: 'top', timeout: 0,
+    message: `${label} OP ${props.idOp}…`,
+    caption: 'Corre en segundo plano. Si cerrás el panel, podés reabrirlo para ver el resultado.'
+  })
+  _pollearJob(jobId)
+}
+
+async function checarJobActivo() {
+  try {
+    const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/job-activo`)
+    if (r.activo) _iniciarPolling(r.activo.jobId, r.activo.tipo)
+  } catch (_) {}
+}
+
 function confirmarProcesar() {
   $q.dialog({
     title: 'Procesar OP',
-    message: `Cambia el estado de la OP ${props.idOp} a "Procesada" en Effi. Demora ~30-60s.`,
+    message: `Cambia el estado de la OP ${props.idOp} a "Procesada" en Effi. Corre en segundo plano (~30-60s).`,
     cancel: true, ok: { label: 'Procesar', color: 'warning' }, persistent: false, dark: true
   }).onOk(async () => {
-    procesando.value = true
     try {
       const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/procesar`, { method: 'POST' })
-      $q.notify({ type: 'positive', message: `OP ${r.id_op} → Procesada`, position: 'top' })
-      await cargar(); emit('actualizada')
+      _iniciarPolling(r.jobId, r.tipo || 'procesar')
     } catch (e) {
-      if (e?.retry) {
-        setTimeout(confirmarProcesar, 3000)
-      } else {
-        $q.notify({ type: 'negative', message: e.message || 'Error al procesar', position: 'top', timeout: 6000 })
-      }
-    } finally { procesando.value = false }
+      if (e?.retry) setTimeout(confirmarProcesar, 3000)
+      else $q.notify({ type: 'negative', message: e.message || 'Error al iniciar', position: 'top', timeout: 6000 })
+    }
   })
 }
 
 function confirmarValidar() {
   $q.dialog({
     title: 'Validar OP',
-    message: `Anula la OP ${props.idOp}, crea una nueva con los reales reportados y la marca como "Validado". Demora ~2-3 min.`,
+    message: `Anula la OP ${props.idOp}, crea una nueva con los reales reportados y la marca como "Validado". Corre en segundo plano (~2-3 min).`,
     cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true, dark: true
   }).onOk(async () => {
-    validando.value = true
-    $q.notify({ type: 'info', message: 'Validando OP...', position: 'top', timeout: 0, group: 'op-validar' })
     try {
       const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/validar`, { method: 'POST' })
-      $q.notify({ type: 'positive', message: `OP ${r.id_op_anterior} → Anulada · OP ${r.id_op_nueva} → Validado`, position: 'top', timeout: 6000 })
-      emit('actualizada', r.id_op_nueva)
+      _iniciarPolling(r.jobId, r.tipo || 'validar')
     } catch (e) {
-      if (e?.retry) {
-        setTimeout(confirmarValidar, 5000)
-      } else {
-        $q.notify({ type: 'negative', message: e.message || 'Error al validar', position: 'top', timeout: 8000 })
-      }
-    } finally {
-      $q.notify({ group: 'op-validar', message: '', timeout: 1 })
-      validando.value = false
+      if (e?.retry) setTimeout(confirmarValidar, 5000)
+      else $q.notify({ type: 'negative', message: e.message || 'Error al iniciar', position: 'top', timeout: 8000 })
     }
   })
 }
+
+onUnmounted(() => _limpiarJob())
 </script>
 
 <style scoped>
