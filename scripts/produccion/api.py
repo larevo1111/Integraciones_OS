@@ -142,10 +142,18 @@ def listar_encargados():
     from lib import master
     with master(dict_cursor=True) as conn:
         with conn.cursor() as cur:
+            # Orden personalizado: encargados habituales de producción primero (Deivy, Laura),
+            # Santi y Jenifer al final (no son operarios típicos), resto en el medio.
             cur.execute(
                 "SELECT email, nombre, numero_identificacion AS cc, nivel_global AS nivel "
                 "FROM sis_usuarios WHERE estado='activo' AND numero_identificacion IS NOT NULL "
-                "ORDER BY nivel_global DESC, nombre"
+                "ORDER BY CASE numero_identificacion "
+                "  WHEN '74084937'   THEN 1  "  # Deivy
+                "  WHEN '1017206760' THEN 2  "  # Laura
+                "  WHEN '1128457413' THEN 98 "  # Jenifer (al final)
+                "  WHEN '3506889'    THEN 99 "  # Santi (al final)
+                "  ELSE 50 END, "
+                "nivel_global DESC, nombre"
             )
             return cur.fetchall()
 

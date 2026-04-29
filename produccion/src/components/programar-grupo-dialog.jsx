@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Combobox } from "@/components/ui/combobox"
 import { api } from "@/lib/api"
-import { auth } from "@/lib/auth"
 
 /**
  * Diálogo Programar OP — preview editable.
@@ -41,10 +40,10 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
     if (encargados.length === 0) {
       api.get('/api/produccion/encargados').then(list => {
         setEncargados(list || [])
-        // Default: usuario logueado si está en la lista, sino el primero
-        const myEmail = auth.usuario?.email
-        const me = (list || []).find(e => e.email === myEmail)
-        setEncargadoCC(me?.cc || list?.[0]?.cc || '')
+        // Default: el primero de la lista (orden definido en backend — operarios primero,
+        // Santi/Jenifer al final). NO usar el usuario logueado para evitar que Santi/Jenifer
+        // queden como encargados predeterminados al programar OPs.
+        setEncargadoCC(list?.[0]?.cc || '')
       }).catch(() => {})
     }
   }, [open, solicitudes, tiposCosto.length, encargados.length])
@@ -184,7 +183,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                       {preview.productos.map((p, i) => (
                         <tr key={i}>
                           <td className="px-1 sm:px-2 py-1 font-mono text-[11px] sm:text-[12px]">{p.cod}</td>
-                          <td className="px-2 py-1 md:min-w-[480px]">
+                          <td className="px-2 py-1 max-w-[140px] sm:max-w-none md:min-w-[480px]">
                             <Combobox value={p.cod} onChange={(c) => cambiarProdArticulo(i, c)} options={opts}
                               placeholder={p.nombre || 'Seleccionar…'} searchPlaceholder="Buscar producto..."
                               triggerClassName="!text-[10px] h-7" />
