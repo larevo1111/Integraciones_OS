@@ -16,7 +16,7 @@ function bustCache(path) {
   return `${path}${sep}_t=${Date.now()}`
 }
 
-async function request(path, options = {}) {
+async function request(path, options = {}, _retry = true) {
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -31,11 +31,28 @@ async function request(path, options = {}) {
   }
   const url = isGet ? bustCache(path) : path
 
-  const resp = await fetch(BASE + url, { ...options, headers, cache: 'no-store' })
+  let resp
+  try {
+    resp = await fetch(BASE + url, { ...options, headers, cache: 'no-store' })
+  } catch (e) {
+    // Network error (sin conexión, DNS, etc.) — reintenta UNA vez con 800ms
+    if (_retry && isGet) {
+      await new Promise(r => setTimeout(r, 800))
+      return request(path, options, false)
+    }
+    throw e
+  }
 
   // Auto-logout si el token expiró / inválido (solo si había token)
   if (resp.status === 401 && t) {
     auth.logout()
+  }
+
+  // Reintento automático en errores transitorios del backend (500/502/503/504)
+  // — cubre SSH tunnel caído u otros bumps de un solo request.
+  if (_retry && isGet && resp.status >= 500 && resp.status <= 504) {
+    await new Promise(r => setTimeout(r, 800))
+    return request(path, options, false)
   }
 
   if (!resp.ok) {
