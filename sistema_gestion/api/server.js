@@ -1919,9 +1919,10 @@ app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
   if (miNivel < 3) return res.status(403).json({ error: 'Procesar requiere nivel >= 3' })
   try {
     const [[op]] = await db.integracion.query(
-      'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOp]
+      'SELECT estado, vigencia FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOp]
     )
     if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
+    if (op.vigencia === 'Anulado') return res.status(400).json({ error: 'La OP está anulada en Effi y no se puede procesar.' })
     if (op.estado === 'Procesada' || op.estado === 'Validado') {
       return res.status(400).json({ error: `OP ya está en estado ${op.estado}` })
     }
@@ -2097,17 +2098,33 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
       })
     }
 
-    console.log(`[op/validar] ${idOpOriginal} — anular`)
-    await ejecutar([path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion], 120000)
-
+    // ORDEN SEGURO (2026-04-29): crear nueva PRIMERO, validarla, y SOLO al final
+    // anular la original. Si algo falla en los 2 primeros pasos, la original queda
+    // intacta y se puede reintentar sin perder la OP.
     console.log(`[op/validar] ${idOpOriginal} — crear nueva con reales`)
     const stdoutCrear = await ejecutar([path.join(scripts, 'import_orden_produccion.js'), jsonPath], 180000)
     const matchId = stdoutCrear.match(/OP_CREADA:(\d+)/)
-    if (!matchId) throw new Error('No se pudo capturar el ID de la nueva OP. Revisar logs.')
+    if (!matchId) throw new Error('No se pudo capturar el ID de la nueva OP. La original no se anuló — se puede reintentar.')
     const idOpNueva = matchId[1]
     console.log(`[op/validar] OP nueva: ${idOpNueva}`)
 
-    await ejecutar([path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion], 90000)
+    console.log(`[op/validar] ${idOpNueva} — cambiar a Validado`)
+    try {
+      await ejecutar([path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion], 90000)
+    } catch (e) {
+      // Falló validar — la nueva queda creada en Generada. Original intacta.
+      throw new Error(`Nueva OP ${idOpNueva} creada pero falló cambio a Validado: ${e.message}. La original ${idOpOriginal} NO se anuló (queda vigente).`)
+    }
+
+    console.log(`[op/validar] ${idOpOriginal} — anular original (último paso)`)
+    try {
+      await ejecutar([path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion], 120000)
+    } catch (e) {
+      // Crítico pero no fatal: la nueva está validada, solo falta anular la original.
+      // Reportar pero NO marcar el job como fallido — el usuario puede anular manualmente.
+      console.error(`[op/validar] ATENCIÓN: nueva OP ${idOpNueva} validada OK pero falló anular original ${idOpOriginal}: ${e.message}`)
+      throw new Error(`Nueva OP ${idOpNueva} validada correctamente pero falló al anular la original ${idOpOriginal}: ${e.message}. Anulala manualmente desde Effi.`)
+    }
 
     // 9. Actualizar g_tareas: todas las que tenían id_op original → id_op nueva
     const [updTareas] = await db.gestion.query(
@@ -2196,9 +2213,10 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
   if (miNivel < 5) return res.status(403).json({ error: 'Validar requiere nivel >= 5' })
   try {
     const [[op]] = await db.integracion.query(
-      'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOpOriginal]
+      'SELECT estado, vigencia FROM zeffi_produccion_encabezados WHERE id_orden = ? LIMIT 1', [idOpOriginal]
     )
     if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
+    if (op.vigencia === 'Anulado') return res.status(400).json({ error: 'La OP está anulada en Effi y no se puede validar.' })
     if (op.estado === 'Validado') return res.status(400).json({ error: 'OP ya validada' })
 
     const [[activo]] = await db.gestion.query(

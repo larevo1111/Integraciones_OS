@@ -41,6 +41,13 @@
               :label="ficha.cabecera.estado || '—'"
               style="margin-left: 6px"
             />
+            <q-chip v-if="estaAnulada"
+              class="op-est-anul"
+              dense size="sm"
+              icon="block"
+              label="Anulada"
+              style="margin-left: 4px"
+            />
             <q-space />
             <button class="btn-icon" title="Cerrar" @click="$emit('cerrar')">
               <span class="material-icons" style="font-size:18px">close</span>
@@ -318,24 +325,30 @@
 
             <!-- ── BLOQUE 7: ACCIONES ─────────────────────────── -->
             <div class="op-section op-acciones">
-              <button
-                v-if="puedeProcesar"
-                class="btn-procesar"
-                :disabled="procesando || estado === 'Procesada' || estado === 'Validado'"
-                @click="confirmarProcesar"
-              >
-                <span class="material-icons" style="font-size:16px">check_circle_outline</span>
-                {{ procesando ? 'Procesando...' : 'Procesar' }}
-              </button>
-              <button
-                v-if="puedeValidar"
-                class="btn-validar"
-                :disabled="validando || estado === 'Validado'"
-                @click="confirmarValidar"
-              >
-                <span class="material-icons" style="font-size:16px">verified</span>
-                {{ validando ? 'Validando...' : 'Validar' }}
-              </button>
+              <div v-if="estaAnulada" class="op-aviso-anulada">
+                <span class="material-icons" style="font-size:16px;color:#888">block</span>
+                Esta OP está anulada en Effi. No se puede procesar ni validar.
+              </div>
+              <template v-else>
+                <button
+                  v-if="puedeProcesar"
+                  class="btn-procesar"
+                  :disabled="procesando || estado === 'Procesada' || estado === 'Validado'"
+                  @click="confirmarProcesar"
+                >
+                  <span class="material-icons" style="font-size:16px">check_circle_outline</span>
+                  {{ procesando ? 'Procesando...' : 'Procesar' }}
+                </button>
+                <button
+                  v-if="puedeValidar"
+                  class="btn-validar"
+                  :disabled="validando || estado === 'Validado'"
+                  @click="confirmarValidar"
+                >
+                  <span class="material-icons" style="font-size:16px">verified</span>
+                  {{ validando ? 'Validando...' : 'Validar' }}
+                </button>
+              </template>
             </div>
           </div>
         </template>
@@ -421,10 +434,12 @@ const nuevaTareaEtiquetas  = ref([])
 const nuevaTareaFecha      = ref('')
 
 const miNivel = computed(() => auth.usuario?.nivel || 1)
-const puedeProcesar = computed(() => miNivel.value >= 3)
-const puedeValidar  = computed(() => miNivel.value >= 5)
 const estado = computed(() => ficha.value?.cabecera?.estado || '')
-const puedeAgregar = computed(() => estado.value === 'Generada' && miNivel.value >= 3)
+const vigencia = computed(() => ficha.value?.cabecera?.vigencia || '')
+const estaAnulada = computed(() => vigencia.value === 'Anulado')
+const puedeProcesar = computed(() => miNivel.value >= 3 && !estaAnulada.value)
+const puedeValidar  = computed(() => miNivel.value >= 5 && !estaAnulada.value)
+const puedeAgregar = computed(() => estado.value === 'Generada' && miNivel.value >= 3 && !estaAnulada.value)
 const puedeEditarTiempos = computed(() => miNivel.value >= 5)
 
 // Edición tiempos consolidados (nivel >= 5)
@@ -894,6 +909,12 @@ onUnmounted(() => _limpiarJob())
 .op-textarea:focus { outline: 2px solid var(--accent); }
 
 .op-acciones { display: flex; gap: 8px; padding-top: 12px; border-bottom: none; }
+.op-aviso-anulada {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 6px;
+  background: var(--bg-row-hover); border: 1px solid var(--border-default);
+  color: var(--text-secondary); font-size: 12px;
+}
 .btn-procesar, .btn-validar {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer;
