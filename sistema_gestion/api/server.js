@@ -1413,6 +1413,10 @@ app.get('/api/gestion/op', async (req, res) => {
     const where = []
     const params = []
 
+    // Por defecto: últimos 6 meses (a menos que el cliente pase 'desde' explícito)
+    if (!desde) {
+      where.push('e.fecha_de_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)')
+    }
     if (estado) {
       const estados = String(estado).split(',').map(s => s.trim()).filter(Boolean)
       if (estados.length) {
