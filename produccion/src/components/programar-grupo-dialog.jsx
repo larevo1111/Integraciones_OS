@@ -183,14 +183,14 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                     <tbody className="divide-y divide-border">
                       {preview.productos.map((p, i) => (
                         <tr key={i}>
-                          <td className="px-2 py-1 font-mono text-[12px]">{p.cod}</td>
-                          <td className="px-2 py-1 min-w-[480px]">
+                          <td className="px-1 sm:px-2 py-1 font-mono text-[11px] sm:text-[12px]">{p.cod}</td>
+                          <td className="px-2 py-1 md:min-w-[480px]">
                             <Combobox value={p.cod} onChange={(c) => cambiarProdArticulo(i, c)} options={opts}
                               placeholder={p.nombre || 'Seleccionar…'} searchPlaceholder="Buscar producto..."
                               triggerClassName="!text-[10px] h-7" />
                           </td>
-                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={p.cantidad} onChange={e => setProd(i, 'cantidad', e.target.value)} /></td>
-                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={p.precio} onChange={e => setProd(i, 'precio', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-20 ml-auto" value={p.cantidad} onChange={e => setProd(i, 'cantidad', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-16 sm:w-24 ml-auto" value={p.precio} onChange={e => setProd(i, 'precio', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(p.cantidad)||0) * (parseFloat(p.precio)||0))}</td>
                           <td className="px-1 py-1"><button onClick={() => removeProd(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>
@@ -214,14 +214,14 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                     <tbody className="divide-y divide-border">
                       {preview.materiales.map((m, i) => (
                         <tr key={i}>
-                          <td className="px-2 py-1 font-mono text-[12px]">{m.cod}</td>
-                          <td className="px-2 py-1 min-w-[504px]">
+                          <td className="px-1 sm:px-2 py-1 font-mono text-[11px] sm:text-[12px]">{m.cod}</td>
+                          <td className="px-2 py-1 md:min-w-[504px]">
                             <Combobox value={m.cod} onChange={(c) => cambiarMatArticulo(i, c)} options={opts}
                               placeholder={m.nombre || 'Seleccionar…'} searchPlaceholder="Buscar material..."
                               triggerClassName="!text-[10px] h-7" />
                           </td>
-                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={m.cantidad} onChange={e => setMat(i, 'cantidad', e.target.value)} /></td>
-                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={m.costo} onChange={e => setMat(i, 'costo', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-20 ml-auto" value={m.cantidad} onChange={e => setMat(i, 'cantidad', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-16 sm:w-24 ml-auto" value={m.costo} onChange={e => setMat(i, 'costo', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(m.cantidad)||0) * (parseFloat(m.costo)||0))}</td>
                           <td className="px-1 py-1"><button onClick={() => removeMat(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>
@@ -245,7 +245,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                     <tbody className="divide-y divide-border">
                       {preview.otros_costos.map((c, i) => (
                         <tr key={i}>
-                          <td className="px-2 py-1 min-w-[504px]">
+                          <td className="px-2 py-1 md:min-w-[504px]">
                             <Combobox value={String(c.tipo_costo_id || '')} onChange={(v) => {
                               const t = tiposCosto.find(x => String(x.tipo_costo_id) === v); if (!t) return
                               const arr = [...preview.otros_costos]
@@ -254,8 +254,8 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                             }} options={optsCosto} placeholder={c.nombre || 'Seleccionar tipo…'} searchPlaceholder="Buscar tipo..."
                             triggerClassName="!text-[10px] h-7" />
                           </td>
-                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-20 ml-auto" value={c.cantidad} onChange={e => setCost(i, 'cantidad', e.target.value)} /></td>
-                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={c.costo} onChange={e => setCost(i, 'costo', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-20 ml-auto" value={c.cantidad} onChange={e => setCost(i, 'cantidad', e.target.value)} /></td>
+                          <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-16 sm:w-24 ml-auto" value={c.costo} onChange={e => setCost(i, 'costo', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(c.cantidad)||0) * (parseFloat(c.costo)||0))}</td>
                           <td className="px-1 py-1"><button onClick={() => removeCost(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>

@@ -220,13 +220,13 @@ export function RecetaDetallePage() {
               {mats.map((m, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1 font-mono text-[12px]">{m.cod_material}</td>
-                  <td className="px-2 py-1 min-w-[420px]">
+                  <td className="px-2 py-1 md:min-w-[420px]">
                     <Combobox value={String(m.cod_material)} onChange={(c) => cambiarMat(i, c)} options={opts}
                       placeholder={m.nombre || 'Seleccionar…'} searchPlaceholder="Buscar material..."
                       triggerClassName="!text-[10px] h-7" />
                   </td>
-                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={m.cantidad_por_lote} onChange={e => setMat(i, 'cantidad_por_lote', e.target.value)} /></td>
-                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={m.costo_unit_snapshot} onChange={e => setMat(i, 'costo_unit_snapshot', e.target.value)} /></td>
+                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-24 ml-auto" value={m.cantidad_por_lote} onChange={e => setMat(i, 'cantidad_por_lote', e.target.value)} /></td>
+                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-24 ml-auto" value={m.costo_unit_snapshot} onChange={e => setMat(i, 'costo_unit_snapshot', e.target.value)} /></td>
                   <td className="px-2 py-1 text-right font-mono">${fmt((parseFloat(m.cantidad_por_lote)||0) * (parseFloat(m.costo_unit_snapshot)||0))}</td>
                   <td className="px-1 py-1"><button onClick={() => removeMat(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                 </tr>
@@ -260,7 +260,7 @@ export function RecetaDetallePage() {
               {prods.map((p, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1 font-mono text-[12px]">{p.es_principal && '★ '}{p.cod_articulo}</td>
-                  <td className="px-2 py-1 min-w-[420px]">
+                  <td className="px-2 py-1 md:min-w-[420px]">
                     <Combobox value={String(p.cod_articulo)} onChange={(c) => cambiarProd(i, c)} options={opts}
                       placeholder={p.nombre || 'Seleccionar…'} searchPlaceholder="Buscar producto..."
                       triggerClassName="!text-[10px] h-7" />
@@ -271,8 +271,8 @@ export function RecetaDetallePage() {
                       setDirty(true)
                     }} className="accent-primary" />
                   </td>
-                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={p.cantidad_por_lote} onChange={e => setProd(i, 'cantidad_por_lote', e.target.value)} /></td>
-                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-28 ml-auto" value={p.precio_min_venta_snapshot} onChange={e => setProd(i, 'precio_min_venta_snapshot', e.target.value)} /></td>
+                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-24 ml-auto" value={p.cantidad_por_lote} onChange={e => setProd(i, 'cantidad_por_lote', e.target.value)} /></td>
+                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-16 sm:w-28 ml-auto" value={p.precio_min_venta_snapshot} onChange={e => setProd(i, 'precio_min_venta_snapshot', e.target.value)} /></td>
                   <td className="px-2 py-1 text-right font-mono">${fmt((parseFloat(p.cantidad_por_lote)||0) * (parseFloat(p.precio_min_venta_snapshot)||0))}</td>
                   <td className="px-1 py-1"><button onClick={() => removeProd(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                 </tr>
@@ -303,13 +303,13 @@ export function RecetaDetallePage() {
             <tbody className="divide-y divide-border">
               {costos.map((c, i) => (
                 <tr key={i}>
-                  <td className="px-2 py-1 min-w-[420px]">
+                  <td className="px-2 py-1 md:min-w-[420px]">
                     <Combobox value={String(c.tipo_costo_id)} onChange={(v) => cambiarCost(i, v)} options={optsCosto}
                       placeholder={c.nombre || 'Seleccionar…'} searchPlaceholder="Buscar tipo..."
                       triggerClassName="!text-[10px] h-7" />
                   </td>
-                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={c.cantidad_por_lote} onChange={e => setCost(i, 'cantidad_por_lote', e.target.value)} /></td>
-                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-24 ml-auto" value={c.costo_unit} onChange={e => setCost(i, 'costo_unit', e.target.value)} /></td>
+                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-24 ml-auto" value={c.cantidad_por_lote} onChange={e => setCost(i, 'cantidad_por_lote', e.target.value)} /></td>
+                  <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-24 ml-auto" value={c.costo_unit} onChange={e => setCost(i, 'costo_unit', e.target.value)} /></td>
                   <td className="px-2 py-1 text-right font-mono">${fmt((parseFloat(c.cantidad_por_lote)||0) * (parseFloat(c.costo_unit)||0))}</td>
                   <td className="px-1 py-1"><button onClick={() => removeCost(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                 </tr>

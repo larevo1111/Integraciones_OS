@@ -208,7 +208,10 @@ export function Sidebar({ mobileOpen = false, onCloseMobile }) {
             </div>
           )}
           <FooterBtn icon={theme === 'dark' ? Sun : Moon} label={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'} onClick={toggle} collapsed={collapsed} />
-          <FooterBtn icon={collapsed ? ChevronsRight : ChevronsLeft} label="Colapsar" onClick={() => setCollapsed(c => !c)} collapsed={collapsed} />
+          {/* Colapsar solo tiene sentido en desktop (en mobile el sidebar es overlay drawer) */}
+          <div className="hidden md:block">
+            <FooterBtn icon={collapsed ? ChevronsRight : ChevronsLeft} label="Colapsar" onClick={() => setCollapsed(c => !c)} collapsed={collapsed} />
+          </div>
           {!collapsed && (
             <div className="px-2 pt-1 text-[10px] tabular-nums" style={{ color: 'var(--text-tertiary)' }}>
               v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '?'}
