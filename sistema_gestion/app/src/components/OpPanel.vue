@@ -644,13 +644,17 @@ async function agregarLineaNoPrevista() {
 
 async function eliminarLinea(l) {
   $q.dialog({
-    title: 'Eliminar línea',
-    message: `¿Eliminar ${l.tipo} ${l.cod_articulo} (${l.descripcion})?`,
-    cancel: true, persistent: false
+    title: `Eliminar ${l.tipo}`,
+    message: `${l.cod_articulo} · ${l.descripcion}<br><span style="color:var(--text-tertiary);font-size:12px">No se enviará a Effi al validar.</span>`,
+    html: true,
+    cancel: { label: 'Cancelar', flat: true, color: 'grey-5' },
+    ok:     { label: 'Eliminar', unelevated: true, color: 'negative' },
+    persistent: false, dark: true
   }).onOk(async () => {
     try {
       await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/lineas/${l.id}`, { method: 'DELETE' })
       await cargar()
+      $q.notify({ type: 'positive', message: 'Línea eliminada', position: 'top', timeout: 2000 })
     } catch (e) {
       $q.notify({ type: 'negative', message: e.message || 'Error', position: 'top' })
     }
