@@ -1,14 +1,36 @@
 import { useEffect, useState, useCallback } from "react"
 import { useNavigate } from "react-router"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { OsDataTable } from "@/components/os-data-table"
 import { api } from "@/lib/api"
+
+const ESTADOS = [
+  { value: 'abierto',     label: 'Abierto' },
+  { value: 'en_revision', label: 'En revisión' },
+  { value: 'resuelto',    label: 'Resuelto' },
+  { value: 'descartado',  label: 'Descartado' },
+]
+
+const TIPOS = [
+  { value: 'stock_negativo',     label: 'Stock negativo' },
+  { value: 'descuadre_conteo',   label: 'Descuadre conteo' },
+  { value: 'articulo_eliminado', label: 'Artículo eliminado' },
+  { value: 'duplicado',          label: 'Duplicado' },
+  { value: 'otro',               label: 'Otro' },
+]
+
+const ESTADO_VARIANT = {
+  abierto: 'solicitado', en_revision: 'solicitado',
+  resuelto: 'programado', descartado: 'destructive',
+}
+
+const fmt = (n) => Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })
+const money = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CO')}`
 
 export function InconsistenciasPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-  const [q, setQ] = useState('')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -20,67 +42,73 @@ export function InconsistenciasPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  const filtered = rows.filter(r => {
-    if (!q.trim()) return true
-    const text = `${r.id_effi} ${r.nombre} ${r.bodega} ${r.problema} ${r.causa_raiz}`.toLowerCase()
-    return q.trim().toLowerCase().split(/\s+/).every(w => text.includes(w))
-  })
+  const columns = [
+    { key: 'id',                   label: 'ID',           visible: true,  nowrap: true, numeric: true },
+    { key: 'fecha_analisis',       label: 'Análisis',     visible: true,  nowrap: true },
+    { key: 'fecha_inventario',     label: 'Inventario',   visible: false, nowrap: true },
+    { key: 'id_effi',              label: 'Cód',          visible: true,  nowrap: true },
+    { key: 'nombre',               label: 'Producto',     visible: true },
+    { key: 'bodega',               label: 'Bodega',       visible: true },
+    { key: 'tipo_inconsistencia',  label: 'Tipo',         visible: true,  options: TIPOS, nowrap: true },
+    { key: 'estado',               label: 'Estado',       visible: true,  options: ESTADOS, nowrap: true },
+    { key: 'stock_antes',          label: 'Stock antes',  visible: true,  numeric: true, nowrap: true },
+    { key: 'inventario_teorico',   label: 'Teórico',      visible: false, numeric: true, nowrap: true },
+    { key: 'inventario_fisico',    label: 'Físico',       visible: false, numeric: true, nowrap: true },
+    { key: 'costo_unitario',       label: 'Costo unit',   visible: false, numeric: true, nowrap: true },
+    { key: 'costo_total_impacto',  label: 'Impacto $',    visible: true,  numeric: true, nowrap: true },
+    { key: 'n_ajustes',            label: 'Ajustes',      visible: true,  numeric: true, nowrap: true },
+    { key: 'causa_raiz',           label: 'Causa',        visible: false },
+    { key: 'creado_por',           label: 'Creado por',   visible: false, nowrap: true },
+    { key: 'created_at',           label: 'Created',      visible: false, nowrap: true },
+  ]
+
+  const renderCell = (row, col, value) => {
+    if (col.key === 'estado') {
+      const lbl = ESTADOS.find(e => e.value === value)?.label || value
+      return <Badge variant={ESTADO_VARIANT[value] || 'outline'}>{lbl}</Badge>
+    }
+    if (col.key === 'tipo_inconsistencia') {
+      const lbl = TIPOS.find(t => t.value === value)?.label || value
+      return <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{lbl}</span>
+    }
+    if (col.key === 'stock_antes' || col.key === 'inventario_teorico' || col.key === 'inventario_fisico') {
+      if (value == null || value === '') return <span className="text-muted-foreground/40">—</span>
+      const n = Number(value)
+      return <span className={`font-mono ${n < 0 ? 'text-red-500' : ''}`}>{fmt(n)}</span>
+    }
+    if (col.key === 'costo_unitario' || col.key === 'costo_total_impacto') {
+      return value ? <span className="font-mono">{money(value)}</span> : <span className="text-muted-foreground/40">—</span>
+    }
+    if (col.key === 'n_ajustes') {
+      return <Badge variant="outline">{value || 0}</Badge>
+    }
+    if (col.key === 'causa_raiz') {
+      const txt = (value || '').replace(/^- /, '').split('\n')[0]
+      return <span className="text-[11px] truncate" title={value}>{txt}</span>
+    }
+    if (col.key === 'fecha_inventario' && !value) {
+      return <span className="text-muted-foreground/40">—</span>
+    }
+    return null
+  }
 
   return (
-    <div className="px-3 py-4 sm:p-5 max-w-[1400px] mx-auto">
+    <div className="px-3 pt-4 pb-6 sm:px-10 sm:pt-10 sm:pb-8 max-w-[1400px] mx-auto">
       <div className="mb-4">
-        <h1 className="text-[16px] sm:text-[18px] font-semibold">Análisis de inconsistencias</h1>
-        <p className="text-[12px] text-muted-foreground mt-0.5">
-          Histórico de análisis de stocks negativos / descuadres con su diagnóstico y ajustes asociados
+        <h1 className="text-[16px] sm:text-[18px] font-semibold tracking-tight">Análisis de inconsistencias</h1>
+        <p className="text-[11px] sm:text-[12px] text-muted-foreground mt-1 hidden sm:block">
+          Histórico de descuadres detectados, su diagnóstico, ajustes asociados e impacto monetario
         </p>
       </div>
 
-      <Input value={q} onChange={e => setQ(e.target.value)}
-             placeholder="Buscar por cod / bodega / causa…"
-             className="mb-3 max-w-md" />
-
-      {loading ? <div className="text-muted-foreground text-[12px]">Cargando…</div> : (
-        <div className="border border-border rounded-md overflow-x-auto">
-          <table className="w-full text-[12px]">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="px-2 py-1.5 text-left">Fecha</th>
-                <th className="px-2 py-1.5 text-left">Cód</th>
-                <th className="px-2 py-1.5 text-left">Nombre</th>
-                <th className="px-2 py-1.5 text-left">Bodega</th>
-                <th className="px-2 py-1.5 text-right">Stock antes</th>
-                <th className="px-2 py-1.5 text-left">Causa</th>
-                <th className="px-2 py-1.5 text-center">Ajustes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map(r => (
-                <tr key={r.id} className="hover:bg-muted/20 cursor-pointer"
-                    onClick={() => navigate(`/inconsistencias/${r.id}`)}>
-                  <td className="px-2 py-1.5 font-mono">{r.fecha}</td>
-                  <td className="px-2 py-1.5 font-mono">{r.id_effi}</td>
-                  <td className="px-2 py-1.5">{r.nombre}</td>
-                  <td className="px-2 py-1.5">{r.bodega}</td>
-                  <td className="px-2 py-1.5 text-right font-mono">{Number(r.stock_antes || 0).toLocaleString('es-CO')}</td>
-                  <td className="px-2 py-1.5 text-[11px] max-w-[400px] truncate" title={r.causa_raiz}>
-                    {(r.causa_raiz || '').replace(/^- /, '').split('\n')[0]}
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
-                    <Badge variant="outline">{r.n_ajustes}</Badge>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="py-4 text-center text-muted-foreground italic">Sin análisis registrados</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="mt-3 text-[11px] text-muted-foreground">
-        {filtered.length} de {rows.length} análisis
-      </div>
+      <OsDataTable
+        rows={rows}
+        columns={columns}
+        loading={loading}
+        title="Inconsistencias"
+        onRowClick={(row) => navigate(`/inconsistencias/${row.id}`)}
+        renderCell={renderCell}
+      />
     </div>
   )
 }

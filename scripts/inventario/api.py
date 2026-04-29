@@ -1619,26 +1619,32 @@ def sync_effi_estado():
 
 @app.get("/api/inventario/historico-ajustes")
 def listar_ajustes_historico(fecha: Optional[str] = None, cod: Optional[str] = None,
-                             bodega: Optional[str] = None, limit: int = 200):
+                             bodega: Optional[str] = None, estado: Optional[str] = None,
+                             limit: int = 200):
     sql = "SELECT * FROM inv_ajustes_historico WHERE 1=1"
     params = []
-    if fecha: sql += " AND fecha=%s"; params.append(fecha)
-    if cod:   sql += " AND id_effi=%s"; params.append(cod)
+    if fecha:  sql += " AND fecha_ajuste=%s"; params.append(fecha)
+    if cod:    sql += " AND id_effi=%s"; params.append(cod)
     if bodega: sql += " AND bodega LIKE %s"; params.append(f'%{bodega}%')
+    if estado: sql += " AND estado=%s"; params.append(estado)
     sql += " ORDER BY created_at DESC LIMIT %s"; params.append(limit)
     return db_query(DB_INV, sql, tuple(params))
 
 
 @app.get("/api/inventario/inconsistencias")
 def listar_inconsistencias(fecha: Optional[str] = None, cod: Optional[str] = None,
-                           bodega: Optional[str] = None, limit: int = 200):
+                           bodega: Optional[str] = None, estado: Optional[str] = None,
+                           tipo: Optional[str] = None, limit: int = 200):
     sql = """SELECT a.*,
-             (SELECT COUNT(*) FROM inv_ajustes_historico h WHERE h.analisis_id=a.id) AS n_ajustes
+             (SELECT COUNT(*) FROM inv_ajustes_historico h WHERE h.analisis_id=a.id) AS n_ajustes,
+             (SELECT SUM(h.cantidad * COALESCE(h.costo_unitario,0)) FROM inv_ajustes_historico h WHERE h.analisis_id=a.id) AS total_ajustado
              FROM inv_analisis_inconsistencias a WHERE 1=1"""
     params = []
-    if fecha: sql += " AND a.fecha=%s"; params.append(fecha)
-    if cod:   sql += " AND a.id_effi=%s"; params.append(cod)
+    if fecha:  sql += " AND a.fecha_analisis=%s"; params.append(fecha)
+    if cod:    sql += " AND a.id_effi=%s"; params.append(cod)
     if bodega: sql += " AND a.bodega LIKE %s"; params.append(f'%{bodega}%')
+    if estado: sql += " AND a.estado=%s"; params.append(estado)
+    if tipo:   sql += " AND a.tipo_inconsistencia=%s"; params.append(tipo)
     sql += " ORDER BY a.created_at DESC LIMIT %s"; params.append(limit)
     return db_query(DB_INV, sql, tuple(params))
 
@@ -1653,10 +1659,34 @@ def detalle_inconsistencia(id: int):
     # Cargar contenido del .md si existe
     if a.get('archivo_md'):
         repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        md_path = os.path.join(repo, 'analisis_de_inventario', str(a['fecha']), a['archivo_md'])
+        md_path = os.path.join(repo, 'analisis_de_inventario', str(a['fecha_analisis']), a['archivo_md'])
         if os.path.isfile(md_path):
             with open(md_path) as f: a['contenido_md'] = f.read()
     return a
+
+
+class AnalisisEstadoIn(BaseModel):
+    estado: str
+
+
+@app.patch("/api/inventario/inconsistencias/{id}/estado")
+def cambiar_estado_inconsistencia(id: int, data: AnalisisEstadoIn):
+    """Cambiar estado del análisis (abierto/en_revision/resuelto/descartado)."""
+    if data.estado not in ('abierto','en_revision','resuelto','descartado'):
+        raise HTTPException(400, "Estado inválido")
+    db_execute(DB_INV, "UPDATE inv_analisis_inconsistencias SET estado=%s WHERE id=%s",
+               (data.estado, id))
+    return {"ok": True}
+
+
+@app.patch("/api/inventario/historico-ajustes/{id}/estado")
+def cambiar_estado_ajuste(id: int, data: AnalisisEstadoIn):
+    """Cambiar estado del ajuste (pendiente/aplicado/fallido/revertido)."""
+    if data.estado not in ('pendiente','aplicado','fallido','revertido'):
+        raise HTTPException(400, "Estado inválido")
+    db_execute(DB_INV, "UPDATE inv_ajustes_historico SET estado=%s WHERE id=%s",
+               (data.estado, id))
+    return {"ok": True}
 
 
 # Servir frontend estático (después de todas las rutas /api/)
