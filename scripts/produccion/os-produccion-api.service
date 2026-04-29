@@ -1,5 +1,5 @@
 [Unit]
-Description=OS Inventario API (FastAPI)
+Description=OS Producción + Inventario — API FastAPI puerto 9600
 After=network.target
 
 [Service]
@@ -7,9 +7,11 @@ Type=simple
 User=osserver
 # Ajustar al instalar: WorkingDirectory = path al repo en este servidor
 WorkingDirectory=/home/osserver/Proyectos_Antigravity/Integraciones_OS
-ExecStart=/usr/bin/python3 scripts/inventario/api.py
+ExecStart=/usr/bin/python3 scripts/produccion/api.py
 Restart=always
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

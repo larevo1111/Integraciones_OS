@@ -28,6 +28,22 @@
 
 *Razón*: el 2026-04-23 reapunté DNS de producción `gestion.oscomunidad.com` del VPS al servidor local, instalé Playwright en VPS sin pedir, abrí SSH jump tunnel persistente a Hostinger con systemd unit, y no lo reporté en el resumen final. Santi pidió un arreglo de UI y terminé cambiando arquitectura de producción. Nunca más.
 
+## 📍 PRINCIPIO — Paths y hosts SIEMPRE relativos
+
+**Para que cualquier app del repo se pueda mover entre servidores con `git pull + restart`, NUNCA se hardcodean rutas absolutas ni IPs/hosts en el código.**
+
+### Reglas concretas
+
+1. **Paths de archivos**: usar `os.path.join(os.path.dirname(__file__), '..', ...)` (Python) o `path.join(__dirname, '..', ...)` (Node). Prohibido `/home/osserver/...` en código fuente.
+2. **Paths del frontend buildeado**: `STATIC_DIR` siempre relativo al script (`<modulo>/dist/`).
+3. **Paths de assets externos** (`session.json`, fotos, exports): relativos al repo o leídos de variable de entorno con default relativo.
+4. **Hosts/IPs/credenciales de BD**: SIEMPRE en `integracion_conexionesbd.env`, NUNCA en código.
+5. **Modo "BD local en mismo servidor"**: el helper `lib/db_conn.py::_es_local()` (y equivalente JS) detecta `DB_<X>_SSH_HOST=direct/localhost/127.0.0.1` y salta el SSH tunnel. Cuando una app se mueve al VPS donde está la BD, basta cambiar el `.env` a `direct` — cero cambios de código.
+6. **Service files systemd**: viven dentro del repo (`<modulo>/<nombre>.service`) versionados, con `WorkingDirectory` que es la única ruta absoluta y se ajusta al servidor destino. Al instalar: copiar a `/etc/systemd/system/` y editar `WorkingDirectory` si el repo está en otra ruta.
+7. **URLs en frontend**: `window.location.origin` (relativas), nunca `https://gestion.oscomunidad.com` literal en `.jsx` / `.vue`.
+
+*Razón*: el 28-abr-2026 movimos Producción + Inventario al VPS — solo hubo que cambiar `.env` y reapuntar Cloudflare. Cero cambios de código. Ese es el estándar.
+
 ## ⚠️ CHECKLIST antes de implementar CUALQUIER cosa
 
 Ejecutar esta lista mentalmente en orden. No saltar pasos.

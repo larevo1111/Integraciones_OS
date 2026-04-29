@@ -588,6 +588,32 @@ Las tablas `resumen_ventas_*` (resumen_ventas_facturas_mes, resumen_ventas_remis
 
 ---
 
+## 8A. UBICACIONES SIEMPRE RELATIVAS — APPS PORTABLES ENTRE SERVIDORES
+
+> **Regla activa desde 2026-04-28**. Aplica a todo código del repo.
+
+**Para que cualquier app del repo se mueva entre servidores con `git pull + restart`, NUNCA se hardcodean rutas absolutas, IPs ni hostnames en el código.**
+
+### Reglas concretas
+1. **Paths**: `os.path.join(os.path.dirname(__file__), '..', ...)` (Python) o `path.join(__dirname, '..', ...)` (Node). Prohibido `/home/osserver/...` en código fuente.
+2. **STATIC_DIR / paths del frontend buildeado**: relativo al script (`<modulo>/dist/`).
+3. **Assets externos** (`session.json`, fotos, exports): relativos al repo o env var con default relativo.
+4. **Hosts/IPs/credenciales de BD**: SIEMPRE en `integracion_conexionesbd.env`, NUNCA en código (ver §8B).
+5. **Modo "BD local"**: `lib/db_conn.py::_es_local()` y equivalente JS detectan `DB_<X>_SSH_HOST=direct/localhost/127.0.0.1` y saltan el SSH tunnel. Mover una app al servidor donde está la BD = cambiar `.env` a `direct`, cero cambios de código.
+6. **Service files systemd**: viven dentro del repo (`<modulo>/<nombre>.service`) versionados. Solo `WorkingDirectory` es absoluta y se ajusta al destino al instalar.
+7. **URLs en frontend**: `window.location.origin` (relativas), nunca hostnames literales en `.jsx` / `.vue`.
+
+### Migración tipo
+1. `git pull` en el destino
+2. Editar `integracion_conexionesbd.env` (cambiar `SSH_HOST` a `direct` si la BD pasa a ser local, o al nuevo VPS)
+3. `cp <modulo>/<nombre>.service /etc/systemd/system/` (ajustar `WorkingDirectory`)
+4. `systemctl enable --now <nombre>.service`
+5. Reapuntar Cloudflare/DNS al nuevo servidor
+
+*Razón*: el 28-abr-2026 movimos Producción + Inventario al VPS Contabo. Solo cambió `.env` + service files + DNS. Cero líneas de código tocadas. Ese es el estándar.
+
+---
+
 ## 8B. CONEXIONES A BD — CENTRALIZACIÓN OBLIGATORIA
 
 > **Regla activa desde 2026-04-20** (commit `ece85a4`). Aplica a TODO agente que toque el repo: Claude Code, subagentes, Antigravity Google Labs, y cualquier script autónomo (`claude -p`, crons, trainers).
