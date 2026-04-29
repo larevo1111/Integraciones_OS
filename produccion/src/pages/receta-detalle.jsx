@@ -27,6 +27,7 @@ export function RecetaDetallePage() {
   const [mats, setMats] = useState([])
   const [costos, setCostos] = useState([])
   const [prods, setProds] = useState([])
+  const [puntos, setPuntos] = useState([])
   const [dirty, setDirty] = useState(false)
 
   const cargar = useCallback(async () => {
@@ -47,6 +48,12 @@ export function RecetaDetallePage() {
       setProds((data.productos || []).map(p => ({
         cod_articulo: p.cod_articulo, nombre: p.nombre, es_principal: !!p.es_principal,
         cantidad_por_lote: p.cantidad_por_lote, precio_min_venta_snapshot: p.precio_min_venta_snapshot,
+      })))
+      setPuntos((data.puntos_criticos || []).map(p => ({
+        parametro: p.parametro || '', tipo: p.tipo || 'numerico',
+        unidad: p.unidad || '', instrumento: p.instrumento || '',
+        valor_min: p.valor_min, valor_max: p.valor_max,
+        opciones_json: p.opciones_json || '', obligatorio: !!p.obligatorio, orden: p.orden || 0,
       })))
       setDirty(false)
     } catch { setR(null) }
@@ -100,6 +107,14 @@ export function RecetaDetallePage() {
     setDirty(true)
   }
 
+  const setPunto = (i, k, v) => { const a = [...puntos]; a[i] = {...a[i], [k]: v}; setPuntos(a); setDirty(true) }
+  const removePunto = i => { setPuntos(puntos.filter((_, j) => j !== i)); setDirty(true) }
+  const addPunto = () => {
+    setPuntos([...puntos, { parametro: '', tipo: 'numerico', unidad: '', instrumento: '',
+      valor_min: null, valor_max: null, opciones_json: '', obligatorio: true, orden: puntos.length }])
+    setDirty(true)
+  }
+
   const setCost = (i, k, v) => { const a = [...costos]; a[i] = {...a[i], [k]: v}; setCostos(a); setDirty(true) }
   const cambiarCost = (i, nuevoTipoStr) => {
     const t = tiposCosto.find(x => String(x.tipo_costo_id) === nuevoTipoStr); if (!t) return
@@ -132,6 +147,17 @@ export function RecetaDetallePage() {
           cod_articulo: String(p.cod_articulo), nombre: p.nombre, es_principal: !!p.es_principal,
           cantidad_por_lote: parseFloat(p.cantidad_por_lote) || 0,
           precio_min_venta_snapshot: parseFloat(p.precio_min_venta_snapshot) || 0,
+        })),
+        puntos_criticos: puntos.filter(p => (p.parametro || '').trim()).map((p, i) => ({
+          parametro: p.parametro.trim(),
+          tipo: p.tipo || 'numerico',
+          unidad: p.unidad || null,
+          instrumento: p.instrumento || null,
+          valor_min: p.valor_min === '' || p.valor_min == null ? null : parseFloat(p.valor_min),
+          valor_max: p.valor_max === '' || p.valor_max == null ? null : parseFloat(p.valor_max),
+          opciones_json: p.opciones_json || null,
+          obligatorio: !!p.obligatorio,
+          orden: p.orden || i,
         })),
       })
       await cargar()
@@ -319,6 +345,92 @@ export function RecetaDetallePage() {
               ))}
               {costos.length === 0 && (
                 <tr><td colSpan={5} className="py-2 text-center text-muted-foreground italic">Sin costos de producción</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Seccion>
+
+      {/* Puntos críticos de control (configurables por producto) */}
+      <Seccion titulo="Puntos críticos" action={
+        <button onClick={addPunto} className="text-[12px] text-primary hover:underline cursor-pointer">+ Agregar</button>
+      }>
+        <div className="border border-border rounded-md overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="px-2 py-1.5 text-left">Parámetro</th>
+                <th className="px-2 py-1.5 text-left">Tipo</th>
+                <th className="px-2 py-1.5 text-left">Unidad</th>
+                <th className="px-2 py-1.5 text-left">Instrumento</th>
+                <th className="px-2 py-1.5 text-right">Mín</th>
+                <th className="px-2 py-1.5 text-right">Máx</th>
+                <th className="px-2 py-1.5 text-left">Opciones (CSV)</th>
+                <th className="px-2 py-1.5 text-center">Oblig.</th>
+                <th className="w-8"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {puntos.map((p, i) => (
+                <tr key={i}>
+                  <td className="px-2 py-1">
+                    <Input className="h-7 text-[12px]" placeholder="Ej: Temperatura templado"
+                      value={p.parametro} onChange={e => setPunto(i, 'parametro', e.target.value)} />
+                  </td>
+                  <td className="px-2 py-1">
+                    <select value={p.tipo} onChange={e => setPunto(i, 'tipo', e.target.value)}
+                      className="h-7 text-[12px] bg-background border border-border rounded px-1">
+                      <option value="numerico">Numérico</option>
+                      <option value="booleano">Booleano</option>
+                      <option value="texto">Texto</option>
+                      <option value="seleccion">Selección</option>
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <Input className="h-7 text-[12px] w-20" placeholder="°C, min..." disabled={p.tipo !== 'numerico'}
+                      value={p.unidad || ''} onChange={e => setPunto(i, 'unidad', e.target.value)} />
+                  </td>
+                  <td className="px-2 py-1">
+                    <Input className="h-7 text-[12px] w-32" placeholder="Termómetro, gramera..." list={`instr-${i}`}
+                      value={p.instrumento || ''} onChange={e => setPunto(i, 'instrumento', e.target.value)} />
+                    <datalist id={`instr-${i}`}>
+                      <option value="Termómetro" />
+                      <option value="Gramera" />
+                      <option value="Cronómetro" />
+                      <option value="Refractómetro" />
+                      <option value="pH-metro" />
+                      <option value="Higrómetro" />
+                      <option value="Visual" />
+                      <option value="Cuchillo (test templado)" />
+                    </datalist>
+                  </td>
+                  <td className="px-2 py-1">
+                    <Input className="h-7 text-right text-[12px] w-20 ml-auto" disabled={p.tipo !== 'numerico'}
+                      value={p.valor_min ?? ''} onChange={e => setPunto(i, 'valor_min', e.target.value)} />
+                  </td>
+                  <td className="px-2 py-1">
+                    <Input className="h-7 text-right text-[12px] w-20 ml-auto" disabled={p.tipo !== 'numerico'}
+                      value={p.valor_max ?? ''} onChange={e => setPunto(i, 'valor_max', e.target.value)} />
+                  </td>
+                  <td className="px-2 py-1">
+                    <Input className="h-7 text-[12px]" placeholder="Claro,Medio,Oscuro" disabled={p.tipo !== 'seleccion'}
+                      value={p.opciones_json || ''} onChange={e => setPunto(i, 'opciones_json', e.target.value)} />
+                  </td>
+                  <td className="px-2 py-1 text-center">
+                    <input type="checkbox" checked={!!p.obligatorio}
+                      onChange={e => setPunto(i, 'obligatorio', e.target.checked)} className="accent-primary" />
+                  </td>
+                  <td className="px-1 py-1">
+                    <button onClick={() => removePunto(i)} className="text-muted-foreground hover:text-destructive p-1">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {puntos.length === 0 && (
+                <tr><td colSpan={9} className="py-2 text-center text-muted-foreground italic">
+                  Sin puntos críticos. Agregá los parámetros que deben validarse al producir este producto (ej: temperatura, tiempo, pH).
+                </td></tr>
               )}
             </tbody>
           </table>

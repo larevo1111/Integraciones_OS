@@ -1001,7 +1001,7 @@ def listar_recetas(familia: Optional[str] = None, estado: Optional[str] = None,
 
 @app.get("/api/recetas/{cod}")
 def obtener_receta(cod: str):
-    """Devuelve la receta completa con materiales, productos y costos."""
+    """Devuelve la receta completa con materiales, productos, costos y puntos críticos."""
     rec = q(DB_PROD, "SELECT * FROM prod_recetas WHERE cod_articulo=%s", (cod,))
     if not rec:
         raise HTTPException(404, f"Receta no encontrada para cod={cod}")
@@ -1013,6 +1013,8 @@ def obtener_receta(cod: str):
         "SELECT * FROM prod_recetas_productos WHERE receta_id=%s ORDER BY es_principal DESC", (rid,))
     r['costos'] = q(DB_PROD,
         "SELECT * FROM prod_recetas_costos WHERE receta_id=%s", (rid,))
+    r['puntos_criticos'] = q(DB_PROD,
+        "SELECT * FROM prod_recetas_puntos_criticos WHERE receta_id=%s ORDER BY orden, id", (rid,))
     return r
 
 
@@ -1086,15 +1088,28 @@ class RecetaProductoIn(BaseModel):
     es_principal: bool = False
 
 
+class RecetaPuntoCriticoIn(BaseModel):
+    parametro: str
+    tipo: str = 'numerico'  # numerico|booleano|texto|seleccion
+    unidad: Optional[str] = None
+    instrumento: Optional[str] = None  # termómetro, gramera, cronómetro, etc.
+    valor_min: Optional[float] = None
+    valor_max: Optional[float] = None
+    opciones_json: Optional[str] = None  # JSON array como string para tipo=seleccion
+    obligatorio: bool = True
+    orden: int = 0
+
+
 class RecetaFullIn(BaseModel):
     materiales: List[RecetaMaterialIn]
     costos: List[RecetaCostoIn]
     productos: List[RecetaProductoIn]
+    puntos_criticos: List[RecetaPuntoCriticoIn] = []
 
 
 @app.put("/api/recetas/{cod}/full")
 def actualizar_receta_full(cod: str, data: RecetaFullIn, usuario=Depends(require_auth)):
-    """Reescribe materiales, costos y productos de una receta (DELETE + INSERT)."""
+    """Reescribe materiales, costos, productos y puntos críticos de una receta (DELETE + INSERT)."""
     rec = q(DB_PROD, "SELECT id FROM prod_recetas WHERE cod_articulo=%s", (cod,))
     if not rec:
         raise HTTPException(404, f"Receta no encontrada para cod={cod}")
@@ -1104,6 +1119,7 @@ def actualizar_receta_full(cod: str, data: RecetaFullIn, usuario=Depends(require
     exe(DB_PROD, "DELETE FROM prod_recetas_materiales WHERE receta_id=%s", (rid,))
     exe(DB_PROD, "DELETE FROM prod_recetas_costos WHERE receta_id=%s", (rid,))
     exe(DB_PROD, "DELETE FROM prod_recetas_productos WHERE receta_id=%s", (rid,))
+    exe(DB_PROD, "DELETE FROM prod_recetas_puntos_criticos WHERE receta_id=%s", (rid,))
 
     for m in data.materiales:
         exe(DB_PROD, """INSERT INTO prod_recetas_materiales
@@ -1125,6 +1141,17 @@ def actualizar_receta_full(cod: str, data: RecetaFullIn, usuario=Depends(require
             VALUES (%s, %s, %s, %s, %s, %s, %s, 0)""",
             (rid, p.cod_articulo, p.nombre, 1 if p.es_principal else 0,
              p.cantidad_por_lote, p.cantidad_por_lote, p.precio_min_venta_snapshot))
+
+    for i, pc in enumerate(data.puntos_criticos):
+        if pc.tipo not in ('numerico','booleano','texto','seleccion'):
+            raise HTTPException(400, f"Tipo de punto crítico inválido: {pc.tipo}")
+        exe(DB_PROD, """INSERT INTO prod_recetas_puntos_criticos
+            (receta_id, orden, parametro, tipo, unidad, instrumento, valor_min, valor_max,
+             opciones_json, obligatorio)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (rid, pc.orden if pc.orden else i, pc.parametro, pc.tipo, pc.unidad,
+             pc.instrumento, pc.valor_min, pc.valor_max, pc.opciones_json,
+             1 if pc.obligatorio else 0))
 
     exe(DB_PROD, "UPDATE prod_recetas SET updated_at=NOW() WHERE id=%s", (rid,))
     return {"ok": True}
