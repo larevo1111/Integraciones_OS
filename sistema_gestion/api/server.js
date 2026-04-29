@@ -1314,7 +1314,7 @@ app.get('/api/gestion/ops', async (req, res) => {
   const q = (req.query.q || '').trim()
   try {
     const [rows] = await db.integracion.query(`
-      SELECT e.id_orden, e.estado, e.fecha_final,
+      SELECT e.id_orden, e.estado, e.fecha_de_creacion, e.fecha_final,
              GROUP_CONCAT(DISTINCT a.descripcion_articulo_producido
                ORDER BY a.descripcion_articulo_producido
                SEPARATOR ' / ') AS articulos
@@ -1322,7 +1322,7 @@ app.get('/api/gestion/ops', async (req, res) => {
       LEFT JOIN zeffi_articulos_producidos a ON a.id_orden = e.id_orden
       WHERE e.vigencia = 'Vigente' AND e.estado != 'Procesada'
         ${q ? "AND (e.id_orden LIKE ? OR a.descripcion_articulo_producido LIKE ?)" : ''}
-      GROUP BY e.id_orden, e.estado, e.fecha_final
+      GROUP BY e.id_orden, e.estado, e.fecha_de_creacion, e.fecha_final
       ORDER BY e.id_orden DESC
       LIMIT 30
     `, q ? [`%${q}%`, `%${q}%`] : [])

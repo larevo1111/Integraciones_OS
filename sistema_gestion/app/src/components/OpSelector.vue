@@ -81,7 +81,7 @@
               <span class="op-articulos">{{ truncar(op.articulos || '—', 55) }}</span>
             </div>
             <div class="op-item-right">
-              <span v-if="op.fecha_final" class="op-fecha">{{ formatFecha(op.fecha_final) }}</span>
+              <span v-if="op.fecha_de_creacion" class="op-fecha">{{ formatFecha(op.fecha_de_creacion) }}</span>
               <span class="op-estado-badge" :class="badgeClass(op.estado)">{{ op.estado }}</span>
             </div>
           </div>
