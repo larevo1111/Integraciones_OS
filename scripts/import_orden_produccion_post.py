@@ -58,10 +58,10 @@ def crear_session_http():
 # Resuelto desde zeffi_empleados.codigo (sync via pipeline Effi).
 # Si Effi cambia un ID, refrescar y reconsultar la tabla.
 MAPEO_ENCARGADOS = {
-    '74084937':   '536',  # Deivy Andres Gonzalez Gutierrez
-    '1128457413': '165',  # Jenifer Alexandra Cano Garcia
-    '3506889':    '213',  # Santiago Sierra
-    # Laura Marcela (1017206760) NO está como empleada en Effi — solo cliente
+    '74084937':   '536',  # Deivy Andres Gonzalez Gutierrez (Empleado)
+    '1128457413': '165',  # Jenifer Alexandra Cano Garcia (Empleado)
+    '3506889':    '213',  # Santiago Sierra (Empleado)
+    '1017206760': '687',  # Laura Echavarria (Cliente — Effi acepta cualquier tercero)
 }
 
 
