@@ -270,8 +270,9 @@ Cuando la IA falla en una consulta:
 **Leer SIEMPRE en este orden:**
 1. `.agent/MANIFESTO.md` — Reglas globales, arquitectura vigente. Fuente de verdad #1.
 2. `.agent/CONTEXTO_ACTIVO.md` — Estado actual del sistema y próximos pasos.
-3. `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts. Verificar si ya existe algo antes de crear.
-4. `.agent/skills/` — Skills individuales: documentan CÓMO hacer algo que ya se aprendió.
+3. `.agent/PENDIENTES.md` — Backlog vivo de deuda técnica, seguridad y estandarización (P1/P2/P3). Escanear antes de tocar archivos relacionados; agregar items detectados durante la sesión. Ver instrucciones en CLAUDE.md "📋 Backlog técnico".
+4. `.agent/CATALOGO_SCRIPTS.md` — Catálogo completo de scripts. Verificar si ya existe algo antes de crear.
+5. `.agent/skills/` — Skills individuales: documentan CÓMO hacer algo que ya se aprendió.
 
 **Para tareas frontend además:** `frontend/design-system/MANUAL_ESTILOS.md`
 

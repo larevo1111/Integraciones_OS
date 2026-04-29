@@ -99,6 +99,27 @@ Antes de cualquier tarea, revisar estos archivos en orden:
 4. **Para tareas frontend**: `frontend/design-system/MANUAL_ESTILOS.md` — manual de estilos obligatorio
 5. Skills disponibles: `/effi-database`, `/effi-negocio`, `/playwright-effi`, `/telegram-pipeline`, `/timezone`
 
+## 📋 Backlog técnico — `.agent/PENDIENTES.md`
+
+Backlog vivo de **deuda técnica, seguridad y estandarización** (NO features ni bugs urgentes). Cada item tiene prioridad P1 (riesgo activo), P2 (deuda significativa), P3 (mejora deseable).
+
+**Cuándo escribir en `PENDIENTES.md`** (no preguntar, hacerlo automáticamente):
+- Detectaste credenciales/secrets en código → P1
+- Encontraste paths absolutos hardcoded, viola §8A de MANIFESTO → P2
+- Encontraste código duplicado en 2+ archivos sin helper común → P2
+- Detectaste falta de tests para código crítico → P3
+- Tomaste un atajo consciente que hay que volver a tocar → P2 mínimo
+- Una dependencia o config está desactualizada → P3
+
+**Cómo escribir** (formato definido en el archivo): título accionable, categoría, contexto en 2-3 líneas, riesgo, acción propuesta en bullets, archivos involucrados, estimado S/M/L. Lee `.agent/PENDIENTES.md` para el template exacto antes de agregar.
+
+**Cuándo leer `PENDIENTES.md`**:
+- Inicio de sesión, si Santi pide "tarea de limpieza" o "una tarde sin features"
+- Antes de tocar un archivo, escanear si tiene items P1/P2 asociados
+- Al cerrar sesión, si quedó algo a medias o se identificó deuda nueva
+
+**Cuándo cerrar un item**: al resolverlo, mover el bloque a `## ✅ Resueltos` con fecha de cierre y commit hash. NO borrar — sirve de bitácora.
+
 ## ⚠️ REGLA ABSOLUTA — Conexiones a BD
 
 **Todas las credenciales y hosts de BD del proyecto viven en UN ÚNICO archivo: `integracion_conexionesbd.env` en la raíz del repo.** Ningún archivo `.js` / `.py` / `.sh` puede tener `host`, `user`, `password`, `database` ni IP/puerto SSH hardcoded. Migrar a otro servidor = editar ese archivo, cero cambios de código.
