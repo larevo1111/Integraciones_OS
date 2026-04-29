@@ -1,5 +1,84 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-24
+**Actualizado**: 2026-04-28
+
+## Completado 2026-04-28 — Migración Producción+Inventario al VPS + Auditoría stocks negativos + Editor recetas + Histórico ajustes
+
+Sesión grande con 9 frentes resueltos. Detalle por bloques:
+
+### A. Migración apps al VPS Contabo
+**Producción API (puerto 9600) e Inventario API (puerto 9401) ahora corren en VPS**, igual que Sistema Gestión. Cero cambios de código — solo configuración. La BD `inventario_produccion_effi` ya estaba en VPS, ahora se accede en modo `direct` (sin SSH tunnel).
+- VPS: `pip install fastapi uvicorn pydantic pymysql sshtunnel httpx pyjwt python-dotenv python-multipart` + `cd produccion && npm install && npm run build` + `npm install` en `scripts/` (Playwright 1.49.1)
+- VPS env: bloque `DB_INVENTARIO_*` con `SSH_HOST=direct` (también funciona INTEGRACION/GESTION en mismo modo si se quiere optimizar después)
+- Service files versionados: `scripts/produccion/os-produccion-api.service`, `scripts/inventario/os-inventario-api.service`
+- VPS cloudflared: `inv.oscomunidad.com` apunta a `localhost:9600` (era 9401)
+- DNS Cloudflare: `cloudflared tunnel route dns --overwrite-dns fa4a4f3d-... inv.oscomunidad.com`
+- Local: APIs `os-produccion-api`/`os-inventario-api` `systemctl stop` (no disable, respaldo); entry de `inv.oscomunidad.com` removida de `/etc/cloudflared/config.yml` (backup `.bak.20260428`)
+- **Cron `effi-pipeline.timer` sigue en local** — corre cada **1 hora** (antes era 2h, lo bajé a pedido). El pipeline grande pasa por `effi_data` LOCAL como intermediaria → sync a `os_integracion` VPS. El botón "Sync Effi" del frontend (que vive en VPS) hace el mismo flujo pero usando la `effi_data` del VPS como intermediaria temporal — resultado final igual: `os_integracion` actualizado.
+- Bug detectado y arreglado durante migración: `lib/db_conn.py::_cfg_remota_dict` modo `direct` leía `db['remote_port']` que no existe → ahora lee de `cfg_remota_ssh()`. Sin este fix el modo direct estaba roto.
+
+### B. Regla nueva en código: paths/hosts SIEMPRE relativos
+**MANIFESTO §8A** y **CLAUDE.md** documentan: prohibido hardcodear rutas absolutas, IPs o hostnames en código. Todo via `os.path.dirname(__file__)/...`, env vars, modo `direct`. Migración entre servidores = `git pull` + editar `.env` + reapuntar DNS, cero líneas de código tocadas. Ejemplificado por esta migración.
+
+### C. Bug: SSH tunnel cacheado dejaba TODOS los endpoints caídos
+APIs FastAPI cacheaban `cfg_inventario()` al startup. SSH tunnel se caía por timeout del server remoto (~10 min sin actividad) pero el dict cacheado seguía apuntando al puerto local del tunnel zombie → 100% de los endpoints daban HTTP 500 hasta restart manual del servicio.
+**Fix triple capa**:
+1. `lib/db_conn.py::abrir_tunel`: `set_keepalive=30s` + verificación `ssh_transport.is_active()` (no solo `forwarder.is_active`) + reabrir si está zombie.
+2. `scripts/{produccion,inventario}/api.py`: `DB_INV/DB_EFFI` son tags string, no dicts cacheados. Wrappers `q()`/`exe()`/`db_query()` resuelven `cfg_inventario()` por request + reintento UNA vez en errores 2013/2006/"session not active"/"broken pipe".
+3. `produccion/src/lib/api.js`: `request()` reintenta UNA vez con 800ms si recibe HTTP 5xx o NetworkError.
+Memoria: [feedback_ssh_tunnel_cache.md](../../.claude/projects/-home-osserver-Proyectos-Antigravity-Integraciones-OS/memory/feedback_ssh_tunnel_cache.md). Tras la migración al VPS este bug ya no aplica (no hay tunnel SSH), pero el fix queda activo por si vuelve a usarse el modo SSH.
+
+### D. Auditoría inventarios negativos 2026-04-28 (módulo nuevo)
+**22 stocks negativos** detectados en bodegas de Effi (18 en Principal + 4 en Productos No Conformes Bod PPAL). Por cada caso:
+- Análisis profundo trazabilidad + conteos previos + causa raíz → archivo `.md` en `analisis_de_inventario/2026-04-28/<cod>_<nombre>_<bodega>.md` (22 archivos + RESUMEN.md)
+- Registro en BD VPS `inventario_produccion_effi`:
+  - Tabla nueva **`inv_analisis_inconsistencias`**: `id, fecha, id_effi, nombre, bodega, stock_antes, problema, causa_raiz, evidencias_json, archivo_md, creado_por, created_at`
+  - Tabla nueva **`inv_ajustes_historico`**: `id, analisis_id (FK), fecha, id_effi, bodega, tipo (ingreso/egreso), cantidad, stock_antes, stock_despues, op_ajuste_effi, motivo, ejecutado_por, created_at`
+- Ajustes Effi via Playwright: **OP #369** (Principal, 18 items, 306 und) + **OP #370** (No Conformes, 4 items, 56 und). Todos los negativos a 0.
+- Pendiente: cod 582 (-0.01 en Principal) detectado post-auditoría — fantasma de 10g por redondeo, no bloqueante.
+
+### E. Frontend nuevo: páginas Inconsistencias e Histórico ajustes
+- `/inconsistencias` — listado de análisis con búsqueda multi-palabra
+- `/inconsistencias/:id` — detalle (problema, causa, ajustes asociados, contenido del .md renderizado)
+- `/historico-ajustes` — tabla de todos los ajustes con link al análisis
+- Backend: `GET /api/inventario/{historico-ajustes,inconsistencias,inconsistencias/{id}}` con filtros fecha/cod/bodega
+- Sidebar: 2 entradas nuevas bajo Inventarios
+
+### F. Editor de recetas (in-place, sheet right side)
+Página `/recetas/:cod` ahora editable: tablas Materiales / Productos / Costos con Combobox cod (búsqueda multi-palabra), Input cantidad/costo, papelera por fila, "+Agregar" en header de cada sección. Toggle radio para producto principal. Totales recalculan en vivo. Botones "Descartar" / "Guardar cambios" aparecen solo cuando dirty.
+- Backend: `PUT /api/recetas/{cod}/full` reescribe los 3 sub-arreglos (DELETE+INSERT)
+- Modelos pydantic `RecetaMaterialIn`, `RecetaCostoIn`, `RecetaProductoIn`
+
+### G. Bug crítico: número de OP creada quedaba siempre el mismo
+`import_orden_produccion_post.py` consultaba `SELECT MAX(id_orden) FROM zeffi_produccion_encabezados` en BD local — que solo se actualiza con refresh manual de Effi. Resultado: todas las OPs creadas tras el último refresh recibían el mismo número (ej: 8 OPs distintas todas marcadas con #2223). El POST a Effi solo devuelve `"OK"` sin id.
+**Fix**: ahora hace GET a `https://effi.com.co/app/orden_produccion`, parsea `data-id` del HTML ANTES y DESPUÉS del POST → id real = `MAX_DESPUES`. Independiente del refresh local.
+Datos corregidos: solicitudes 73, 76-82 reasignadas a OPs 2223-2228 según orden de creación (en `prod_solicitudes` y `prod_ops_creadas`).
+
+### H. Recetas corregidas (datos)
+- **cod 387 Miel de Fuego 275g**: agregado ají (cod 379) con proporción 14.41% (0.0375 kg por unidad). Miel ajustada 0.275→0.260 kg. Costo: $8.325/und (era $6.488).
+- **cod 238 Infusión 200g**: bolsa cambiada cod 100 (KRAFT 500g) → 143 (FLEX METAL 250g, $476.68).
+- **cod 497 Infusión 400g**: agregadas etiquetas faltantes 490 (delantera, $1.125) + 523 (trasera, $1.125).
+
+### I. Stock + unidades de Producto Terminado
+- Backend `/api/articulos`: ahora usa `stock_total_empresa` (consolidado) en lugar de `stock_bodega_principal_sucursal_principal` aislada. Evita stocks fantasma cuando hay negativos en otra bodega que compensan.
+- BD `inv_rangos`: PT con `unidad='GRS'` → `'UND'` (68 filas masivamente). Los productos terminados se cuentan por unidad — el "GRS" en el nombre es la presentación, no la unidad de conteo.
+- Ajuste Effi cod 405 CHOCOBEETAL OS 130 GRS: Principal -63 / No Conformes +63 → quedó en 5 unidades reales (era 68 fantasma).
+
+### J. Pipeline Effi: cron + mail
+- Timer `effi-pipeline.timer`: `OnUnitActiveSec` 2h → **1h** (en `/etc/systemd/system/`, backup `.bak`)
+- Mail `larevo1111@gmail.com` no llegaba: App Password de Google (`jovc hbxy sjlz noob`) caducado → renovado a `ucpl lyfh dujr fprd` en `scripts/.env` (gitignored)
+
+### Tablas BD nuevas (VPS `inventario_produccion_effi`)
+- `inv_analisis_inconsistencias` (22 filas iniciales)
+- `inv_ajustes_historico` (22 filas iniciales con FK al análisis)
+
+### Bumps de versión Producción
+v0.3.2 → v0.3.3 → v0.3.4 → v0.3.5 → v0.4.0 → v0.4.1 (último deployado en VPS)
+
+### Plan completado
+[.agent/planes/completados/migracion_produccion_inventario_vps_2026-04-28.md](planes/completados/migracion_produccion_inventario_vps_2026-04-28.md)
+[.agent/planes/activos/auditoria_inventarios_negativos_2026-04-28.md](planes/activos/auditoria_inventarios_negativos_2026-04-28.md) (mover a completados)
+
+---
 
 ## Completado 2026-04-24 — Módulo "Órdenes de Producción" (Sistema Gestión v2.9.0)
 
