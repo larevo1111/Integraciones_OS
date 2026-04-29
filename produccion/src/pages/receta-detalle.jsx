@@ -388,12 +388,12 @@ export function RecetaDetallePage() {
                       <option value="seleccion">Selección</option>
                     </select>
                   </td>
-                  <td className="px-2 py-1">
+                  <td className="px-2 py-1 min-w-[160px]">
                     {p.tipo === 'numerico' ? (
                       <Combobox value={p.unidad || ''} onChange={(v) => setPunto(i, 'unidad', v)}
                         options={unidades.map(u => ({ value: u.simbolo, label: `${u.simbolo} — ${u.nombre || u.categoria}` }))}
                         placeholder="—" searchPlaceholder="Buscar unidad..."
-                        triggerClassName="!text-[11px] h-7 w-24" />
+                        triggerClassName="!text-[11px] h-7 w-full" />
                     ) : <span className="text-muted-foreground/40 text-[11px]">—</span>}
                   </td>
                   <td className="px-2 py-1">

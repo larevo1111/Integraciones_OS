@@ -54,7 +54,10 @@ export function Combobox({ value, onChange, options, placeholder = "Seleccionar.
         <Popover.Content
           className={cn(
             "z-50 max-w-none rounded-md border bg-card shadow-lg",
-            variant === "link" ? "w-80" : "w-[var(--radix-popover-trigger-width)]"
+            // El popover hereda el width del trigger PERO con mínimo legible
+            // (220px) para que opciones largas no salgan truncadas en triggers
+            // estrechos como celdas de tabla.
+            variant === "link" ? "w-80" : "w-[var(--radix-popover-trigger-width)] min-w-[220px]"
           )}
           sideOffset={4}
           align={variant === "link" ? "end" : "start"}
