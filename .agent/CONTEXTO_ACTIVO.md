@@ -1,5 +1,59 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-28
+**Actualizado**: 2026-04-29
+
+## Completado 2026-04-29 — Sistema Gestión: bloque OPs + sidebar refactor + tiempos editables (v2.9.3 → v2.10.20)
+
+Sesión intensiva en Sistema Gestión, foco principal en módulo de Órdenes de Producción y refactors UX/UI. Detalle completo en [contextos/sistema_gestion.md §Sesiones 2026-04-27 al 2026-04-29](contextos/sistema_gestion.md). Resumen ejecutivo:
+
+### A. Módulo Órdenes de Producción (panel detalle)
+- **`OpPanel.vue`** nuevo — abre desde `/ops-tabla`. Materiales/productos lectura, **Tiempos consolidados editables (nivel ≥5)**, tareas vinculadas con quickadd, observaciones lote, botones Procesar/Validar
+- Tabla en `g_op_tiempos`: snapshot por `id_op × categoria_produccion_id`. Si vacío → modo "vivo" (suma `g_tareas.duracion_usuario_seg`). Si lleno → modo "snapshot"
+- Endpoints nuevos: `POST /op/sync` (SSE), `PUT /op/:id/tiempos`, `PUT /op/:id/lineas`, `POST /op/:id/lineas`, `DELETE /op/:id/lineas/:lineaId`, `POST /op/:id/procesar`, `POST /op/:id/validar`
+- **Botón "Sincronizar Effi"** en toolbar de tabla — llama al script Python `scripts/refresh_effi_produccion.py` con SSE (notify ongoing arriba con paso actual). Lock `/tmp/sync_ops_effi.lock` evita duplicados
+- Tabla `/ops-tabla`: LIMIT 5000 + filtro últimos 6 meses por defecto
+
+### B. Sidebar nivel 3 → popover flotante (estilo HubSpot)
+- Componente nuevo **`SidebarSubSeccion.vue`** que decide popover (desktop+mobile) vs acordeón (mini-mode)
+- En desktop: `q-menu` lateral a la derecha; en mobile: `q-menu` debajo del header (no se sale del drawer)
+- Chevron `>` a la derecha del header. Click toggle abre/cierra. Hover muestra highlight (no abre)
+- Aplicado a 6 sub-secciones × 2 contextos (Mis Tareas + Equipo)
+
+### C. Tiempos consolidados editables (nivel ≥5)
+- Sección "Tiempos consolidados" en OpPanel ahora tiene botón "Editar" (solo nivel ≥5)
+- Modo edición: cada fila `[select] [_h_]h [_m_]m [×]` + botón `+ agregar tiempo` + Guardar/Cancelar
+- Inputs `[h] [m]` separados (no `HH:MM:SS`) — mobile-friendly, teclado numérico directo
+- Permite agregar tiempos a OPs viejas sin tareas vinculadas. NO toca tareas, solo `g_op_tiempos`
+
+### D. Categorías actualizadas
+- **Nueva**: `Desarrollo_de_producto` (id 17, orden 10, color `#00BFA5`, icono `science`)
+- **Fusión**: Reuniones + Informes → `Reuniones_e_informes` (id 11, orden 13). Informes desactivada (registros migrados)
+- **Sub-categorías producción nuevas**: `Produccion` (orden 1), `Desenmoldado` (orden 4)
+- IA actualizada: pista del clasificador automático ahora reconoce las nuevas categorías
+
+### E. Auto-update PWA (v2.9.8-9)
+- **Banner verde** "Hay una nueva versión disponible — Actualizar" cuando el SW detecta versión nueva (chequeo cada 5 min)
+- **Botón "Actualizar app"** en sidebar (debajo de Modo claro) — fuerza unregister SW + clear caches + reload
+- `register-service-worker.js`: `updated` callback ahora dispara `CustomEvent('sw-updated')` en lugar de auto-reload silencioso
+
+### F. Refactors / deuda técnica resuelta
+- **MultiActionBar**: TareasPage tenía copia inline de 270 líneas. Reemplazada por componente compartido. –288 líneas en TareasPage
+- **CatProduccionSelector**: chip Cat. producción inline duplicado en TareaForm + TareaPanel + OpPanel. Extraído a componente. –37 líneas netas
+- **TareaForm + TareaPanel**: orden unificado (TareaMetaChips primero, luego OP, Cat. producción, DetallesProducción)
+- Pendiente: unificar TareaForm y TareaPanel en un solo componente con prop `modo: crear|editar`
+
+### G. Bugs UX/UI fijos (selección)
+- v2.9.3: círculo check tareas invisible en modo claro (`rgba(255,255,255,0.50)` sobre blanco)
+- v2.9.4 + v2.10.6: bottombar móvil tapaba botones/multibar (`bottom: calc(N + safe-area-inset-bottom)`)
+- v2.10.8: papelera en TareaPanel embebido no eliminaba (faltaba `@eliminar` listener)
+- v2.10.14: OpSelector mostraba `fecha_final` en lugar de `fecha_de_creacion`
+- v2.10.15: TareaForm no mostraba Cat. producción + Detalles producción al seleccionar OP
+- v2.10.17: tiempos consolidados sumaban `duracion_cronometro_seg` (raw) → ahora `duracion_usuario_seg`
+- v2.10.18: banner "Sincronizando..." quedaba pegado tras terminar (notify dismiss faltante)
+
+### Versión actual
+**v2.10.20** desplegada en `gestion.oscomunidad.com` (VPS Contabo).
+
+---
 
 ## Completado 2026-04-28 — Migración Producción+Inventario al VPS + Auditoría stocks negativos + Editor recetas + Histórico ajustes
 

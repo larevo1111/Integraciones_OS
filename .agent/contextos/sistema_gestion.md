@@ -1,5 +1,6 @@
 # Contexto: Sistema Gestión OS
-**Actualizado**: 2026-04-23
+**Actualizado**: 2026-04-29
+**Versión actual**: v2.10.20
 
 ## Propósito
 
@@ -14,16 +15,15 @@ Web activa en gestion.oscomunidad.com + Android futuro (Capacitor).
 | Puerto API | 9300 |
 | Systemd | `os-gestion.service` |
 | Directorio | `sistema_gestion/` |
-| Build prod | `cd sistema_gestion/app && npx quasar build && rsync -a --delete dist/spa/ ../api/public/` |
+| Build prod | `cd sistema_gestion/app && npm run build && rsync -a --delete dist/pwa/ ../api/public/` (modo PWA, NO `npx quasar build`) |
 | Dev frontend | `cd sistema_gestion/app && npx quasar dev` (puerto 9301) |
 | Manual diseño | `sistema_gestion/MANUAL_DISENO_HIBRIDO.md` |
-| Cloudflare | Tunnel local activo — DNS apunta al servidor local |
+| Hosting | **VPS Contabo 94.72.115.156** — DNS apunta al VPS desde 2026-04-20 |
 
-### VPS listo (pendiente corte — 2026-04-10)
-- VPS Contabo: 94.72.115.156 — repo clonado, servicios corriendo, BDs migradas
-- Tunnel cloudflared VPS: `vps-os` (ID: fa4a4f3d-5eeb-43fa-ae09-b838e084bb9a)
-- **DNS siguen apuntando al servidor local** hasta que Santi confirme que el VPS funciona bien
-- Probar VPS directo: `http://94.72.115.156:9300`
+### Deploy a VPS
+1. `npm run build` local + rsync a `api/public/` + commit + push
+2. SSH al VPS: `git pull` + `systemctl restart os-gestion.service`
+3. Sudo del VPS sin password sobre `osserver` no está configurado — usar sudoers o root via `sshpass -p '<pwd>' ssh root@94.72.115.156`
 
 ## Credenciales BD (3 pools centralizados)
 
@@ -37,13 +37,17 @@ Web activa en gestion.oscomunidad.com + Android futuro (Capacitor).
 
 Pool `comunidad` usa SSH tunnel a Hostinger (puerto 65002, key `sos_erp`). Pools `gestion` e `integracion` usan SSH tunnel al VPS (puerto 22, key `id_ed25519`, user `osserver`). Timezone nativo del MariaDB VPS = `-05:00`.
 
-## Tablas en `u768061575_os_gestion`
+## Tablas en `os_gestion` (VPS Contabo)
 
 | Tabla | Descripción |
 |---|---|
-| `g_categorias` | 13 seeds con color e icono. Campo `es_empaque` para categoría Empaque |
-| `g_tareas` | Tareas con duraciones 5S: `duracion_usuario_seg`, `duracion_cronometro_seg`, `duracion_sistema_seg` (INT, segundos), `crono_inicio` (DATETIME, NULL=pausado). **Desde 2026-04-23**: `id_op_original` (varchar), `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min` (INT, para Detalles de producción) |
-| `g_tarea_produccion_lineas` | **Nueva (2026-04-21)** — líneas materiales/productos de la OP vinculada a una tarea. Columnas: `tarea_id`, `tipo` enum('material','producto'), `cod_articulo`, `descripcion`, `cantidad_teorica` (desde Effi), `cantidad_real` (input usuario). Siembra automática al abrir acordeón |
+| `g_categorias` | Categoría principal de tarea (16 activas + Informes desactivada). Color, ícono, orden, `es_produccion`, `es_empaque`. Cambios 2026-04-29: insertada **Desarrollo_de_producto** (id 17, orden 10), renombrada Reuniones → **Reuniones_e_informes** (id 11), desactivada Informes (id 6) — fusionada con Reuniones |
+| `g_categorias_produccion` | Sub-categorías de tarea cuando categoría principal es Producción (Alistamiento, Templado, Enmoldado, Desenmoldado, Empaque, Etiquetado, Sellado, Esterilización, Pasteurización, Encordonado, Loteado, Limpieza, Otra). 2026-04-29: agregadas **Produccion** (id 14, orden 1) y **Desenmoldado** (id 13, orden 4) |
+| `g_tareas` | Tareas. Duraciones 5S: `duracion_usuario_seg` (confirmada por usuario al completar), `duracion_cronometro_seg` (raw del crono), `duracion_sistema_seg` (fecha_fin_real - fecha_inicio_real). `crono_inicio` (DATETIME, NULL=pausado). Vinculación: `id_op` (OP actual), `id_op_original` (OP previa antes de validar), `categoria_produccion_id`. Tiempos manuales: `tiempo_alistamiento_min`, `tiempo_produccion_min`, `tiempo_empaque_min`, `tiempo_limpieza_min` |
+| `g_op_detalle` | **Una fila por OP** (UPSERT por `id_op`+`empresa`). `observaciones_lote`, `procesado_por`, `procesado_en`, `validado_por`, `validado_en`, `op_anterior`, `responsable_validado` |
+| `g_op_lineas` | Materiales/productos REALES de una OP (después de validar). `tipo` enum('material','producto'), `cod_articulo`, `descripcion`, `unidad`, `cantidad_teorica`, `cantidad_real`, `costo_unit`, `precio_unit`, `es_no_previsto` |
+| `g_op_tiempos` | **Snapshot de tiempos consolidados por OP × categoria_produccion** (`segundos_totales`). Se llena al validar OP O al editar manualmente desde OpPanel (nivel ≥5). Si está vacío para una OP, los tiempos se calculan al vuelo desde `g_tareas.duracion_usuario_seg` (modo "vivo") |
+| `g_tarea_produccion_lineas` | (Legacy 2026-04-21) Líneas materiales/productos por tarea. Reemplazado en gran parte por `g_op_lineas` que es por OP, no por tarea |
 | `g_tarea_tiempo` | Legacy — ya no se consulta. Las duraciones viven en `g_tareas` directamente |
 | `g_usuarios_config` | Configuración por usuario |
 | `g_perfiles` | Perfiles de usuario |
@@ -275,6 +279,9 @@ ProyectoModal.vue, DetalleDificultadPage, DetalleIdeaPage, DetallePendientePage,
 
 - [x] ~~Implementar Módulo Jornadas (Fase 3.5)~~ ✅ 2026-03-26
 - [x] ~~Módulo Proyectos/Dificultades/Compromisos/Ideas~~ ✅ 2026-03-31
+- [x] ~~Módulo Órdenes de Producción (vista detalle, sync, tiempos)~~ ✅ 2026-04-28
+- [x] ~~Auto-update PWA con banner + botón manual~~ ✅ 2026-04-27
+- [ ] **Unificar `TareaForm` y `TareaPanel`** — son dos componentes con orden similar; consolidar a uno solo (modo crear/editar)
 - [ ] Push notifications FCM (Fase 4)
 - [ ] APK Android (Fase 4)
 
@@ -282,3 +289,114 @@ ProyectoModal.vue, DetalleDificultadPage, DetalleIdeaPage, DetallePendientePage,
 
 `.agent/skills/sistema_gestion.md` — skill disponible como `/sistema-gestion`
 Detalle completo del módulo: `.agent/docs/sistema_gestion_tareas.md` (o `MEMORY.md` → sistema_gestion_tareas.md)
+
+---
+
+## Sesiones 2026-04-27 al 2026-04-29 — Bloque OPs + UX/UI completo
+
+Trabajo intensivo en 3 frentes: (1) módulo Órdenes de Producción (panel detalle, sync, tiempos consolidados editables), (2) refactor sidebar nivel 3 a popover flotante (estilo HubSpot), (3) auto-update PWA y deuda técnica menor.
+
+### Componentes nuevos
+- **`OpPanel.vue`** — panel detalle de OP que se abre desde `/ops-tabla`. Materiales + Artículos producidos (lectura) + Tiempos consolidados (editables nivel ≥5) + Tareas vinculadas + Quickadd de tarea + Observaciones del lote + botones Procesar/Validar
+- **`SidebarSubSeccion.vue`** — wrapper que renderiza header + slot. Decide si mostrar acordeón vertical (mobile, anterior comportamiento) o popover flotante (desktop, nuevo)
+- **`CatProduccionSelector.vue`** — chip + q-menu reusable para seleccionar sub-categoría de producción. Reemplaza markup duplicado en TareaForm, TareaPanel y OpPanel
+
+### Endpoints nuevos backend
+```
+POST   /api/gestion/op/sync                     SSE — refresh Effi (Playwright + import + sync VPS).
+                                                Lock /tmp/sync_ops_effi.lock, TTL 10 min, 409 si en curso
+GET    /api/gestion/op/:id_op/ficha             Detalle: cabecera + materiales + productos + tiempos +
+                                                tareas_vinculadas + detalle. Si NO hay snapshot en
+                                                g_op_tiempos → suma duracion_usuario_seg de tareas (modo vivo)
+PUT    /api/gestion/op/:id_op/tiempos           Editar tiempos consolidados (nivel ≥5).
+                                                Body: { tiempos: [{categoria_produccion_id, segundos}] }
+                                                DELETE+INSERT en g_op_tiempos. Filas con seg≤0 se descartan.
+                                                Si lista vacía → vuelve a modo "vivo"
+PUT    /api/gestion/op/:id_op/detalle           Observaciones lote + responsable validado (UPSERT)
+PUT    /api/gestion/op/:id_op/lineas/:lineaId   Actualizar cantidad_real de un material/producto
+POST   /api/gestion/op/:id_op/lineas            Agregar línea no prevista (solo estado=Generada)
+DELETE /api/gestion/op/:id_op/lineas/:lineaId   Solo líneas no previstas
+POST   /api/gestion/op/:id_op/procesar          Cambia estado OP a Procesada en Effi (Playwright)
+POST   /api/gestion/op/:id_op/validar           Anula OP + crea OP nueva con reales + Validado (~3 min)
+```
+
+### Cambios en endpoints existentes
+- `GET /api/gestion/op` (lista de OPs):
+  - LIMIT 500 → 5000 (caben las ~2229 actuales con margen)
+  - **Filtro últimos 6 meses por defecto**: `WHERE fecha_de_creacion >= DATE_SUB(NOW(), INTERVAL 6 MONTH)` excepto si cliente pasa `?desde=`
+- `GET /api/gestion/ops` (selector autocomplete):
+  - SELECT incluye ahora `e.fecha_de_creacion` (antes solo `fecha_final`)
+  - El selector ya muestra fecha de creación, no fecha de fin programado (bug v2.10.13)
+- `/api/gestion/sugerir-categoria`:
+  - Pista del IA actualizada: agregadas "Reuniones e informes" y "Desarrollo de producto" con keywords
+
+### Sidebar refactor (nivel 3 → popover flotante)
+**Antes** (≤ v2.9.x): cada sub-section en Mis Tareas / Equipo era un acordeón vertical con la lista de proyectos/dificultades/etc inline.
+
+**Ahora** (≥ v2.10.0):
+- En **desktop** (sidebar full ≥768px): click en el header del nivel 2 abre `q-menu` lateral con la lista (estilo HubSpot, ver `produccion/floating-submenu` como referencia visual)
+- En **mobile** (drawer overlay): click abre `q-menu` debajo del header (anchor `bottom left`, no `top right`, para que no se salga del viewport del drawer)
+- En **mini-mode** (sidebar 64px): comportamiento anterior intacto (popover en el item nivel 1)
+- Chevron `>` a la **derecha** del header (antes a la izquierda)
+- Hover sobre el header muestra highlight pero NO abre popover (evita aperturas accidentales)
+- Click toggle abre/cierra popover; click fuera cierra (q-menu lo maneja solo)
+
+Aplicado a 6 sub-secciones × 2 contextos (Mis Tareas + Equipo): Proyectos, Dificultades, Compromisos, Ideas, Órdenes de producción, Etiquetas.
+
+### Tabla `/ops-tabla` (`OpTablePage.vue`)
+- **Botón "Sincronizar Effi"** en la toolbar — dispara SSE a `/api/gestion/op/sync`. Notify "ongoing" arriba con paso actual del script Python (Exportando inventario, Exportando OPs, Importando, Sync VPS, ...). Al terminar OK recarga la tabla. Lock evita ejecuciones simultáneas.
+- **Click en fila** abre `OpPanel` (panel lateral 540px desktop / full mobile)
+- **OsDataTable**: filtro de columna default cambiado de `eq` ('Igual a') → `contains` ('Contiene'). Aplica globalmente a TODAS las tablas que usan OsDataTable en el sistema
+
+### Auto-update PWA (v2.9.8-9)
+- **Banner verde arriba** "Hay una nueva versión disponible — Actualizar" cuando el SW detecta versión nueva (chequeo cada 5 min). Reemplaza el reload silencioso anterior
+- **Botón "Actualizar app"** en sidebar (debajo de Modo claro). Click → dialog confirmación → unregister SW + clear caches + reload. Útil cuando el usuario quiere forzar update sin esperar
+- `register-service-worker.js`: el callback `updated` ahora dispara `CustomEvent('sw-updated')` en lugar de `location.reload()` directo. MainLayout escucha y muestra el banner
+
+### TareaForm + TareaPanel — orden unificado (v2.10.17)
+Antes: TareaForm (modal Nueva Tarea) tenía orden distinto a TareaPanel (detalle de tarea). Ahora ambos siguen el mismo orden:
+
+1. Título
+2. **TareaMetaChips** (categoría + prioridad + etiquetas + fecha + responsables + proyecto)
+3. OP Effi (si Producción)
+4. **Cat. producción** (si Producción)
+5. **Detalles producción** (acordeón, si Producción)
+6. Remisión / Pedido (si Empaque)
+7. Descripción
+
+**Deuda técnica restante**: los dos componentes son archivos separados — idealmente unificarlos en un solo componente con prop `modo: crear|editar`. Pendiente.
+
+### Tiempos consolidados editables (v2.10.19-20)
+Sección "Tiempos consolidados" en OpPanel:
+- **Modo vista**: tabla con `Categoría | HH:MM:SS` + total. Tag arriba: "en vivo" (calculado de tareas) o "snapshot" (manual o validación)
+- **Modo edición** (toggle "Editar", solo nivel ≥5):
+  - Cada fila: `[select Categoría] [_h_]h [_m_]m [×]`
+  - Botón `+ agregar tiempo` al final
+  - Botones `Cancelar` / `Guardar`
+  - Al guardar: PUT `/op/:id/tiempos` reemplaza completo en `g_op_tiempos`. La OP entra a modo snapshot
+  - Si todas las filas se borran → `g_op_tiempos` queda vacío → vuelve al modo "vivo" (recalcula desde tareas)
+- Inputs `[h]` y `[m]` separados (no `HH:MM:SS` un solo input) — más cómodo en mobile, sin caracteres especiales que escribir
+
+### Bugs fijos
+| Versión | Bug |
+|---|---|
+| v2.9.3 | Círculo del check de tareas invisible en modo claro (`rgba(255,255,255,0.50)` sobre fondo blanco) |
+| v2.9.4 | Botones Procesar/Validar tapados por bottombar móvil — `padding-bottom: calc(80px + safe-area)` |
+| v2.10.6 | Multi-action bar tapada por bottombar — `bottom: calc(65px + safe-area)` |
+| v2.10.8 | Papelera del TareaPanel embebido en ProyectoPanel no eliminaba (faltaba `@eliminar` listener) |
+| v2.10.11 | Tabla OPs solo mostraba Generadas (LIMIT 500 cortaba antes de Procesadas) |
+| v2.10.14 | OpSelector mostraba `fecha_final` (fin programado) en lugar de `fecha_de_creacion` |
+| v2.10.15 | TareaForm no mostraba Cat. producción + Detalles producción al seleccionar OP (solo aparecían al editar) |
+| v2.10.17 | Tiempos consolidados sumaban `duracion_cronometro_seg` (raw) — ahora suman `duracion_usuario_seg` (confirmado por usuario) |
+| v2.10.18 | Banner "Sincronizando..." se quedaba pegado tras terminar (notify dismiss no se llamaba) |
+
+### Patrones técnicos importantes
+- **Build PWA OBLIGATORIO**: usar `npm run build` (alias de `quasar build -m pwa`) NO `npx quasar build` (genera SPA sin sw.js → rompe PWAs instaladas). Ver `feedback_pwa_build_command.md`
+- **Bottombar móvil ~53px de alto**: cualquier elemento `position: fixed; bottom: …` en mobile debe usar `calc(>53px + env(safe-area-inset-bottom, 0))`. Cualquier panel scrollable debe tener `padding-bottom` similar al final. Documentado en skill `quasar-layout` §12
+- **Service Worker auto-update**: el SW chequea cada 5 min. Ver `feedback_pwa_build_command.md` para detalles del flujo banner+manual
+- **Reuso de componentes 5S**: chips, selectores, panels — siempre buscar componente existente antes de duplicar markup. Ejemplo: `CatProduccionSelector` reemplaza ~26 líneas duplicadas en 3 archivos
+
+### Lecciones (memoria)
+- `feedback_alcance_minimo.md`: cuando me piden cambio visual sutil (ej. mover una flecha), NO refactorizar HTML adyacente. Caso `SidebarSubSeccion` v2.10.2-3-4: eliminé el icon decorativo del header sin que me pidieran y rompió la sangría visual
+- `feedback_pwa_build_command.md`: validar SIEMPRE que `dist/pwa/sw.js` se generó tras un build. El comando `npx quasar build` (no PWA) deja PWAs instaladas pegadas
+- `feedback_componente_compartido.md`: si voy a copiar markup a 2+ lugares → extraer componente PRIMERO, no después
