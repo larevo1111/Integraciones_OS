@@ -344,17 +344,32 @@
 
     <!-- Diálogo: agregar línea no prevista -->
     <q-dialog v-model="dialogNuevaLinea" persistent>
-      <q-card style="min-width:320px">
+      <q-card style="min-width:380px;max-width:90vw">
         <q-card-section><div class="text-h6">Agregar {{ nuevaLinea.tipo }} no previsto</div></q-card-section>
         <q-card-section class="q-pt-none">
-          <q-input v-model="nuevaLinea.cod_articulo" label="Código artículo" dense filled />
-          <q-input v-model="nuevaLinea.descripcion" label="Descripción" dense filled class="q-mt-sm" />
-          <q-input v-model="nuevaLinea.unidad" label="Unidad" dense filled class="q-mt-sm" />
-          <q-input v-model="nuevaLinea.cantidad_real" label="Cantidad real" dense filled class="q-mt-sm" inputmode="decimal" />
+          <div class="text-caption text-grey q-mb-xs">Artículo</div>
+          <ArticuloSelector
+            v-model="articuloSeleccionado"
+            :tipo="nuevaLinea.tipo"
+            :placeholder="nuevaLinea.tipo === 'producto' ? 'Buscar producto…' : 'Buscar material…'"
+          />
+          <div v-if="articuloSeleccionado" class="row items-end q-gutter-sm q-mt-md">
+            <q-input
+              v-model="nuevaLinea.cantidad_real"
+              label="Cantidad"
+              dense filled inputmode="decimal" autofocus
+              class="col"
+              :suffix="articuloSeleccionado.unidad || ''"
+            />
+          </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Cancelar" @click="dialogNuevaLinea = false" />
-          <q-btn unelevated label="Agregar" color="primary" :disable="!nuevaLinea.cod_articulo" @click="agregarLineaNoPrevista" />
+          <q-btn flat label="Cancelar" @click="cerrarDialogNuevaLinea" />
+          <q-btn
+            unelevated label="Agregar" color="primary"
+            :disable="!articuloSeleccionado || !nuevaLinea.cantidad_real"
+            @click="agregarLineaNoPrevista"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -372,6 +387,7 @@ import TareaPanel from './TareaPanel.vue'
 import ResponsablesSelector from './ResponsablesSelector.vue'
 import EtiquetasSelector from './EtiquetasSelector.vue'
 import CatProduccionSelector from './CatProduccionSelector.vue'
+import ArticuloSelector from './ArticuloSelector.vue'
 
 const $q  = useQuasar()
 const auth = useAuthStore()
@@ -391,7 +407,8 @@ const tareaAbierta = ref(null)
 const procesando  = ref(false)
 const validando   = ref(false)
 const dialogNuevaLinea = ref(false)
-const nuevaLinea = reactive({ tipo: 'material', cod_articulo: '', descripcion: '', unidad: '', cantidad_real: '' })
+const nuevaLinea = reactive({ tipo: 'material', cantidad_real: '' })
+const articuloSeleccionado = ref(null)  // {cod, nombre, unidad, costo_unit, precio_unit, grupo}
 
 // Quickadd tarea vinculada a esta OP
 const categoriasProduccion = ref([])
@@ -589,24 +606,34 @@ async function guardarObs() {
 }
 
 function abrirNuevaLinea(tipo) {
-  Object.assign(nuevaLinea, { tipo, cod_articulo: '', descripcion: '', unidad: '', cantidad_real: '' })
+  nuevaLinea.tipo = tipo
+  nuevaLinea.cantidad_real = ''
+  articuloSeleccionado.value = null
   dialogNuevaLinea.value = true
+}
+function cerrarDialogNuevaLinea() {
+  dialogNuevaLinea.value = false
+  articuloSeleccionado.value = null
+  nuevaLinea.cantidad_real = ''
 }
 
 async function agregarLineaNoPrevista() {
+  if (!articuloSeleccionado.value) return
+  const a = articuloSeleccionado.value
   try {
-    const cant = parseDecimal(nuevaLinea.cantidad_real)
     await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/lineas`, {
       method: 'POST',
       body: JSON.stringify({
         tipo: nuevaLinea.tipo,
-        cod_articulo: nuevaLinea.cod_articulo.trim(),
-        descripcion: nuevaLinea.descripcion.trim(),
-        unidad: nuevaLinea.unidad.trim(),
-        cantidad_real: cant
+        cod_articulo: a.cod,
+        descripcion: a.nombre,
+        unidad: a.unidad || '',
+        cantidad_real: parseDecimal(nuevaLinea.cantidad_real),
+        costo_unit: a.costo_unit ?? null,
+        precio_unit: a.precio_unit ?? null,
       })
     })
-    dialogNuevaLinea.value = false
+    cerrarDialogNuevaLinea()
     await cargar()
     $q.notify({ type: 'positive', message: 'Línea agregada', position: 'top' })
   } catch (e) {

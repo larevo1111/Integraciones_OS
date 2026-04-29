@@ -12,12 +12,12 @@
 const central = require('../../lib/db_conn')
 
 async function conectar() {
-  // master/gestion/integracion viven en VPS Contabo (misma red local para el server
-  // que corre allí; SSH para el local). comunidad (Hostinger) queda como legacy
-  // opcional — algún query aún lo puede usar hasta refactor completo.
-  await Promise.all([central.master(), central.gestion(), central.integracion()])
+  // master/gestion/integracion/inventario viven en VPS Contabo (misma red local para
+  // el server que corre allí; SSH para el local). comunidad (Hostinger) queda como
+  // legacy opcional — algún query aún lo puede usar hasta refactor completo.
+  await Promise.all([central.master(), central.gestion(), central.integracion(), central.inventario()])
   intentarComunidad()
-  console.log(`[db] Pools listos (master+gestion+integracion) — timezone: ${central.TIMEZONE}`)
+  console.log(`[db] Pools listos (master+gestion+integracion+inventario) — timezone: ${central.TIMEZONE}`)
 }
 
 async function intentarComunidad() {
@@ -36,4 +36,5 @@ module.exports = {
   get comunidad()   { return central.poolComunidad },
   get gestion()     { return central.poolGestion },
   get integracion() { return central.poolIntegracion },
+  get inventario()  { return central.poolInventario },
 }

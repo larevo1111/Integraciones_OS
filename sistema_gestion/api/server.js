@@ -1744,6 +1744,67 @@ app.put('/api/gestion/op/:id_op/lineas/:lineaId', requireAuth, async (req, res) 
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// GET /api/gestion/articulos?q=texto&tipo=material|producto
+// Búsqueda de artículos del catálogo Effi (zeffi_inventario) enriquecida con
+// inv_rangos (grupo + unidad). Multi-palabra AND. Ordena: 1) grupo coincide
+// con el tipo solicitado, 2) clasificados con otro grupo, 3) sin clasificar.
+app.get('/api/gestion/articulos', requireAuth, async (req, res) => {
+  const q    = String(req.query.q || '').trim()
+  const tipo = req.query.tipo === 'producto' ? 'producto' : 'material'
+  const gruposPrioritarios = tipo === 'material' ? ['MP','INS'] : ['PT','PP']
+  try {
+    // 1) Buscar candidatos en zeffi_inventario (vigentes, sin Activo fijo ni Servicio)
+    let sqlZ = `SELECT id, nombre, tipo_de_articulo,
+                  COALESCE(NULLIF(costo_manual,''), NULLIF(costo_promedio,''), NULLIF(ultimo_costo,'')) AS costo_unit,
+                  NULLIF(precio_precio_publico,'') AS precio_unit
+                FROM zeffi_inventario
+                WHERE vigencia = 'Vigente'
+                  AND tipo_de_articulo NOT IN ('Activo fijo (Propiedad, planta y equipo)','Servicio')`
+    const params = []
+    if (q) {
+      const palabras = q.split(/\s+/).filter(Boolean)
+      for (const w of palabras) {
+        sqlZ += ' AND (id LIKE ? OR nombre LIKE ?)'
+        params.push(`%${w}%`, `%${w}%`)
+      }
+    }
+    sqlZ += ' ORDER BY nombre ASC LIMIT 80'
+    const [zRows] = await db.integracion.query(sqlZ, params)
+    if (!zRows.length) return res.json({ articulos: [] })
+
+    // 2) Lookup inv_rangos para esos ids
+    const ids = zRows.map(r => String(r.id))
+    const [rRows] = await db.inventario.query(
+      `SELECT id_effi, grupo, unidad FROM inv_rangos WHERE id_effi IN (?)`, [ids]
+    )
+    const rangosMap = new Map(rRows.map(r => [String(r.id_effi), { grupo: r.grupo, unidad: r.unidad }]))
+
+    // 3) Merge + scoring
+    const articulos = zRows.map(z => {
+      const r = rangosMap.get(String(z.id))
+      const grupo = r?.grupo || null
+      const unidad = r?.unidad || ''
+      let score = 3 // sin clasificar
+      if (grupo && gruposPrioritarios.includes(grupo)) score = 1
+      else if (grupo) score = 2
+      return {
+        cod: String(z.id),
+        nombre: z.nombre || '',
+        unidad,
+        grupo,
+        tipo_effi: z.tipo_de_articulo || '',
+        costo_unit: z.costo_unit ? Number(z.costo_unit) : null,
+        precio_unit: z.precio_unit ? Number(z.precio_unit) : null,
+        score,
+      }
+    })
+    articulos.sort((a,b) => a.score - b.score || a.nombre.localeCompare(b.nombre))
+    res.json({ articulos: articulos.slice(0, 30) })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // POST /api/gestion/op/:id_op/lineas — agregar línea no prevista (solo si estado=Generada)
 app.post('/api/gestion/op/:id_op/lineas', requireAuth, async (req, res) => {
   const idOp = String(req.params.id_op)
