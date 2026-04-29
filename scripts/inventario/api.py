@@ -46,28 +46,56 @@ app.add_middleware(
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 from lib import cfg_integracion, cfg_inventario
-DB_INV  = cfg_inventario(dict_cursor=False)
-# DB_EFFI = os_integracion en VPS Contabo. Ver MANIFESTO §8.
-DB_EFFI = cfg_integracion(dict_cursor=False)
+
+# Sentinelas: cuando se pasa estos al wrapper, regenera el dict en cada query.
+# Esto cubre el caso de SSH tunnel caído por timeout — abrir_tunel() detecta y reabre.
+DB_INV  = 'INV'
+DB_EFFI = 'EFFI'
 
 
-def db_query(db_config, sql, params=None):
-    conn = pymysql.connect(**db_config, cursorclass=pymysql.cursors.DictCursor)
-    with conn.cursor() as cur:
-        cur.execute(sql, params or ())
-        rows = cur.fetchall()
-    conn.close()
-    return rows
+def _resolve_cfg(tag):
+    if tag == 'INV':  return cfg_inventario(dict_cursor=False)
+    if tag == 'EFFI': return cfg_integracion(dict_cursor=False)
+    # Permite seguir pasando dict directo si algún caller lo arma a mano.
+    return tag
 
 
-def db_execute(db_config, sql, params=None):
-    conn = pymysql.connect(**db_config)
-    with conn.cursor() as cur:
-        cur.execute(sql, params or ())
-        conn.commit()
-        affected = cur.rowcount
-    conn.close()
-    return affected
+def _is_conn_lost(err):
+    """Detecta errores de tunnel caído / conexión perdida que ameritan reintento."""
+    s = str(err).lower()
+    return ('lost connection' in s or 'session not active' in s
+            or 'broken pipe' in s or '2013' in s or '2006' in s)
+
+
+def db_query(db_config, sql, params=None, _retry=True):
+    cfg = _resolve_cfg(db_config)
+    try:
+        conn = pymysql.connect(**cfg, cursorclass=pymysql.cursors.DictCursor)
+        with conn.cursor() as cur:
+            cur.execute(sql, params or ())
+            rows = cur.fetchall()
+        conn.close()
+        return rows
+    except pymysql.err.OperationalError as e:
+        if _retry and _is_conn_lost(e):
+            return db_query(db_config, sql, params, _retry=False)
+        raise
+
+
+def db_execute(db_config, sql, params=None, _retry=True):
+    cfg = _resolve_cfg(db_config)
+    try:
+        conn = pymysql.connect(**cfg)
+        with conn.cursor() as cur:
+            cur.execute(sql, params or ())
+            conn.commit()
+            affected = cur.rowcount
+        conn.close()
+        return affected
+    except pymysql.err.OperationalError as e:
+        if _retry and _is_conn_lost(e):
+            return db_execute(db_config, sql, params, _retry=False)
+        raise
 
 
 def registrar_auditoria(conteo_id, accion, usuario, valor_anterior=None, valor_nuevo=None, detalle=None):

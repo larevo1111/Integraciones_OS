@@ -82,22 +82,41 @@ def _es_local(prefijo):
     return h in ('localhost', '127.0.0.1', '', 'direct')
 
 
+def _tunel_vivo(t):
+    """Verifica que el tunnel SSH esté vivo de verdad (transport activo, no solo is_active)."""
+    if not t or not getattr(t, 'is_active', False):
+        return False
+    try:
+        tr = t.ssh_transport
+        return bool(tr and tr.is_active() and tr.is_alive())
+    except Exception:
+        return False
+
+
 def abrir_tunel(prefijo):
     """Abre (o reusa) un SSHTunnelForwarder para el prefijo dado. Retorna el tunel.
 
     Si DB_<prefijo>_SSH_HOST es localhost/127.0.0.1/direct, retorna None: el caller
-    debe conectar directo al MariaDB local sin pasar por tunnel."""
+    debe conectar directo al MariaDB local sin pasar por tunnel.
+
+    Reabre el tunel si la SSH session cayó (transport inactivo)."""
     P = prefijo.upper()
     if _es_local(P):
         return None
-    if P in _tuneles and _tuneles[P].is_active:
-        return _tuneles[P]
+    if P in _tuneles:
+        if _tunel_vivo(_tuneles[P]):
+            return _tuneles[P]
+        # Tunel zombie: stopped o transport caído. Cerrar y reabrir.
+        try: _tuneles[P].stop()
+        except Exception: pass
+        del _tuneles[P]
     s = cfg_remota_ssh(P)
     t = SSHTunnelForwarder(
         (s['host'], s['port']),
         ssh_username=s['user'],
         ssh_pkey=s['key'],
         remote_bind_address=(s['remote_host'], s['remote_port']),
+        set_keepalive=30.0,  # ping SSH cada 30s para evitar timeout del server
     )
     t.start()
     _tuneles[P] = t

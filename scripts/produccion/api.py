@@ -29,13 +29,14 @@ BASE_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
 STATIC_DIR = os.path.join(BASE_DIR, 'produccion', 'dist')
 
 # Conexión a BD remota inventario_produccion_effi (VPS, vía tunnel SSH automático)
-# cfg_inventario() abre el tunnel 1 vez por proceso y devuelve dict listo para pymysql.connect
-DB_INVPROD = cfg_inventario(dict_cursor=True)
-DB_PROD = DB_INVPROD  # tablas prod_*
-DB_INV  = DB_INVPROD  # tablas inv_*
+# Tags para resolver config en cada query (cfg_inventario reabre tunel SSH si cayó).
+# Antes cacheaba el dict una sola vez al startup → cuando el tunel SSH timeouteaba,
+# todos los endpoints fallaban con "Lost connection" hasta restart del servicio.
+DB_PROD = 'INV'   # tablas prod_*
+DB_INV  = 'INV'   # tablas inv_*
 # DB_EFFI apunta a os_integracion en VPS Contabo (fuente de verdad).
 # effi_data local es SOLO intermediaria del pipeline — ver MANIFESTO §8.
-DB_EFFI = cfg_integracion(dict_cursor=True)
+DB_EFFI = 'EFFI'
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'os_secret_dev_change_me')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -131,25 +132,49 @@ def api_auth_me(usuario=Depends(require_auth)):
     return {'ok': True, 'usuario': usuario}
 
 
-def q(db, sql, params=None):
-    conn = pymysql.connect(**db)
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql, params or ())
-            return cur.fetchall()
-    finally:
-        conn.close()
+def _resolve_db(tag):
+    if tag == 'INV':  return cfg_inventario(dict_cursor=True)
+    if tag == 'EFFI': return cfg_integracion(dict_cursor=True)
+    return tag  # dict directo (compat)
 
 
-def exe(db, sql, params=None):
-    conn = pymysql.connect(**db)
+def _is_conn_lost(err):
+    s = str(err).lower()
+    return ('lost connection' in s or 'session not active' in s
+            or 'broken pipe' in s or '2013' in s or '2006' in s)
+
+
+def q(db, sql, params=None, _retry=True):
+    cfg = _resolve_db(db)
     try:
-        with conn.cursor() as cur:
-            cur.execute(sql, params or ())
-            conn.commit()
-            return cur.lastrowid or cur.rowcount
-    finally:
-        conn.close()
+        conn = pymysql.connect(**cfg)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, params or ())
+                return cur.fetchall()
+        finally:
+            conn.close()
+    except pymysql.err.OperationalError as e:
+        if _retry and _is_conn_lost(e):
+            return q(db, sql, params, _retry=False)
+        raise
+
+
+def exe(db, sql, params=None, _retry=True):
+    cfg = _resolve_db(db)
+    try:
+        conn = pymysql.connect(**cfg)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, params or ())
+                conn.commit()
+                return cur.lastrowid or cur.rowcount
+        finally:
+            conn.close()
+    except pymysql.err.OperationalError as e:
+        if _retry and _is_conn_lost(e):
+            return exe(db, sql, params, _retry=False)
+        raise
 
 
 # ── Sugerencia de receta ───────────────────────────────────
