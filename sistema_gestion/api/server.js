@@ -1696,6 +1696,33 @@ app.put('/api/gestion/op/:id_op/detalle', requireAuth, async (req, res) => {
   }
 })
 
+// PUT /api/gestion/op/:id_op/tiempos — reemplaza los tiempos consolidados (solo nivel ≥ 5)
+// Body: { tiempos: [{ categoria_produccion_id, segundos }] }
+// Borra todo lo previo de la OP en g_op_tiempos y reinserta. La OP queda en modo "snapshot".
+app.put('/api/gestion/op/:id_op/tiempos', requireAuth, async (req, res) => {
+  if ((req.usuario.nivel || 0) < 5) return res.status(403).json({ error: 'Solo nivel ≥ 5 puede editar tiempos consolidados' })
+  const idOp = String(req.params.id_op)
+  const tiempos = Array.isArray(req.body?.tiempos) ? req.body.tiempos : []
+  try {
+    await db.gestion.query('DELETE FROM g_op_tiempos WHERE empresa = ? AND id_op = ?', [req.empresa, idOp])
+    for (const t of tiempos) {
+      const seg = Math.max(0, parseInt(t.segundos) || 0)
+      const catId = parseInt(t.categoria_produccion_id)
+      if (!catId || seg <= 0) continue
+      await db.gestion.query(
+        `INSERT INTO g_op_tiempos (id_op, empresa, categoria_produccion_id, segundos_totales)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE segundos_totales = VALUES(segundos_totales)`,
+        [idOp, req.empresa, catId, seg]
+      )
+    }
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('[PUT /op/:id/tiempos]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // PUT /api/gestion/op/:id_op/lineas/:lineaId — actualizar cantidad_real
 app.put('/api/gestion/op/:id_op/lineas/:lineaId', requireAuth, async (req, res) => {
   const idOp = String(req.params.id_op)

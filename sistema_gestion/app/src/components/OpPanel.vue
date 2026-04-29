@@ -168,20 +168,69 @@
                 Tiempos consolidados
                 <span v-if="ficha.fuente_tiempos === 'snapshot'" class="op-tag">snapshot</span>
                 <span v-else class="op-tag op-tag-vivo">en vivo</span>
+                <q-space />
+                <q-btn
+                  v-if="puedeEditarTiempos && !editandoTiempos"
+                  flat dense no-caps size="xs" icon="edit"
+                  label="Editar"
+                  @click="iniciarEdicionTiempos"
+                />
               </div>
-              <div v-if="!ficha.tiempos.length" class="op-empty">Aún no hay tiempos registrados</div>
-              <table v-else class="op-table">
-                <tbody>
-                  <tr v-for="t in ficha.tiempos" :key="t.categoria">
-                    <td>{{ t.categoria }}</td>
-                    <td class="t-right text-mono">{{ segHHMMSS(t.segundos) }}</td>
-                  </tr>
-                  <tr class="op-row-total">
-                    <td><b>Total</b></td>
-                    <td class="t-right text-mono"><b>{{ segHHMMSS(totalSeg) }}</b></td>
-                  </tr>
-                </tbody>
-              </table>
+
+              <!-- Modo VISTA -->
+              <template v-if="!editandoTiempos">
+                <div v-if="!ficha.tiempos.length" class="op-empty">Aún no hay tiempos registrados</div>
+                <table v-else class="op-table">
+                  <tbody>
+                    <tr v-for="t in ficha.tiempos" :key="t.categoria">
+                      <td>{{ t.categoria }}</td>
+                      <td class="t-right text-mono">{{ segHHMMSS(t.segundos) }}</td>
+                    </tr>
+                    <tr class="op-row-total">
+                      <td><b>Total</b></td>
+                      <td class="t-right text-mono"><b>{{ segHHMMSS(totalSeg) }}</b></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </template>
+
+              <!-- Modo EDICIÓN -->
+              <template v-else>
+                <table class="op-table">
+                  <tbody>
+                    <tr v-for="(t, idx) in tiemposEdit" :key="'edit-'+idx">
+                      <td>
+                        <select v-model.number="t.categoria_produccion_id" class="op-input-num" style="width:auto">
+                          <option v-for="c in categoriasProduccion" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                        </select>
+                      </td>
+                      <td class="t-right">
+                        <input
+                          type="text" inputmode="numeric"
+                          class="op-input-num text-mono"
+                          style="width:90px"
+                          :value="segHHMMSS(t.segundos)"
+                          @input="onTiempoInput(idx, $event.target.value)"
+                          placeholder="HH:MM:SS"
+                        />
+                      </td>
+                      <td class="t-right">
+                        <button class="btn-icon-mini" @click="eliminarTiempoFila(idx)" title="Eliminar">
+                          <span class="material-icons" style="font-size:14px">delete_outline</span>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div class="op-add-line">
+                  <button class="op-btn-add" @click="agregarTiempoFila">+ agregar tiempo</button>
+                </div>
+                <div class="row q-gutter-xs q-mt-sm">
+                  <q-btn flat dense no-caps size="sm" label="Cancelar" @click="cancelarEdicionTiempos" />
+                  <q-space />
+                  <q-btn unelevated dense no-caps size="sm" color="primary" label="Guardar" :loading="guardandoTiempos" @click="guardarTiempos" />
+                </div>
+              </template>
             </div>
 
             <!-- ── BLOQUE 5: TAREAS VINCULADAS ────────────────── -->
@@ -347,6 +396,60 @@ const puedeProcesar = computed(() => miNivel.value >= 3)
 const puedeValidar  = computed(() => miNivel.value >= 5)
 const estado = computed(() => ficha.value?.cabecera?.estado || '')
 const puedeAgregar = computed(() => estado.value === 'Generada' && miNivel.value >= 3)
+const puedeEditarTiempos = computed(() => miNivel.value >= 5)
+
+// Edición tiempos consolidados (nivel >= 5)
+const editandoTiempos = ref(false)
+const tiemposEdit = ref([])
+const guardandoTiempos = ref(false)
+
+function iniciarEdicionTiempos() {
+  // Copia editable: usa categoria_id del backend si está, o resuelve por nombre
+  tiemposEdit.value = (ficha.value?.tiempos || []).map(t => ({
+    categoria_produccion_id: t.categoria_id || categoriasProduccion.value.find(c => c.nombre === t.categoria)?.id || null,
+    segundos: t.segundos
+  })).filter(t => t.categoria_produccion_id)
+  editandoTiempos.value = true
+}
+function cancelarEdicionTiempos() {
+  editandoTiempos.value = false
+  tiemposEdit.value = []
+}
+function agregarTiempoFila() {
+  // Elegir primera categoría no usada (o cualquiera si todas se usaron)
+  const usadas = new Set(tiemposEdit.value.map(t => t.categoria_produccion_id))
+  const libre = categoriasProduccion.value.find(c => !usadas.has(c.id)) || categoriasProduccion.value[0]
+  if (!libre) return
+  tiemposEdit.value.push({ categoria_produccion_id: libre.id, segundos: 0 })
+}
+function eliminarTiempoFila(idx) {
+  tiemposEdit.value.splice(idx, 1)
+}
+function parseHHMMSS(str) {
+  if (!str) return 0
+  const parts = String(str).split(':').map(p => parseInt(p) || 0)
+  if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2]
+  if (parts.length === 2) return parts[0]*60 + parts[1]
+  return parts[0] || 0
+}
+function onTiempoInput(idx, valor) {
+  tiemposEdit.value[idx].segundos = parseHHMMSS(valor)
+}
+async function guardarTiempos() {
+  guardandoTiempos.value = true
+  try {
+    await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/tiempos`, {
+      method: 'PUT',
+      body: JSON.stringify({ tiempos: tiemposEdit.value })
+    })
+    editandoTiempos.value = false
+    tiemposEdit.value = []
+    await cargar()
+    $q.notify({ type: 'positive', message: 'Tiempos actualizados', position: 'top', timeout: 2000 })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.message || 'Error al guardar', position: 'top' })
+  } finally { guardandoTiempos.value = false }
+}
 
 const totalSeg = computed(() => (ficha.value?.tiempos || []).reduce((s, t) => s + (Number(t.segundos)||0), 0))
 
