@@ -1064,3 +1064,80 @@ URL webhook configurada en `wa-bridge.service` → `WA_WEBHOOK_URL` (default: `h
 - **Ubicación**: `inventario/politicas.json`
 - **Niveles**: 1 (contador), 3 (coordinador), 5 (supervisor), 7 (admin)
 - **11 acciones**: contar, notas, fotos, agregar_articulo, nuevo/reiniciar/cerrar/eliminar inventario, etc.
+
+---
+
+## 7. Scripts Effi — POST directo (sin Playwright)
+
+Scripts Python que interactúan con Effi vía POST directo a sus endpoints internos (descubiertos por espionaje con Chrome DevTools MCP / Playwright). Tiempo típico ~1s vs 60-90s del scraping con Playwright. Documentación técnica completa: `.claude/skills/effi-tecnico/SKILL.md`.
+
+**Sesión Effi**: todos requieren `scripts/session.json` válido (cookies). Si caduca: `cd scripts && node -e 'require("./session.js").getPage().then(({browser})=>browser.close())'` (regenera login automático con creds en `session.js`).
+
+**Validación de éxito**: Effi devuelve HTTP 200 SIEMPRE. El éxito real se valida por `body == "OK"`. Cualquier otra respuesta (típicamente "Error en los parámetros internos recibidos") indica fallo. Implementado en cada script.
+
+### import_orden_produccion_post.py
+- **Propósito**: Crear OP en Effi vía POST a `/app/orden_produccion/crear` (~1s)
+- **Ubicación**: `scripts/import_orden_produccion_post.py`
+- **Uso**: `python3 scripts/import_orden_produccion_post.py /tmp/op.json`
+- **JSON input**: mismo formato que `import_orden_produccion.js` (sucursal_id, bodega_id, fecha_inicio/fin, encargado CC, materiales[], articulos_producidos[], otros_costos[])
+- **Captura del id**: scrapea `data-id` de `/app/orden_produccion` ANTES y DESPUÉS del POST → id real = MAX_DESPUES (el POST devuelve solo "OK" sin id). Sin esto el id quedaba mal cacheado.
+- **Mapeo CC→ID encargado**: tabla estática `MAPEO_ENCARGADOS` (Deivy 74084937→536, Jenifer 1128457413→165, Santi 3506889→213, Laura 1017206760→687). Si CC no mapeado: `RuntimeError` → wrapper FastAPI cae al fallback Playwright.
+- **Excepciones**: usa `RuntimeError` (no `SystemExit`) para que `_ejecutar_op_background` en `produccion/api.py` las capture y caiga al fallback Playwright.
+- **Llamado desde**: `scripts/produccion/api.py::_ejecutar_op_background()` (BackgroundTask de FastAPI). Fallback: `import_orden_produccion.js` (Playwright, ~60-90s).
+
+### import_articulo_anular_post.py — 2026-04-29
+- **Propósito**: Anular 1+ artículos del catálogo Effi (marca No Vigente). Reversible vía "Reactivar" en UI.
+- **Ubicación**: `scripts/import_articulo_anular_post.py`
+- **Endpoint**: `POST /app/articulo/anular` (3 campos: `codigo` token cifrado URL-encoded TAL CUAL del HTML, `session_empresa`, `session_usuario`)
+- **Uso**:
+  - Cods sueltos: `python3 scripts/import_articulo_anular_post.py 587,588,589`
+  - Desde CSV: `python3 scripts/import_articulo_anular_post.py --csv /tmp/anular.csv` (lee primera col, salta header)
+  - Dry-run: agregar `--dry-run`
+  - Delay entre POSTs: `--delay 0.5` (default 0.5s)
+- **Estrategia**: scrapea `/app/articulo` paginado (~10 páginas, 50 articulos por página) → mapa `cod → codigo cifrado` (extraído de `<a class="modificar" data-codigo="..." data-id="N">`). El token cifrado se invalida tras anular en la misma página → re-scrape automático en caso de fallo.
+- **Bug fix crítico (29-abr)**: Effi requiere el `codigo` URL-encoded literal (`%3D%3D`), NO desencodear con `unquote()`. Si se desencodea, falla con "Error en los parámetros internos recibidos".
+- **Test pasado**: 94/94 artículos depurados el 29-abr (auditoría `analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.csv`).
+
+### import_articulo_crear_post.py — 2026-04-29
+- **Propósito**: Crear artículo nuevo en Effi
+- **Ubicación**: `scripts/import_articulo_crear_post.py`
+- **Endpoint**: `POST /app/articulo/crear` (form `form_CART`, ~47 campos)
+- **Uso**:
+  - CLI mínimo: `python3 scripts/import_articulo_crear_post.py --nombre "X" --tipo 1 --categoria 47 --costo 1000`
+  - Desde JSON: `python3 ... --json /tmp/nuevo.json`
+  - Dry-run: agregar `--dry-run`
+- **Tipos (`--tipo`)**: 1=Materia prima, 2=Producto en proceso, 3=Producto terminado, 4=Servicio, 5=Activo fijo
+- **Sucursal default**: 1 (Principal)
+- **Campos defaults**: marca/cuentas contables = `default`, gestión_stock=on, compras=on, 4 tarifas estándar (13/15/16/19) con precios vacíos
+- **Devuelve**: el id asignado scrapeando `/app/articulo` post-create filtrando por `data-descripcion="<nombre>"` (los nuevos quedan al final ordenados por id desc)
+- **Tarifas**: para precios de venta, pasar dict `{'13': '5000', '15': '5500', ...}` en `tarifas` del JSON
+
+### import_articulo_modificar_post.py — 2026-04-29
+- **Propósito**: Modificar artículo existente (cambio parcial o total)
+- **Ubicación**: `scripts/import_articulo_modificar_post.py`
+- **Endpoint**: `POST /app/articulo/modificar_articulo` (50 campos = data actual + cambios + id real + session_*)
+- **Uso**:
+  - Cambio parcial: `python3 scripts/import_articulo_modificar_post.py --cod 587 --nombre "Nuevo" --costo 5000`
+  - Solo costo: `python3 ... --cod 587 --costo 3500`
+  - Desde JSON: `python3 ... --cod 587 --json /tmp/cambios.json`
+  - Dry-run: agregar `--dry-run`
+- **Estrategia**: lee TODOS los `data-*` del link `<a class="modificar">` del cod (HTML decoded), mapea `data-X` → `name="X"` del form via `MAP_DATA_TO_FORM`, aplica cambios parciales del usuario, POSTea payload completo. Effi NO autorrellena el form al abrir el modal — JS de la UI lee los `data-*`.
+- **Gotchas resueltos**:
+  - Checkboxes (`gestion_stock`, `compras`, `ventas`, `descuento`, `alquiler`, `mandato`): el data viene como `"1"`/`"0"` pero Effi quiere `"on"` si activo o **omitir el campo** si inactivo (no `"0"`)
+  - Selects vacíos: usar `"default"` (no `""`) para `marca`, `cuenta_contable_*`
+  - HTML entities: los `data-*` vienen HTML-encoded (`&quot;`, `&amp;`) — `html_decode()` antes de mandar
+- **Mantiene tarifas estándar** vacías (preserva las existentes en Effi al re-crear el form).
+
+### import_ajuste_inventario.js — Playwright
+- **Propósito**: Crear ajuste de inventario en Effi (entrada o salida) importando conceptos desde Excel
+- **Ubicación**: `scripts/import_ajuste_inventario.js`
+- **Uso**: `node scripts/import_ajuste_inventario.js <bodega_id> <archivo.xlsx> [observacion]`
+- **Bodegas**: 1=Principal, 2=Villa de aburra, 3=Apica, 4=El Salvador, 5=Feria Santa Elena, 6=DON LUIS SAN MIGUEL, 7=LA TIERRITA, 8=Jenifer, 10=REGINALDO, 13=Desarrollo de Producto, 14=Ricardo, 15=Mercado Libre, 16=Santiago, 17=Productos No Conformes Bod PPAL, 18=FERIA CAMPESINA SAN CARLOS
+- **Formato Excel**: ver `plantilla_importacion_ajuste_inventario.xlsx`. Columnas: Código Effi · Descripción · Lote · Serie · Costo · Tipo de ajuste (1=Ingreso 2=Egreso) · Cantidad
+- **Por qué Playwright y no POST directo**: el flujo requiere upload de Excel + parseo del lado Effi. Aún no se ha hecho espionaje del POST equivalente.
+- **Usado en**: auditoría 28-abr (OP #369 Principal 18 items + OP #370 No Conformes 4 items)
+
+### _espiar_post_op.js, _espiar_articulo.js, _espiar_v2.js — utilidades de descubrimiento
+- **Propósito**: scripts Playwright que interceptan TODAS las requests HTTP que hace Effi al ejecutar una acción (crear OP / modificar artículo / etc). Útil para descubrir endpoints nuevos, payload exacto, headers, y reverse-engineer del flujo.
+- **Salida**: `/tmp/espia_*.json` con `{ method, url, post_data, ts }` por cada request
+- **Cuándo usar**: solo para descubrir/diagnosticar — NO se ejecutan en producción. Si necesitás re-investigar un endpoint, mejor usar Chrome DevTools MCP directamente (más interactivo).

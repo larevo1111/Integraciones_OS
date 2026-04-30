@@ -1,5 +1,78 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-29
+**Actualizado**: 2026-04-30
+
+## Completado 2026-04-29 / 30 — Producción: editor recetas evolución + módulo calidad/puntos críticos + scripts artículos Effi POST directo + depuración 94 artículos
+
+Sesión grande del 29-30 abr en módulo Producción (`inv.oscomunidad.com`), 7 frentes resueltos:
+
+### A. Editor de recetas — evolución (v0.4.4 → v0.4.10)
+- **Campo `observaciones_op`** en `prod_recetas` (TEXT). Texto fijo que se inyecta en la observación de la OP al programar. Editable desde `/recetas/:cod` + precarga editable en el textarea del modal "Programar". `_construir_observacion()` ahora arma 2 partes: rigor (auto: productos+usr+sols) + extra (lo del textarea, viene precargado de la receta y editado por el usuario). Límite Effi subido de 250 → 1000 chars.
+- **Sección "Puntos críticos"** en `/recetas/:cod` — tabla editable con columnas: Parámetro, Tipo (numerico/booleano/texto/seleccion), Unidad (Combobox sobre maestra), Instrumento (datalist), Mín, Máx, Opciones (CSV), Obligatorio. Inputs Mín/Máx/Unidad disabled si tipo≠numerico; Opciones disabled si tipo≠seleccion.
+- **Tabla nueva `prod_recetas_puntos_criticos`** (FK receta_id, ON DELETE CASCADE).
+- **Maestra `prod_unidades_medida`** — 35 unidades (22 espejo de Hostinger `costos_unidades` + 13 locales para puntos críticos: °C, °F, pH, °Brix, %, ppm, aw, UFC/g, UFC/ml, µm, bar, psi, rpm). Endpoint `GET /api/produccion/unidades`.
+- Backend: `RecetaPatch.observaciones_op` opcional + `PUT /api/recetas/{cod}/full` reescribe puntos_criticos + `RecetaPuntoCriticoIn`.
+- Combobox unidad: `min-w-[220px]` en popover (antes salía truncado por trigger estrecho de la celda).
+- Reorden encargados en preview OP: Deivy/Laura primero, Santi/Jenifer al final. Default ya no es el usuario logueado.
+
+### B. Módulo histórico inconsistencias — campos nuevos + estandarización (v0.4.5)
+- ALTER masivo `inv_analisis_inconsistencias` y `inv_ajustes_historico`: rename `fecha`→`fecha_analisis`/`fecha_ajuste`, +`fecha_inventario`, `tipo_inconsistencia` (enum 5), `estado` (abierto/en_revision/resuelto/descartado vs pendiente/aplicado/fallido/revertido), `inventario_teorico`, `inventario_fisico`, `costo_unitario`, `costo_total_impacto`, `fecha_planificado`, `costo_total`, `error_msg`, `updated_at`.
+- Backfill 22 análisis + 22 ajustes del 28-abr con valores nuevos.
+- Páginas refactoreadas a **estándar OsDataTable** (igual a Solicitudes), reemplazando tablas HTML crudas: `/inconsistencias`, `/historico-ajustes`, `/inconsistencias/:id`.
+- Detalle: 4 cards de snapshot (Stock antes / Teórico / Físico / Impacto $) + botones cambiar estado del análisis + tabla de ajustes con todos los campos nuevos.
+- Backend: filtros nuevos `?estado=`, `?tipo=`; agrega `total_ajustado` al listar; PATCH `/api/inventario/inconsistencias/{id}/estado` y `.../historico-ajustes/{id}/estado`.
+
+### C. Auditoría 297 candidatos a depurar + 94 anulados en Effi
+- Query a `os_integracion`: artículos vigentes + sin uso como material/producto/compra desde 2025-04-29 (1 año). Detectó **297 candidatos** ($4.066.140 valor inventario; 216 nunca usados; 64 con stock).
+- Generado `analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.md` y `.csv` (separador `;`, UTF-8 BOM, columna `accion_sugerida` con 5 valores).
+- Santi marcó **94 con X** en el CSV → ejecutados via script anular masivo.
+- 1ra ronda detectó bug crítico (URL-encoding del token cifrado), 2da ronda con fix completó **94/94 anulados**. Reversibles vía "Reactivar" en Effi.
+
+### D. Scripts artículos Effi POST directo (3 nuevos)
+Espionaje vía Chrome DevTools MCP descubrió 3 endpoints:
+- **`POST /app/articulo/anular`** — 3 campos (`codigo` token cifrado, `session_empresa`, `session_usuario`). Reversible.
+- **`POST /app/articulo/crear`** — form `form_CART` ~47 campos. Devuelve "OK" sin id (id se obtiene via scrape post-create).
+- **`POST /app/articulo/modificar_articulo`** — 50 campos = data actual + cambios + id real + session_*.
+
+Hallazgo crítico: `data-codigo` del HTML viene URL-encoded (`%3D%3D`) y Effi lo espera ASÍ, NO desencodeado. Validación de éxito por `body=="OK"` (no por HTTP 200, Effi siempre devuelve 200).
+
+Scripts (en `scripts/`):
+- `import_articulo_anular_post.py` — cods sueltos / `--csv` / `--dry-run` / `--delay`
+- `import_articulo_crear_post.py` — `--nombre/--tipo/--categoria/--costo` o `--json`
+- `import_articulo_modificar_post.py` — `--cod N --nombre/--costo/--tipo/--categoria` (cambio parcial) o `--json`
+
+Documentado en `.claude/skills/effi-tecnico/SKILL.md` §3 (3 endpoints) + §13 (tokens cifrados).
+
+### E. Bitácora calidad y puntos críticos (`.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md`)
+Doc consolidado con:
+- **Modelo conceptual 5S**: Inspección de calidad (booleanos genéricos, vive en módulo Gestión OS) vs Puntos críticos (configurables por producto, vive en ficha receta).
+- Reglas para definir puntos críticos: solo medible, máximo 3-5 por producto, cada parámetro debe generar acción.
+- **Instrumentos disponibles en planta OS**: termómetro, cronómetro, balanza, pH-metro (en agua + nevera), revisión organoléptica, test de PAPEL para templado (NO cuchillo).
+- **10 procesos productivos identificados** (cocción mesa, refinado/conchado, templado chocolate, pasteurización miel, cristalización miel, infusionado miel, tostado cacao, tostado frutos secos, crema molienda, infusión cacao+menta+polen, chocomiel, chocobeetal granel).
+- **13 productos PP CLAVE** identificados (las presentaciones envasadas heredan los puntos del proceso base, no se duplican).
+- Plantillas concretas por proceso con parámetros sugeridos. **En proceso de validación con Santi lote por lote**.
+- Vinculación futura HACCP/ISO 22000.
+
+### F. Bug fix crítico: SystemExit en POST OP (29-abr 17:51)
+3 solicitudes (83/84/85) quedaron colgadas en estado "programando" por sesión Effi caducada. El script `import_orden_produccion_post.py` abortaba con `SystemExit` que no era capturado por el wrapper FastAPI (solo captura `Exception`). Fix: 3 `raise SystemExit` → `raise RuntimeError`. Sesión regenerada en VPS via `node -e require('./session.js').getPage()...`
+
+### G. Pipeline cron + mail (29-abr 17:30)
+- `effi-pipeline.timer`: 2h → 1h (a pedido de Santi)
+- Gmail App Password renovado: viejo `jovc hbxy sjlz noob` (caducado) → nuevo `ucpl lyfh dujr fprd`. Mail a `larevo1111@gmail.com` funcionando.
+
+### Tablas BD nuevas / modificadas (todas en VPS `inventario_produccion_effi`)
+- **`prod_recetas_puntos_criticos`** (NUEVA): id, receta_id FK, orden, parametro, tipo enum(numerico/booleano/texto/seleccion), unidad, instrumento, valor_min/max, opciones_json, obligatorio, created_at, updated_at
+- **`prod_unidades_medida`** (NUEVA): id, simbolo UNIQUE, nombre, categoria, factor, origen enum(hostinger/local), activo
+- **`prod_recetas`** (ALTER): + `observaciones_op TEXT NULL`
+- **`inv_analisis_inconsistencias`** (ALTER): rename fecha→fecha_analisis, +fecha_inventario, tipo_inconsistencia, estado, inventario_teorico/fisico, costo_unitario, costo_total_impacto, updated_at
+- **`inv_ajustes_historico`** (ALTER): rename fecha→fecha_ajuste, +fecha_planificado, estado, costo_total, error_msg, updated_at
+
+### Versiones desplegadas
+Producción: v0.3.5 → v0.4.10. Bundle servido v0.4.10 desde VPS Contabo.
+
+### Plan completado
+- `.agent/planes/completados/auditoria_inventarios_negativos_2026-04-28.md` (cierre 28-abr)
+
+---
 
 ## Completado 2026-04-29 — Sistema Gestión: bloque OPs + sidebar refactor + tiempos editables (v2.9.3 → v2.10.20)
 

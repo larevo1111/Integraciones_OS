@@ -1,8 +1,9 @@
 # Producción OS — Contexto del Subproyecto
 
 **Creado**: 2026-04-28
+**Actualizado**: 2026-04-30
 **Estado**: Operativo en VPS Contabo (`inv.oscomunidad.com`)
-**Versión actual**: v0.4.1
+**Versión actual**: v0.4.10
 
 ---
 
@@ -39,7 +40,7 @@ Placeholder — vista mensual de solicitudes programadas (próximamente).
 Libro maestro de recetas (110+ recetas validadas) por familia: mieles, chocolates, cremas_mani, infusiones, coberturas, tabletas, propóleo, polen, cacao_nibs, otros.
 
 ### 4. Receta detalle (`/recetas/:cod`) — **EDITABLE**
-Tablas Materiales / Productos / Costos editables in-place:
+Tablas Materiales / Productos / Costos / **Puntos críticos** editables in-place:
 - Combobox cod (búsqueda multi-palabra)
 - Input cantidad y costo unitario
 - Papelera por fila + "+Agregar" en header
@@ -47,7 +48,11 @@ Tablas Materiales / Productos / Costos editables in-place:
 - Totales recalculan en vivo
 - Botones "Descartar" / "Guardar cambios" aparecen solo cuando hay cambios
 
-Backend: `PUT /api/recetas/{cod}/full` reescribe los 3 sub-arreglos.
+Sección **"Observaciones para Effi"** (textarea editable): texto fijo que se inyecta en la observación de cada OP de ese producto. Se precarga editable en el modal "Programar OP" (el usuario puede ajustarlo por OP). Backend: `PATCH /api/recetas/{cod}` con `observaciones_op`.
+
+Sección **"Puntos críticos"** (tabla editable): parámetros medibles del proceso productivo con rango aceptable. Columnas: Parámetro, Tipo (numerico/booleano/texto/seleccion), Unidad (Combobox sobre maestra), Instrumento (datalist: Termómetro/Gramera/Cronómetro/Refractómetro/pH-metro/Higrómetro/Visual/Cuchillo), Mín, Máx, Opciones (CSV), Obligatorio. Inputs Mín/Máx/Unidad disabled si tipo≠numerico. Backend: `PUT /api/recetas/{cod}/full` reescribe puntos junto con materiales/costos/productos.
+
+Backend: `PUT /api/recetas/{cod}/full` reescribe los 4 sub-arreglos (materiales, productos, costos, puntos_criticos).
 
 ### 5. Inventarios (`/inventarios`, `/inventarios/:fecha`, `/catalogo`)
 Sub-app de inventarios físicos (módulo separado pero comparte backend). Ver [inventario_fisico.md](inventario_fisico.md).
@@ -79,10 +84,12 @@ Service files versionados en `scripts/produccion/` y `scripts/inventario/`. Para
 ## Tablas BD principales
 
 ### `inventario_produccion_effi` (VPS)
-- `prod_recetas` (110+) — libro maestro
-- `prod_recetas_materiales` — materiales por receta
-- `prod_recetas_productos` — productos coproducidos por receta
-- `prod_recetas_costos` — costos M.O. por receta
+- `prod_recetas` (110+) — libro maestro. Campos clave: `cod_articulo`, `nombre`, `familia`, `patron`, `estado` (borrador/validada), `notas_analisis`, **`observaciones_op`** (texto fijo que va a Effi), confianza (alta/media/baja)
+- `prod_recetas_materiales` — materiales por receta (cod_material, cantidad_por_lote, ratio_por_unidad, costo_unit_snapshot)
+- `prod_recetas_productos` — productos coproducidos (cod_articulo, es_principal, cantidad_por_lote, precio_min_venta_snapshot)
+- `prod_recetas_costos` — costos M.O. por receta (tipo_costo_id, cantidad_por_lote, costo_unit)
+- **`prod_recetas_puntos_criticos`** (NUEVA 2026-04-29) — parámetros de calidad por receta. FK receta_id ON DELETE CASCADE. Campos: parametro, tipo (numerico/booleano/texto/seleccion), unidad, instrumento, valor_min, valor_max, opciones_json, obligatorio, orden. El módulo Gestión OS leerá esta tabla cuando muestre puntos críticos en validación de OPs.
+- **`prod_unidades_medida`** (NUEVA 2026-04-29) — maestra de unidades. 35 entradas: 22 espejo de Hostinger `costos_unidades` + 13 locales para puntos críticos. Campos: simbolo UNIQUE, nombre, categoria, factor, origen (hostinger/local). Endpoint `GET /api/produccion/unidades`.
 - `prod_solicitudes` — solicitudes de producción del frontend
 - `prod_grupos` — agrupación de solicitudes en OP
 - `prod_ops_creadas` — histórico de OPs creadas desde el sistema (con log_creacion + duracion + estado)
@@ -92,8 +99,8 @@ Service files versionados en `scripts/produccion/` y `scripts/inventario/`. Para
 - `inv_auditorias` — log de cambios en conteos
 - `inv_observaciones` — notas por conteo
 - `inv_fechas` — meta de fechas de inventario (cierre, etc)
-- `inv_analisis_inconsistencias` (NUEVA 2026-04-28)
-- `inv_ajustes_historico` (NUEVA 2026-04-28, FK a análisis)
+- `inv_analisis_inconsistencias` (NUEVA 2026-04-28, ALTER 2026-04-29: +fecha_inventario, tipo_inconsistencia, estado, inventario_teorico/fisico, costo_unitario, costo_total_impacto, updated_at)
+- `inv_ajustes_historico` (NUEVA 2026-04-28, FK a análisis. ALTER 2026-04-29: +fecha_planificado, estado, costo_total, error_msg, updated_at)
 
 ### `os_integracion` (VPS) — espejo de Effi
 - `zeffi_inventario` — catálogo + stocks por bodega
@@ -117,6 +124,23 @@ Service files versionados en `scripts/produccion/` y `scripts/inventario/`. Para
 ### Ajustes de inventario en Effi (Playwright)
 - `scripts/import_ajuste_inventario.js <bodega_id> <archivo.xlsx> [observacion]`
 - Formato Excel en `plantilla_importacion_ajuste_inventario.xlsx`
+
+### Artículos en Effi (POST directo, sin Playwright) — 2026-04-29
+3 scripts Python con scraping de tokens cifrados:
+- **`scripts/import_articulo_anular_post.py`** — anula 1+ artículos. `python3 ... 587,588 [--csv archivo.csv] [--dry-run] [--delay 0.5]`. Scrapea ~10 páginas para mapear `cod → codigo cifrado` (Effi requiere ese token URL-encoded TAL CUAL del HTML, no desencodear).
+- **`scripts/import_articulo_crear_post.py`** — crea artículo. `python3 ... --nombre "X" --tipo 1 --categoria 47 --costo 1000`. Devuelve el id asignado scrapeando post-create.
+- **`scripts/import_articulo_modificar_post.py`** — modifica artículo. `python3 ... --cod 587 --nombre "Nuevo" --costo 5000` (cambio parcial: lee data-* actual del link `.modificar`, mergea con cambios, POSTea). Soporta `--json` para override completo.
+
+⚠️ Effi devuelve HTTP 200 SIEMPRE. El éxito real es `body=="OK"`. Cualquier otra respuesta (típicamente "Error en los parámetros internos recibidos") indica fallo. Validación documentada en `.claude/skills/effi-tecnico/SKILL.md` §3 y §13.
+
+### Calidad / Puntos críticos — 2026-04-29
+Doc completo en `.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md`:
+- Modelo 5S: Inspección genérica (vive en módulo Gestión OS) vs Puntos críticos (vive en ficha receta)
+- Reglas para definir puntos críticos: solo medible, máximo 3-5 por producto
+- Instrumentos disponibles en planta OS: termómetro, cronómetro, balanza, pH-metro (en agua + nevera), revisión organoléptica, test de PAPEL (NO cuchillo)
+- 13 productos PP CLAVE identificados (procesos base, no presentaciones derivadas)
+- Plantillas concretas por proceso (cocción mesa, templado, pasteurización miel, tostado cacao, tostado frutos secos, crema molienda, infusión, chocomiel, chocobeetal)
+- Estado: en validación con Santi lote por lote (al 30-abr 0 de 99 PP con puntos definidos)
 
 ## Flujos críticos
 
