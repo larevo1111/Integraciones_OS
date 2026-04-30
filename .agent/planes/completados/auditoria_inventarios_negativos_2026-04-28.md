@@ -9,7 +9,7 @@ Identificar TODOS los artículos vigentes con stock negativo en alguna bodega de
 - Todo ajuste y análisis queda en BD para histórico consultable, además del .md detallado en disco.
 
 ## Fase 0 — Infraestructura
-1. Carpeta `analisis_de_inventario/2026-04-28/` (versionada en git).
+1. Carpeta `inventario/analisis_de_inventario/2026-04-28/` (versionada en git).
 2. Tabla `inv_analisis_inconsistencias` en VPS `inventario_produccion_effi`:
    - `id, fecha, id_effi, nombre, bodega, stock_antes, problema, causa_raiz, evidencias_json, archivo_md, created_at`
 3. Tabla `inv_ajustes_historico` en VPS:
@@ -27,7 +27,7 @@ Por cada `(cod, bodega)` con negativo:
    - Traslado en una dirección sin contraparte
    - OP que consumió de bodega equivocada
    - Sobreconsumo (egreso mayor al stock)
-4. Escribir `analisis_de_inventario/2026-04-28/<cod>_<slug>_<bodega>.md` con:
+4. Escribir `inventario/analisis_de_inventario/2026-04-28/<cod>_<slug>_<bodega>.md` con:
    - Encabezado: cod, nombre, bodega, stock actual
    - Cronología completa
    - Causa raíz identificada

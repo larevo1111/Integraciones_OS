@@ -1,0 +1,298 @@
+﻿cod;nombre;;categoria;tipo;stock;costo_unit;valor_inventario;ult_material;ult_produccion;ult_compra;nunca_usado;accion_sugerida
+369;DESCUENTOS;;;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+564;Exhibidor Tableta Grande;;;Activo fijo (Propiedad, planta y equipo);0;22000;0;;;;SI;NO TOCAR (catálogo permanente)
+522;Exhibidor tableta pequeño;;;Activo fijo (Propiedad, planta y equipo);0;12000;0;;;;SI;NO TOCAR (catálogo permanente)
+378;DS AJO CRIOLLO X KG;x;DESARROLLO DE PRODUCTO;Materia prima;0;30000;0;;;;SI;CANDIDATO ANULAR — nunca usado
+274;DS CREMA DE AVELLANAS X KG;x;DESARROLLO DE PRODUCTO;Materia prima;0,46;72000;33120;;;;SI;REVISAR — tiene stock
+206;DS FRUTAS DESHIDRATADAS 250 GR MARZO 2024;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;;;;SI;CANDIDATO ANULAR — nunca usado
+383;DS MIEL INFUSIONADA EUCALIPTO 265g;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;1;0;;;;SI;CANDIDATO ANULAR — nunca usado
+381;DS MIEL INFUSIONADA ROMERO Y JENGIBRE 265g;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;1;0;;;;SI;CANDIDATO ANULAR — nunca usado
+386;DS ROMERO ALOE VERA 2024 X GRAMO;x;DESARROLLO DE PRODUCTO;Materia prima;0;0;0;;;;SI;CANDIDATO ANULAR — nunca usado
+288;Papel Kraf 120g cortado Tamaño carta pliego x 9uds;x;DESARROLLO DE PRODUCTO;Materia prima;0;650;0;;;;SI;CANDIDATO ANULAR — nunca usado
+287;Papel kraf 150g cortado Tamaño carta Pliego (100x70 CMS);x;DESARROLLO DE PRODUCTO;Materia prima;0;750;0;;;;SI;CANDIDATO ANULAR — nunca usado
+415;O01.01. Papeleria;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+416;O01.02. Impuestos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+417;O01.03. Gastos de publicidad e imagen;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+418;O01.04. Gastos desarrollo de producto;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+419;O01.05. Fletes Ventas OS;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+420;O01.06. Gastos de Venta OS;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+421;O01.07. Software;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+422;O01.08. Gestiones administrativas y legales;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+423;O01.09. Viaticos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+424;O01.10. Gastos Bancarios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+425;O01.11. Arriendo;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+426;O01.12. Servicios Publicos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+427;O01.13. Ferreteria;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+428;O01.14. Feria viaticos y general;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+429;O01.15. Feria gastos de venta;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+430;O01.16. Feria insumos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+431;O01.17. Gastos en mejoras y varios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+432;O01.18. Uniformes y dotacion;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+433;O01.19. Consumibles produccion;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+434;O01.20. Gastos Generales;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+435;O01.21. Tecnologia;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+436;O01.22. Fletes compras;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+437;O01.23. Estudios de mercado y competencia;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+438;O01.30. Por Identificar;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+439;O06.01. Herramientas;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+440;O06.02. Maquinas;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+441;O06.03. Activos Muebles;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+442;O06.04. Activos Fijos y reformas;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+443;O06.05. Vehiculos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+444;O06.06. Tecnologia;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+445;O06.07. Molderia general;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+446;O06.08. Material POP;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+447;O06.20. Otros Activos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+448;O07.01. Honorarios a socios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+449;O07.02. Comisiones miembros;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+450;O07.03. Honorarios a terceros;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+451;O07.04. Salarios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+452;O07.05. Eps;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+453;O07.06. Arl;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+454;O07.07. Pension;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+455;O07.08. Parafiscales;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+456;O07.09. Primas;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+457;O07.10. Cesantias;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+458;O07.11. Bonificaciones e incentivos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+459;O07.12. Pago Dividendos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+460;O07.13. Subsidio de transporte;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+461;O07.14. Comision x desempéño;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+462;O07.15. Pagos x Dia;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+463;O07.16. Comisiones red de amigos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+464;O07.17. Comisiones a terceros;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+465;O07.18. x;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+466;O07.19. x;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+467;O07.20. Pagos de Honorarios y dividendos General;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+468;O08.04. Pago Intereses Socios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+469;O08.05. Pago Intereses Familiares y amigos;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+470;O08.06. Pago Intereses Entidades Financieras;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+471;O08.10. Pago Deudas e Intereses:;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+472;O09.04. Inversiones Financieras;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+473;O10.01. Cursos y mentorias;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+475;O10.02. Estudios periodos medios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+474;O10.02. Talleres y seminarios;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+476;O10.10. Capacitaciones y Asesorias General;;GASTOS;Servicio;0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+587;Aji en polvo trinidad escorpio x grm;;T01.03. AGROECOLOGICOS GRAL;Materia prima;0;3500;0;;;;SI;CANDIDATO ANULAR — nunca usado
+585;ALMENDRA DE CACAO SAN LUIS;;T01.03. AGROECOLOGICOS GRAL;Materia prima;111;11000;1221000;;;;SI;REVISAR — tiene stock
+520;DESPERDICIO - CHOCOMIEL 80/20 x Kg;;T01.03. AGROECOLOGICOS GRAL;Producto en proceso;0;21276;0;;;;SI;CANDIDATO ANULAR — nunca usado
+324;ENVASE 500G CON PANAL X UNIDAD;;T01.03. AGROECOLOGICOS GRAL;Producto en proceso;0;0;0;;;;SI;CANDIDATO ANULAR — nunca usado
+54;MIEL APICA PROCESADA X KILO;x;T01.03. AGROECOLOGICOS GRAL;Producto en proceso;0;18700;0;;;;SI;CANDIDATO ANULAR — nunca usado
+233;Envase Vidrio MB30R Flint, 30cc, B. 41 C Tapa UNICOR;;T03.01. ENVASES Y TAPAS;Materia prima;0;784;0;;;;SI;CANDIDATO ANULAR — nunca usado
+64;TAPA METALICA B.53 UNICOR;;T03.01. ENVASES Y TAPAS;Materia prima;0;325,25;0;;;;SI;CANDIDATO ANULAR — nunca usado
+68;TAPA METALICA DORADA B.38 UNICOR;;T03.01. ENVASES Y TAPAS;Materia prima;0;183,2;0;;;;SI;CANDIDATO ANULAR — nunca usado
+95;BOLSA FLEX UP MINI 133 X 170 80-160 GRS ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;3;315,2;945,6;;;;SI;REVISAR — tiene stock
+96;BOLSA FLEX UP PEQUE 133 X 210 150-250 GRS ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;8;372,3;2978,4;;;;SI;REVISAR — tiene stock
+560;BOLSA FLEX UP VENTANA MED CON ETIQUETAS INFUSION 400 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;18;1487,4;26773,2;;;;SI;REVISAR — tiene stock
+566;BOLSA METALIZADA VENTANA CON ETIQUETAS ALMENDRA 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;5;1487,4;7437;;;;SI;REVISAR — tiene stock
+567;BOLSA METALIZADA VENTANA CON ETIQUETAS ALMENDRA DE CACAO 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+562;BOLSA METALIZADA VENTANA CON ETIQUETAS CHOCOLATE BOMBONES 250 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;12;1487,4;17848,8;;;;SI;REVISAR — tiene stock
+563;BOLSA METALIZADA VENTANA CON ETIQUETAS CHOCOLATE GRANULADO 250 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;16;1487,4;23798,4;;;;SI;REVISAR — tiene stock
+561;BOLSA METALIZADA VENTANA CON ETIQUETAS INFUSION 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+568;BOLSA METALIZADA VENTANA CON ETIQUETAS MACADAMIA 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+569;BOLSA METALIZADA VENTANA CON ETIQUETAS MARAÑON 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;4;1487,4;5949,6;;;;SI;REVISAR — tiene stock
+570;BOLSA METALIZADA VENTANA CON ETIQUETAS MIX FRUTOS SECOS 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+565;BOLSA METALIZADA VENTANA CON ETIQUETAS NIBS 200 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;15;1487,4;22311;;;;SI;REVISAR — tiene stock
+573;BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS ALMENDRA 100 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;12;1487,4;17848,8;;;;SI;REVISAR — tiene stock
+576;BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS ALMENDRA DE CACAO 100 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+572;BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS MACADAMIA 100 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;2;1487,4;2974,8;;;;SI;REVISAR — tiene stock
+574;BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS MARAÑON 100 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;8;1487,4;11899,2;;;;SI;REVISAR — tiene stock
+571;BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS MIX FRUTOS SECOS 100 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+575;BOLSA PEQUEÑA TRANSPARENTE CON ETIQUETAS NIBS 100 GR;;T03.03. ENVASES ECOLOGICOS;Producto en proceso;0;1487,4;0;;;;SI;CANDIDATO ANULAR — nunca usado
+142;RECIPACK 2.0 160X240FFA80MM FLEX UP TTE;;T03.03. ENVASES ECOLOGICOS;Materia prima;27;279;7533;;;;SI;REVISAR — tiene stock
+141;RECIPACK 2.0-AB 133X210FFA70MM FLEX UP TTE;;T03.03. ENVASES ECOLOGICOS;Materia prima;19;216;4104;;;;SI;REVISAR — tiene stock
+542;ETIQUETA MACADAMIA 100G TRASERA X UNIDAD;;T03.21. ETIQUETAS ADESIVAS;Materia prima;55;818;44990;;;;SI;REVISAR — tiene stock
+544;ETIQUETA MARAÑON 100G TRASERA X UNIDAD;;T03.21. ETIQUETAS ADESIVAS;Materia prima;45;1000;45000;;;;SI;REVISAR — tiene stock
+492;ETIQUETA MIEL OS 265G PLAST.;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;150;0;;;;SI;CANDIDATO ANULAR — nunca usado
+491;ETIQUETA MIEL OS 500G PLAST.;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;150;0;;;;SI;CANDIDATO ANULAR — nunca usado
+541;ETIQUETA MIX FRUTOS SECOS 100G TRASERA X UNIDAD;;T03.21. ETIQUETAS ADESIVAS;Materia prima;134;410;54940;;;;SI;REVISAR — tiene stock
+507;ETIQUETA PRECIOS X HOJA;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;6500;0;;;;SI;CANDIDATO ANULAR — nunca usado
+532;Etiqueta tableta tornasol 100p natural x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;22,5;0;;;;SI;CANDIDATO ANULAR — nunca usado
+531;Etiqueta tableta tornasol cacao organico x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;22,5;0;;;;SI;CANDIDATO ANULAR — nunca usado
+536;Etiqueta tableta tornasol con almendra x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;19,54;0;;;;SI;CANDIDATO ANULAR — nunca usado
+534;Etiqueta tableta tornasol con macadamia x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;19,54;0;;;;SI;CANDIDATO ANULAR — nunca usado
+535;Etiqueta tableta tornasol con mani x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;19,54;0;;;;SI;CANDIDATO ANULAR — nunca usado
+537;Etiqueta tableta tornasol con nibs de cacao x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;19,54;0;;;;SI;CANDIDATO ANULAR — nunca usado
+538;Etiqueta tableta tornasol con sal marina x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;19,54;0;;;;SI;CANDIDATO ANULAR — nunca usado
+533;Etiqueta tableta tornasol solo chocolate x unidad;;T03.21. ETIQUETAS ADESIVAS;Materia prima;0;19,54;0;;;;SI;CANDIDATO ANULAR — nunca usado
+578;Etiqueta Transparente Miel Panal 150 gr;;T03.21. ETIQUETAS ADESIVAS;Materia prima;11;300;3300;;;;SI;REVISAR — tiene stock
+577;Etiqueta Transparente Miel Panal 275 gr;;T03.21. ETIQUETAS ADESIVAS;Materia prima;2;300;600;;;;SI;REVISAR — tiene stock
+256;BOLSA PAPEL CON CARGADERA 50uds 23.5 x12 x 33 SIGMAPLAST;;T03.31. BOLSAS DE PAPEL;Materia prima;0;0;0;;;;SI;CANDIDATO ANULAR — nunca usado
+253;BOLSA FLEX UP 16 X 26 CON VALVULA;;T03.31. BOLSAS PLASTICAS;Materia prima;10;693,48;6934,8;;;;SI;REVISAR — tiene stock
+374;BOLSA GRAN FORMATO 13KG EMPAQUE MAT. PRIMA;;T03.31. BOLSAS PLASTICAS;Materia prima;1;2566,36;2566,36;;;;SI;REVISAR — tiene stock
+254;BOLSA PLANA FLEXIBLE15 X 20 CM CON VALVULA;;T03.31. BOLSAS PLASTICAS;Materia prima;15;302,81;4542,15;;;;SI;REVISAR — tiene stock
+341;BOLSA PLANA PET METALIZADA  FELXIBLE 16X28CM;;T03.31. BOLSAS PLASTICAS;Materia prima;50;405;20250;;;;SI;REVISAR — tiene stock
+338;BOLSA PLANA PET METALIZADA / FLEXIBLE SIN IMPRESION 16X22 EMPAQUE COBERTURA;;T03.31. BOLSAS PLASTICAS;Materia prima;4;318;1272;;;;SI;REVISAR — tiene stock
+375;BOLSA VERDE 35KG IMPRESA EMPAQUE MAT. PRIMA;;T03.31. BOLSAS PLASTICAS;Materia prima;0;6647;0;;;;SI;CANDIDATO ANULAR — nunca usado
+409;MOLDE POLICARBONATO AMAZON FIGURAS  VARIAS X UNIDAD;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);4;55000;220000;;;;SI;NO TOCAR (catálogo permanente)
+270;MOLDE POLICARBONATO AMAZON FIGURAS 9 - 12g X UNIDAD;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);19;55000;1045000;;;;SI;NO TOCAR (catálogo permanente)
+271;MOLDE POLICARBONATO AMAZON TABLETA  CUADRICULA X UNIDAD;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);16;15000;240000;;;;SI;NO TOCAR (catálogo permanente)
+408;MOLDE POLICARBONATO AMAZON TABLETA RAYA X UNIDAD;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);1;55000;55000;;;;SI;NO TOCAR (catálogo permanente)
+200;MOLDE POLICARBONATO FORMA CACAITO;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);2;55000;110000;;;;SI;NO TOCAR (catálogo permanente)
+202;REJILLA COCINA;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+203;TAPETE SILICONA;;T05.02. A.F. MOLDES;Activo fijo (Propiedad, planta y equipo);0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+304;Bowld Metálico de 32cms;;T05.03. HERRAMIENTAS;Activo fijo (Propiedad, planta y equipo);0;18500;0;;;;SI;NO TOCAR (catálogo permanente)
+234;Espátula Alta Temperatura 16pulg.;;T05.03. HERRAMIENTAS;Activo fijo (Propiedad, planta y equipo);1;31933;31933;;;;SI;NO TOCAR (catálogo permanente)
+201;ESPATULA BLANCA;;T05.03. HERRAMIENTAS;Activo fijo (Propiedad, planta y equipo);0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+221;PISTOLA DE CALOR RANGER;;T05.03. HERRAMIENTAS;Activo fijo (Propiedad, planta y equipo);0;100840;0;;;;SI;NO TOCAR (catálogo permanente)
+211;REFINADORA CHOCOLATE PREMIER1;;T05.03. HERRAMIENTAS;Activo fijo (Propiedad, planta y equipo);0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+210;TERMOMIX;;T05.03. HERRAMIENTAS;Activo fijo (Propiedad, planta y equipo);0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+286;Amonio Cuaternario x litro (Limpieza y desinfección);;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;1;12700;12700;;;;SI;REVISAR — tiene stock
+280;BATA DESECHABLE POLIPROPILENO X UNIDAD;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;10;5090;50900;;;;SI;REVISAR — tiene stock
+224;CABUYA TAMBOR X 25METROS;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;3000;0;;;;SI;CANDIDATO ANULAR — nunca usado
+281;GORRO DESECHABLE BLANCO X 100 UNIDADS;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;1;19300;19300;;;;SI;REVISAR — tiene stock
+282;GUANTES DE NITRILO TALLA M CAJA X 50 PARES;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;1;33000;33000;;;;SI;REVISAR — tiene stock
+260;PAPEL PARAFINADO ROLLO X 100M EMPAQUES Y DESECHABLES LA MAYORISTA;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;20000;0;;;;SI;CANDIDATO ANULAR — nunca usado
+257;PLATO CANOA BAMBÚ 10CMS 25uds SIGMAPLAST;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;22400;0;;;;SI;CANDIDATO ANULAR — nunca usado
+258;ROLLO EXTENSIBLE PLASTICO ALIMENTOS RAP 300M;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;16500;0;;;;SI;CANDIDATO ANULAR — nunca usado
+259;TOALLA DE PAPEL PARA COCINA x 3 Rollos;;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;11000;0;;;;SI;CANDIDATO ANULAR — nunca usado
+340;VINAGRE / ACIDO ACETICO X 3 LITROS / MINORISTA (LIMPIEZA Y DESINFECCION);;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;4800;0;;;;SI;CANDIDATO ANULAR — nunca usado
+59;DESCASCARILLADO CF CACAO;;T09.01. SERVICIOS MAQUILA;Servicio;0;2000;0;;;;SI;NO TOCAR (catálogo permanente)
+177;ENMOLDADO DE CHOCOLATE X KG;;T09.01. SERVICIOS MAQUILA;Servicio;0;5000;0;;;;SI;NO TOCAR (catálogo permanente)
+176;MAQUILA OBTENCION DE NIBS DE CACAO X KG;;T09.01. SERVICIOS MAQUILA;Servicio;0;4845;0;;;;SI;NO TOCAR (catálogo permanente)
+94;PROCESO MOLDEADO CHOCOLATE DE MESA;;T09.01. SERVICIOS MAQUILA;Servicio;0;3000;0;;;;SI;NO TOCAR (catálogo permanente)
+57;REFINADO CACAO 24H;;T09.01. SERVICIOS MAQUILA;Servicio;0;7000;0;;;;SI;NO TOCAR (catálogo permanente)
+56;REFINADO CF CACAO 12H;;T09.01. SERVICIOS MAQUILA;Servicio;0;5000;0;;;;SI;NO TOCAR (catálogo permanente)
+58;TOSTADO CF CACAO;;T09.01. SERVICIOS MAQUILA;Servicio;0;2000;0;;;;SI;NO TOCAR (catálogo permanente)
+150;MANO DE OBRA OS GENERAL;;T09.02. SERVICIOS M.O.;Servicio;0;1;0;;;;SI;NO TOCAR (catálogo permanente)
+117;PROCESO EMPACADO CHOCOLATE;;T09.02. SERVICIOS M.O.;Servicio;0;800;0;;;;SI;NO TOCAR (catálogo permanente)
+161;Domicilio;;T09.06. SERVICIOS LOGISTICA;Servicio;0;8000;0;;;;SI;NO TOCAR (catálogo permanente)
+236;Flete Mercadolibre;;T09.06. SERVICIOS LOGISTICA;Servicio;0;9100;0;;;;SI;NO TOCAR (catálogo permanente)
+166;Comision bold;;T09.10. SERVICIOS GENERALES;Servicio;0;1;0;;;;SI;NO TOCAR (catálogo permanente)
+216;ABAS TOSTADAS X KG;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;33000;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+112;ACEITE DE MANI THAI 1 LT BEST CHOICE;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;73500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+219;AJONJOLÍ TOSTADO X GRAMO;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;26;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+4;Articulo 1Y;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;700;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+220;BANANO DESHIDRATADO X GRAMO;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;137;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+255;BOLSA DE PAPEL ANTIGRASA 2LB X 100UDS;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;12353;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+359;CASCARILLA DE CACAO SF x KL;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;4500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+19;CHOCOLATE MESA OS BOLSA 135 GRS PORCIONADA (15p);x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;7240;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+17;CHOCOLATE MESA OS BOLSA 400 GRS PORCIONADA (44p);x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;17421;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+28;CREMA DE CHOCOLATE ARTESANAL OS 130 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;6399,67;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+24;CREMA DE CHOCOLATE ARTESANAL OS 250 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;9814,75;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+152;CREMA DE CHOCOLATE ARTESANAL OS X KILO;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;28459;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+106;CUCHARA MIELERA ECOSANOS GRANDE;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;5000;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+199;DS LECITINA 60 CC. MARZO 2024;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;60;0;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+230;DS MIEL VAINILLA CARAMELIZADA 2024;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;0;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+204;DS MOSTAZA AMARILLA MARZO 2024;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;500;0;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+197;DS SEMILLA DE CALABAZA MARZO 2024;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;0;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+198;DS SOYA TOSTADA MARZO 2024;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;0;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+22;DULCE DE LECHE MIEL OS 130 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;5986,26;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+62;ENVASADO APICA;;T999. PRODUCTOS QUE NO SE USAN;Servicio;0;700;0;;;;SI;NO TOCAR (catálogo permanente)
+70;ENVASE PET DISCORDOBA 500 CC B.28;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;6;475;2850;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+81;Envase Pet Salsa Mixta R 0081SAL200, 200cc SOLO ENVASES;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;504,21;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+63;ENVASE VIDRIO R 3590, 255 CC B.53 UNICOR;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;10;945,4;9454;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+84;ENVASE VIDRIO R. 4353, 400 CC, B.38 C Tapa UNICOR;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;1088,3;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+69;ENVASE VIDRIO R. 4353, 400 CC, B.38 UNICOR;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;905,1;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+61;FILTRADO APICA;;T999. PRODUCTOS QUE NO SE USAN;Servicio;0;500;0;;;;SI;NO TOCAR (catálogo permanente)
+515;Guayusa hojas x Kg;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;175000;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+51;MIEL APICA X 1.370 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;32500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+48;MIEL APICA X 180 GR;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;6000;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+47;MIEL APICA X 320 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;10500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+52;MIEL APICA X 5 KG;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;93500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+50;MIEL APICA X 688 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;16500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+49;MIEL APICA X MEDIA 500GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;14000;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+248;Miel Os Bolsa 700 grs;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;13445;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+10;MIEL OS PLASTICO 715grs;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;13856;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+7;MIEL OS VIDRIO 400grs;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;8822,87;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+8;MIEL OS VIDRIO 565grs;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;11717,22;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+218;PIÑA DESHIDRATADA X GRAMO;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;100;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+217;PITAHAYA DESHIDRATADA X GRAMO;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;190;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+168;POLEN DE ABEJA OS 200 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;12158;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+185;Stevia Sg90 xgr;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;480;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+66;Tapa Fliptop R-28 Salsa Negra SOLO ENVASES;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;294,12;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+160;Taza infusion cacao, menta y polen;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;800;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+223;TELA CABUYA FIQUE ANCHO 1,2 X METRO;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;5000;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+222;TELA YUTE  ANCHOO 1.5 X METRO;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;22500;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+157;Yerbabuena x gramo;x;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;50;0;;;;SI;ANULAR EN EFFI (ya etiquetado como no usado)
+172;CUCHARA MIELERA GRANDE;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;1;2850;2850;;;;SI;REVISAR — tiene stock
+145;CUCHARA MIELERA MEDIANA;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;7;2550;17850;;;;SI;REVISAR — tiene stock
+12;Miel os plastico 265 grs;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;6222;0;;;;SI;CANDIDATO ANULAR — nunca usado
+499;Tableta Chocolate 100Pgm (sin empacar);;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto terminado;0;5200;0;;;;SI;CANDIDATO ANULAR — nunca usado
+489;Tableta Chocolate 73p 50 grs pack x 5 CPM;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;29856;0;;;;SI;CANDIDATO ANULAR — nunca usado
+321;CHOCOLATE MESA GRANULADO OS BOLSA 1 KILO;;TPT.02. VENTA OTROS;Producto en proceso;0;41275;0;;;;SI;CANDIDATO ANULAR — nunca usado
+245;EXHIBIDOR GRANDE MADERA 3 NIVELES;;XMATERIAL DE APOYO VENTAS POP;Activo fijo (Propiedad, planta y equipo);0;60000;0;;;;SI;NO TOCAR (catálogo permanente)
+246;HABLADOR EN ACRILICO BASE MADERA;;XMATERIAL DE APOYO VENTAS POP;Activo fijo (Propiedad, planta y equipo);4;28000;112000;;;;SI;NO TOCAR (catálogo permanente)
+391;HABLADOR MADERA;;XMATERIAL DE APOYO VENTAS POP;Activo fijo (Propiedad, planta y equipo);0;28000;0;;;;SI;NO TOCAR (catálogo permanente)
+268;VITRINA RODAJA MADERA;;XMATERIAL DE APOYO VENTAS POP;Activo fijo (Propiedad, planta y equipo);0;0;0;;;;SI;NO TOCAR (catálogo permanente)
+394;CREMA DE MACADAMIA CON NIBS OS 110 GRS;;DESARROLLO DE PRODUCTO;Producto en proceso;0;10332;0;;11/01/2025 23:01;;NO;CANDIDATO ANULAR — sin uso >1 año
+395;CREMA DE MACADAMIA CON NIBS OS 200 GRS;;DESARROLLO DE PRODUCTO;Producto en proceso;0;16672;0;;11/01/2025 23:01;;NO;CANDIDATO ANULAR — sin uso >1 año
+393;CREMA DE MACADAMIA CON NIBS OS 60 GRS;;DESARROLLO DE PRODUCTO;Producto en proceso;0;6696;0;;11/01/2025 23:01;;NO;CANDIDATO ANULAR — sin uso >1 año
+388;CREMA DE MACADAMIA CON NIBS X KILO;;DESARROLLO DE PRODUCTO;Producto en proceso;0;1;0;31/01/2025 23:24;31/01/2025 23:24;;NO;CANDIDATO ANULAR — sin uso >1 año
+487;DS Bombon Chocolate Relleno Macadamia;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;3000;0;;7/03/2025 21:23;;NO;CANDIDATO ANULAR — sin uso >1 año
+486;DS Bombon Chocolate Relleno Mani;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;3000;0;;7/03/2025 21:23;;NO;CANDIDATO ANULAR — sin uso >1 año
+488;DS Bombon Chocolate Relleno Miel;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;3000;0;;7/03/2025 21:23;;NO;CANDIDATO ANULAR — sin uso >1 año
+192;DS COBERTURA DE CHOCOLATE MARZO 2024 X KILO;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;20/09/2024 13:52;14/08/2024 7:19;;NO;CANDIDATO ANULAR — sin uso >1 año
+285;DS COBERTURA MIEL X KILO;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;;31/07/2024 8:52;;NO;CANDIDATO ANULAR — sin uso >1 año
+370;DS Crema de chocolate receta 1 x gramo;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;;18/12/2024 17:31;;NO;CANDIDATO ANULAR — sin uso >1 año
+371;DS Crema de chocolate receta 2 x gramo;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;;15/11/2024 19:41;;NO;CANDIDATO ANULAR — sin uso >1 año
+382;DS MIEL INFUSIONADA  AJO CRIOLLO 265g;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;1;0;;17/03/2025 20:26;;NO;CANDIDATO ANULAR — sin uso >1 año
+385;DS MIEL INFUSIONADA ALOE VERA 265g;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;1;0;;23/04/2025 5:44;;NO;CANDIDATO ANULAR — sin uso >1 año
+276;DS Miel OS bolsa con válvula x Gramo;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;;18/12/2024 17:43;;NO;CANDIDATO ANULAR — sin uso >1 año
+277;DS Miel y Polen x gramo;x;DESARROLLO DE PRODUCTO;Producto en proceso;0;0;0;;18/12/2024 17:43;;NO;CANDIDATO ANULAR — sin uso >1 año
+328;Lecitina de Girasol X kg;x;DESARROLLO DE PRODUCTO;Materia prima;0;15000;0;11/09/2024 11:43;;;NO;CANDIDATO ANULAR — sin uso >1 año
+137;MANI SIN CASCARA X KILO;;T01.03. AGROECOLOGICOS GRAL;Materia prima;18;11000;198000;12/04/2024 12:29;;;NO;REVISAR — tiene stock
+337;ENVASE MB50R FLINT 50CCTO B.45 DEGUSTACION REDONDO;;T03.01. ENVASES Y TAPAS;Materia prima;0;915;0;6/11/2024 13:23;;;NO;CANDIDATO ANULAR — sin uso >1 año
+65;;x;T03.01. ENVASES Y TAPAS;Materia prima;0;462,2;0;9/03/2025 19:56;;;NO;CANDIDATO ANULAR — sin uso >1 año
+135;ENVASE VIDRIO R 4186-2465, 130 CC B.48 C Tapa UNICOR;;T03.01. ENVASES Y TAPAS;Materia prima;0;947;0;8/02/2025 13:12;;;NO;CANDIDATO ANULAR — sin uso >1 año
+208;Envase Vidrio R mb110h Flint, 110cc, B. 46 UNICOR;;T03.01. ENVASES Y TAPAS;Materia prima;0;1020,2;0;27/02/2025 16:16;;;NO;CANDIDATO ANULAR — sin uso >1 año
+78;TAPA METALICA B.63 X UNIDAD;;T03.01. ENVASES Y TAPAS;Materia prima;84;370;31080;11/02/2025 15:17;10/09/2024 23:09;;NO;REVISAR — tiene stock
+322;TAPA METÁLICA B46 X UNIDAD;;T03.01. ENVASES Y TAPAS;Materia prima;24;200;4800;11/02/2025 15:17;;;NO;REVISAR — tiene stock
+180;TAPA METALICA DORADA B.48;;T03.01. ENVASES Y TAPAS;Materia prima;0;462;0;17/01/2025 10:23;;;NO;CANDIDATO ANULAR — sin uso >1 año
+139;BOLSA DOY PACK PET/FLEXIBLE SIN IMPRESION TRANSPARENTE 7.0 X 8.0 80 MICRAS CON VALVULA;;T03.03. ENVASES ECOLOGICOS;Materia prima;0;0;0;13/09/2024 22:31;;;NO;CANDIDATO ANULAR — sin uso >1 año
+98;BOLSA FLEX UP GRANDE 190 X 250 480-650 GRS ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;0;591,6;0;12/06/2024 11:06;;;NO;CANDIDATO ANULAR — sin uso >1 año
+99;BOLSA FLEX UP VENTANA PEQUE 133 X 210 150-250 GRS ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;8;382,36;3058,88;21/05/2024 17:30;;;NO;REVISAR — tiene stock
+101;BOLSA TRANSP VALVULA DOY PACK 10 X 18 + FFA 6cms 200 - 300 GRS (ABIERTA) Bolsa transparente con tapa pequeña ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;1;344,6;344,6;18/12/2024 17:45;;;NO;REVISAR — tiene stock
+102;BOLSA TRANSP VALVULA DOY PACK 10 X 18 + FFA 6cms 200 - 300 GRS (CERRADA) Bolsa transparente con tapa pequeña ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;45;345;15525;19/12/2024 12:31;;;NO;REVISAR — tiene stock
+103;BOLSA TRANSP VALVULA DOY PACK 13.3 X 21 + FFA 7cms 300 - 400 GRS (ABIERTA) Bolsa transparente con tapa mediana ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;6;458;2748;1/05/2024 13:01;;;NO;REVISAR — tiene stock
+104;BOLSA TRANSP VALVULA DOY PACK 13.3 X 21 + FFA 7cms 300 - 400 GRS (CERRADA) Bolsa transparente con tapa mediana ALICO;;T03.03. ENVASES ECOLOGICOS;Materia prima;32;458;14656;30/01/2024 11:52;;;NO;REVISAR — tiene stock
+140;RECIPACK 2.0 - AB 100X180FFA60MM FLEX UP TTE;;T03.03. ENVASES ECOLOGICOS;Materia prima;27;236;6372;13/09/2024 14:21;;;NO;REVISAR — tiene stock
+403;ETIQUETA CREMA DE MACADAMIA CON NIBS DE CACAO 110g;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;36;150;5400;11/01/2025 23:01;;;NO;REVISAR — tiene stock
+404;ETIQUETA CREMA DE MACADAMIA CON NIBS DE CACAO 200g;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;36;150;5400;11/01/2025 23:01;;;NO;REVISAR — tiene stock
+402;ETIQUETA CREMA DE MACADAMIA CON NIBS DE CACAO 60g;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;48;150;7200;11/01/2025 23:01;;;NO;REVISAR — tiene stock
+354;ETIQUETA MIEL OS CARMEN CRISTALIZADA  1000G;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;24;150;3600;27/11/2024 13:37;;;NO;REVISAR — tiene stock
+351;ETIQUETA MIEL OS CARMEN CRISTALIZADA  150G;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;38;150;5700;14/01/2025 17:53;;;NO;REVISAR — tiene stock
+352;ETIQUETA MIEL OS CARMEN CRISTALIZADA  275G;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;33;150;4950;17/03/2025 12:25;;;NO;REVISAR — tiene stock
+353;ETIQUETA MIEL OS CARMEN CRISTALIZADA  640G;x;T03.21. ETIQUETAS ADESIVAS;Materia prima;36;150;5400;17/03/2025 12:25;;;NO;REVISAR — tiene stock
+179;Empaque mini para muestra de chocolate de mesa;;T03.41. CAJAS;Materia prima;74;1000;74000;21/04/2025 11:00;;;NO;REVISAR — tiene stock
+269;PINCHO PINZA BAMBÚ BE-GREEN PARA DEGUSTACIÓN X 20UDS;x;T05.06. CONSUMIBLES PRODUCCION Y VENTAS;Materia prima;0;4202;0;;;4/07/2024 19:14;NO;CANDIDATO ANULAR — sin uso >1 año
+23;AREQUIPE MIEL OS 130 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;6615,98;0;;2/02/2024 11:26;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+242;AREQUIPE MIEL OS 230 GRS;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;10208;0;;1/05/2024 13:07;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+149;AREQUIPE MIEL OS X KILO;x;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;32646;0;1/05/2024 13:07;1/05/2024 13:01;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+115;AVELLANA GR;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;72;0;18/03/2024 16:22;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+212;Bicarbonato x gramo;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;15;0;1/05/2024 13:01;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+392;Cacao Almendra x Kg. Proveedores Varios San Carlos;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;27000;0;17/02/2025 12:59;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+267;CAJA KIT VENTANA PEQUEÑA X UNIDAD;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;4000;0;17/06/2024 12:08;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+158;CAJA POLEN, MIEL, PROPOLO Y MIELERO PEQ.;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;21293;0;;17/06/2024 12:08;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+214;Caramelo de miel pulverizado x gramo;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;32;0;;16/04/2024 9:38;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+215;Caramelo de panela x gramo;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;65;0;1/05/2024 10:49;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+207;CHOCOLATE EN POLVO X Kg;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;0;0;11/02/2025 18:13;13/12/2024 15:04;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+18;CHOCOLATE MESA OS BOLSA 200 GRS PORCIONADA (22P);X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;9737;0;11/07/2024 18:06;12/06/2024 18:27;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+26;CHOCOLATE MESA OS BOLSA 300 GRS PORCIONADA (33p);X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;13279;0;4/07/2024 15:52;18/01/2024 12:14;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+189;DS AREQUIPE DE MIEL MARZO 2024;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;0;0;;18/03/2024 11:57;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+190;DS CREMA DE CHOCOLATE MARZO 2024;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;0;0;19/03/2024 22:47;19/03/2024 22:47;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+372;DS Crema de miel x Kg;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0,88;15000;13200;;12/11/2024 16:02;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+194;DS NUEZ DEL BRASIL X GRAMO MARZO 2024;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;0;0;7/08/2024 16:47;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+184;DS STEVIA Sg45 X GR MARZO 2024;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;370,4;0;20/03/2024 15:33;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+148;DULCE DE LECHE MIEL OS X KILO;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;27802;0;;30/01/2024 11:52;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+82;ENVASE VIDRIO R 3590, 255 CC B.53 C Tapa  UNICOR;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;10;1270;12700;15/11/2024 20:09;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+181;Envase Vidrio R 4267 Flint, 450cc, B.89, C Tapa UNICOR;;T999. PRODUCTOS QUE NO SE USAN;Materia prima;8;2242;17936;15/11/2024 16:54;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+83;ENVASE VIDRIO R 4423, 280 CC B.38 C Tapa UNICOR;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;973,2;0;9/02/2025 15:45;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+67;ENVASE VIDRIO R 4423, 280 CC B.38 UNICOR;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;790;0;13/12/2024 12:46;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+27;INFUSION DE CACAO OS CON MENTA, POLEN X 100 GRS;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;3213,08;0;5/07/2024 9:49;26/04/2024 16:05;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+153;INFUSION DE CACAO OS CON MENTA, POLEN Y YERBABUENA X KILO;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;13585;0;;;22/11/2023 11:55;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+170;PROPOLEO OS 325 grs;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;7657,9;0;12/04/2024 12:53;3/02/2024 17:41;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+213;Sal Común x Gramo;X;T999. PRODUCTOS QUE NO SE USAN;Materia prima;0;2,5;0;1/05/2024 13:01;;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+159;TAZA CHOCOLATE LECHE 7OZ;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;1500;0;;3/02/2024 19:55;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+175;TAZA CHOCOLATE LECHE 7OZ + COMPLEMENTO;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;2800;0;;3/02/2024 19:55;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+174;TAZA POLEN Y JUGO;X;T999. PRODUCTOS QUE NO SE USAN;Producto en proceso;0;3000;0;;3/02/2024 19:55;;NO;ANULAR EN EFFI (ya etiquetado como no usado)
+398;CREMA DE MANI BOLSA PLANA VALVULA PERFORACION  (ID 138);;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;1;0;;19/12/2024 12:31;;NO;CANDIDATO ANULAR — sin uso >1 año
+144;CUCHARA MIELERA PEQUEÑA;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;41;1715;70315;17/06/2024 12:08;22/05/2024 16:14;;NO;REVISAR — tiene stock
+397;DS CREMA DE MANI DOY PACK 10X18 (ID102);;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;1;0;;19/12/2024 12:31;;NO;CANDIDATO ANULAR — sin uso >1 año
+350;Miel OS Carmen 1000 grs;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;20837;0;;27/11/2024 13:37;;NO;CANDIDATO ANULAR — sin uso >1 año
+361;Miel Os Carmen degustacion 65 grs;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;1;0;;6/11/2024 13:23;;NO;CANDIDATO ANULAR — sin uso >1 año
+9;MIEL OS PLASTICO 500grs;;TPT.01. VENTA AGROECOLOGICOS VARIOS;Producto en proceso;0;10250;0;30/05/2024 9:15;9/03/2025 19:56;;NO;CANDIDATO ANULAR — sin uso >1 año
+335;DEGUSTACION DOY PACK 45gm Miel;;TPT.02. VENTA OTROS;Producto en proceso;0;3000;0;;13/09/2024 22:31;;NO;CANDIDATO ANULAR — sin uso >1 año
+336;DEGUSTACION DOY PACK 45gm Propoleo;;TPT.02. VENTA OTROS;Producto en proceso;0;3000;0;;13/09/2024 22:31;;NO;CANDIDATO ANULAR — sin uso >1 año
+173;Muestra Chocolate de mesa 2 porciones;;TPT.02. VENTA OTROS;Producto en proceso;5;2000;10000;;21/04/2025 11:00;;NO;REVISAR — tiene stock
+235;EXHIBIDOR MEDIANO MADERA 2 NIVELES;;XMATERIAL DE APOYO VENTAS POP;Activo fijo (Propiedad, planta y equipo);0;35000;0;;;4/07/2024 19:14;NO;NO TOCAR (catálogo permanente)
+251;EXHIBIDOR PEQUEÑO MADERA 1 NIVEL;;XMATERIAL DE APOYO VENTAS POP;Activo fijo (Propiedad, planta y equipo);0;0;0;;;4/07/2024 19:14;NO;NO TOCAR (catálogo permanente)

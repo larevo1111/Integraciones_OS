@@ -163,7 +163,7 @@ Doc completo en `.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md`:
 ### Auditoría de inconsistencias
 1. Detección masiva de stocks negativos por bodega (query a `zeffi_inventario`)
 2. Análisis trazabilidad por (cod, bodega) → causa raíz + recomendación
-3. `.md` por caso en `analisis_de_inventario/<fecha>/` + INSERT en `inv_analisis_inconsistencias`
+3. `.md` por caso en `inventario/analisis_de_inventario/<fecha>/` + INSERT en `inv_analisis_inconsistencias`
 4. Ajustes Effi (Playwright) agrupados por bodega → INSERT en `inv_ajustes_historico` con FK
 5. Refresh Effi para verificar que negativos quedaron en 0
 

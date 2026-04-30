@@ -1096,7 +1096,7 @@ Scripts Python que interactúan con Effi vía POST directo a sus endpoints inter
   - Delay entre POSTs: `--delay 0.5` (default 0.5s)
 - **Estrategia**: scrapea `/app/articulo` paginado (~10 páginas, 50 articulos por página) → mapa `cod → codigo cifrado` (extraído de `<a class="modificar" data-codigo="..." data-id="N">`). El token cifrado se invalida tras anular en la misma página → re-scrape automático en caso de fallo.
 - **Bug fix crítico (29-abr)**: Effi requiere el `codigo` URL-encoded literal (`%3D%3D`), NO desencodear con `unquote()`. Si se desencodea, falla con "Error en los parámetros internos recibidos".
-- **Test pasado**: 94/94 artículos depurados el 29-abr (auditoría `analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.csv`).
+- **Test pasado**: 94/94 artículos depurados el 29-abr (auditoría `inventario/analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.csv`).
 
 ### import_articulo_crear_post.py — 2026-04-29
 - **Propósito**: Crear artículo nuevo en Effi

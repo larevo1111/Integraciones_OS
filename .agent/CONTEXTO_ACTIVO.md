@@ -23,7 +23,7 @@ Sesión grande del 29-30 abr en módulo Producción (`inv.oscomunidad.com`), 7 f
 
 ### C. Auditoría 297 candidatos a depurar + 94 anulados en Effi
 - Query a `os_integracion`: artículos vigentes + sin uso como material/producto/compra desde 2025-04-29 (1 año). Detectó **297 candidatos** ($4.066.140 valor inventario; 216 nunca usados; 64 con stock).
-- Generado `analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.md` y `.csv` (separador `;`, UTF-8 BOM, columna `accion_sugerida` con 5 valores).
+- Generado `inventario/analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.md` y `.csv` (separador `;`, UTF-8 BOM, columna `accion_sugerida` con 5 valores).
 - Santi marcó **94 con X** en el CSV → ejecutados via script anular masivo.
 - 1ra ronda detectó bug crítico (URL-encoding del token cifrado), 2da ronda con fix completó **94/94 anulados**. Reversibles vía "Reactivar" en Effi.
 
@@ -162,7 +162,7 @@ Memoria: [feedback_ssh_tunnel_cache.md](../../.claude/projects/-home-osserver-Pr
 
 ### D. Auditoría inventarios negativos 2026-04-28 (módulo nuevo)
 **22 stocks negativos** detectados en bodegas de Effi (18 en Principal + 4 en Productos No Conformes Bod PPAL). Por cada caso:
-- Análisis profundo trazabilidad + conteos previos + causa raíz → archivo `.md` en `analisis_de_inventario/2026-04-28/<cod>_<nombre>_<bodega>.md` (22 archivos + RESUMEN.md)
+- Análisis profundo trazabilidad + conteos previos + causa raíz → archivo `.md` en `inventario/analisis_de_inventario/2026-04-28/<cod>_<nombre>_<bodega>.md` (22 archivos + RESUMEN.md)
 - Registro en BD VPS `inventario_produccion_effi`:
   - Tabla nueva **`inv_analisis_inconsistencias`**: `id, fecha, id_effi, nombre, bodega, stock_antes, problema, causa_raiz, evidencias_json, archivo_md, creado_por, created_at`
   - Tabla nueva **`inv_ajustes_historico`**: `id, analisis_id (FK), fecha, id_effi, bodega, tipo (ingreso/egreso), cantidad, stock_antes, stock_despues, op_ajuste_effi, motivo, ejecutado_por, created_at`

@@ -24,8 +24,8 @@
 - **Correcciones documentadas**: 11 costos manuales, error Nibs (358→178), Almendra maquila (0→118kg)
 - **Inventario parcial 20 abril 2026**: completado, 28→33 artículos (con esterilizados), ajustes aplicados, cero artículos negativos en Effi
 - **Inventario parcial 28 abril 2026**: 120 artículos (chocobeetal, nibs, mani, bombones, granulado, envases vidrio esteril+UNICOR, almendra + 16 negativos previos + infusiones 238/497)
-- **Auditoría stocks negativos 28-abr-2026**: 22 artículos analizados (18 Principal + 4 No Conformes), causa raíz documentada en `analisis_de_inventario/2026-04-28/`, ajustes Effi #369 (306 und) + #370 (56 und) — todos los negativos a 0
-- **Depuración catálogo Effi 29-abr-2026**: query a `os_integracion` detectó 297 artículos vigentes sin uso desde 2025-04-29 ($4.066.140 valor inventario; 216 nunca usados). Listado en `analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.{md,csv}`. Santi marcó 94 con X en el CSV → ejecutados via `scripts/import_articulo_anular_post.py` (POST directo, NO Playwright). 94/94 anulados en Effi (reversibles vía "Reactivar"). Distribución: 64 ya etiquetados T999, 14 sin uso >1 año, 8 nunca usados, 8 con stock pero obsoletos.
+- **Auditoría stocks negativos 28-abr-2026**: 22 artículos analizados (18 Principal + 4 No Conformes), causa raíz documentada en `inventario/analisis_de_inventario/2026-04-28/`, ajustes Effi #369 (306 und) + #370 (56 und) — todos los negativos a 0
+- **Depuración catálogo Effi 29-abr-2026**: query a `os_integracion` detectó 297 artículos vigentes sin uso desde 2025-04-29 ($4.066.140 valor inventario; 216 nunca usados). Listado en `inventario/analisis_de_inventario/2026-04-29/depuracion_articulos_inactivos.{md,csv}`. Santi marcó 94 con X en el CSV → ejecutados via `scripts/import_articulo_anular_post.py` (POST directo, NO Playwright). 94/94 anulados en Effi (reversibles vía "Reactivar"). Distribución: 64 ya etiquetados T999, 14 sin uso >1 año, 8 nunca usados, 8 con stock pero obsoletos.
 - **Inventarios parciales**: operativos con preselección inteligente (`/api/inventario/sugerir-articulos`)
 - **Costo**: migrado de costo_promedio a costo_manual en todo el sistema
 - **App**: corre desde VPS Contabo (`inv.oscomunidad.com`), API en puerto 9600 (Producción) y 9401 (Inventario), BD `inventario_produccion_effi` en modo `direct`
@@ -54,7 +54,7 @@ Backend (`scripts/inventario/api.py`):
 - `GET /api/inventario/inconsistencias/{id}` (con `contenido_md` cargado)
 - `GET /api/inventario/historico-ajustes?fecha=&cod=&bodega=&limit=`
 
-Carpeta `analisis_de_inventario/<YYYY-MM-DD>/` (versionada en git):
+Carpeta `inventario/analisis_de_inventario/<YYYY-MM-DD>/` (versionada en git):
 - Un `.md` por caso con trazabilidad completa, conteos previos, causa identificada
 - `RESUMEN.md` índice de la fecha
 

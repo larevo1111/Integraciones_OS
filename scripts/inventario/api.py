@@ -1659,7 +1659,7 @@ def detalle_inconsistencia(id: int):
     # Cargar contenido del .md si existe
     if a.get('archivo_md'):
         repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        md_path = os.path.join(repo, 'analisis_de_inventario', str(a['fecha_analisis']), a['archivo_md'])
+        md_path = os.path.join(repo, 'inventario', 'analisis_de_inventario', str(a['fecha_analisis']), a['archivo_md'])
         if os.path.isfile(md_path):
             with open(md_path) as f: a['contenido_md'] = f.read()
     return a
