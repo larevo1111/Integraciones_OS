@@ -1444,8 +1444,7 @@ app.get('/api/gestion/op', async (req, res) => {
       ${whereSql}
       GROUP BY e.id_orden, e.estado, e.vigencia, e.nombre_encargado,
                e.id_encargado, e.fecha_inicial, e.fecha_final, e.fecha_de_creacion
-      ORDER BY FIELD(e.estado, 'Generada', 'Procesada', 'Validado', 'Anulada'),
-               e.fecha_de_creacion DESC
+      ORDER BY e.fecha_de_creacion DESC
       LIMIT 5000
     `, params)
 
@@ -1468,7 +1467,10 @@ app.get('/api/gestion/op', async (req, res) => {
         o.validado_en          = d?.validado_en          || null
         o.op_anterior          = d?.op_anterior          || null
         o.responsable_validado = d?.responsable_validado || null
+        o.lote                 = String(d?.op_anterior || o.id_orden)
       })
+    } else {
+      ops.forEach(o => { o.lote = String(o.id_orden) })
     }
     res.json({ ok: true, ops })
   } catch (e) {

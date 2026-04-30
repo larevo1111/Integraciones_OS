@@ -87,6 +87,7 @@ const columnas = computed(() => [
   { key: 'estado',            label: 'Estado',     sortable: true, visible: true, width: '110px',
     options: ['Generada','Procesada','Validado','Anulada'].map(e => ({ value: e, label: e, color: ESTADO_COLOR[e] })) },
   { key: 'id_orden',          label: 'OP',         sortable: true, visible: true, width: '90px' },
+  { key: 'lote',              label: 'Lote/OP ant',sortable: true, visible: true, width: '110px' },
   { key: 'nombre_encargado',  label: 'Responsable',sortable: true, visible: true, width: '180px' },
   { key: 'articulos',         label: 'Artículos',  sortable: false, visible: true },
   { key: 'fecha_de_creacion', label: 'Creada',     sortable: true, visible: true, width: '130px' },

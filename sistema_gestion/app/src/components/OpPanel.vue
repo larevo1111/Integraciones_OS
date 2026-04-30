@@ -67,9 +67,9 @@
               <div class="op-cab-row"><span class="op-lbl">Vigencia</span><span class="op-val">{{ ficha.cabecera.vigencia || '—' }}</span></div>
               <div class="op-cab-row"><span class="op-lbl">Creada</span><span class="op-val">{{ fmtFecha(ficha.cabecera.fecha_de_creacion) }}</span></div>
               <div class="op-cab-row"><span class="op-lbl">Sucursal/Bodega</span><span class="op-val">{{ ficha.cabecera.sucursal || '—' }} / {{ ficha.cabecera.bodega || '—' }}</span></div>
-              <div v-if="ficha.detalle?.op_anterior" class="op-cab-row">
-                <span class="op-lbl">OP anterior</span>
-                <span class="op-val text-grey">#{{ ficha.detalle.op_anterior }}</span>
+              <div class="op-cab-row">
+                <span class="op-lbl">Lote/OP ant</span>
+                <span class="op-val">#{{ ficha.detalle?.op_anterior || idOp }}</span>
               </div>
               <div v-if="ficha.detalle?.procesado_por" class="op-cab-row">
                 <span class="op-lbl">Procesada por</span>
