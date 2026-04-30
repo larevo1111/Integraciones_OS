@@ -52,6 +52,12 @@ Doc consolidado con:
 - Plantillas concretas por proceso con parámetros sugeridos. **En proceso de validación con Santi lote por lote**.
 - Vinculación futura HACCP/ISO 22000.
 
+**📍 Punto exacto donde quedamos al cerrar la sesión (30-abr)**:
+- **Lote 1 — Pasteurización miel** (cod 373, 586, 60 → afecta 27 SKUs derivados): se le propusieron a Santi 4 puntos (T° máx 60-65°C, tiempo 20-30min, pH 3.5-4.5, sabor/olor) y **están esperando confirmación de rangos REALES de su planta** (probablemente distintos: la operación puede ser HTST 50-58°C ó LTLT 5-45min según su práctica) antes de aplicar via PATCH a las recetas.
+- **Lotes pendientes (en orden)**: Lote 2 = Templado chocolate (cod 583, 581, 485) → Lote 3 = Cocción mesa (73, 74) → Lote 4 = Chocobeetal granel (275) → Lote 5 = Chocomiel + Infusión + Marañón.
+- **Cómo aplicar**: una vez validados los rangos por proceso, INSERT en `prod_recetas_puntos_criticos` con `receta_id` del cod base. Las presentaciones derivadas leerán los puntos del proceso base (no se duplican — eso lo decide el módulo Gestión OS al armar la sección de validación de OP).
+- **Doc de referencia para retomar**: `.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md` §4 (plantillas por proceso ya escritas, falta validar rangos).
+
 ### F. Bug fix crítico: SystemExit en POST OP (29-abr 17:51)
 3 solicitudes (83/84/85) quedaron colgadas en estado "programando" por sesión Effi caducada. El script `import_orden_produccion_post.py` abortaba con `SystemExit` que no era capturado por el wrapper FastAPI (solo captura `Exception`). Fix: 3 `raise SystemExit` → `raise RuntimeError`. Sesión regenerada en VPS via `node -e require('./session.js').getPage()...`
 

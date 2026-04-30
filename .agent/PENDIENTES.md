@@ -87,6 +87,22 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 
 ---
 
+### [P2] Validar y aplicar puntos críticos de calidad a las 13 recetas PP CLAVE
+**Categoría**: estandarización (módulo calidad)
+**Detectado**: 2026-04-30 por Claude
+**Contexto**: Tabla `prod_recetas_puntos_criticos` ya creada y editor frontend funcionando. Doc `.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md` tiene 10 procesos identificados con plantillas sugeridas (T°/tiempo/pH/sabor). **Estado al 30-abr: 0/99 recetas con puntos definidos**. Proceso de validación arrancado lote por lote con Santi pero sin terminar (esperando rangos REALES de planta para cada proceso).
+**Riesgo si no se hace**: el módulo Gestión OS ya tiene listo el frontend para mostrar puntos críticos al validar OPs, pero sin datos quedaría vacío. Sin puntos críticos, el operario no sabe qué medir.
+**Acción propuesta** — completar lote por lote con Santi, en este orden (cada lote = 1 sesión corta de validación + UPDATE):
+1. **Lote 1: Pasteurización miel** (cod 373, 586, 60). 4 puntos sugeridos: T° máx 60-65°C, tiempo 20-30min, pH 3.5-4.5, sabor/olor. ESPERANDO rangos REALES de Santi (puede ser HTST 50-58°C ó LTLT distintos). → Aplica a 27 SKUs derivados.
+2. **Lote 2: Templado chocolate** (cod 583, 581, 485). Sugerido: T° fusión 45-50°C, T° trabajo 31-32°C, test PAPEL (no cuchillo). → Aplica a 30+ SKUs (tabletas/bombones/granulados/coberturas).
+3. **Lote 3: Cocción mesa** (cod 73, 74). Sugerido: T° 70-85°C, tiempo 30-45min, sabor.
+4. **Lote 4: Chocobeetal granel** (cod 275). Sugerido: T° fusión chocolate, T° mezcla con polen, sabor.
+5. **Lote 5: Resto** — Chocomiel (346), Infusión cacao+menta+polen (339), Marañón tostado (516), Cremas molienda (151/479/367/388), Tostado cacao (80/178/261), Tostado frutos secos.
+**Cómo aplicar (post validación)**: INSERT en `prod_recetas_puntos_criticos` (FK `receta_id` del cod base). El módulo Gestión OS leerá esta tabla al armar sección de validación de OP. Los SKUs derivados heredan los puntos del proceso base.
+**Doc referencia**: `.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md` §4 (plantillas escritas, falta validar rangos).
+**Archivos involucrados**: BD `prod_recetas_puntos_criticos` (no toca código).
+**Estimado**: M (15 min × 5 lotes = ~75 min total, distribuido en sesiones cortas con Santi)
+
 ### [P3] Sincronización maestra de unidades Hostinger → local
 **Categoría**: estandarización
 **Detectado**: 2026-04-29 por Claude
