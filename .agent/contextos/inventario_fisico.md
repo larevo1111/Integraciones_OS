@@ -1,8 +1,8 @@
 # Inventario Fisico OS — Contexto del Subproyecto
 
 **Creado**: 2026-03-30
-**Actualizado**: 2026-04-30
-**Estado**: Operativo — auditoría stocks negativos + depuración 94 artículos inactivos en Effi + módulo Inconsistencias/Histórico ajustes con campos nuevos (estado/snapshot/costo) + scripts artículos POST directo (anular/crear/modificar)
+**Actualizado**: 2026-05-03
+**Estado**: Operativo — inventario 30-abr en preparación (snapshot teórico Effi guardado) + nuevos cods cacao San Luis (593-596) + auditoría stocks negativos + depuración 94 artículos inactivos en Effi + módulo Inconsistencias/Histórico ajustes con campos nuevos (estado/snapshot/costo) + scripts artículos POST directo (anular/crear/modificar)
 
 ---
 
@@ -18,6 +18,10 @@
 
 ## Estado actual
 
+- **Inventario 30 abril 2026 (en preparación)**:
+  - Snapshot teórico Effi al 1-may guardado en `inventario/snapshots/inventario_2026-04-30_teorico.xlsx` (export crudo, 372 artículos vigentes, 68 columnas con stocks por 15 bodegas + costos)
+  - Físico **pendiente de capturar** — debe incluir adicionales fuera del export Effi: 97.5 kg NIBS DE CACAO SL (cod 593) + 16 kg CASCARILLA DE CACAO SL (cod 594) en bodega Principal
+  - Cods nuevos cacao San Luis creados 03-may (ver §Hitos abajo): 593, 594, 595, 596
 - **Inventario marzo 2026**: cerrado, ajustado, informe PDF generado, análisis IA con Gemini
 - **Valor inventario físico marzo**: $15.682.482 (costo manual)
 - **Ajustes marzo aplicados**: 361 (Principal, 170 art.) + 362 (PNC, 16 art.) + 363 (corrección Almendra 55)
@@ -29,6 +33,27 @@
 - **Inventarios parciales**: operativos con preselección inteligente (`/api/inventario/sugerir-articulos`)
 - **Costo**: migrado de costo_promedio a costo_manual en todo el sistema
 - **App**: corre desde VPS Contabo (`inv.oscomunidad.com`), API en puerto 9600 (Producción) y 9401 (Inventario), BD `inventario_produccion_effi` en modo `direct`
+
+## Hitos
+
+### 2026-05-03 — Cacao San Luis: cadena completa creada en Effi
+4 cods nuevos creados via `scripts/import_articulo_crear_post.py` (POST directo, ~0.2s c/u). Paralelos al patrón LT (La Tierrita), tipo=2 (Producto en proceso), categoria=3 (T01.03. AGROECOLOGICOS GRAL):
+
+| Cod | Nombre | Costo manual | Lógica |
+|---|---|---|---|
+| 585 | ALMENDRA DE CACAO SAN LUIS x KG | $11.000 | (ya existía, MP tipo=1) |
+| **593** | NIBS DE CACAO SL x KG | $19.000 | (1.25 kg almendra × $11.000) + ~$5.250 servicios maquila |
+| **594** | CASCARILLA DE CACAO SL x KG | $3.300 | $4.500 LT × (11.000/15.000) — proporcional a costo almendra |
+| **595** | COBERTURA CHOCOLATE CPM 73% TEMPLADA SL x KG | $43.432 | igual LT (cobertura usa cod 319 + manteca templada, no escala con almendra cruda) |
+| **596** | COBERTURA CHOCOLATE 100% TEMPLADA SL x KG | $43.432 | igual LT (mismo motivo) |
+
+Convenciones aplicadas en nombres:
+- Origen al final + unidad al final: `xxxxx SL x KG`
+- Cascarilla corregida: `x KG` (no `x KL` como tenía LT por error)
+
+**Pendientes**:
+- Aparecen en `os_integracion.zeffi_inventario` tras próximo refresh pipeline (1h) o "Sync Effi" en app
+- Recetas en `prod_recetas` para los nuevos PP — replicar de las LT (cod 178/80) cuando se pidan
 
 ## Módulos nuevos (2026-04-28)
 

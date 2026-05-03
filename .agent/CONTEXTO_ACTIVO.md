@@ -1,5 +1,32 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-04-30
+**Actualizado**: 2026-05-03
+
+## En curso 2026-05-03 — Cacao San Luis (cadena Effi creada) + inventario 30-abr en preparación
+
+Sesión corta directa desde el VPS (no desde local como suele ser). Sincronizado repo (`git pull`) sin pérdida — cambios locales del VPS eran byte-idénticos al remoto, fueron stash+pull+drop.
+
+### A. Cadena cacao San Luis creada en Effi (4 cods nuevos)
+Detalle completo en [contextos/inventario_fisico.md §Hitos 2026-05-03](contextos/inventario_fisico.md). Resumen:
+- **Cod 585** (ALMENDRA DE CACAO SAN LUIS x KG, $11.000) ya existía — MP base
+- **Cods 593, 594, 595, 596** creados via `import_articulo_crear_post.py` — NIBS SL ($19.000), CASCARILLA SL ($3.300), COBERTURA CPM 73% TEMPLADA SL ($43.432), COBERTURA 100% TEMPLADA SL ($43.432)
+- Patrón paralelo a LT (La Tierrita): mismo `tipo=2`, `categoria=3`
+- Convención de nombres: `xxxxx SL x KG` (origen + unidad al final)
+- Costos NIBS y CASCARILLA escalados por proporción de almendra ($11k SL vs $15k SC LT). Coberturas iguales que LT (no escalan con almendra cruda — usan cod 319 + manteca templada cod 485)
+
+### B. Inventario 30 abril 2026 — snapshot teórico guardado
+- Export crudo de Effi del estado al 30-abr (sacado por Santi el 1-may): `inventario/snapshots/inventario_2026-04-30_teorico.xlsx` (renombrado del original `12355_17776671858111_756017.xlsx`)
+- 372 artículos vigentes, 68 columnas (stocks por 15 bodegas + costos completos + tarifas)
+- **Físico pendiente de capturar** — debe incluir adicionales fuera del export Effi:
+  - 97.5 kg NIBS DE CACAO SL (cod 593) en bodega Principal
+  - 16 kg CASCARILLA DE CACAO SL (cod 594) en bodega Principal
+  - (estos cods son nuevos en Effi, sin stock — entran al inventario por conteo físico de lo que ya está en planta)
+
+### C. Sync repo VPS ↔ remoto
+- VPS estaba en `f43802a`, remoto tenía 4 commits adelante incluyendo el upload del xlsx (`82b9b2a`)
+- Cambios locales sin commitear (`db.js`, `server.js`, scripts de artículos) eran **byte-idénticos** al remoto
+- Resuelto con: backup `/tmp/public_bak_*` → `git stash -u` → `git pull` → `git stash drop`
+
+---
 
 ## Completado 2026-04-29 / 30 — Producción: editor recetas evolución + módulo calidad/puntos críticos + scripts artículos Effi POST directo + depuración 94 artículos
 
