@@ -262,6 +262,23 @@ El 2026-04-27 Santi renombró el catálogo en Effi creando **2 líneas claras de
 
 → Línea SC usa miel **373**; línea Carmen usa miel **586**.
 
+### Línea ARANCEL — Mieles SIN ETIQUETAR (envases UNICOR sin esterilizar)
+
+OPs donde Arancel envasa miel para OS. Usa envases UNICOR comprados a UNICOR S.A. y entregados a Arancel.
+
+| Presentación | Miel (kg) | Envase UNICOR | Producto producido (PP) |
+|---|---:|---|---|
+| 150 grs | 0.150 | cod **86** (110cc UNICOR, $1.000) | cod **548** (Miel Os vidrio 150grs SIN ETIQUETAR) |
+| 275 grs | 0.275 | cod **87** (230cc UNICOR, $1.060) | cod **546** (Miel Os vidrio 275 grs SIN ETIQUETAR) |
+| 640 grs | 0.640 | cod **88** (500cc UNICOR, $1.555) | cod **547** (Miel Os vidrio 640grs SIN ETIQUETAR) |
+| 1000 grs | 1.000 | cod **85** (750cc UNICOR, $2.205) | cod **550** (Miel Os Vidrio 1000 grs SIN ETIQUETAR) |
+
+- **Encargado**: Arancel Apicultor San Miguel (CC 3184970152)
+- **Costo miel**: $21.000/kg (Arancel cobra esa tarifa)
+- **Otro costo**: id `8` — `ENVASADO MIEL APICA (INCLUYE FILTRADO) (Unidad)` — $500/und × cantidad total de envases
+- **Patrón observación**: `MIELES SIN ETIQUETAR LOTE` (referencia: OP 2040 del 8-mar, OP 2241 del 4-may)
+- Ratio total: capacidad miel = 36×1.0 + 48×0.64 + 72×0.275 + 72×0.150 = **97.32 kg** (para los 228 envases típicos de la remisión UNICOR)
+
 **Heurística confirmada**: el peso del nombre = kg de miel por unidad (1:1). 13.45 kg miel para 6×1000g + 7×150g + 10×640g = (6.00 + 1.05 + 6.40).
 
 ### M.O. para envasado mieles

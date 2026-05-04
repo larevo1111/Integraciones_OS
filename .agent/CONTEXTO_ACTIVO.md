@@ -1,5 +1,62 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-04
+**Actualizado**: 2026-05-05
+
+## En curso 2026-05-05 — Cierre inventario 30-abr + OP 2241 Arancel + sistema de notas por inventario
+
+Continuación de la sesión anterior. 4 frentes resueltos:
+
+### A. Remisión de compra #479 (UNICOR) sumada al inventario 30-abr
+- Remisión #479 (04-may 17:12, $359.784,60) trae 4 envases UNICOR (cods 85, 86, 87, 88) — pagados abril, recibidos 04-may, entregados a Arancel para envasado.
+- **Sync directo SQL** `effi_data` → `os_integracion` (4 tablas: zeffi_remisiones_compra_*, zeffi_ordenes_compra_*) tras correr `export_remisiones_compra.js` + `import_all.js`. El pipeline cron se evita para hacer un fix puntual.
+- Sumadas las 4 cantidades al `inventario_fisico` de cada cod en bodega Principal (UPDATE en `inv_conteos`).
+
+### B. OP 2241 — Arancel envasado miel (creada en Effi)
+- **Producto**: Mieles SIN ETIQUETAR — Arancel vendió 97 kg miel a OS y la envasó en los envases UNICOR de la remisión #479.
+- **Encargado**: Arancel Apicultor San Miguel (CC 3184970152)
+- **Materiales** (5): cod 373 (97 kg miel × $21.000) + 4 envases UNICOR
+- **Productos** (4): 36×550 + 48×547 + 72×546 + 72×548 (mieles SIN ETIQUETAR)
+- **Otro costo**: id 8 ENVASADO MIEL APICA × 228 unds × $500 = $114.000
+- Creada via Playwright (`import_orden_produccion.js` con `/tmp/op_arancel_2026-05-04.json`) — POST directo no aplica porque CC de Arancel no está en MAPEO_ENCARGADOS.
+- Patrón clonado de OP 2040 (8-mar) — misma combinación de envases/cods/encargado.
+
+### C. Sistema de notas por inventario — OBLIGATORIO
+**Pattern**: `inventario/analisis_de_inventario/<YYYY-MM-DD>/notas.md` (uno por evento de inventario, versionado en repo).
+- Sección agregada al skill `inventario-fisico/SKILL.md` con estructura mínima, cuándo escribir, por qué importa (5S Shitsuke).
+- Creado `inventario/analisis_de_inventario/2026-04-30/notas.md` documentando:
+  - Excepciones: precarga Cacao SL (cods 593/594), remisión 479 sumada
+  - OP derivada: 2241 Arancel
+  - Decisiones de criterio: OV #720, consignación, 14 cods T999/T05, 13 anulados con stock, 8 negativos
+  - Pendientes: regularizar Cacao SL, sistemizar "compras pagadas en otro mes"
+  - Backups asociados
+
+### D. Skill `produccion-recetas` — sección "Línea ARANCEL"
+Agregada nueva sección con:
+- Tabla envase UNICOR → grs miel → producto SIN ETIQUETAR (cods 86→548, 87→546, 88→547, 85→550)
+- Costos: miel $21.000/kg, envasado id 8 $500/und
+- Encargado fijo: Arancel CC 3184970152
+- Patrón observación + ratio total típico (228 envases = 97.32 kg miel)
+
+### Estado inventario 30-abr
+| | |
+|---|---:|
+| Total filas | 410 |
+| Inventariables contadas | 301 |
+| Excluidos | 109 |
+| Pendientes | 0 |
+| Diferencias post-ajustes | 188 (62%) |
+
+Backups generados (3, post-cada cambio significativo):
+- `inventario_2026-04-30_2026-05-04_234901.sql` — pre-restauración SL
+- `inventario_2026-04-30_post_precargas_2026-05-04_235430.sql` — post-restauración SL
+- `inventario_2026-04-30_post_op2241_2026-05-05_004907.sql` — post-remisión 479 + OP 2241
+
+CSV versionado: `inventario/snapshots/inventario_2026-04-30_fisico_completo.csv` (refrescado).
+
+### Pendientes inmediatos
+- Inventario Jenifer (sigue vacío)
+- Bug visual jornada (pausa 12:29-14:00 se pinta como 01:29-02:00 PM, -1h offset). Solo en detalle UI; BD y Excel correctos.
+
+---
 
 ## En curso 2026-05-04 — Inventario 30-abr cargado + 29 OPs Procesadas + 4 fixes backend + módulo teórico Paso 1/2
 

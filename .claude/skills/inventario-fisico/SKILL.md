@@ -182,3 +182,44 @@ journalctl -u os-inventario-api -f
 | 4 | Detección errores de unidades | Implementado |
 | 5 | Verificación de inconsistencias | Pendiente |
 | 6 | Informe final (resumen diferencias) | Pendiente |
+
+---
+
+## Notas por inventario — OBLIGATORIO
+
+Cada inventario tiene excepciones, decisiones y precargas que NO quedan en BD. Para no perder contexto entre inventarios:
+
+**Pattern**: `inventario/analisis_de_inventario/<YYYY-MM-DD>/notas.md` — uno por evento de inventario, versionado en repo.
+
+### Estructura mínima
+```markdown
+# Notas inventario YYYY-MM-DD
+**Fecha de corte**: ...
+**Fuente teórico**: xlsx Effi / cálculo Paso 1+2 / etc
+**Bodegas activas**: ...
+
+## Excepciones aplicadas
+- Precargas manuales (cods nuevos sin OC, físico ya en planta)
+- Compras pagadas en mes anterior pero recibidas/registradas en este
+
+## OPs derivadas del inventario
+- OPs creadas a partir del cierre
+
+## Decisiones de criterio
+- Tratamiento de OVs vigentes (consignación)
+- Cods en categorías excluidas con stock
+- Stocks negativos / Anulados con stock
+
+## Pendientes para próximo inventario
+```
+
+### Cuándo escribir
+- AL CIERRE de cada inventario (antes de archivarlo)
+- Cada vez que aplico un UPDATE manual (precarga, ajuste de excepción)
+- Cuando creo una OP derivada del inventario
+
+### Por qué importa (5S — Shitsuke)
+Sin notas, el siguiente inventario no sabe por qué hay diferencias residuales del anterior, ni qué decisiones se tomaron, ni qué quedó pendiente. **No es opcional**.
+
+### Ejemplo referencia
+`inventario/analisis_de_inventario/2026-04-30/notas.md` — inventario abril con precargas Cacao SL, remisión #479 sumada a físico, OP 2241 Arancel derivada.
