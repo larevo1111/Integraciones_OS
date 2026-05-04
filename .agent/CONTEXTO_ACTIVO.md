@@ -1,5 +1,120 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-03
+**Actualizado**: 2026-05-04
+
+## En curso 2026-05-04 — Inventario 30-abr cargado + 29 OPs Procesadas + 4 fixes backend + módulo teórico Paso 1/2
+
+Sesión grande directa desde VPS. 8 frentes resueltos:
+
+### A. Inventario físico 30-abr — completo y respaldado
+- **410 filas en `inv_conteos`** (fecha 2026-04-30): 301 inventariables (todas contadas, 188 con diferencia) + 109 excluidos (T999/T05/XMATERIAL/sin gestión)
+- **Bodegas activas**: Principal (283), Productos No Conformes (18), Jenifer (0 — pestaña visible aunque vacía)
+- Teórico cargado del xlsx `inventario/snapshots/inventario_2026-04-30_teorico.xlsx` (export crudo Effi del 1-may, 372 vigentes, 68 columnas)
+- Validado contra Paso 1 (trazabilidad): coincide 372/372 si se excluye OV #720 (1-may 00:03 KAKAW) — prueba que el xlsx representa el cierre real al 30-abr 23:59
+- Iteraciones de carga (en orden):
+  1. Script ad-hoc `scripts/inventario/crear_inventario_30abr_desde_xlsx.py` cargó 174 filas iniciales (solo con stock)
+  2. Insertados 13 anulados-con-stock del 29-abr (cods 199, 204, 351, 352, 353, 354, 402, 403, 404, 70, 82, 372, 274) — perdidos en el primer pase porque ya estaban anulados
+  3. Insertados 109 excluidos (con bodega='—') + 93 inventariables sin stock (Principal teórico=0) → 390 filas
+  4. Detectadas y arregladas 22 discrepancias vs xlsx: 14 con stock que estaban excluidos por reglas (Santi pidió volverlos a marcar excluidos manteniendo el dato del xlsx) + 8 stocks negativos descartados por bug `stock <= 0` → 400 filas
+  5. **Precargas físicas SL** (cacao San Luis recién creado en Effi): cod 593 NIBS = 97.5 kg, cod 594 CASCARILLA = 16 kg en Principal con teórico=0 → diferencia +97.5 / +16 (esos cods aún no estaban en zeffi al cierre)
+  6. Equipo recontó las precargas a 0 sin saberlo → restauradas con `contado_por='precarga_30abr_xlsx'` y nota explícita
+- Pendiente: agregar inventario Jenifer + una compra que falta antes del cierre definitivo
+- **Backups**:
+  - `backups/inventario_produccion_effi/inventario_2026-04-30_2026-05-04_234901.sql` (estado 100% contado, antes de restauración SL)
+  - `backups/inventario_produccion_effi/inventario_2026-04-30_post_precargas_2026-05-04_235430.sql` (estado actual, post-restauración SL)
+  - `inventario/snapshots/inventario_2026-04-30_fisico_completo.csv` (versionable en repo, 410 líneas)
+
+### B. Reporte de mercancía en consignación al 30-abr (aparte del inventario)
+Generados en `inventario/analisis_de_inventario/2026-04-30/`:
+- `consignacion_al_30abr.md` — resumen
+- `consignacion_al_30abr_detallado.csv` — 200 líneas (cod × ov)
+- `consignacion_al_30abr_por_ov.csv` — 10 OVs vigentes no facturadas
+- `consignacion_al_30abr_por_articulo.csv` — 48 artículos únicos
+
+**Total**: 312 unidades, $5.879.323. Toda esta mercancía YA está descontada del `stock_total_empresa` de Effi (Effi descuenta al crear OV); como ninguna OV vigente tiene mercancía aún en planta (Santi confirmó), el teórico del xlsx es correcto y NO hay que ajustar.
+
+### C. 30 OPs Generadas Vigentes resueltas en Effi
+- **OP 2230 anulada** (test ALIEXPRESS, $0.10) via `anular_orden_produccion.js`
+- **29 OPs pasadas a Procesada** via `cambiar_estado_orden_produccion.js` en serie (Playwright). Tiempo total: 7.6 min (~16s por OP — sesión Effi reutilizada). 29/29 OK, cero fallos.
+- OPs procesadas: 2163, 2164, 2165, 2191, 2194, 2195, 2198, 2199, 2202, 2203, 2204, 2205, 2207, 2208, 2210, 2214, 2215, 2217, 2221, 2223, 2224, 2228, 2229, 2234, 2235, 2236, 2237, 2238, 2239
+
+### D. Módulo Inventario teórico — Paso 1/2 separados
+**Antes**: `calcular_inventario_teorico.py` hacía todo monolítico:
+```
+stock_actual − trazabilidad_post_corte + materiales_OPs_Generadas − productos_OPs_Generadas
+```
+**Ahora**: 2 funciones independientes idempotentes:
+- `aplicar_trazabilidad(fecha)` — Paso 1: solo el rebobinado (`stock − movimientos`)
+- `aplicar_ops_generadas(fecha)` — Paso 2: solo las OPs (`+ materiales − productos`)
+- `calcular(fecha)` (legacy) llama ambas en orden (retro-compat)
+
+CLI: `--paso traza|ops|completo` (default completo). Cada paso conserva el otro campo en `inv_teorico` (`ajuste_trazabilidad` vs `ajuste_ops_*`). `actualizar_conteos` ahora **respeta `excluido=1`** (no sobrescribe los excluidos).
+
+2 endpoints nuevos:
+- `POST /api/inventario/aplicar-trazabilidad`
+- `POST /api/inventario/aplicar-ops-generadas`
+
+3 botones en header del inventario (frontend producción):
+- 🕘 `history` — Paso 1 (rebobinar trazabilidad)
+- 🏭 `factory` — Paso 2 (excluir OPs Generadas)
+- 📊 `analytics` — Cálculo completo (los 2 pasos en orden)
+
+### E. Sistema Gestión — tabla OPs filtros corregidos (v2.10.28)
+Problema: filtro "Generada" mostraba 320 OPs (290 anuladas + 30 vigentes); "Anuladas" mostraba 0 (filtraba mal).
+
+**Solución**: nueva columna calculada `estado_efectivo` en endpoint `/api/gestion/op`:
+```sql
+CASE WHEN vigencia='Anulado' THEN 'Anulada' ELSE estado END AS estado_efectivo
+```
+Frontend `OpTablePage.vue` ahora usa `estado_efectivo` con 4 opciones (Generada/Procesada/Validado/Anulada). Quitada columna Vigencia separada (era redundante).
+
+### F. Bug fix timezone en edición de jornadas (v2.10.28)
+**Síntoma**: Santi editaba jornada Deivy 21-abr inicio=7am, fin=5:12pm, al guardar quedaba 12am - 10:12am (offset 7h).
+**Causa raíz**: 3 endpoints en `server.js` usaban `new Date(hora_inicio)` raw o pasaban string sin convertir. `new Date("2026-04-21T07:00")` en VPS Berlin (CEST) interpreta como local CEST → guarda 7h offset.
+**Fix limpio**: 6 líneas en 3 endpoints reemplazando `new Date()`/raw → `parseBackendDate()` (helper `lib/timezone.js`, ya usado en otros 7 lugares):
+- `PUT /jornadas/:id/editar`
+- `PUT /jornadas/:id/editar-admin`
+- `PUT /jornadas/:id/pausas/:pausaId`
+
+### G. Bug fix backend inventario "no matriculado" (v0.4.11)
+**Síntoma**: error 500 al crear artículo no matriculado en la app.
+**Causa raíz**: regresión del fix SSH tunnel del 28-abr. `DB_INV` ahora es un **string tag**, pero 3 endpoints en `api.py` seguían usando `pymysql.connect(**DB_INV)` directo (rompe porque `**` espera dict, no string).
+**Fix limpio**: 3 líneas reemplazando `**DB_INV` → `**_resolve_cfg(DB_INV)` — mismo patrón que ya usan los wrappers `db_query`/`db_execute`. Mantiene la atomicidad multi-query (que se perdería al partir en wrappers individuales).
+
+Líneas tocadas: `agregar_no_matriculado` (449), `asignar_no_matriculado` (508), `cerrar_inventario_calcular_severidad` (956).
+
+### H. UI inventario — refactor a OsDataTable + ajustes mobile (v0.4.11)
+- `tabla-conteo.jsx` reescrita usando `OsDataTable` (igual que el resto del proyecto). Filtros/orden/agregados/exportar funcionan igual a las otras tablas.
+- 3 props nuevas en `OsDataTable`: `rowClassName`, `hideOnMobile`, `labelMobile`.
+- **Mobile**: 4 columnas (ID 11px, Artículo+TEO chip+grupo, Cat MP/PP/PT short, Cnt). Categoría se muestra siempre (corta), no se oculta — habilita filtro por tipo.
+- Filtros pills: padding/gap aumentados — antes apretado.
+- Bodegas: pestañas fijas (Principal / Productos No Conformes / Jenifer) aunque tengan 0 (lista hardcodeada en frontend `BODEGAS_FIJAS`).
+- Columna ID con `text-[11px]` (2pt menos que el resto, mejor jerarquía visual).
+
+### I. CLAUDE.md — regla de versionamiento formalizada
+Punto 11 reforzado + nueva sección §Manejo de versiones:
+- Bump de versión OBLIGATORIO en cada commit que toca frontend/backend
+- Tabla de archivos por módulo (Gestión: `MainLayout.vue`; Producción: `package.json`)
+- Esquema semver (PATCH/MINOR/MAJOR)
+- Flujo obligatorio de 5 pasos por commit
+- "Sin excepciones — facilita detectar qué versión está en producción sin abrir consola"
+
+### Versiones desplegadas
+- **Sistema Gestión v2.10.28** (bundle `index-6Z8F8iP-.js`) — fix timezone jornadas + tabla OPs estado_efectivo
+- **Producción + Inventario v0.4.11** (bundle `index-v0_4_11-Cdn7GGp-.js`) — paso 1/2 teórico + fix NM 500 + UI compacta + bodegas fijas
+
+### Servicios reiniciados (vía kill — systemd Restart=always)
+- `os-gestion.service` PID 1736759 (22:59:22)
+- `os-inventario-api.service` PID 1736766 (22:59:22)
+
+### Pendientes inmediatos
+- Agregar inventario Jenifer (todavía vacío)
+- Incluir una compra al inventario 30-abr (Santi tiene la info)
+- Decidir si la 3a fila "contada" accidental fue limpiada — sí, se limpió (cod 479 quedó pendiente)
+
+### Bug visual conocido (no urgente)
+- Detalle de pausa en jornada muestra hora 12h con bug: pausa 12:29-14:00 (91 min en BD = 1h 31m) se muestra como "01:29 PM - 02:00 PM" (= 31 min en pantalla). El Excel y la BD están bien; solo el popup pinta mal. Diagnóstico pendiente.
+
+---
 
 ## En curso 2026-05-03 — Cacao San Luis (cadena Effi creada) + inventario 30-abr en preparación
 
