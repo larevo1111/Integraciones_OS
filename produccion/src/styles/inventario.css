@@ -305,9 +305,14 @@ body {
 
 .cell-id { font-size: 12px; color: var(--text-tertiary); font-family: 'Fragment Mono', monospace; }
 .cell-articulo { font-size: 13px; color: var(--text-primary); }
-.articulo-line1 { display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.articulo-line1 { display: flex; align-items: center; gap: 4px; overflow: hidden; flex-wrap: wrap; }
 .articulo-teorico-movil { display: none; }
 .articulo-line2 { display: none; }
+/* Chips meta en mobile (TEO + grupo corto debajo del nombre) */
+.articulo-meta-movil { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.chip-teo { font-size: 9px; font-weight: 600; font-family: 'Fragment Mono', monospace; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.06); color: var(--text-tertiary); letter-spacing: 0.3px; }
+/* Wrapper de badge + chip contador dentro de conteo cell */
+.conteo-cell-meta { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 32px; }
 .grupo-tag { font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
 .grupo-mp { background: rgba(59,130,246,0.15); color: #60a5fa; }
 .grupo-pp { background: rgba(168,85,247,0.15); color: #c084fc; }
@@ -690,14 +695,14 @@ body {
   .inv-btn-scan { height: 28px; padding: 0 7px; font-size: 11px; }
   .inv-btn-scan span:last-child { display: none; }
 
-  /* Filtros: scroll horizontal, compacto */
-  .inv-filters-row { padding: 3px 8px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 3px; }
+  /* Filtros: scroll horizontal, compacto pero respirando */
+  .inv-filters-row { padding: 8px 12px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 6px; }
   .inv-filters-row::-webkit-scrollbar { display: none; }
-  .inv-pill { padding: 2px 7px; font-size: 10px; }
-  .inv-pill-count { font-size: 9px; }
+  .inv-pill { padding: 5px 10px; font-size: 11px; border-radius: 999px; }
+  .inv-pill-count { font-size: 10px; margin-left: 5px; }
   .inv-bodegas-label { display: none; }
-  .inv-separator { height: 16px; margin: 0 3px; }
-  .inv-bodega-add-btn { width: 20px; height: 20px; }
+  .inv-separator { height: 18px; margin: 0 6px; }
+  .inv-bodega-add-btn { width: 22px; height: 22px; }
   .inv-bodega-dropdown { left: auto; right: 0; min-width: 180px; }
 
   /* 400px = status(14) + id(22) + art(auto≈170) + cat(30) + conteo(134) */
@@ -721,7 +726,7 @@ body {
   .col-categoria { width: 36px; }
   .cell-categoria { text-align: center; }
   .grupo-tag-full { display: none; }
-  .grupo-tag-short { display: inline-block; font-size: 7px; white-space: normal; word-break: break-word; line-height: 1.3; padding: 2px 3px; }
+  .grupo-tag-short { display: inline-block; font-size: 9px; white-space: nowrap; line-height: 1.2; padding: 2px 5px; font-weight: 700; }
 
   /* Conteo: stepper + input + badge + dots */
   .teorico-block { display: none; }

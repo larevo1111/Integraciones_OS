@@ -235,99 +235,179 @@ def obtener_productos_ops(ops_ids):
     return {r['cod_articulo']: float(r['total']) for r in rows}
 
 
-# ─── Cálculo principal ─────────────────────────────────────────────
-def calcular(fecha_corte, usuario=None, hora_corte=None):
-    """Ejecuta el cálculo completo y guarda en inv_teorico.
-    hora_corte: opcional, formato HH:MM:SS. Si no se da, usa 23:59:59.
+# ─── Cálculo principal (separado en 2 pasos independientes) ────────
+#
+# Cada paso es idempotente: re-aplicarlo sobreescribe SU campo en inv_teorico
+# (ajuste_trazabilidad o ajuste_ops_*) y recalcula stock_teorico desde los 4
+# componentes guardados. Los botones del frontend llaman cada paso por separado.
+#
+# - Paso 1 (rebobinar trazabilidad):    stock_effi y ajuste_trazabilidad
+# - Paso 2 (excluir OPs Generadas):     ajuste_ops_materiales y ajuste_ops_productos
+#
+# Si la fila ya existía con valores del otro paso, esos se conservan.
+# stock_teorico siempre = stock_effi - ajuste_trazabilidad + ajuste_ops_materiales - ajuste_ops_productos
+# ──────────────────────────────────────────────────────────────────
+
+
+def _upsert_inv_teorico(fecha_corte, datos_por_articulo, campos_actualizar, ops_json=None):
+    """Hace UPSERT en inv_teorico para los artículos dados, modificando solo los
+    `campos_actualizar` y recalculando stock_teorico al final.
+
+    datos_por_articulo: {cod_articulo: {'nombre': str, 'stock_effi': float,
+                         'ajuste_trazabilidad': float, 'ajuste_ops_materiales': float,
+                         'ajuste_ops_productos': float}}
+    campos_actualizar: lista de campos que el caller setea explícitamente
+                       (los otros conservan su valor previo si ya existía la fila).
     """
-    hora = hora_corte or '23:59:59'
-    corte_ts = f"{fecha_corte} {hora}"
-    log.info(f"=== INICIO CÁLCULO TEÓRICO ===")
-    log.info(f"Fecha corte: {corte_ts} ({TIMEZONE})")
-    log.info(f"Offset a UTC (para zeffi_cambios_estado): +{OFFSET_A_UTC}h")
-    log.info(f"Usuario: {usuario or 'cli'}")
-
-    # Paso 1: Stock actual
-    stock = obtener_stock_actual()
-    log.info(f"Stock actual: {len(stock)} artículos")
-
-    # Paso 2: Trazabilidad post-corte
-    traz = obtener_trazabilidad_post_corte(corte_ts)
-    log.info(f"Movimientos post-corte: {len(traz)} artículos con movimiento")
-
-    # Paso 3: OPs generadas al corte
-    ops = obtener_ops_generadas_al_corte(corte_ts)
-    log.info(f"OPs generadas al corte: {len(ops)} → {ops}")
-
-    # Paso 4: Materiales y productos
-    materiales = obtener_materiales_ops(ops)
-    productos = obtener_productos_ops(ops)
-    log.info(f"Materiales a devolver: {len(materiales)} artículos")
-    log.info(f"Productos a quitar: {len(productos)} artículos")
-
-    # Paso 5: Calcular stock teórico por artículo
-    todos_ids = set(stock.keys())
-    todos_ids.update(traz.keys())
-    todos_ids.update(materiales.keys())
-    todos_ids.update(productos.keys())
-
+    if not datos_por_articulo:
+        return 0
     ahora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    ops_json = json.dumps(ops)
-    filas = []
+    ops_json = ops_json or '[]'
 
-    for art_id in todos_ids:
-        s = stock.get(art_id, {})
-        stock_effi = s.get('stock', 0)
-        nombre = s.get('nombre', f'Artículo {art_id}')
-        ajuste_traz = traz.get(art_id, 0)
-        ajuste_mat = materiales.get(art_id, 0)
-        ajuste_prod = productos.get(art_id, 0)
+    # Leer fila existente para conservar campos no modificados
+    existentes = {r['cod_articulo']: r for r in query(DB_INV, """
+        SELECT cod_articulo, stock_effi, ajuste_trazabilidad,
+               ajuste_ops_materiales, ajuste_ops_productos, ops_incluidas
+        FROM inv_teorico WHERE fecha_corte = %s
+    """, (fecha_corte,))}
 
-        teorico = stock_effi - ajuste_traz + ajuste_mat - ajuste_prod
-
-        filas.append((
-            fecha_corte, str(art_id), nombre,
-            stock_effi, ajuste_traz, ajuste_mat, ajuste_prod,
-            teorico, len(ops), ops_json, ahora
-        ))
-
-    # Paso 6: Guardar (UPSERT)
-    if filas:
-        conn = pymysql.connect(**DB_INV)
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM inv_teorico WHERE fecha_corte = %s", (fecha_corte,))
-            cur.executemany("""
+    conn = pymysql.connect(**DB_INV)
+    with conn.cursor() as cur:
+        for art_id, d in datos_por_articulo.items():
+            prev = existentes.get(str(art_id), {})
+            stock_effi   = d.get('stock_effi') if 'stock_effi' in campos_actualizar else float(prev.get('stock_effi') or 0)
+            aj_traz      = d.get('ajuste_trazabilidad') if 'ajuste_trazabilidad' in campos_actualizar else float(prev.get('ajuste_trazabilidad') or 0)
+            aj_mat       = d.get('ajuste_ops_materiales') if 'ajuste_ops_materiales' in campos_actualizar else float(prev.get('ajuste_ops_materiales') or 0)
+            aj_prod      = d.get('ajuste_ops_productos') if 'ajuste_ops_productos' in campos_actualizar else float(prev.get('ajuste_ops_productos') or 0)
+            stock_teo    = stock_effi - aj_traz + aj_mat - aj_prod
+            ops_inc      = ops_json if 'ajuste_ops_materiales' in campos_actualizar else (prev.get('ops_incluidas') or '[]')
+            ops_count    = len(json.loads(ops_inc)) if ops_inc else 0
+            cur.execute("""
                 INSERT INTO inv_teorico
                     (fecha_corte, cod_articulo, nombre_articulo,
                      stock_effi, ajuste_trazabilidad, ajuste_ops_materiales, ajuste_ops_productos,
                      stock_teorico, ops_generadas_count, ops_incluidas, calculado_en)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, filas)
-            conn.commit()
-        conn.close()
+                VALUES (%s,%s,%s, %s,%s,%s,%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    nombre_articulo       = VALUES(nombre_articulo),
+                    stock_effi            = VALUES(stock_effi),
+                    ajuste_trazabilidad   = VALUES(ajuste_trazabilidad),
+                    ajuste_ops_materiales = VALUES(ajuste_ops_materiales),
+                    ajuste_ops_productos  = VALUES(ajuste_ops_productos),
+                    stock_teorico         = VALUES(stock_teorico),
+                    ops_generadas_count   = VALUES(ops_generadas_count),
+                    ops_incluidas         = VALUES(ops_incluidas),
+                    calculado_en          = VALUES(calculado_en)
+            """, (fecha_corte, str(art_id), d.get('nombre', f'Artículo {art_id}'),
+                  stock_effi, aj_traz, aj_mat, aj_prod,
+                  stock_teo, ops_count, ops_inc, ahora))
+        conn.commit()
+        n = cur.rowcount
+    conn.close()
+    return n
 
-    # Paso 7: Actualizar inventario_teorico en inv_conteos
+
+def aplicar_trazabilidad(fecha_corte, usuario=None, hora_corte=None):
+    """PASO 1 — Rebobinar por trazabilidad.
+
+    Setea stock_effi y ajuste_trazabilidad. Conserva ajustes de OPs si ya estaban.
+    Resultado: stock_teorico = stock_actual_effi - movimientos_post_corte (+ OPs si aplicaron antes).
+    """
+    hora = hora_corte or '23:59:59'
+    corte_ts = f"{fecha_corte} {hora}"
+    log.info(f"=== PASO 1: REBOBINAR TRAZABILIDAD === corte={corte_ts} usuario={usuario or 'cli'}")
+
+    stock = obtener_stock_actual()
+    traz = obtener_trazabilidad_post_corte(corte_ts)
+    log.info(f"Stock actual: {len(stock)} artículos | Movimientos post-corte: {len(traz)}")
+
+    todos_ids = set(stock.keys()) | set(traz.keys())
+    datos = {}
+    for art_id in todos_ids:
+        s = stock.get(art_id, {})
+        datos[art_id] = {
+            'nombre': s.get('nombre', f'Artículo {art_id}'),
+            'stock_effi': s.get('stock', 0),
+            'ajuste_trazabilidad': traz.get(art_id, 0),
+        }
+    n = _upsert_inv_teorico(fecha_corte, datos,
+                            campos_actualizar=['stock_effi', 'ajuste_trazabilidad'])
     actualizar_conteos(fecha_corte)
-
-    # Paso 8: Poblar inv_ops_revisar (auditoría de OPs cerca del corte)
-    n_revisar = poblar_ops_revisar(fecha_corte, ops, ahora)
-    log.info(f"OPs en auditoría: {n_revisar} (preservadas revisiones manuales)")
-
-    log.info(f"Guardados: {len(filas)} artículos en inv_teorico")
-    log.info(f"=== FIN CÁLCULO TEÓRICO ({ahora}) ===")
+    log.info(f"=== FIN PASO 1: {n} artículos actualizados ===")
     return {
-        'articulos': len(filas),
-        'ops_generadas': len(ops),
+        'paso': 'trazabilidad',
+        'articulos': n,
         'mov_post_corte': len(traz),
+        'stock_articulos': len(stock),
+        'timezone': TIMEZONE,
+    }
+
+
+def aplicar_ops_generadas(fecha_corte, usuario=None, hora_corte=None):
+    """PASO 2 — Excluir OPs que estaban en estado 'Generada' al corte.
+
+    Setea ajuste_ops_materiales y ajuste_ops_productos. Conserva stock_effi y
+    ajuste_trazabilidad si ya estaban. Si no había stock_effi previo, lo lee de
+    zeffi para que stock_teorico tenga sentido.
+    """
+    hora = hora_corte or '23:59:59'
+    corte_ts = f"{fecha_corte} {hora}"
+    log.info(f"=== PASO 2: EXCLUIR OPs GENERADAS === corte={corte_ts} usuario={usuario or 'cli'}")
+
+    ops = obtener_ops_generadas_al_corte(corte_ts)
+    materiales = obtener_materiales_ops(ops)
+    productos = obtener_productos_ops(ops)
+    log.info(f"OPs generadas al corte: {len(ops)} → {ops}")
+    log.info(f"Materiales: {len(materiales)} | Productos: {len(productos)}")
+
+    # Si la tabla está vacía, necesitamos stock_effi de fallback (paso 1 nunca corrió)
+    stock = obtener_stock_actual()
+
+    todos_ids = set(materiales.keys()) | set(productos.keys()) | set(stock.keys())
+    datos = {}
+    for art_id in todos_ids:
+        s = stock.get(art_id, {})
+        datos[art_id] = {
+            'nombre': s.get('nombre', f'Artículo {art_id}'),
+            'stock_effi': s.get('stock', 0),  # solo se usa si no había fila previa
+            'ajuste_ops_materiales': materiales.get(art_id, 0),
+            'ajuste_ops_productos': productos.get(art_id, 0),
+        }
+    n = _upsert_inv_teorico(fecha_corte, datos,
+                            campos_actualizar=['ajuste_ops_materiales', 'ajuste_ops_productos'],
+                            ops_json=json.dumps(ops))
+    actualizar_conteos(fecha_corte)
+    poblar_ops_revisar(fecha_corte, ops, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    log.info(f"=== FIN PASO 2: {n} artículos actualizados ===")
+    return {
+        'paso': 'ops_generadas',
+        'articulos': n,
+        'ops_generadas': len(ops),
         'materiales_ajustados': len(materiales),
         'productos_ajustados': len(productos),
-        'calculado_en': ahora,
+        'timezone': TIMEZONE,
+    }
+
+
+def calcular(fecha_corte, usuario=None, hora_corte=None):
+    """Cálculo completo: aplica los 2 pasos en orden (mantiene compatibilidad)."""
+    log.info(f"=== INICIO CÁLCULO TEÓRICO COMPLETO === corte={fecha_corte} usuario={usuario or 'cli'}")
+    r1 = aplicar_trazabilidad(fecha_corte, usuario, hora_corte)
+    r2 = aplicar_ops_generadas(fecha_corte, usuario, hora_corte)
+    return {
+        'articulos': r1['articulos'],
+        'ops_generadas': r2['ops_generadas'],
+        'mov_post_corte': r1['mov_post_corte'],
+        'materiales_ajustados': r2['materiales_ajustados'],
+        'productos_ajustados': r2['productos_ajustados'],
+        'calculado_en': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'timezone': TIMEZONE,
     }
 
 
 def actualizar_conteos(fecha_corte):
-    """Actualiza inventario_teorico en inv_conteos con los datos calculados."""
+    """Actualiza inventario_teorico en inv_conteos con los datos calculados.
+    Respeta excluido=1 (no toca las filas marcadas como no inventariables)."""
     teoricos = query(DB_INV, """
         SELECT cod_articulo, stock_teorico
         FROM inv_teorico
@@ -348,9 +428,10 @@ def actualizar_conteos(fecha_corte):
                         ELSE NULL
                     END
                 WHERE fecha_inventario = %s AND id_effi = %s
+                  AND excluido = 0
             """, (t['stock_teorico'], t['stock_teorico'], fecha_corte, t['cod_articulo']))
         conn.commit()
-        log.info(f"Conteos actualizados con stock teórico")
+        log.info(f"Conteos actualizados con stock teórico (excluidos preservados)")
     conn.close()
 
 
@@ -518,5 +599,12 @@ if __name__ == '__main__':
     parser.add_argument('--fecha', default=str(date.today()), help='Fecha de corte YYYY-MM-DD')
     parser.add_argument('--hora', default=None, help='Hora de corte HH:MM:SS (default 23:59:59)')
     parser.add_argument('--usuario', default='cli', help='Usuario que ejecuta')
+    parser.add_argument('--paso', choices=['traza', 'ops', 'completo'], default='completo',
+                       help='traza=solo rebobinar trazabilidad, ops=solo excluir OPs Generadas, completo=ambos')
     args = parser.parse_args()
-    calcular(args.fecha, args.usuario, args.hora)
+    if args.paso == 'traza':
+        aplicar_trazabilidad(args.fecha, args.usuario, args.hora)
+    elif args.paso == 'ops':
+        aplicar_ops_generadas(args.fecha, args.usuario, args.hora)
+    else:
+        calcular(args.fecha, args.usuario, args.hora)

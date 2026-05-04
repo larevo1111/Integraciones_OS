@@ -1435,7 +1435,9 @@ app.get('/api/gestion/op', async (req, res) => {
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
     const [ops] = await db.integracion.query(`
-      SELECT e.id_orden, e.estado, e.vigencia, e.nombre_encargado,
+      SELECT e.id_orden, e.estado, e.vigencia,
+             CASE WHEN e.vigencia = 'Anulado' THEN 'Anulada' ELSE e.estado END AS estado_efectivo,
+             e.nombre_encargado,
              e.id_encargado, e.fecha_inicial, e.fecha_final, e.fecha_de_creacion,
              GROUP_CONCAT(DISTINCT a.descripcion_articulo_producido
                ORDER BY a.descripcion_articulo_producido SEPARATOR ', ') AS articulos
@@ -3109,8 +3111,8 @@ app.put('/api/gestion/jornadas/:id/editar', requireAuth, async (req, res) => {
 
     const { hora_inicio, hora_fin, observaciones } = req.body
     const sets = []; const params = []
-    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); params.push(hora_inicio) }
-    if (hora_fin !== undefined)    { sets.push('hora_fin = ?');    params.push(hora_fin) }
+    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); params.push(hora_inicio ? parseBackendDate(hora_inicio) : null) }
+    if (hora_fin !== undefined)    { sets.push('hora_fin = ?');    params.push(hora_fin    ? parseBackendDate(hora_fin)    : null) }
     if (observaciones !== undefined) { sets.push('observaciones = ?'); params.push(observaciones) }
     if (!sets.length) return res.status(400).json({ error: 'Nada que actualizar' })
 
@@ -3141,8 +3143,8 @@ app.put('/api/gestion/jornadas/:id/editar-admin', requireAuth, async (req, res) 
     const sets = ['usuario_ult_modificacion = ?']
     const params = [req.usuario.email]
 
-    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); params.push(hora_inicio ? new Date(hora_inicio) : null) }
-    if (hora_fin    !== undefined) { sets.push('hora_fin = ?');    params.push(hora_fin    ? new Date(hora_fin)    : null) }
+    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); params.push(hora_inicio ? parseBackendDate(hora_inicio) : null) }
+    if (hora_fin    !== undefined) { sets.push('hora_fin = ?');    params.push(hora_fin    ? parseBackendDate(hora_fin)    : null) }
     if (observaciones !== undefined) { sets.push('observaciones = ?'); params.push(observaciones || null) }
 
     params.push(req.params.id, req.empresa)
@@ -3281,8 +3283,8 @@ app.put('/api/gestion/jornadas/:id/pausas/:pausaId/editar', requireAuth, async (
     // Actualizar campos editables (NUNCA _registro)
     const sets = []
     const vals = []
-    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); vals.push(hora_inicio ? new Date(hora_inicio) : null) }
-    if (hora_fin !== undefined)    { sets.push('hora_fin = ?');    vals.push(hora_fin ? new Date(hora_fin) : null) }
+    if (hora_inicio !== undefined) { sets.push('hora_inicio = ?'); vals.push(hora_inicio ? parseBackendDate(hora_inicio) : null) }
+    if (hora_fin !== undefined)    { sets.push('hora_fin = ?');    vals.push(hora_fin    ? parseBackendDate(hora_fin)    : null) }
     if (observaciones !== undefined) { sets.push('observaciones = ?'); vals.push(observaciones || null) }
     sets.push('usuario_ult_modificacion = ?'); vals.push(req.usuario.email)
     vals.push(pausa.id)

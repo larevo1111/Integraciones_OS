@@ -446,7 +446,7 @@ async def agregar_no_matriculado(
         with open(ruta, 'wb') as f:
             shutil.copyfileobj(foto.file, f)
 
-    conn = pymysql.connect(**DB_INV)
+    conn = pymysql.connect(**_resolve_cfg(DB_INV))
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO inv_conteos
@@ -505,7 +505,7 @@ class AsignarArticulo(BaseModel):
 @app.post("/api/inventario/articulos/asignar")
 def asignar_no_matriculado(data: AsignarArticulo):
     """Vincula un artículo NM con un artículo real de Effi."""
-    conn = pymysql.connect(**DB_INV, cursorclass=pymysql.cursors.DictCursor)
+    conn = pymysql.connect(**_resolve_cfg(DB_INV), cursorclass=pymysql.cursors.DictCursor)
     with conn.cursor() as cur:
         # Verificar que el conteo existe y es NM
         cur.execute("SELECT id, id_effi, nombre, categoria, notas FROM inv_conteos WHERE id = %s", (data.conteo_id,))
@@ -578,21 +578,50 @@ class GestionInventario(BaseModel):
 
 # === INVENTARIO TEÓRICO ===
 
-@app.post("/api/inventario/calcular-teorico")
-def calcular_teorico(data: GestionInventario):
-    """Calcula inventario teórico a fecha de corte (nivel >= 5)."""
+def _ejecutar_paso_teorico(paso, fecha_inventario, usuario):
+    """Helper: ejecuta el script con --paso traza|ops|completo."""
     import subprocess
     result = subprocess.run(
         ['python3', os.path.join(BASE_DIR, 'scripts/inventario/calcular_inventario_teorico.py'),
-         '--fecha', data.fecha_inventario],
-        capture_output=True, text=True, cwd=BASE_DIR, timeout=120
+         '--fecha', fecha_inventario, '--paso', paso, '--usuario', usuario or 'api'],
+        capture_output=True, text=True, cwd=BASE_DIR, timeout=180
     )
     if result.returncode != 0:
-        raise HTTPException(status_code=500, detail=result.stderr or 'Error al calcular teórico')
+        raise HTTPException(status_code=500, detail=result.stderr or f'Error al ejecutar paso {paso}')
+    return result.stdout
 
+
+@app.post("/api/inventario/calcular-teorico")
+def calcular_teorico(data: GestionInventario):
+    """Cálculo COMPLETO: stock − trazabilidad + materiales OPs − productos OPs (nivel >= 5)."""
+    out = _ejecutar_paso_teorico('completo', data.fecha_inventario, data.usuario)
     registrar_auditoria(0, 'calcular_teorico', data.usuario, None, data.fecha_inventario,
-                        f'Inventario teórico calculado para {data.fecha_inventario}')
-    return {"ok": True, "output": result.stdout}
+                        f'Teórico completo (traza + ops) para {data.fecha_inventario}')
+    return {"ok": True, "paso": "completo", "output": out}
+
+
+@app.post("/api/inventario/aplicar-trazabilidad")
+def aplicar_trazabilidad(data: GestionInventario):
+    """PASO 1 — Rebobinar por trazabilidad (nivel >= 5).
+    teorico = stock_actual_effi − Σ movimientos_post_corte
+    Conserva ajuste de OPs si ya estaba aplicado.
+    """
+    out = _ejecutar_paso_teorico('traza', data.fecha_inventario, data.usuario)
+    registrar_auditoria(0, 'aplicar_trazabilidad', data.usuario, None, data.fecha_inventario,
+                        f'Paso 1: rebobinar trazabilidad para {data.fecha_inventario}')
+    return {"ok": True, "paso": "trazabilidad", "output": out}
+
+
+@app.post("/api/inventario/aplicar-ops-generadas")
+def aplicar_ops_generadas(data: GestionInventario):
+    """PASO 2 — Excluir OPs Generadas al corte (nivel >= 5).
+    teorico = stock_effi (o el que ya estuviera) + Σ materiales_ops_gen − Σ productos_ops_gen
+    Conserva ajuste de trazabilidad si ya estaba aplicado.
+    """
+    out = _ejecutar_paso_teorico('ops', data.fecha_inventario, data.usuario)
+    registrar_auditoria(0, 'aplicar_ops_generadas', data.usuario, None, data.fecha_inventario,
+                        f'Paso 2: excluir OPs Generadas para {data.fecha_inventario}')
+    return {"ok": True, "paso": "ops_generadas", "output": out}
 
 
 @app.get("/api/inventario/teorico/estado")
@@ -924,7 +953,7 @@ def calcular_gestion(data: GestionCalcular):
         valor_total = 1  # evitar division por cero
 
     # 3. Calcular impacto y severidad por artículo
-    conn = pymysql.connect(**DB_INV)
+    conn = pymysql.connect(**_resolve_cfg(DB_INV))
     insertados = 0
     with conn.cursor() as cur:
         cur.execute("DELETE FROM inv_gestion WHERE fecha_inventario = %s", (data.fecha_inventario,))

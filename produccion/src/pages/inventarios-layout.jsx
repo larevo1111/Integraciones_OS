@@ -175,8 +175,17 @@ export function InventariosLayoutPage() {
   useEffect(() => { cargarArticulos() }, [cargarArticulos])
 
   // Bodegas con stock vs sin stock
-  const bodegasConStock = useMemo(() => bodegas.filter(b => b.total > 0), [bodegas])
-  const bodegasSinStock = useMemo(() => bodegas.filter(b => b.total === 0), [bodegas])
+  // Bodegas visibles como pestañas: con stock + las "fijas" del inventario actual
+  // (Principal, Productos No Conformes, Jenifer) aunque no tengan stock todavía.
+  const BODEGAS_FIJAS = ['Principal', 'Productos No Conformes', 'Jenifer']
+  const bodegasConStock = useMemo(
+    () => bodegas.filter(b => b.total > 0 || BODEGAS_FIJAS.includes(b.bodega)),
+    [bodegas]
+  )
+  const bodegasSinStock = useMemo(
+    () => bodegas.filter(b => b.total === 0 && !BODEGAS_FIJAS.includes(b.bodega)),
+    [bodegas]
+  )
 
   // Filtros con count
   const filtros = useMemo(() => FILTROS_BASE.map(f => ({
@@ -201,17 +210,21 @@ export function InventariosLayoutPage() {
     return `${parseInt(d, 10)} ${MESES_CORTOS[parseInt(m, 10) - 1]} ${y}`
   }
 
-  const calcularTeorico = async () => {
+  const ejecutarPasoTeorico = async (endpoint) => {
     if (calculandoTeorico) return
     setCalculandoTeorico(true)
     try {
-      await api.post('/api/inventario/calcular-teorico', { fecha, usuario: auth.usuario?.email || '' })
+      await api.post(endpoint, { fecha, usuario: auth.usuario?.email || '' })
       const e = await api.get(`/api/inventario/teorico/estado?fecha=${fecha}`)
       setEstadoTeorico(e)
       await cargarArticulos()
     } catch (e) { alert('Error: ' + e.message) }
     finally { setCalculandoTeorico(false) }
   }
+
+  const calcularTeorico        = () => ejecutarPasoTeorico('/api/inventario/calcular-teorico')
+  const aplicarTrazabilidad    = () => ejecutarPasoTeorico('/api/inventario/aplicar-trazabilidad')
+  const aplicarOpsGeneradas    = () => ejecutarPasoTeorico('/api/inventario/aplicar-ops-generadas')
 
   const recargarTodo = async () => {
     if (!fecha) return
@@ -282,12 +295,26 @@ export function InventariosLayoutPage() {
           <div className="inv-header-right">
             {/* Acciones del inventario activo (antes vivían en el aside) */}
             {fecha && puede('nuevo_inventario') && (
-              <button className={`inv-header-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
-                      disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
-                      onClick={calcularTeorico}
-                      title={estadoTeorico?.calculado ? `Recalcular teórico (${estadoTeorico.calculado_en || ''})` : 'Calcular inventario teórico'}>
-                <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 16 }}>analytics</span>
-              </button>
+              <>
+                <button className={`inv-header-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
+                        disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
+                        onClick={aplicarTrazabilidad}
+                        title="Paso 1: Rebobinar por trazabilidad (stock − movimientos post-corte)">
+                  <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 16 }}>history</span>
+                </button>
+                <button className={`inv-header-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
+                        disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
+                        onClick={aplicarOpsGeneradas}
+                        title="Paso 2: Excluir OPs Generadas al corte (+ materiales − productos)">
+                  <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 16 }}>factory</span>
+                </button>
+                <button className={`inv-header-action ${calculandoTeorico ? 'inv-panel-action-spin' : ''}`}
+                        disabled={calculandoTeorico || estadoCierre.inventario_cerrado}
+                        onClick={calcularTeorico}
+                        title={estadoTeorico?.calculado ? `Recalcular teórico completo (${estadoTeorico.calculado_en || ''})` : 'Calcular teórico completo (paso 1 + paso 2)'}>
+                  <span className={`material-icons ${calculandoTeorico ? 'spin' : ''}`} style={{ fontSize: 16 }}>analytics</span>
+                </button>
+              </>
             )}
             {fecha && puede('cerrar_conteo') && !estadoCierre.conteo_cerrado && (
               <button className="inv-header-action" onClick={() => setModalAbierto('cerrar-conteo')} title="Cerrar conteo físico">

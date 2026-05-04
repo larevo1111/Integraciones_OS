@@ -1,0 +1,4 @@
+[2026-05-04 02:29:58,423] INFO === PASO 1: REBOBINAR TRAZABILIDAD === corte=2026-04-30 23:59:59 usuario=larevo1111@gmail.com
+[2026-05-04 02:29:58,468] INFO Stock actual: 372 artículos | Movimientos post-corte: 24
+[2026-05-04 02:30:00,963] INFO Conteos actualizados con stock teórico (excluidos preservados)
+[2026-05-04 02:30:00,964] INFO === FIN PASO 1: 1 artículos actualizados ===

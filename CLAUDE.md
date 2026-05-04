@@ -63,7 +63,7 @@ Ejecutar esta lista mentalmente en orden. No saltar pasos.
 8. **Si es UI** — leer `frontend/design-system/MANUAL_ESTILOS.md` y usar Quasar (no CSS crudo, no HTML nativo).
 9. **Timezone SIEMPRE hora local** (nunca UTC) — usar `hoyLocal()` / `localDateCO()` / `NOW()`. Nunca `toISOString().slice(0,10)` ni `CURDATE()`.
 10. **Test mobile + web SIEMPRE** antes de entregar — preferible con Chrome DevTools MCP. Si no está activa, informar y usar Playwright como soporte. Nunca saltar el test.
-11. **Commit + push** con mensaje descriptivo en español.
+11. **Commit + push** con mensaje descriptivo en español + **bump de versión OBLIGATORIO** visible en la app. Sin excepciones (ver regla completa en §Manejo de versiones).
 12. **Actualizar plan** (mover a `.agent/planes/completados/`), **`.agent/CONTEXTO_ACTIVO.md`** y **`.agent/contextos/<modulo>.md`** si cambió algo estructural.
 
 ## Autonomía operativa
@@ -352,6 +352,37 @@ Todos los endpoints `q`/`q_str`/`search`/`busqueda`, todos los filtros de Combob
 - Composables en `/src/composables/` con prefijo `use`
 - Pages en `/src/pages/`, components en `/src/components/`, layouts en `/src/layouts/`
 - Imports agrupados: vue → quasar → módulos del proyecto → componentes
+
+## Manejo de versiones — REGLA ABSOLUTA
+
+**Cada commit que toca frontend o backend de un módulo desplegable debe bumpear la versión visible en la UI.** Sin excepciones — ese número es lo único que permite saber a Santi (sin abrir consola, F12, ni código) qué hay corriendo en producción y si su navegador refrescó.
+
+### Dónde está la versión de cada módulo
+
+| Módulo | Archivo del bump | Cómo se ve en UI |
+|---|---|---|
+| Sistema Gestión | `sistema_gestion/app/src/layouts/MainLayout.vue` (`const APP_VERSION = 'vX.Y.Z'`) | chip pequeño bajo el nombre en sidebar |
+| Producción + Inventario | `produccion/package.json` (`"version": "X.Y.Z"`) — vite la inyecta como `__APP_VERSION__` y nombra los assets `index-vX_Y_Z-hash.js` | chip en el footer del sidebar |
+
+### Esquema semver
+
+- **PATCH** (`v2.10.27 → v2.10.28`): bug fix, refactor sin cambio de comportamiento, ajuste de UI
+- **MINOR** (`v2.10.X → v2.11.0`): feature nueva, columna nueva, endpoint nuevo
+- **MAJOR** (`v2.X.X → v3.0.0`): cambio incompatible, rediseño grande, migración de schema
+
+### Flujo obligatorio en cada commit
+
+1. Antes del `git add`: bumpear el archivo de versión del módulo tocado
+2. Rebuild del frontend (`npm run build` o `bash deploy.sh` según el módulo)
+3. `git add` incluyendo: archivos editados + bump + assets generados (si el módulo los versiona en repo)
+4. Commit con la versión en el mensaje: `fix(gestion): X (v2.10.28)` o `feat(produccion): Y (v0.4.11)`
+5. Push — el repo es la fuente de verdad. Cualquier servidor (VPS o local) sólo necesita `git pull` + restart del servicio para tener la versión nueva
+
+### Por qué importa
+
+- Santi lee la versión en la app y sabe si su navegador cargó lo último
+- Logs de servidor pueden mostrar la versión activa (`__APP_VERSION__`) para diagnóstico
+- Si una sesión deja cambios sin bump, es como decir "no pasó nada" cuando sí pasó — confunde
 
 ## Estilo de respuesta
 

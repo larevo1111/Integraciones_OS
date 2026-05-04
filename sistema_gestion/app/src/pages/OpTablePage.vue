@@ -27,13 +27,8 @@
           {{ sincronizando ? 'Sincronizando…' : 'Sincronizar Effi' }}
         </q-btn>
       </template>
-      <template #cell-estado="{ value }">
+      <template #cell-estado_efectivo="{ value }">
         <span :style="`display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;background:${ESTADO_COLOR[value]||'#78909C'}20;color:${ESTADO_COLOR[value]||'#78909C'}`">
-          {{ value }}
-        </span>
-      </template>
-      <template #cell-vigencia="{ value }">
-        <span :style="`display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;background:${value==='Anulado' ? '#90909020' : '#2db14a20'};color:${value==='Anulado' ? '#909090' : '#2db14a'}`">
           {{ value }}
         </span>
       </template>
@@ -84,15 +79,13 @@ const ESTADO_COLOR = {
 }
 
 const columnas = computed(() => [
-  { key: 'estado',            label: 'Estado',     sortable: true, visible: true, width: '110px',
+  { key: 'estado_efectivo',   label: 'Estado',     sortable: true, visible: true, width: '110px',
     options: ['Generada','Procesada','Validado','Anulada'].map(e => ({ value: e, label: e, color: ESTADO_COLOR[e] })) },
   { key: 'id_orden',          label: 'OP',         sortable: true, visible: true, width: '90px' },
   { key: 'lote',              label: 'Lote/OP ant',sortable: true, visible: true, width: '110px' },
   { key: 'nombre_encargado',  label: 'Responsable',sortable: true, visible: true, width: '180px' },
   { key: 'articulos',         label: 'Artículos',  sortable: false, visible: true },
   { key: 'fecha_de_creacion', label: 'Creada',     sortable: true, visible: true, width: '130px' },
-  { key: 'vigencia',          label: 'Vigencia',   sortable: true, visible: true, width: '90px',
-    options: ['Vigente','Anulado'].map(v => ({ value: v, label: v })) },
 ])
 
 const filas = computed(() => ops.value)

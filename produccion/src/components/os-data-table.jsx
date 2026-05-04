@@ -31,6 +31,7 @@ export function OsDataTable({
   selectedIds = [],          // ids seleccionados (controlado externamente)
   onSelectionChange,         // (newSelectedIds) => void
   rowIdKey = 'id',           // clave del id por fila (default 'id')
+  rowClassName,              // (row) => string — clase extra por fila
 }) {
   const [localColumns, setLocalColumns] = useState([])
   useEffect(() => { setLocalColumns(columns.map(c => ({ ...c }))) }, [columns])
@@ -384,11 +385,19 @@ export function OsDataTable({
                     sortKey === col.key && "text-foreground",
                     columnAggregates[col.key] && "border-b-emerald-500/60",
                     colPopup === col.key && "bg-accent text-foreground",
+                    col.hideOnMobile && "hidden sm:table-cell",
                     "hover:text-foreground"
                   )}
                 >
                   <div className="flex items-center gap-1">
-                    <span className="flex-1">{col.label}</span>
+                    <span className="flex-1">
+                      {col.labelMobile ? (
+                        <>
+                          <span className="sm:hidden">{col.labelMobile}</span>
+                          <span className="hidden sm:inline">{col.label}</span>
+                        </>
+                      ) : col.label}
+                    </span>
                     {sortKey === col.key && (
                       sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                     )}
@@ -435,7 +444,8 @@ export function OsDataTable({
                     className={cn(
                       "border-b border-border/50 hover:bg-accent/50 transition-colors group",
                       onRowClick && "cursor-pointer",
-                      isSelected && "bg-primary/10"
+                      isSelected && "bg-primary/10",
+                      rowClassName?.(row)
                     )}
                   >
                     {selectable && (
@@ -456,7 +466,11 @@ export function OsDataTable({
                       const value = row[col.key]
                       const custom = renderCell?.(row, col, value)
                       return (
-                        <td key={col.key} className={cn("px-3 h-9 align-middle text-[13px]", col.nowrap && "whitespace-nowrap")}>
+                        <td key={col.key} className={cn(
+                          "px-3 h-9 align-middle text-[13px]",
+                          col.nowrap && "whitespace-nowrap",
+                          col.hideOnMobile && "hidden sm:table-cell"
+                        )}>
                           {custom !== undefined && custom !== null ? custom : formatCell(value, col.key)}
                         </td>
                       )
