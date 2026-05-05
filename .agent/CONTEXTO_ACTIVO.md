@@ -1,6 +1,47 @@
 # Contexto Activo — Integraciones OS
 **Actualizado**: 2026-05-05
 
+## En curso 2026-05-05 — Scripts POST cotización/remisión + fix sesión producción
+
+Sesión desde VPS. 4 frentes resueltos.
+
+### A. Scripts POST directo nuevos (cotización venta + remisión compra)
+- **`scripts/import_cotizacion_venta_post.py`** — POST a `/app/cotizacion/crear`, ~1s vs 60-90s Playwright.
+  - Calcula `total_impuesto` sumando `base × TASAS_IMPUESTO[id]` por línea
+  - Valida respuesta: `json.loads(body)` → `respuesta == 'OK'`
+  - Detecta id de cotización creada via MAX(data-id) antes/después
+- **`scripts/import_remision_compra_post.py`** — POST a `/app/remision_c/crear`, misma lógica.
+  - Campos extra vs cotización: `t_egreso[]`, `medio_pago[]`, `caja_medio_pago[]` (sep `Ǆ`), `valor_medio_pago[]`, `action='1'`, `json_ref=''`
+  - Sin `vendedor`, `propina`, `tercero`
+
+### B. Cotización #1610 creada — La Viña
+- 13 artículos "entregado" del xlsx `cruce_factura_inventario_TomaCafeLaVina.xlsx`
+- Cliente La Viña: id Effi **793** (resuelto via paginación `llena_tercero_buscar`)
+- Precios Tarifa A: de `zeffi_cotizaciones_ventas_detalle.precio_ta_a` / `zeffi_inventario.precio_ta_a`
+- Vendedor: Jenifer CC `1128457413` → id Effi **165** (de `zeffi_facturas_venta_encabezados`)
+- IVA por artículo: Propóleos=Exento(2), Mieles/Almendras/Bombones/Nibs=Excluido(7), Tabletas/Chocomiel/Cremas=19%(1)
+
+### C. Skill `effi-tecnico` — Reglas comunes cotización + remisión
+Bloque nuevo "Reglas comunes" añadido antes de `### POST /app/cotizacion/crear`:
+1. **`impuestos[]` NUNCA vacío** — mapeo completo string→id (IVA 19%→1, Exento→2, 5%→3, 14%→4, INCBP→5, consumo 8%→6, Excluido→7). SQL de referencia incluido.
+2. **`vendedor` desde última factura** — SQL sobre `zeffi_facturas_venta_encabezados`, NO desde `zeffi_clientes` (suele ser NULL).
+3. **`t_forma_pago='1'`** (Contado a 1 día) — SIEMPRE, sin excepciones.
+
+### D. Fix producción — renovación de sesión Effi antes de Playwright completo
+**Problema**: cuando la sesión expira, el fallback usaba Playwright COMPLETO (login + crear OP = ~90s). Aunque el auto-login funcionaba, el usuario veía "programando" por ~90s.
+
+**Solución**:
+- Nuevo **`scripts/refresh_session.js`** — solo hace login Playwright, cierra el browser, actualiza `session.json`. (~25s)
+- En `scripts/produccion/api.py` (`_ejecutar_op_background`): cuando POST directo falla por sesión expirada → llama `refresh_session.js` (~25s) → reintenta POST directo (~1s) → solo si falla cae al Playwright completo.
+- Resultado: sesión expirada = ~27s vs ~90s antes.
+- **Requiere reiniciar**: `sudo systemctl restart os-inventario-api.service`
+
+### Pendientes inmediatos
+- Inventario Jenifer (sigue vacío)
+- Bug visual jornada (pausa 12:29-14:00 se pinta como 01:29-02:00 PM). BD y Excel correctos.
+
+---
+
 ## En curso 2026-05-05 — Cierre inventario 30-abr + OP 2241 Arancel + sistema de notas por inventario
 
 Continuación de la sesión anterior. 4 frentes resueltos:

@@ -1128,6 +1128,42 @@ Scripts Python que interactúan con Effi vía POST directo a sus endpoints inter
   - HTML entities: los `data-*` vienen HTML-encoded (`&quot;`, `&amp;`) — `html_decode()` antes de mandar
 - **Mantiene tarifas estándar** vacías (preserva las existentes en Effi al re-crear el form).
 
+### import_cotizacion_venta_post.py — 2026-05-05
+- **Propósito**: Crear cotización de venta en Effi vía POST directo
+- **Ubicación**: `scripts/import_cotizacion_venta_post.py`
+- **Endpoint**: `POST /app/cotizacion/crear` (form `form_CR`, ~43 campos)
+- **Uso**:
+  - `python3 scripts/import_cotizacion_venta_post.py /tmp/cotiz.json`
+  - `python3 scripts/import_cotizacion_venta_post.py /tmp/cotiz.json --dry-run`
+- **Tiempo**: ~1s vs 60-90s Playwright
+- **Campos clave del JSON**: `sucursal_id`, `bodega_id`, `cliente_id`, `vendedor_id`, `fecha_entrega` (YYYY-MM-DD), `divisa` (COP), `conceptos[]` (cod_articulo, cantidad, precio, descuento, lote, serie, observacion, impuestos[]), `formas_pago[]` (t_forma_pago, valor), `retenciones[]`
+- **Reglas críticas**:
+  - `impuestos[]` NUNCA vacío — siempre el id explícito (1=IVA 19%, 2=Exento, 7=Excluido, etc.)
+  - `vendedor` viene de la última factura al cliente (`zeffi_facturas_venta_encabezados`), NO de `zeffi_clientes` (suele ser NULL)
+  - `t_forma_pago='1'` (Contado 1 día) — SIEMPRE, sin excepciones
+- **Detección ID creada**: MAX(data-id) del HTML antes/después del POST
+- **Validación respuesta**: `json.loads(body)['respuesta'] == 'OK'`
+
+### import_remision_compra_post.py — 2026-05-05
+- **Propósito**: Crear remisión de compra en Effi vía POST directo
+- **Ubicación**: `scripts/import_remision_compra_post.py`
+- **Endpoint**: `POST /app/remision_c/crear` (form `form_CR`, ~50 campos)
+- **Uso**:
+  - `python3 scripts/import_remision_compra_post.py /tmp/remision.json`
+  - `python3 scripts/import_remision_compra_post.py /tmp/remision.json --dry-run`
+- **Tiempo**: ~1s vs 60-90s Playwright
+- **Campos extra vs cotización**: `t_egreso[]`, `remision_proveedor`, `medio_pago[]`, `caja_medio_pago[]` (sep `Ǆ`), `valor_medio_pago[]`, `observacion_medio_pago[]`, `sucursal_anticipo[]`, `id_anticipo[]`, `action='1'`, `json_ref=''`
+- **Sin** `vendedor`, `propina`, `tercero`
+- Mismas reglas de `impuestos[]` y `t_forma_pago` que cotización
+
+### refresh_session.js — 2026-05-05
+- **Propósito**: Renovar la sesión Effi (login Playwright) sin crear nada — solo actualiza `scripts/session.json`
+- **Ubicación**: `scripts/refresh_session.js`
+- **Uso**: `node scripts/refresh_session.js`
+- **Tiempo**: ~20-30s (mucho menos que Playwright completo ~90s)
+- **Cuándo usar**: cuando POST directo falla por cookies expiradas. El backend de producción (`api.py`) lo llama automáticamente antes de caer al fallback Playwright completo.
+- **Sale con**: 0 si ok, 1 si falla. Imprime `✅ Sesión Effi renovada` o `❌ Error`.
+
 ### import_ajuste_inventario.js — Playwright
 - **Propósito**: Crear ajuste de inventario en Effi (entrada o salida) importando conceptos desde Excel
 - **Ubicación**: `scripts/import_ajuste_inventario.js`
