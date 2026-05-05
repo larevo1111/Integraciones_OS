@@ -80,6 +80,53 @@ s.headers.update({
 
 Implementación: [scripts/import_orden_produccion_post.py](scripts/import_orden_produccion_post.py).
 
+### POST /app/cotizacion/crear ⭐ (cotización de venta)
+Crea cotización completa. Form `form_CR`. ~43 fields para 1 línea + 1 forma de pago. Tiempo ~1s.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `sucursal`, `bodega`, `centro_costos` | int | `1` (Principal) |
+| `fecha_entrega` | string | Formato `YYYY-MM-DD` (NO `DD/MM/YYYY` como OPs) |
+| `divisa` | string | Código ISO: `'COP'` (158 opciones) |
+| `trm` | int | `1` para COP |
+| `cliente` | int | id Effi del cliente (resolver via búsqueda) |
+| `direccion_cliente` | string | `'default'` o id de la dirección |
+| `vendedor` | string | `'default'` o id del vendedor (376, 536...) |
+| `tercero` | string | Vacío por defecto |
+| `descuento_global`, `propina` | num | Defaults `0.00`, `0` |
+| `articulo[]`, `cantidad[]`, `precio[]` | array | Líneas |
+| `id_concepto[]` | string | **Random 21 dígitos** por línea, clave en `impuestos[<id>][]` |
+| `bruto[]`, `descuento[]`, `total_concepto[]` | array | Calculados |
+| `impuestos[<id_concepto>][]` | int | id del impuesto (1=IVA 19%, etc) |
+| `t_forma_pago[]`, `valor_forma_pago[]` | array | Forma de pago. **NO requiere `medio_pago`/`caja_medio_pago`** (eso es de remisión compra) |
+| `retencion[]`, `base_retencion[]`, `valor_retencion[]` | array | `'default'` + vacíos si no hay |
+| `bruto_transaccion`, `subtotal_transaccion`, `total_descuento`, `total_impuesto`, `total_retencion`, `total_transaccion` | num | Totales (Effi recalcula impuesto al validar) |
+| `garantia`, `observacion` | textarea | Vacíos OK |
+| `prontopago`, `fecha_prontopago` | string | Vacíos OK |
+
+Implementación: [scripts/import_cotizacion_venta_post.py](scripts/import_cotizacion_venta_post.py). URL listado: `/app/cotizacion?vigente=1`.
+
+### POST /app/remision_c/crear ⭐ (remisión de compra)
+Crea remisión de compra (entrada mercancía + pago). Form `form_CR`. ~50 fields. Tiempo ~1s.
+
+Mismos campos base que cotización + diferencias clave:
+| Campo | Notas |
+|---|---|
+| `fecha_compra` | NO `fecha_entrega` |
+| `proveedor`, `direccion_proveedor` | NO `cliente`/`direccion_cliente` |
+| `t_egreso[]` | tipo egreso por línea (`'1'` = compra normal, 126 opciones) |
+| `remision_proveedor` | número de factura/remisión externa del proveedor |
+| `medio_pago[]` | id medio de pago (1=Efectivo, 9 opciones) |
+| `caja_medio_pago[]` | **`'1Ǆ2'`** con separador `Ǆ` (cuenta`Ǆ`caja) |
+| `cuenta_medio_pago[]` | `'default'` o id |
+| `valor_medio_pago[]` | mismo valor que `valor_forma_pago[]` |
+| `observacion_medio_pago[]` | textarea |
+| `sucursal_anticipo[]`, `id_anticipo[]` | anticipos (vacíos OK) |
+| `action`, `json_ref` | hidden constantes (`'1'`, `''`) |
+| Sin `vendedor`, `propina`, `tercero` | (lógico — es compra) |
+
+Implementación: [scripts/import_remision_compra_post.py](scripts/import_remision_compra_post.py). Investigación previa: [.agent/docs/EFFI_POST_REMISION_COMPRA.md](.agent/docs/EFFI_POST_REMISION_COMPRA.md).
+
 ### POST /app/articulo/anular ⭐ (depuración masiva)
 Anula (marca No Vigente) un artículo. Reversible vía "Reactivar" en UI.
 
@@ -325,6 +372,11 @@ Este skill **NO reemplaza** los anteriores — los **complementa con la capa té
 | `scripts/session.js` | Genera/refresca session.json |
 | `scripts/import_orden_produccion.js` | Crea OP via Playwright (fallback) — con SPY hook |
 | `scripts/import_orden_produccion_post.py` | Crea OP via POST directo (~1s) |
+| `scripts/import_cotizacion_venta_post.py` | Crea cotización venta via POST directo (~1s) |
+| `scripts/import_remision_compra_post.py` | Crea remisión de compra via POST directo (~1s) |
+| `scripts/import_articulo_crear_post.py` | Crea artículo via POST directo |
+| `scripts/import_articulo_modificar_post.py` | Modifica artículo via POST directo |
+| `scripts/import_articulo_anular_post.py` | Anula artículo (con --csv batch) |
 | `scripts/export_*.js` | Exports Playwright de cada módulo |
 | `scripts/import_all.js` | Importa exports a `effi_data` (HTML/xlsx) |
 | `scripts/refresh_effi_produccion.py` | Orquesta export+import+sync VPS |
@@ -339,6 +391,8 @@ Este skill **NO reemplaza** los anteriores — los **complementa con la capa té
 |---|---|
 | Login manual + generar sesión | 30s (única vez) |
 | Crear OP via POST directo | ~1s ⭐ |
+| Crear cotización venta via POST | ~1s ⭐ |
+| Crear remisión compra via POST | ~1s ⭐ |
 | Crear OP via Playwright (fallback) | 60-90s |
 | Export inventario | ~30s |
 | Export produccion_encabezados | ~60s |

@@ -1,6 +1,6 @@
 # Effi — POST directo `/app/remision_c/crear`
 
-**Estado**: investigación parcial, falta capturar 1 POST real para validar.
+**Estado**: ✅ Script implementado en [scripts/import_remision_compra_post.py](../../scripts/import_remision_compra_post.py) (2026-05-05). Falta validar con 1 POST real (probar con remisión chica y revisar resultado).
 
 ## Endpoint
 ```
