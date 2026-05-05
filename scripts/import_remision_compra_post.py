@@ -53,7 +53,7 @@ Formato JSON:
 
 Doc: .agent/docs/EFFI_POST_REMISION_COMPRA.md + .claude/skills/effi-tecnico/SKILL.md §3
 """
-import sys, os, json, re, time, argparse, random
+import json, re, time, argparse, random
 from pathlib import Path
 import requests
 
@@ -100,6 +100,18 @@ def _id_concepto():
     return str(random.randint(10**20, 10**21 - 1))
 
 
+# Tasas Effi (id → %) — extraído de form_CR (mismo set que cotización venta)
+TASAS_IMPUESTO = {
+    '1': 0.19,  # IVA 19%
+    '2': 0.0,   # IVA Exento
+    '3': 0.05,  # IVA 5%
+    '4': 0.14,  # IVA 14%
+    '5': 0.0,   # INCBP (monto fijo, no %)
+    '6': 0.08,  # Impuesto consumo 8%
+    '7': 0.0,   # IVA Excluido
+}
+
+
 def _max_remision_id(s):
     r = s.get(f'{EFFI_BASE}/app/remision_c', timeout=20)
     ids = re.findall(r'data-id=["\'](\d+)["\']', r.text)
@@ -109,9 +121,17 @@ def _max_remision_id(s):
 def construir_payload(data, session_empresa, session_usuario):
     bruto_total = 0
     descuento_total = 0
+    impuesto_total = 0
     for c in data['conceptos']:
-        bruto_total += float(c['cantidad']) * float(c['precio'])
-        descuento_total += float(c.get('descuento', 0))
+        cant = float(c['cantidad'])
+        precio = float(c['precio'])
+        bruto = cant * precio
+        desc = float(c.get('descuento', 0))
+        bruto_total += bruto
+        descuento_total += desc
+        base = bruto - desc
+        for imp_id in c.get('impuestos', []):
+            impuesto_total += base * TASAS_IMPUESTO.get(str(imp_id), 0.0)
 
     descuento_global = float(data.get('descuento_global', 0))
     subtotal = bruto_total - descuento_total - descuento_global
@@ -163,15 +183,15 @@ def construir_payload(data, session_empresa, session_usuario):
         for imp in c.get('impuestos', []):
             payload.append((f'impuestos[{idc}][]', str(imp)))
 
-    # Totales (Effi recalcula impuesto al validar)
-    total_neto = subtotal  # sin impuestos calculados aquí
+    # Totales — Effi VALIDA que coincidan con sus cálculos al guardar
+    total_neto = subtotal + impuesto_total
     payload += [
-        ('bruto_transaccion',    str(int(bruto_total)) if bruto_total == int(bruto_total) else f'{bruto_total:.2f}'),
-        ('subtotal_transaccion', str(int(subtotal)) if subtotal == int(subtotal) else f'{subtotal:.2f}'),
-        ('total_descuento',      str(int(descuento_total + descuento_global))),
-        ('total_impuesto',       '0'),
+        ('bruto_transaccion',    f'{bruto_total:.2f}'),
+        ('subtotal_transaccion', f'{subtotal:.2f}'),
+        ('total_descuento',      f'{(descuento_total + descuento_global):.2f}'),
+        ('total_impuesto',       f'{impuesto_total:.2f}'),
         ('total_retencion',      '0'),
-        ('total_transaccion',    str(int(total_neto)) if total_neto == int(total_neto) else f'{total_neto:.2f}'),
+        ('total_transaccion',    f'{total_neto:.2f}'),
     ]
 
     # Retenciones (default vacías)
@@ -189,7 +209,7 @@ def construir_payload(data, session_empresa, session_usuario):
             ('valor_retencion[]', ''),
         ]
 
-    # Formas de pago (mínimo 1)
+    # Formas de pago (mínimo 1) — Effi exige suma == total_neto
     formas = data.get('formas_pago', [])
     if not formas:
         formas = [{
@@ -201,7 +221,7 @@ def construir_payload(data, session_empresa, session_usuario):
             'observacion': '',
         }]
     for fp in formas:
-        valor = float(fp.get('valor', 0))
+        valor = float(fp.get('valor', 0)) if fp.get('valor') is not None else total_neto
         payload += [
             ('t_forma_pago[]',          str(fp.get('t_forma_pago', '1'))),
             ('valor_forma_pago[]',      f'{valor:.2f}'),
@@ -258,9 +278,15 @@ def crear_remision(json_path, dry_run=False):
     print(f'   Response (200 chars): {r.text[:200]!r}')
     r.raise_for_status()
 
+    # Effi responde JSON: {"respuesta":"OK"|"error","mensaje":"..."}
     body = r.text.strip()
-    if body and body != 'OK' and 'error' in body.lower()[:60]:
-        raise RuntimeError(f'POST falló: {body[:300]}')
+    try:
+        resp = json.loads(body)
+        if resp.get('respuesta') != 'OK':
+            raise RuntimeError(f'POST falló: {resp.get("mensaje", body)[:500]}')
+    except json.JSONDecodeError:
+        if 'error' in body.lower()[:60]:
+            raise RuntimeError(f'POST falló: {body[:500]}')
 
     print('🔄 Consultando MAX(id_remision) tras el POST...')
     max_despues = _max_remision_id(s)

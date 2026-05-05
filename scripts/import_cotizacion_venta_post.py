@@ -46,7 +46,7 @@ Formato JSON:
 
 Doc: .claude/skills/effi-tecnico/SKILL.md §3
 """
-import sys, os, json, re, time, argparse, random
+import json, re, time, argparse, random
 from pathlib import Path
 import requests
 
@@ -95,6 +95,18 @@ def _id_concepto():
     return str(random.randint(10**20, 10**21 - 1))
 
 
+# Tasas de impuesto Effi (id → porcentaje) — extraído del select del form_CR
+TASAS_IMPUESTO = {
+    '1': 0.19,  # IVA 19%
+    '2': 0.0,   # IVA Exento
+    '3': 0.05,  # IVA 5%
+    '4': 0.14,  # IVA 14%
+    '5': 0.0,   # INCBP (monto fijo, no %)
+    '6': 0.08,  # Impuesto consumo 8%
+    '7': 0.0,   # IVA Excluido
+}
+
+
 def _max_cotizacion_id(s):
     """Scrape el listado para detectar la cotización recién creada (max id antes/después)."""
     r = s.get(f'{EFFI_BASE}/app/cotizacion', timeout=20)
@@ -107,6 +119,7 @@ def construir_payload(data, session_empresa, session_usuario):
     # Calcular totales línea por línea
     bruto_total = 0
     descuento_total = 0
+    impuesto_total = 0
     for c in data['conceptos']:
         cant = float(c['cantidad'])
         precio = float(c['precio'])
@@ -114,6 +127,11 @@ def construir_payload(data, session_empresa, session_usuario):
         desc = float(c.get('descuento', 0))
         bruto_total += bruto
         descuento_total += desc
+        # Suma impuestos por línea: cada id en c['impuestos'] aplica su tasa al (bruto - descuento)
+        base = bruto - desc
+        for imp_id in c.get('impuestos', []):
+            tasa = TASAS_IMPUESTO.get(str(imp_id), 0.0)
+            impuesto_total += base * tasa
 
     descuento_global = float(data.get('descuento_global', 0))
     propina = float(data.get('propina', 0))
@@ -173,16 +191,15 @@ def construir_payload(data, session_empresa, session_usuario):
             # Effi espera la clave aunque sea vacía si se usaron impuestos en otra línea — dejar omitido
             pass
 
-    # Totales (Effi recalcula pero los manda igual el form)
-    total_impuesto = 0  # No calculamos % de impuesto aquí — Effi recalcula
-    total_neto = subtotal + propina + total_impuesto
+    # Totales (Effi VALIDA que coincidan con sus cálculos al guardar)
+    total_neto = subtotal + propina + impuesto_total
     payload += [
-        ('bruto_transaccion',    str(int(bruto_total)) if bruto_total == int(bruto_total) else f'{bruto_total:.2f}'),
-        ('subtotal_transaccion', str(int(subtotal)) if subtotal == int(subtotal) else f'{subtotal:.2f}'),
-        ('total_descuento',      str(int(descuento_total + descuento_global))),
-        ('total_impuesto',       str(int(total_impuesto))),
+        ('bruto_transaccion',    f'{bruto_total:.2f}'),
+        ('subtotal_transaccion', f'{subtotal:.2f}'),
+        ('total_descuento',      f'{(descuento_total + descuento_global):.2f}'),
+        ('total_impuesto',       f'{impuesto_total:.2f}'),
         ('total_retencion',      '0'),
-        ('total_transaccion',    str(int(total_neto)) if total_neto == int(total_neto) else f'{total_neto:.2f}'),
+        ('total_transaccion',    f'{total_neto:.2f}'),
     ]
 
     # Retenciones (opcional, default vacío)
@@ -199,13 +216,13 @@ def construir_payload(data, session_empresa, session_usuario):
             ('valor_retencion[]', ''),
         ]
 
-    # Formas de pago
+    # Formas de pago — Effi exige que la suma sea igual a total_neto
     formas = data.get('formas_pago', [])
     if not formas:
         # Default: contado total con id 1
         formas = [{'t_forma_pago': '1', 'valor': total_neto}]
     for fp in formas:
-        valor = float(fp.get('valor', 0))
+        valor = float(fp.get('valor', 0)) if fp.get('valor') is not None else total_neto
         payload += [
             ('t_forma_pago[]',    str(fp.get('t_forma_pago', '1'))),
             ('valor_forma_pago[]', f'{valor:.2f}'),
@@ -244,9 +261,15 @@ def crear_cotizacion(json_path, dry_run=False):
     print(f'   Response (200 chars): {r.text[:200]!r}')
     r.raise_for_status()
 
+    # Effi responde JSON: {"respuesta":"OK"|"error","mensaje":"..."}
     body = r.text.strip()
-    if body and body != 'OK' and 'error' in body.lower()[:60]:
-        raise RuntimeError(f'POST falló: {body[:300]}')
+    try:
+        resp = json.loads(body)
+        if resp.get('respuesta') != 'OK':
+            raise RuntimeError(f'POST falló: {resp.get("mensaje", body)[:500]}')
+    except json.JSONDecodeError:
+        if 'error' in body.lower()[:60]:
+            raise RuntimeError(f'POST falló: {body[:500]}')
 
     print('🔄 Consultando MAX(id_cotizacion) tras el POST...')
     max_despues = _max_cotizacion_id(s)
