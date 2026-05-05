@@ -419,28 +419,55 @@ def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: l
         log_buffer.append(f'[POST DIRECTO] OP creada: {op_id} en {int(_time.time()-t0)}s')
     except Exception as e:
         log_buffer.append(f'[POST DIRECTO] FALLÓ: {e}')
-        log_buffer.append('[FALLBACK] Intentando con Playwright...')
         op_id = None
-        # ── INTENTO 2: Playwright (fallback) ─────────────────────────────
-        try:
-            proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', json_path],
-                                  cwd=repo, capture_output=True, text=True, timeout=300)
-            log_buffer.append(proc.stdout or '')
-            if proc.stderr: log_buffer.append('--- STDERR ---\n' + proc.stderr)
-            metodo = 'playwright'
-            if proc.returncode != 0:
-                _marcar_error(f'Ambos métodos fallaron. Playwright stderr: {(proc.stderr or "")[-200:]}', '\n'.join(log_buffer))
+
+        # ── INTENTO 2: si la sesión expiró, renovarla y reintentar POST directo (~25s)
+        err_str = str(e).lower()
+        session_expired = any(w in err_str for w in ('expirada', 'sesión', 'sin cookies', 'session'))
+        if session_expired:
+            log_buffer.append('[SESSION] Sesión Effi expirada — renovando con Playwright login...')
+            try:
+                rp = subprocess.run(['node', 'scripts/refresh_session.js'],
+                                    cwd=repo, capture_output=True, text=True, timeout=90)
+                log_buffer.append(rp.stdout or '')
+                if rp.returncode == 0:
+                    log_buffer.append('[SESSION] Sesión renovada — reintentando POST directo...')
+                    try:
+                        buf2 = _io.StringIO()
+                        with redirect_stdout(buf2), redirect_stderr(buf2):
+                            op_id = crear_op_post(json_path)
+                        log_buffer.append(buf2.getvalue())
+                        log_buffer.append(f'[POST DIRECTO v2] OP creada: {op_id} en {int(_time.time()-t0)}s')
+                    except Exception as e_retry:
+                        log_buffer.append(f'[POST DIRECTO v2] FALLÓ: {e_retry}')
+                        op_id = None
+                else:
+                    log_buffer.append(f'[SESSION] Renovación fallida: {(rp.stderr or "")[-300:]}')
+            except Exception as e_sess:
+                log_buffer.append(f'[SESSION] Error al renovar: {e_sess}')
+
+        # ── INTENTO 3: Playwright completo (fallback final) ───────────────
+        if op_id is None:
+            log_buffer.append('[FALLBACK] Intentando con Playwright completo...')
+            try:
+                proc = subprocess.run(['node', 'scripts/import_orden_produccion.js', json_path],
+                                      cwd=repo, capture_output=True, text=True, timeout=300)
+                log_buffer.append(proc.stdout or '')
+                if proc.stderr: log_buffer.append('--- STDERR ---\n' + proc.stderr)
+                metodo = 'playwright'
+                if proc.returncode != 0:
+                    _marcar_error(f'Todos los métodos fallaron. Playwright stderr: {(proc.stderr or "")[-200:]}', '\n'.join(log_buffer))
+                    return
+                for line in (proc.stdout or '').splitlines():
+                    if line.startswith('OP_CREADA:'):
+                        try: op_id = int(line.split(':')[1].strip())
+                        except Exception: pass
+                if not op_id:
+                    _marcar_error('Playwright OK pero no se pudo capturar OP_CREADA', '\n'.join(log_buffer))
+                    return
+            except Exception as e2:
+                _marcar_error(f'Todos los métodos fallaron. {e2}', '\n'.join(log_buffer))
                 return
-            for line in (proc.stdout or '').splitlines():
-                if line.startswith('OP_CREADA:'):
-                    try: op_id = int(line.split(':')[1].strip())
-                    except Exception: pass
-            if not op_id:
-                _marcar_error('Playwright OK pero no se pudo capturar OP_CREADA', '\n'.join(log_buffer))
-                return
-        except Exception as e2:
-            _marcar_error(f'Ambos métodos fallaron. {e2}', '\n'.join(log_buffer))
-            return
 
     if not op_id:
         _marcar_error('No se obtuvo op_id', '\n'.join(log_buffer))
