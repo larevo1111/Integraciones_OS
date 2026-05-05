@@ -80,6 +80,43 @@ s.headers.update({
 
 Implementación: [scripts/import_orden_produccion_post.py](scripts/import_orden_produccion_post.py).
 
+### Reglas comunes — cotización venta + remisión compra
+
+#### ⚠️ `impuestos[]` NUNCA va vacío
+**Todos los artículos en Effi tienen un tipo de IVA**. Nunca enviar `impuestos[<id_concepto>][]` sin valor. El campo `zeffi_inventario.impuestos` contiene el string; mapearlo a su id numérico:
+
+| String en `zeffi_inventario.impuestos` | id Effi |
+|---|---|
+| `'IVA 19%'` | `1` |
+| `'IVA Exento'` | `2` |
+| `'IVA 5%'` | `3` |
+| `'IVA 14%'` | `4` |
+| `'INCBP'` | `5` |
+| `'Imp. consumo 8%'` | `6` |
+| `'IVA Excluido'` | `7` |
+
+```sql
+SELECT cod_articulo, nombre, impuestos FROM zeffi_inventario WHERE cod_articulo IN (...);
+```
+
+#### ⚠️ `vendedor` NO sale de `zeffi_clientes`
+`zeffi_clientes.vendedor` suele ser NULL. El vendedor real está en la última factura emitida al cliente:
+
+```sql
+SELECT id_vendedor, vendedor
+FROM zeffi_facturas_venta_encabezados
+WHERE cliente = '<id_cliente_effi>'
+ORDER BY id_factura DESC
+LIMIT 1;
+```
+
+El `id_vendedor` es el número de cédula (CC). Mapearlo al id interno Effi con `MAPEO_ENCARGADOS` en el script, o buscarlo en `zeffi_empleados` si aplica.
+
+#### ⚠️ Forma de pago SIEMPRE Contado a 1 día
+**Sin excepciones**: `t_forma_pago='1'` (Contado a 1 día). Nunca preguntar al usuario qué forma de pago usar.
+
+---
+
 ### POST /app/cotizacion/crear ⭐ (cotización de venta)
 Crea cotización completa. Form `form_CR`. ~43 fields para 1 línea + 1 forma de pago. Tiempo ~1s.
 
