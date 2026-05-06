@@ -31,7 +31,10 @@ export default defineConfig(() => {
       target: { browser: ['es2022'] },
       vueRouterMode: 'hash',
       env: {
-        VITE_GOOGLE_CLIENT_ID: '290093919454-j2l1el0p624v65cada556pdc3r2gm6k7.apps.googleusercontent.com',
+        // Google OAuth client_id se importa desde src/config/oauth.js (NO usar
+        // build.env de quasar.config.js — el setup actual no inyecta correctamente
+        // import.meta.env.VITE_* y el bundle quedaba con clientId: undefined).
+        // Ver incidente 4-may → 6-may-2026 en src/config/oauth.js.
         VITE_API_BASE: '',
         VITE_APP_TIMEZONE: TZ.APP_TIMEZONE,
         VITE_APP_TIMEZONE_NAME: TZ.APP_TIMEZONE_NAME

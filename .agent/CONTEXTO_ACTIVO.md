@@ -1,7 +1,31 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-05
+**Actualizado**: 2026-05-06
 
-## En curso 2026-05-05 — Scripts POST cotización/remisión + fix sesión producción
+## Completado 2026-05-06 — Incidente login Google OAuth (root cause + fix definitivo) — v2.10.28
+
+**Síntoma**: Deivy y Santi vieron error 400 "Missing required parameter: client_id" al hacer login con Google en `gestion.oscomunidad.com`. La app llevaba ~36h funcionando con bundle silencioso roto.
+
+**Root cause** (combo de 3 cosas):
+1. El 4-may a las 23:11, alguien hizo `npm run build` directo en VPS sin tener `sistema_gestion/app/.env` (gitignored). El bundle salió con `clientId: undefined` — sin error visible.
+2. Service Worker de la PWA tenía cacheada la versión buena anterior → users seguían viendo la app funcionar mientras el bundle servidor estaba roto.
+3. El 6-may en la mañana el SW detectó hash distinto en `sw.js`, invalidó cache, descargó bundle nuevo (roto) → todos los users empezaron a fallar **sin que nadie tocara nada hoy**.
+
+**Investigación descartó hacker**: último login SSH externo fue 3-may, sin sesiones code-server hoy, cron `sync-repo.sh` solo hace `git pull` (sin build), sync.log muestra "Sin cambios" todas las ejecuciones del día.
+
+**Fix definitivo** (v2.10.28):
+- Eliminado `.env` (local + VPS).
+- Nuevo archivo `sistema_gestion/app/src/config/oauth.js` con `export const GOOGLE_CLIENT_ID = '...'` committeado.
+- `boot/googleAuth.js` y `LoginPage.vue` importan desde ahí (no `import.meta.env.VITE_*`).
+- Quitado `VITE_GOOGLE_CLIENT_ID` de `quasar.config.js > build.env` (descubrimos que ese mecanismo deja `clientId: void 0` en el bundle — Quasar v2 + Vite v5 no inyecta `import.meta.env.VITE_*` desde `build.env` correctamente).
+- Bundle deployado verificado: client_id presente en `oauth-*.js` chunk.
+
+**Lección**: Secrets PÚBLICOS (Google client_id, Stripe pk_, Sentry DSN) NO van en `.env` — van committed. `.env` es solo para secrets verdaderos que NO deben quedar en repo. Memoria: `feedback_secrets_publicos_no_env.md`.
+
+**Acción para users con caché vieja**: incógnito (Ctrl+Shift+N) o F12 → Application → Service Workers → Unregister + Clear site data.
+
+---
+
+## Completado 2026-05-05 — Scripts POST cotización/remisión + fix sesión producción
 
 Sesión desde VPS. 4 frentes resueltos.
 

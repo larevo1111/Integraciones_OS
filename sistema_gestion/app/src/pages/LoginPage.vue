@@ -41,6 +41,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { googleSdkLoaded } from 'vue3-google-login'
 import { useAuthStore } from 'src/stores/authStore'
+import { GOOGLE_CLIENT_ID } from 'src/config/oauth'
 
 const router    = useRouter()
 const auth      = useAuthStore()
@@ -52,7 +53,7 @@ const seleccionando = ref(null)
 onMounted(() => {
   googleSdkLoaded((google) => {
     google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      client_id: GOOGLE_CLIENT_ID,
       callback: onGoogleCallback,
       ux_mode: 'popup'
     })

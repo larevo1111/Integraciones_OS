@@ -107,6 +107,11 @@ Los endpoints `/procesar` y `/validar` verifican al arranque si el server tiene 
 - JWT doble: temporal (si >1 empresa) → selección empresa → JWT final con `empresa_activa`
 - Router guard decodifica `JWT payload.tipo==='final'` para evitar acceso con token temporal a `/tareas`
 - Tabla `sys_usuarios` en Hostinger para lookup de usuarios
+- **client_id de Google OAuth**: `sistema_gestion/app/src/config/oauth.js` (committeado, NO en `.env`).
+  Razón: el client_id es público (queda visible en HTML del iframe del botón Google) y `.env`
+  no se sincroniza a otros servidores → builds en VPS quedaban con `clientId: undefined`.
+  Detalle del incidente 2026-05-06 → ver el comentario en `src/config/oauth.js` y memoria
+  `feedback_secrets_publicos_no_env.md`.
 
 ## Módulo Tareas — estado completo (2026-03-23)
 
