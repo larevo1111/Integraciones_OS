@@ -1,6 +1,6 @@
 # Contexto: Sistema Gestión OS
-**Actualizado**: 2026-04-29
-**Versión actual**: v2.10.20
+**Actualizado**: 2026-05-06
+**Versión actual**: v2.10.28
 
 ## Propósito
 
@@ -405,3 +405,60 @@ Sección "Tiempos consolidados" en OpPanel:
 - `feedback_alcance_minimo.md`: cuando me piden cambio visual sutil (ej. mover una flecha), NO refactorizar HTML adyacente. Caso `SidebarSubSeccion` v2.10.2-3-4: eliminé el icon decorativo del header sin que me pidieran y rompió la sangría visual
 - `feedback_pwa_build_command.md`: validar SIEMPRE que `dist/pwa/sw.js` se generó tras un build. El comando `npx quasar build` (no PWA) deja PWAs instaladas pegadas
 - `feedback_componente_compartido.md`: si voy a copiar markup a 2+ lugares → extraer componente PRIMERO, no después
+- `feedback_secrets_publicos_no_env.md`: secrets públicos (Google client_id, Stripe pk, Sentry DSN) NO van en `.env` — van committed en `src/config/*.js`. `.env` no se sincroniza entre servers → builds silenciosos rotos
+
+---
+
+## Sesiones 2026-04-30 → 2026-05-06 — Bloque OPs avanzado + incidente OAuth (v2.10.21 → v2.10.28)
+
+### v2.10.21 — Ancho panel OP +20% + alineación headers tabla
+- `OpPanel`: ancho 540px → **648px** en web (mobile sigue 100vw)
+- Nueva clase `.op-input-cell` (borderless, padding horizontal 0) para inputs en tabla materiales/productos. El valor del input alinea con el header (`cell-right - 4px`). Antes el valor estaba ~7px desfasado por border+padding.
+
+### v2.10.22 — Buscador de catálogo en líneas no previstas
+**Antes**: el modal "Agregar material/producto no previsto" pedía `cod_articulo`, `descripción`, `unidad`, `cantidad` a mano. **Ahora**: solo selector de artículo + cantidad (con sufijo unidad automático).
+
+- Nuevo endpoint `GET /api/gestion/articulos?q=&tipo=material|producto`
+  - Lee `os_integracion.zeffi_inventario` + LEFT JOIN `inventario_produccion_effi.inv_rangos` (vía nuevo pool `db.inventario` agregado en `api/db.js`)
+  - Búsqueda multi-palabra AND. Excluye Activo fijo + Servicio + No vigentes
+  - Orden por score: 1=grupo coincide con tipo (MP/INS para material, PT/PP para producto), 2=clasificado con otro grupo, 3=sin clasificar (no excluye, sale al final)
+- Nuevo componente `ArticuloSelector.vue` (similar a OpSelector, dropdown teleport con buscador). Muestra cod, nombre, badge de grupo, unidad, costo
+- POST `/op/:id/lineas` ahora recibe también `costo_unit` y `precio_unit` desde el artículo seleccionado
+
+### v2.10.23 — Background jobs Procesar/Validar + borrar cualquier línea
+**Antes**: click "Procesar" o "Validar" → request HTTP de larga duración (~30-60s o ~2-3min) que bloqueaba la UI. Si cerrabas el panel, perdías la notificación. **Ahora**: jobs en background con polling.
+
+- Nueva tabla `g_op_jobs` (`id, empresa, id_op, tipo enum('procesar','validar'), estado enum('pendiente','en_progreso','exitoso','fallido'), started_at, finished_at, resultado_json, error_msg, usuario_email`)
+- Endpoints `/op/:id/procesar` y `/op/:id/validar` ahora insertan job pendiente y devuelven `{jobId}` inmediato. Disparan `execFile` Playwright vía `setImmediate` (fire-and-forget). Si ya hay job activo se reanuda
+- Nuevos endpoints `GET /op/jobs/:jobId` y `GET /op/:id/job-activo` para polling y reanudación
+- Frontend `OpPanel`: notify persistente "Procesando/Validando OP X…" con polling cada 3s. Al cerrar el panel y reabrirlo, polling reanuda automático. Cleanup en onUnmounted
+
+**Borrar líneas originales**: backend `DELETE /lineas/:id` quita filtro `es_no_previsto = 1`. Frontend muestra botón eliminar en TODAS las líneas (mat + prod). Útil cuando Effi rechaza líneas en 0.
+
+### v2.10.24 — Dialog eliminar línea estilo dark + español
+
+### v2.10.25 — Check vigencia anulada
+Endpoint `/procesar` y `/validar` ahora rechazan si `vigencia='Anulado'` (antes solo verificaban `estado`). Frontend: chip "Anulada" en header del panel + aviso "Esta OP está anulada en Effi" en lugar de los botones.
+
+### v2.10.26 — Validar invierte orden del flujo (crítico)
+**Bug encontrado**: el flujo era `1) anular original → 2) crear nueva → 3) cambiar nueva a Validado`. Si Playwright fallaba en el paso 2 o 3 (timeout, error Effi), la original ya estaba anulada y se perdía la OP.
+
+**Fix**: nuevo orden seguro `1) crear nueva → 2) cambiar nueva a Validado → 3) anular original`. Si falla 1 o 2, la original queda intacta y se puede reintentar. Cada paso con try/catch + mensaje específico del estado en que quedó todo.
+
+Caso real OP 2233 → 2240: la OP original se quedó `Generada/Anulado` por un crash anterior. Se validó manualmente reproduciendo el flujo (saltando el "anular" porque ya estaba anulada).
+
+### v2.10.27 — Tabla OPs orden por fecha + columna Lote/OP ant
+**Bug invisible**: el orden default de `/api/gestion/op` era `FIELD(estado, 'Generada','Procesada','Validado','Anulada')`, lo que dejaba las Validadas casi al fondo. La OP 2240 quedaba en posición 627 de 630 → daba la impresión de que la sync no funcionaba.
+
+- Backend: orden cambiado a `fecha_de_creacion DESC` (las más recientes primero, sin importar estado).
+- Backend: campo derivado `lote = op_anterior || id_orden` (no es columna nueva en BD, es derivado).
+- Frontend: nueva columna **"Lote/OP ant"** en tabla OPs (entre OP y Responsable, visible default, sortable). Para OP sin validar = id_orden propio. Para OP creada al validar otra = op_anterior (id de la original).
+- En el panel detalle: fila "Lote/OP ant" siempre visible.
+
+### v2.10.28 — Fix definitivo Google OAuth client_id (incidente 2026-05-06)
+Ver bloque completo en [.agent/CONTEXTO_ACTIVO.md](../CONTEXTO_ACTIVO.md). Resumen:
+- Eliminado `.env` (local + VPS).
+- Nuevo `sistema_gestion/app/src/config/oauth.js` con `GOOGLE_CLIENT_ID` hardcoded committeado.
+- `boot/googleAuth.js` y `LoginPage.vue` importan desde ahí (no `import.meta.env.VITE_*`).
+- Quitado `VITE_GOOGLE_CLIENT_ID` de `quasar.config.js > build.env` (el setup actual no lo inyecta correctamente — bundle quedaba con `clientId: void 0`).
+- Memoria: `feedback_secrets_publicos_no_env.md`.
