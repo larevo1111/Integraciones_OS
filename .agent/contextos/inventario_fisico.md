@@ -60,6 +60,8 @@
 
 Receta granel (id=120) clonada de Carmen id=106 (no de SC id=55, que tenía error con BOLSA FLEX UP en lugar de la cruda). Costos manuales productos finales = idénticos a SC (decisión Santi). Skill `produccion-recetas` §4.bis actualizada con la 3ra línea + presentación 275g.
 
+**IMPORTANTE — `catalogo_articulos.grupo_producto`**: cuando se crea una línea nueva de productos, NO basta con crear los artículos en Effi y las recetas. El frontend `/produccion/solicitudes` modo "Por grupo" lee de `catalogo_articulos.grupo_producto` (en `effi_data` LOCAL + `os_integracion` VPS). Los nuevos cods Urrao se insertaron manualmente en ambas BDs con `grupo_producto='Miel Os Urrao'` (mismo patrón que SC/Carmen). El script `sync_catalogo_articulos.py` solo detecta cods que ya aparecen en facturas/remisiones de venta — no funciona para cods recién creados sin uso. **Regla**: al crear una línea nueva de productos finales, INSERTAR en `catalogo_articulos` (local + VPS) con grupo_producto del nombre limpio sin gramaje.
+
 ### 2026-05-03 — Cacao San Luis: cadena completa creada en Effi
 4 cods nuevos creados via `scripts/import_articulo_crear_post.py` (POST directo, ~0.2s c/u). Paralelos al patrón LT (La Tierrita), tipo=2 (Producto en proceso), categoria=3 (T01.03. AGROECOLOGICOS GRAL):
 
