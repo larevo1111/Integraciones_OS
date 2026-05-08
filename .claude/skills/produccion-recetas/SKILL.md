@@ -228,7 +228,7 @@ Ejemplo:
 
 ## 4.bis Recetas confirmadas — MIELES (post-renombrado catálogo 2026-04-27)
 
-El 2026-04-27 Santi renombró el catálogo en Effi creando **2 líneas claras de mieles** según origen del proveedor. Antes los productos se llamaban "Miel Os Vidrio NNNg" y eran ambiguos sobre la fuente; ahora cada producto declara su origen en el nombre.
+El 2026-04-27 Santi renombró el catálogo en Effi creando **líneas claras de mieles** según origen del proveedor. Antes los productos se llamaban "Miel Os Vidrio NNNg" y eran ambiguos sobre la fuente; ahora cada producto declara su origen en el nombre. La línea **Urrao** se agregó el 2026-05-08 con el mismo patrón.
 
 ### Productos finales (post-rename)
 
@@ -240,19 +240,24 @@ El 2026-04-27 Santi renombró el catálogo en Effi creando **2 líneas claras de
 | 347 | Miel OS Carmen 150 grs | Carmen | $7,000 |
 | 349 | Miel OS Carmen 640 grs | Carmen | $23,123 |
 | 350 | Miel OS Carmen 1000 grs | Carmen | $49,800 |
+| 602 | Miel Os Urrao 150 grs | Urrao | $7,930 |
+| 603 | Miel Os Urrao 640 grs | Urrao | $21,324 |
+| 604 | Miel Os Urrao 1000 grs | Urrao | $31,053 |
 
 ### Materiales miel disponibles
 
 | Cod | Nombre | Costo/kg | Línea |
 |---|---|---:|---|
-| **373** | MIEL FILTRADA PASTEURIZADA SAN CARLOS x KILO | $23,000 | SC |
-| **586** | MIEL FILTRADA PASTEURIZADA - EL CARMEN x KILO | $22,000 | Carmen |
+| **373** | MIEL FILTRADA PASTEURIZADA SAN CARLOS x KG | $23,000 | SC |
+| **586** | MIEL FILTRADA PASTEURIZADA - EL CARMEN x KG | $22,000 | Carmen |
+| **601** | MIEL FILTRADA PASTEURIZADA URRAO x KG | $23,000 | Urrao |
 | 60 | MIEL FILTRADA SAN CARLOS x KILO (no pasteurizada) | $22,000 | — (no se usa por defecto) |
+| 600 | MIEL FILTRADA URRAO x KG (no pasteurizada) | $22,000 | — (no se usa por defecto) |
 | 53 | MIEL SAN MIGUEL CRUDA x KILO | $16,000 | otra (otro proveedor) |
 
-### Receta canónica (1 unidad, escalable) — confirmada por Santi 2026-04-27
+### Receta canónica (1 unidad, escalable) — confirmada por Santi 2026-04-27 (SC/Carmen) + 2026-05-08 (Urrao)
 
-**Ambas líneas usan los MISMOS envases esterilizados y MISMAS etiquetas genéricas. Solo cambia la miel.**
+**Las 3 líneas usan los MISMOS envases esterilizados y MISMAS etiquetas genéricas. Solo cambia la miel.**
 
 | Presentación | Miel (kg) | Envase esterilizado | Etiqueta presentación | Etiqueta tapa |
 |---|---|---|---|---|
@@ -260,7 +265,7 @@ El 2026-04-27 Santi renombró el catálogo en Effi creando **2 líneas claras de
 | 640 grs | 0.640 kg miel | cod **555** (500cc esteril, $2,055) | cod **262** ($300) | cod **90** ($390) |
 | 1000 grs | 1.000 kg miel | cod **552** (750cc esteril, $2,705) | cod **263** ($300) | cod **90** ($390) |
 
-→ Línea SC usa miel **373**; línea Carmen usa miel **586**.
+→ Línea SC usa miel **373**; línea Carmen usa miel **586**; línea Urrao usa miel **601**.
 
 ### Línea ARANCEL — Mieles SIN ETIQUETAR (envases UNICOR sin esterilizar)
 

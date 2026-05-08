@@ -36,6 +36,25 @@
 
 ## Hitos
 
+### 2026-05-08 — Línea Mieles Urrao: cadena completa creada en Effi + recetas
+4 cods nuevos creados via `scripts/import_articulo_crear_post.py` (POST directo, ~0.3s c/u). Paralelo total a las líneas SC y Carmen post-rename 2026-04-27:
+
+| Cod | Nombre | Tipo | Categoría | Costo manual |
+|---|---|---|---|---:|
+| **600** | MIEL FILTRADA URRAO x KG (cruda, ya existía) | PP (2) | T01.03 (3) | $22.000 |
+| **601** | MIEL FILTRADA PASTEURIZADA URRAO x KG | PP (2) | T01.03 (3) | $23.000 |
+| **602** | Miel Os Urrao 150 grs | PP (2) | TPT.01 (1) | $4.589 |
+| **603** | Miel Os Urrao 640 grs | PP (2) | TPT.01 (1) | $13.690 |
+| **604** | Miel Os Urrao 1000 grs | PP (2) | TPT.01 (1) | $20.337 |
+
+**3 recetas creadas en `prod_recetas`** (ids 111/112/113, estado validada, familia mieles, patrón escalable) clonando estructura de SC (ids 33/20/19), reemplazando solo material 373→601:
+
+- 150 grs (id 111): 0.150 kg miel 601 + envase 553 + etiqueta 290 + tapa 90 + M.O. 0.03h
+- 640 grs (id 112): 0.640 kg miel 601 + envase 555 + etiqueta 262 + tapa 90 + M.O. 0.03h
+- 1000 grs (id 113): 1.000 kg miel 601 + envase 552 + etiqueta 263 + tapa 90 + M.O. 0.03h
+
+Costos manuales productos finales = idénticos a SC (decisión Santi). Skill `produccion-recetas` actualizada §4.bis con la 3ra línea.
+
 ### 2026-05-03 — Cacao San Luis: cadena completa creada en Effi
 4 cods nuevos creados via `scripts/import_articulo_crear_post.py` (POST directo, ~0.2s c/u). Paralelos al patrón LT (La Tierrita), tipo=2 (Producto en proceso), categoria=3 (T01.03. AGROECOLOGICOS GRAL):
 
