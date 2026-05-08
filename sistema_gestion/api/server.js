@@ -2286,6 +2286,183 @@ app.get('/api/gestion/op/:id_op/job-activo', requireAuth, async (req, res) => {
 })
 
 
+// ─── CALIDAD: Inspección + Puntos críticos por OP ────────────────
+// Plan: .agent/planes/activos/calidad_inspeccion_op_2026-05-08.md
+// 2 tablas en os_gestion: g_op_inspeccion_calidad + g_op_pc_registro.
+// PCs vienen de prod_recetas_puntos_criticos (db.inventario, VPS).
+
+function _aqlSugerido(tamanoLote) {
+  if (!tamanoLote || tamanoLote < 2) return 1
+  if (tamanoLote <= 15)  return 2
+  if (tamanoLote <= 25)  return 3
+  if (tamanoLote <= 50)  return 5
+  if (tamanoLote <= 90)  return 8
+  if (tamanoLote <= 150) return 13
+  if (tamanoLote <= 280) return 20
+  return 32
+}
+
+// GET /api/gestion/op/:id_op/calidad/sugerencia
+// Devuelve PCs de la receta del producto principal de la OP + AQL sugerido.
+app.get('/api/gestion/op/:id_op/calidad/sugerencia', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  try {
+    // 1) Producto principal de la OP (primera línea tipo='producto', priorizando previstos)
+    const [productos] = await db.gestion.query(
+      `SELECT cod_articulo, descripcion, cantidad_real, cantidad_teorica
+       FROM g_op_lineas
+       WHERE empresa = ? AND id_op = ? AND tipo = 'producto'
+       ORDER BY es_no_previsto ASC, id ASC LIMIT 1`,
+      [req.empresa, idOp]
+    )
+    const principal = productos[0] || null
+    const tamanoLote = Number(principal?.cantidad_real ?? principal?.cantidad_teorica ?? 0)
+    const aqlSugerido = _aqlSugerido(tamanoLote)
+
+    // 2) Buscar receta + PCs en BD inventario_produccion_effi
+    let receta = null
+    let puntosCriticos = []
+    if (principal?.cod_articulo) {
+      const [recetas] = await db.inventario.query(
+        `SELECT id, cod_articulo, nombre FROM prod_recetas WHERE cod_articulo = ? LIMIT 1`,
+        [String(principal.cod_articulo)]
+      )
+      receta = recetas[0] || null
+      if (receta) {
+        const [pcs] = await db.inventario.query(
+          `SELECT id, parametro, tipo, unidad, instrumento,
+                  valor_min AS rango_min, valor_max AS rango_max,
+                  opciones_json, obligatorio, orden
+           FROM prod_recetas_puntos_criticos
+           WHERE receta_id = ?
+           ORDER BY orden ASC, id ASC`,
+          [receta.id]
+        )
+        puntosCriticos = pcs
+      }
+    }
+    res.json({
+      ok: true,
+      producto_principal: principal,
+      tamano_lote_unidades: tamanoLote,
+      aql_sugerido: aqlSugerido,
+      receta,
+      puntos_criticos: puntosCriticos,
+    })
+  } catch (e) {
+    console.error('[GET /op/:id/calidad/sugerencia]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/gestion/op/:id_op/calidad — lista inspecciones de la OP (con sus PCs)
+app.get('/api/gestion/op/:id_op/calidad', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  try {
+    const [inspecciones] = await db.gestion.query(
+      `SELECT * FROM g_op_inspeccion_calidad
+       WHERE empresa = ? AND id_op = ?
+       ORDER BY inspeccionado_en DESC, id DESC`,
+      [req.empresa, idOp]
+    )
+    if (!inspecciones.length) return res.json({ inspecciones: [] })
+    const ids = inspecciones.map(i => i.id)
+    const [pcs] = await db.gestion.query(
+      `SELECT * FROM g_op_pc_registro WHERE inspeccion_id IN (?) ORDER BY id ASC`,
+      [ids]
+    )
+    const pcMap = {}
+    for (const r of pcs) {
+      (pcMap[r.inspeccion_id] = pcMap[r.inspeccion_id] || []).push(r)
+    }
+    inspecciones.forEach(i => { i.puntos_criticos = pcMap[i.id] || [] })
+    res.json({ inspecciones })
+  } catch (e) {
+    console.error('[GET /op/:id/calidad]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/gestion/op/:id_op/calidad — crear inspección + registros PCs
+app.post('/api/gestion/op/:id_op/calidad', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const b = req.body || {}
+  const validBool = v => ['si','no','na'].includes(v) ? v : null
+  const resultadoVal = ['aprobado','rechazado','liberado_observacion'].includes(b.resultado) ? b.resultado : null
+  if (!resultadoVal) return res.status(400).json({ error: 'resultado requerido (aprobado|rechazado|liberado_observacion)' })
+
+  const conn = await db.gestion.getConnection()
+  try {
+    await conn.beginTransaction()
+    const [r] = await conn.query(
+      `INSERT INTO g_op_inspeccion_calidad
+        (empresa, id_op, tamano_lote_unidades, tamano_muestra,
+         visual_normal, tapado_sellado, etiqueta_normal, sabor_olor_normal,
+         defectos_criticos, defectos_mayores, defectos_menores,
+         resultado, observacion, inspector_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.empresa, idOp,
+        b.tamano_lote_unidades ?? null,
+        b.tamano_muestra ?? null,
+        validBool(b.visual_normal),
+        validBool(b.tapado_sellado),
+        validBool(b.etiqueta_normal),
+        validBool(b.sabor_olor_normal),
+        Number(b.defectos_criticos) || 0,
+        Number(b.defectos_mayores) || 0,
+        Number(b.defectos_menores) || 0,
+        resultadoVal,
+        b.observacion?.toString().trim() || null,
+        req.usuario.email,
+      ]
+    )
+    const inspeccionId = r.insertId
+
+    // Insertar PCs (si vienen)
+    const pcs = Array.isArray(b.puntos_criticos) ? b.puntos_criticos : []
+    for (const pc of pcs) {
+      const tipoPC = ['numerico','booleano','texto','seleccion'].includes(pc.tipo) ? pc.tipo : 'texto'
+      const valorNum = pc.valor_numerico != null && pc.valor_numerico !== '' ? Number(pc.valor_numerico) : null
+      const valorBool = pc.valor_booleano == null ? null : (pc.valor_booleano ? 1 : 0)
+      const rangoMin = pc.rango_min != null && pc.rango_min !== '' ? Number(pc.rango_min) : null
+      const rangoMax = pc.rango_max != null && pc.rango_max !== '' ? Number(pc.rango_max) : null
+      // Calcular dentro_rango server-side
+      let dentroRango = null
+      if (tipoPC === 'numerico' && valorNum != null) {
+        const okMin = rangoMin == null || valorNum >= rangoMin
+        const okMax = rangoMax == null || valorNum <= rangoMax
+        dentroRango = (okMin && okMax) ? 1 : 0
+      } else if (tipoPC === 'booleano' && valorBool != null) {
+        dentroRango = valorBool === 1 ? 1 : 0
+      }
+      await conn.query(
+        `INSERT INTO g_op_pc_registro
+          (inspeccion_id, pc_receta_id, parametro, tipo, unidad,
+           rango_min, rango_max, valor_numerico, valor_booleano, valor_texto,
+           dentro_rango, observacion)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          inspeccionId, pc.pc_receta_id ?? null,
+          (pc.parametro || '').toString().slice(0, 100),
+          tipoPC, pc.unidad?.toString().slice(0, 20) || null,
+          rangoMin, rangoMax, valorNum, valorBool,
+          pc.valor_texto?.toString() || null,
+          dentroRango, pc.observacion?.toString() || null
+        ]
+      )
+    }
+    await conn.commit()
+    res.json({ ok: true, inspeccionId })
+  } catch (e) {
+    try { await conn.rollback() } catch (_) {}
+    console.error('[POST /op/:id/calidad]', e)
+    res.status(500).json({ error: e.message })
+  } finally {
+    try { conn.release() } catch (_) {}
+  }
+})
+
 // Endpoints viejos `/tareas/:id/produccion/{,tiempos,procesar,validar,lineas}` removidos 2026-04-24
 // Fueron reemplazados por endpoints a nivel OP (ver arriba). Frontend nuevo apunta a `/op/:id_op/*`.
 

@@ -252,7 +252,15 @@
               </template>
             </div>
 
-            <!-- ── BLOQUE 5: TAREAS VINCULADAS ────────────────── -->
+            <!-- ── BLOQUE 5: CALIDAD ──────────────────────────── -->
+            <CalidadPanel
+              ref="calidadPanelRef"
+              :id-op="String(idOp)"
+              :estado-op="estado"
+              :es-anulada="estaAnulada"
+            />
+
+            <!-- ── BLOQUE 6: TAREAS VINCULADAS ────────────────── -->
             <div class="op-section">
               <div class="op-section-title">Tareas vinculadas ({{ ficha.tareas_vinculadas.length }})</div>
 
@@ -401,6 +409,7 @@ import ResponsablesSelector from './ResponsablesSelector.vue'
 import EtiquetasSelector from './EtiquetasSelector.vue'
 import CatProduccionSelector from './CatProduccionSelector.vue'
 import ArticuloSelector from './ArticuloSelector.vue'
+import CalidadPanel from './CalidadPanel.vue'
 
 const $q  = useQuasar()
 const auth = useAuthStore()
@@ -414,6 +423,7 @@ const emit = defineEmits(['cerrar', 'actualizada'])
 
 const ficha       = ref(null)
 const cargando    = ref(false)
+const calidadPanelRef = ref(null)
 const obsLote     = ref('')
 const borrador    = reactive({})
 const tareaAbierta = ref(null)
@@ -765,9 +775,20 @@ function confirmarProcesar() {
 }
 
 function confirmarValidar() {
+  // Soft-block: si calidad rechazada o sin inspección, advertir antes de validar
+  const ultima = calidadPanelRef.value?.ultimaInsp
+  let extraMsg = ''
+  if (!ultima) {
+    extraMsg = '<br><br><span style="color:#ffa726">⚠️ Esta OP no tiene inspección de calidad registrada.</span>'
+  } else if (ultima.resultado === 'rechazado') {
+    extraMsg = '<br><br><span style="color:#e74c3c">⚠️ Esta OP tiene Calidad = <b>Rechazado</b>.</span>'
+  } else if (ultima.resultado === 'liberado_observacion') {
+    extraMsg = '<br><br><span style="color:#ffa726">ℹ️ Calidad: Liberado con observación.</span>'
+  }
   $q.dialog({
     title: 'Validar OP',
-    message: `Anula la OP ${props.idOp}, crea una nueva con los reales reportados y la marca como "Validado". Corre en segundo plano (~2-3 min).`,
+    message: `Anula la OP ${props.idOp}, crea una nueva con los reales reportados y la marca como "Validado". Corre en segundo plano (~2-3 min).${extraMsg}`,
+    html: true,
     cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true, dark: true
   }).onOk(async () => {
     try {
