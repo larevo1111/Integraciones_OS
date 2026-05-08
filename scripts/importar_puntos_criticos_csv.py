@@ -49,6 +49,24 @@ def normalizar_unidad(u: str | None) -> str | None:
     return MAPEO_UNIDADES.get(u.lower(), u)
 
 
+def inferir_instrumento(parametro: str, tipo: str) -> str | None:
+    """Devuelve instrumento sugerido desde el nombre del parámetro.
+    Cuando el CSV viene con `instrumento` vacío (caso típico cuando Santi
+    marca 'm' y solo cambia min/max sin completar el resto), inferimos
+    con sentido común. Reglas alineadas a doc CALIDAD_Y_PUNTOS_CRITICOS.md.
+    """
+    import re as _re
+    p = (parametro or '').lower()
+    if _re.search(r'\btiempo\b', p): return 'Cronómetro'
+    if _re.search(r'\btemperatura\b', p): return 'Termómetro'
+    if _re.search(r'\bph\b', p): return 'pH-metro'
+    if 'cristaliza' in p or 'test de papel' in p: return 'Test papel'
+    if _re.search(r'\bsabor\b|\bolor\b|\baroma\b', p): return 'Organoléptico'
+    if _re.search(r'\bcolor\b|\btextura\b', p): return 'Visual'
+    if 'quiebre' in p: return 'Test manual'
+    return None
+
+
 def parse_opciones(notas_claude: str) -> str | None:
     """Extrae lista de opciones de 'Opciones: A / B / C' → JSON."""
     if not notas_claude:
@@ -113,6 +131,11 @@ def main():
             valor_max = num_or_none(r['max']) if tipo == 'numerico' else None
             unidad = normalizar_unidad(r['unidad'])
             instrumento = (r['instrumento'] or '').strip() or None
+            if not instrumento:
+                instrumento = inferir_instrumento(r['parametro'], tipo)
+                if instrumento:
+                    print(f"  ⚠ inferido instrumento '{instrumento}' para "
+                          f"cod {r['cod']} '{r['parametro']}'")
             opciones_json = parse_opciones(r.get('notas_claude', '')) if tipo == 'seleccion' else None
             orden = int(r['orden']) if str(r['orden']).strip().isdigit() else 1
 
