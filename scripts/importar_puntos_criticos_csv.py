@@ -31,6 +31,23 @@ from lib import inventario  # type: ignore
 CSV_PATH = REPO / 'inventario' / 'puntos_criticos_para_validar.csv'
 DRY_RUN = '--dry-run' in sys.argv
 
+# Mapeo CSV (plural/abreviado) → maestra prod_unidades_medida (singular).
+# El CSV usa "min"/"horas"/"dias" pero la UI lee de la maestra que usa singular.
+MAPEO_UNIDADES = {
+    'horas': 'hora',
+    'min': 'minuto',
+    'minutos': 'minuto',
+    'dias': 'dia',
+    'segundos': 'segundo',
+}
+
+
+def normalizar_unidad(u: str | None) -> str | None:
+    if not u:
+        return None
+    u = u.strip()
+    return MAPEO_UNIDADES.get(u.lower(), u)
+
 
 def parse_opciones(notas_claude: str) -> str | None:
     """Extrae lista de opciones de 'Opciones: A / B / C' → JSON."""
@@ -94,7 +111,7 @@ def main():
             tipo = (r['tipo'] or 'numerico').strip().lower()
             valor_min = num_or_none(r['min']) if tipo == 'numerico' else None
             valor_max = num_or_none(r['max']) if tipo == 'numerico' else None
-            unidad = (r['unidad'] or '').strip() or None
+            unidad = normalizar_unidad(r['unidad'])
             instrumento = (r['instrumento'] or '').strip() or None
             opciones_json = parse_opciones(r.get('notas_claude', '')) if tipo == 'seleccion' else None
             orden = int(r['orden']) if str(r['orden']).strip().isdigit() else 1
