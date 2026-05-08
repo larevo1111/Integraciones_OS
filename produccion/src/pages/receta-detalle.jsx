@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Combobox } from "@/components/ui/combobox"
 import { api } from "@/lib/api"
+import { articuloToOption } from "@/lib/articulos"
 
 function Money({ v }) {
   const n = Number(v || 0)
@@ -71,9 +72,7 @@ export function RecetaDetallePage() {
   }, [cargar])
 
   useEffect(() => {
-    api.get('/api/articulos').then(d => setArticulos(d.map(a => ({
-      value: a.cod, label: `${a.cod} — ${a.nombre}`, nombre: a.nombre, costo_manual: a.costo_manual,
-    })))).catch(() => {})
+    api.get('/api/articulos').then(d => setArticulos(d.map(articuloToOption))).catch(() => {})
     api.get('/api/produccion/tipos-costo').then(setTiposCosto).catch(() => {})
     api.get('/api/produccion/unidades').then(setUnidades).catch(() => {})
   }, [])

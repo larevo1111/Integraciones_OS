@@ -83,13 +83,13 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const addMat = (cod) => {
     const a = articulos.find(x => x.value === cod)
     if (!a) return
-    const m = [...preview.materiales, { cod, nombre: a.label.replace(/^\d+ — /, ''), cantidad: 1, costo: 0 }]
+    const m = [...preview.materiales, { cod, nombre: a.nombre, cantidad: 1, costo: 0 }]
     updateAll(m, preview.productos, preview.otros_costos)
   }
   const addProd = (cod) => {
     const a = articulos.find(x => x.value === cod)
     if (!a) return
-    const p = [...preview.productos, { cod, nombre: a.label.replace(/^\d+ — /, ''), cantidad: 1, precio: 0 }]
+    const p = [...preview.productos, { cod, nombre: a.nombre, cantidad: 1, precio: 0 }]
     updateAll(preview.materiales, p, preview.otros_costos)
   }
   const addCost = (tipoIdStr) => {
@@ -129,8 +129,8 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   if (!open) return null
 
   const fmt = (n) => (Math.round(n)).toLocaleString('es-CO')
-  const opts = (articulos || []).map(a => ({ value: a.value, label: a.label, nombre: a.nombre }))
-  const optsCosto = tiposCosto.map(t => ({ value: String(t.tipo_costo_id), label: `${t.tipo_costo_id} — ${t.nombre}`, nombre: t.nombre }))
+  const opts = articulos || []
+  const optsCosto = tiposCosto.map(t => ({ value: String(t.tipo_costo_id), label: `${t.tipo_costo_id} · ${t.nombre}`, nombre: t.nombre }))
   const optsEncargado = encargados.map(e => ({ value: e.cc, label: e.nombre }))
 
   return (

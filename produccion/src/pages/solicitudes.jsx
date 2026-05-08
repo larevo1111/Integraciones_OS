@@ -6,6 +6,7 @@ import { OsDataTable } from "@/components/os-data-table"
 import { DetalleSolicitudSheet } from "@/components/detalle-solicitud-sheet"
 import { ProgramarGrupoDialog } from "@/components/programar-grupo-dialog"
 import { api } from "@/lib/api"
+import { articuloToOption } from "@/lib/articulos"
 
 const ESTADOS = [
   { value: "solicitado", label: "Solicitado" },
@@ -51,16 +52,7 @@ export function SolicitudesPage() {
 
   const cargarArticulos = useCallback(async () => {
     const data = await api.get('/api/articulos')
-    setArticulos(data.map(a => ({
-      value: a.cod,
-      label: `${a.cod} — ${a.nombre}`,
-      subtitle: `Stock: ${a.stock}${a.unidad ? ' ' + a.unidad : ''}`,
-      badge: a.tipo,
-      tipo: a.tipo,
-      grupo_producto: a.grupo_producto || '',
-      nombre: a.nombre,
-      costo_manual: a.costo_manual || 0,
-    })))
+    setArticulos(data.map(articuloToOption))
   }, [])
 
   useEffect(() => { cargar(); cargarArticulos() }, [cargar, cargarArticulos])
