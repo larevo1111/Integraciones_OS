@@ -241,6 +241,7 @@ El 2026-04-27 Santi renombró el catálogo en Effi creando **líneas claras de m
 | 349 | Miel OS Carmen 640 grs | Carmen | $23,123 |
 | 350 | Miel OS Carmen 1000 grs | Carmen | $49,800 |
 | 602 | Miel Os Urrao 150 grs | Urrao | $7,930 |
+| 605 | Miel Os Urrao 275 grs | Urrao | $13,030 |
 | 603 | Miel Os Urrao 640 grs | Urrao | $21,324 |
 | 604 | Miel Os Urrao 1000 grs | Urrao | $31,053 |
 
@@ -262,6 +263,7 @@ El 2026-04-27 Santi renombró el catálogo en Effi creando **líneas claras de m
 | Presentación | Miel (kg) | Envase esterilizado | Etiqueta presentación | Etiqueta tapa |
 |---|---|---|---|---|
 | 150 grs | 0.150 kg miel | cod **553** (110cc esteril, $1,500) | cod **290** ($300) | cod **90** ($390) |
+| 275 grs | 0.275 kg miel | cod **554** (230cc esteril, $1,560) | cod **291** ($300) | cod **90** ($390) |
 | 640 grs | 0.640 kg miel | cod **555** (500cc esteril, $2,055) | cod **262** ($300) | cod **90** ($390) |
 | 1000 grs | 1.000 kg miel | cod **552** (750cc esteril, $2,705) | cod **263** ($300) | cod **90** ($390) |
 
