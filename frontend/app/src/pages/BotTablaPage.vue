@@ -253,6 +253,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { parseNumeroFlexible, fmtNum as fmtNumHelper } from 'src/utils/numero'
 
 const route = useRoute()
 
@@ -500,20 +501,18 @@ const groupedRows = computed(() => {
 const displayRows = computed(() => groupedRows.value || sortedRows.value)
 
 // ── Detectar numérico ──────────────────────────────────
-function _stripNumFmt(s) {
-  // Limpia formatos COP/US: "$1.234.567", "1,234,567", "45.2%", "-$500"
-  return s.replace(/[$%]/g, '').replace(/\./g, '').replace(/,/g, '.').trim()
-}
+// Nota: parseNum + fmtNum vienen del helper compartido src/utils/numero.js
+// que distingue formato US (1234.56) vs COP (1.234.567) correctamente.
+const parseNum = parseNumeroFlexible
+const fmtNum = fmtNumHelper
+
 function isNumericKey(key) {
   const sample = allRows.value.slice(0, 8)
   if (!sample.length) return false
   return sample.every(r => {
     const v = r[key]
     if (v === null || v === undefined || v === '') return true
-    const s = String(v).trim()
-    if (s === '') return true
-    const clean = _stripNumFmt(s)
-    return clean !== '' && !isNaN(Number(clean))
+    return Number.isFinite(parseNum(v))
   })
 }
 function isNumeric(key) {
@@ -522,20 +521,6 @@ function isNumeric(key) {
   return isNumericKey(key)
 }
 
-// ── Formato de celda ───────────────────────────────────
-function fmtNum(n) {
-  if (n === null || n === undefined || isNaN(n)) return '—'
-  const decimals = (Math.abs(n) - Math.floor(Math.abs(n))) > 0.0005
-    ? Math.min(String(n.toFixed(3)).replace(/0+$/, '').split('.')[1]?.length || 0, 3)
-    : 0
-  return n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-}
-
-function parseNum(val) {
-  if (val === null || val === undefined || val === '' || val === '—') return NaN
-  const clean = _stripNumFmt(String(val))
-  return clean === '' ? NaN : parseFloat(clean)
-}
 function formatCell(val, col) {
   if (val === null || val === undefined || val === '—') return '—'
   if (col && isNumeric(col.key)) {
