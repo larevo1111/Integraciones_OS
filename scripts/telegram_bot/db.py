@@ -108,17 +108,34 @@ def guardar_sesion(telegram_user_id: int, username: str, nombre: str,
 def guardar_tabla_temp(token: str, pregunta: str, columnas: list,
                        filas: list, empresa: str = 'ori_sil_2'):
     import json
+    cols_json = json.dumps(columnas)
+    filas_json = json.dumps(filas)
+    sql = """
+        INSERT INTO bot_tablas_temp (token, empresa, pregunta, columnas, filas)
+        VALUES (%s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE filas=VALUES(filas), created_at=NOW()
+    """
+    params = (token, empresa, pregunta, cols_json, filas_json)
+
+    # 1) Guardar en local (ia_service_os) — fuente de verdad para el bot
     conn = get_local_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO bot_tablas_temp (token, empresa, pregunta, columnas, filas)
-                VALUES (%s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE filas=VALUES(filas), created_at=NOW()
-            """, (token, empresa, pregunta, json.dumps(columnas), json.dumps(filas)))
+            cur.execute(sql, params)
             conn.commit()
     finally:
         conn.close()
+
+    # 2) Replicar al VPS (os_integracion) — necesario para el ERP en VPS
+    # Si falla, NO romper el flujo del bot — solo loggear.
+    try:
+        from lib import integracion
+        with integracion() as conn_vps:
+            with conn_vps.cursor() as cur:
+                cur.execute(sql, params)
+                conn_vps.commit()
+    except Exception as e:
+        print(f'[bot_tablas_temp] WARN: no se pudo replicar al VPS: {e}', flush=True)
 
 
 def limpiar_tablas_viejas():

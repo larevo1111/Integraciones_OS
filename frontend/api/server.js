@@ -1027,13 +1027,15 @@ app.get('/api/export/:recurso', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// Bot tabla: leer token de bot_tablas_temp (ia_service_os local)
+// Bot tabla: leer token de bot_tablas_temp.
+// El ia-service guarda doble copia (local + VPS os_integracion). Aquí leemos del VPS
+// porque este ERP corre allí — la BD ia_service_os sigue siendo la fuente local.
 app.get('/api/bot/tabla', async (req, res) => {
   const { token } = req.query
   if (!token) return res.status(400).json({ ok: false, error: 'Token requerido' })
   const central = require('../../lib/db_conn')
   try {
-    const pool = await central.local('ia_service_os')
+    const pool = await central.integracion()
     const [rows] = await pool.execute(
       'SELECT pregunta, columnas, filas FROM bot_tablas_temp WHERE token = ? AND created_at > NOW() - INTERVAL 24 HOUR',
       [token]
