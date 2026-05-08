@@ -296,6 +296,23 @@ OPs donde Arancel envasa miel para OS. Usa envases UNICOR comprados a UNICOR S.A
 ❌ Asumir que envases esterilizados son solo para Carmen — Santi confirmó que ambas líneas los usan.
 ❌ Asumir que etiquetas "CARMEN CRISTALIZADA" (cod 351/353/354) van con productos Carmen — esas son obsoletas, ahora se usan las genéricas (290/262/263) para ambas líneas.
 
+### Línea ESTERILIZACIÓN ENVASES — recetas 552-556 (cargadas 2026-05-08)
+
+OPs donde se esteriliza un envase UNICOR para producir su versión esterilizada. **1 envase normal → 1 esterilizado. Sin lote estándar — siempre por unidad**.
+
+| PT esterilizado | Cod | MP envase normal | Cod base | Costo MP |
+|---|---:|---|---:|---:|
+| Envase 750cc esterilizado | **552** | Vidrio 750cc UNICOR | 85 | $2.205 |
+| Envase 110cc esterilizado | **553** | Vidrio 110cc UNICOR | 86 | $1.000 |
+| Envase 230cc esterilizado | **554** | Vidrio 230cc UNICOR | 87 | $1.060 |
+| Envase 500cc esterilizado | **555** | Vidrio 500cc UNICOR | 88 | $1.555 |
+| Envase 50cc esterilizado | **556** | Vidrio 50cc UNICOR | 232 | $827 |
+
+- **Otro costo**: `tipo_costo_id=13` — `M.O. HORA ORIGEN SILVESTRE (Hora)` × **0.5 horas** × $7.000 = **$3.500 fijo por OP** (independiente de la cantidad de envases).
+- **Patrón ratio**: 1:1 — por cada N envases UNICOR consumidos, se producen N esterilizados.
+- **Sin lote estándar** — el operador define la cantidad al programar la OP. Si la tanda es muy grande, ajustar 0.5h M.O.
+- **IDs receta** (en `prod_recetas`): 114, 115, 116, 117, 118 — todas estado `validada` el 2026-05-08.
+
 ---
 
 ## 4.ter Receta confirmada — CREMA DE MANÍ x KILO (cod 151)
