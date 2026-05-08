@@ -1,6 +1,6 @@
 # Contexto: Sistema Gestión OS
-**Actualizado**: 2026-05-06
-**Versión actual**: v2.10.28
+**Actualizado**: 2026-05-08
+**Versión actual**: v2.10.30
 
 ## Propósito
 
@@ -47,6 +47,9 @@ Pool `comunidad` usa SSH tunnel a Hostinger (puerto 65002, key `sos_erp`). Pools
 | `g_op_detalle` | **Una fila por OP** (UPSERT por `id_op`+`empresa`). `observaciones_lote`, `procesado_por`, `procesado_en`, `validado_por`, `validado_en`, `op_anterior`, `responsable_validado` |
 | `g_op_lineas` | Materiales/productos REALES de una OP (después de validar). `tipo` enum('material','producto'), `cod_articulo`, `descripcion`, `unidad`, `cantidad_teorica`, `cantidad_real`, `costo_unit`, `precio_unit`, `es_no_previsto` |
 | `g_op_tiempos` | **Snapshot de tiempos consolidados por OP × categoria_produccion** (`segundos_totales`). Se llena al validar OP O al editar manualmente desde OpPanel (nivel ≥5). Si está vacío para una OP, los tiempos se calculan al vuelo desde `g_tareas.duracion_usuario_seg` (modo "vivo") |
+| `g_op_inspeccion_calidad` | **Calidad por OP (2026-05-08)**. Una row por inspección. Snapshot completo de muestreo (`tamano_lote_unidades`, `tamano_muestra`), 4 booleanos genéricos (`visual_normal`, `tapado_sellado`, `etiqueta_normal`, `sabor_olor_normal` enum si/no/na), 3 contadores (`defectos_criticos/mayores/menores`), `resultado` enum(aprobado/rechazado/liberado_observacion), `observacion`, `inspector_email`, `inspeccionado_en` |
+| `g_op_pc_registro` | **Mediciones de Puntos Críticos (2026-05-08)**. FK a `g_op_inspeccion_calidad`. Snapshot de `parametro/tipo/unidad/rango_min-max` (por si la receta cambia). `valor_numerico/booleano/texto` según tipo. `dentro_rango` calculado server-side al insertar |
+| `g_op_jobs` | **Jobs de procesar/validar (2026-04-29)**. Tracking persistente. `tipo` enum(procesar/validar), `estado` enum(pendiente/en_progreso/exitoso/fallido), `started_at`, `finished_at`, `resultado_json`, `error_msg`, `usuario_email` |
 | `g_tarea_produccion_lineas` | (Legacy 2026-04-21) Líneas materiales/productos por tarea. Reemplazado en gran parte por `g_op_lineas` que es por OP, no por tarea |
 | `g_tarea_tiempo` | Legacy — ya no se consulta. Las duraciones viven en `g_tareas` directamente |
 | `g_usuarios_config` | Configuración por usuario |
@@ -454,6 +457,28 @@ Caso real OP 2233 → 2240: la OP original se quedó `Generada/Anulado` por un c
 - Backend: campo derivado `lote = op_anterior || id_orden` (no es columna nueva en BD, es derivado).
 - Frontend: nueva columna **"Lote/OP ant"** en tabla OPs (entre OP y Responsable, visible default, sortable). Para OP sin validar = id_orden propio. Para OP creada al validar otra = op_anterior (id de la original).
 - En el panel detalle: fila "Lote/OP ant" siempre visible.
+
+### v2.10.30 — Sección Calidad por OP (2026-05-08)
+Digitalización de la bitácora de calidad en papel. Nuevo bloque `<CalidadPanel>` embebido en `OpPanel.vue` entre Tiempos y Tareas.
+
+**BD nuevas en `os_gestion`**: `g_op_inspeccion_calidad` + `g_op_pc_registro` (FK).
+
+**Backend**:
+- `GET /op/:id/calidad/sugerencia` — devuelve PCs de la receta del producto principal de la OP + AQL sugerido (ANSI/ASQ Z1.4 simplificado).
+- `GET /op/:id/calidad` — lista inspecciones con sus PCs.
+- `POST /op/:id/calidad` — crea inspección + PCs en transacción.
+
+**Frontend `CalidadPanel.vue`**:
+- 5 sub-bloques: muestreo / inspección visual / mediciones PCs (dinámicos por receta) / defectos (stepper +/-) / resultado.
+- Indicador ✓/✗ por rango en cada PC numérico.
+- Auto-rechazo + obs obligatoria si defectos críticos > 0.
+- Firma automática (email + timestamp).
+
+**OpPanel**: badge calidad en bloque + soft-block al validar (dialog warning si rechazado/sin inspección, no bloquea).
+
+**Restricciones de alcance**: NO toca Effi (no estados nuevos, no workflows). Workflow no conformidad → fase ERP futura.
+
+Plan: `.agent/planes/completados/calidad_inspeccion_op_2026-05-08.md`. Doc base: `.agent/docs/CALIDAD_Y_PUNTOS_CRITICOS.md`.
 
 ### v2.10.28 — Fix definitivo Google OAuth client_id (incidente 2026-05-06)
 Ver bloque completo en [.agent/CONTEXTO_ACTIVO.md](../CONTEXTO_ACTIVO.md). Resumen:

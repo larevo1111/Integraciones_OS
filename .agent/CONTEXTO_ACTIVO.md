@@ -1,5 +1,34 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-06
+**Actualizado**: 2026-05-08
+
+## Completado 2026-05-08 — Sistema Gestión: Sección Calidad por OP (v2.10.30)
+
+Digitalizada la bitácora de calidad en papel como bloque dentro de cada OP en `OpPanel.vue`. Combina:
+- **Inspección visual genérica** (4 booleanos: visual / tapado / etiqueta / sabor-olor) → para todos los productos
+- **Mediciones de Puntos Críticos** (dinámicos por receta, leídos de `prod_recetas_puntos_criticos` BD `inventario_produccion_effi`) → según producto principal de la OP
+- **Defectos** (críticos/mayores/menores con stepper +/-)
+- **Resultado** (Aprobado / Rechazado / Liberado con observación) + auto-firma del usuario logueado
+
+**BD nueva** (en `os_gestion` VPS):
+- `g_op_inspeccion_calidad` — 1 row por inspección con snapshot completo de muestreo + booleanos + defectos + resultado + inspector
+- `g_op_pc_registro` — 1 row por PC medido (FK a inspeccion). Snapshot de parametro/tipo/unidad/rango por si la receta cambia. Calcula `dentro_rango` server-side.
+
+**Backend** (3 endpoints nuevos en `/api/gestion/op/:id/calidad/...`):
+- `GET .../sugerencia` — devuelve PCs de la receta del producto principal + AQL sugerido (ANSI/ASQ Z1.4 simplificado: 2-15→2, 16-25→3, 26-50→5, 51-90→8, 91-150→13, 151-280→20, 281+→32)
+- `GET ` — lista inspecciones con sus PCs
+- `POST ` — crea inspección + PCs en transacción
+
+**Frontend**:
+- Nuevo `CalidadPanel.vue` — mobile-first, 5 sub-bloques (muestreo / visual / mediciones PCs / defectos / resultado). Indicador ✓/✗ por rango en cada PC numérico. Auto-rechazo + obs obligatoria si defectos críticos>0.
+- `OpPanel.vue` — embebe CalidadPanel entre Tiempos y Tareas. Soft-block al validar: dialog warning si calidad rechazada o sin inspección (no bloquea, el director decide).
+
+**Restricciones de alcance** (acordadas con Santi):
+- Calidad vive 100% en `os_gestion`. NUNCA toca Effi (no estados nuevos, no workflows).
+- Workflow de no conformidad / reproceso / descarte → fase ERP futura.
+
+Plan: `.agent/planes/completados/calidad_inspeccion_op_2026-05-08.md`.
+
+---
 
 ## Completado 2026-05-06 — Incidente login Google OAuth (root cause + fix definitivo) — v2.10.28
 
