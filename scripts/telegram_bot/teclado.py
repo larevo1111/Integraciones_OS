@@ -27,9 +27,10 @@ MAX_INLINE = 5
 
 # Todos los agentes seleccionables: (label, callback_data, nivel_minimo)
 AGENTES = [
-    ('🏠 Qwen Coder 14B (Local / Rápido)', 'agente:ollama-qwen-coder', 1),
-    ('🦾 Super Agente (Claude Code)',       'agente:superagente',       5),
-    ('🧩 Super Agente (OpenCode)',          'agente:superagente-oc',    5),
+    ('⚡ Gemini Flash (Cloud / Recomendado)', 'agente:gemini-flash',      1),
+    ('🏠 Qwen Coder 14B (Local)',             'agente:ollama-qwen-coder', 1),
+    ('🦾 Super Agente (Claude Code)',         'agente:superagente',       5),
+    ('🧩 Super Agente (OpenCode)',            'agente:superagente-oc',    5),
 ]
 
 
