@@ -117,5 +117,34 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 
 ---
 
+### [P2] Bug: PATCH `/api/ia/tipos-admin/:tipo` falla por columna inexistente
+**Categoría**: limpieza
+**Detectado**: 2026-05-08 por Claude (al configurar agente_preferido para demo)
+**Contexto**: El endpoint usa `WHERE tipo=?` pero la columna real en `ia_tipos_consulta` se llama `slug`. La query falla con `Unknown column 'tipo' in 'WHERE'`. El PUT de la misma ruta sí usa `WHERE slug=?` y funciona — workaround actual es hacer PUT preservando todos los campos.
+**Riesgo si no se hace**: cualquier cambio parcial de un tipo de consulta debe pasar por PUT (más verboso, más fácil de pifiar) en lugar de PATCH puntual. Sin impacto en producción mientras nadie use PATCH.
+**Acción propuesta**:
+- En `ia-admin/api/server.js:555`, reemplazar `WHERE tipo=?` por `WHERE slug=?`.
+- Considerar agregar guardas: rechazar si `req.body` está vacío o tiene claves no whitelisted.
+- Reiniciar `os-ia-admin.service` en server local.
+**Archivos involucrados**: `ia-admin/api/server.js` (línea 555)
+**Estimado**: S (5 min + restart)
+
+---
+
+### [P2] Bug: GET `/api/ia/superagente/sesiones` falla con `Unknown column 's.mensajes'`
+**Categoría**: limpieza
+**Detectado**: 2026-05-08 por Claude (smoke check super agentes)
+**Contexto**: El endpoint hace `SELECT s.id, s.usuario_id, s.updated_at, s.mensajes ... FROM sa_sesiones s` pero esa tabla NO tiene columna `mensajes` (los mensajes de SA Claude viven en `~/.claude/projects/.../*.jsonl`, los de SA OpenCode en `~/.local/share/opencode/opencode.db`). Además solo lee `sa_sesiones` (Claude) y nunca `saoc_sesiones` (OpenCode).
+**Riesgo si no se hace**: el panel admin web no puede listar sesiones de super agentes. Si Santi quiere ver historial de sesiones de SA antes/después de la demo, no puede sin hacer SSH al server local.
+**Acción propuesta**:
+- Refactorizar el endpoint para leer de ambas tablas (`sa_sesiones` y `saoc_sesiones`) y devolver una lista unificada con campo `tipo_agente: claude|opencode`.
+- Eliminar referencia a `s.mensajes`. Si se quiere conteo de mensajes, leer del filesystem (Claude) o de `opencode.db` (OpenCode) en background — por ahora dejarlo en `null`.
+- Mismo refactor para `GET /api/ia/superagente/sesiones/:id` (línea 1286).
+- Reiniciar `os-ia-admin.service`.
+**Archivos involucrados**: `ia-admin/api/server.js` (líneas 1257-1283 y 1286-1292)
+**Estimado**: M (30-45 min)
+
+---
+
 ## ✅ Resueltos
 *(Items movidos aquí al cerrarse, con fecha y commit)*
