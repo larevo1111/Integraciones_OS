@@ -1,6 +1,17 @@
 <template>
   <div v-if="puntosCriticos.length || sinReceta" class="op-section">
-    <div class="op-section-title">Puntos críticos</div>
+    <div class="op-section-title pc-section-header">
+      <span>Puntos críticos</span>
+      <q-space />
+      <button
+        v-if="!readOnly && hayValoresPC"
+        type="button" class="pc-btn-limpiar"
+        title="Limpiar todas las mediciones"
+        @click="confirmarLimpiar"
+      >
+        <span class="material-icons" style="font-size:14px">delete_sweep</span>
+      </button>
+    </div>
 
     <div v-if="sinReceta" class="op-empty">
       Esta OP no tiene puntos críticos definidos en la receta.
@@ -20,14 +31,19 @@
         <!-- Numérico -->
         <template v-if="pc.tipo === 'numerico'">
           <div class="pc-input-row">
-            <input
-              type="number" inputmode="decimal" step="any"
-              :value="medicion(pc.id)?.valor_numerico ?? ''"
-              :placeholder="rangoPlaceholder(pc)"
-              :disabled="readOnly"
-              @blur="onBlurNumerico(pc, $event.target.value)"
-              class="pc-input"
-            />
+            <span class="pc-input-wrap">
+              <input
+                type="number" inputmode="decimal" step="any"
+                :value="medicion(pc.id)?.valor_numerico ?? ''"
+                :placeholder="rangoPlaceholder(pc)"
+                :disabled="readOnly"
+                @blur="onBlurNumerico(pc, $event.target.value)"
+                class="pc-input"
+              />
+              <button v-if="!readOnly && medicion(pc.id)?.valor_numerico != null" type="button"
+                class="pc-clear-x" title="Limpiar"
+                @click="onClearPC(pc)">×</button>
+            </span>
             <span class="pc-unidad">{{ pc.unidad || '' }}</span>
             <span v-if="rangoVisual(pc)" class="pc-rango" :class="rangoClass(pc)">
               {{ rangoVisual(pc) }}
@@ -200,6 +216,35 @@ function onSeleccion(pc, val) {
   persistir(pc, { valor_texto: nuevo })
 }
 
+function onClearPC(pc) {
+  if (props.readOnly) return
+  // Limpia todos los valores de ese PC
+  persistir(pc, { valor_numerico: null, valor_booleano: null, valor_texto: null })
+}
+
+const hayValoresPC = computed(() => {
+  return mediciones.value.some(m =>
+    m.valor_numerico != null || m.valor_booleano != null ||
+    (m.valor_texto != null && m.valor_texto !== '')
+  )
+})
+
+async function confirmarLimpiar() {
+  if (props.readOnly) return
+  $q.dialog({
+    title: 'Limpiar puntos críticos',
+    message: 'Se borrarán todas las mediciones del proceso. ¿Confirmar?',
+    cancel: { label: 'Cancelar', flat: true, color: 'grey-5' },
+    ok: { label: 'Limpiar', unelevated: true, color: 'negative' },
+    persistent: false, dark: true
+  }).onOk(async () => {
+    // Limpiar cada PC en paralelo
+    await Promise.all(puntosCriticos.value.map(pc =>
+      persistir(pc, { valor_numerico: null, valor_booleano: null, valor_texto: null })
+    ))
+  })
+}
+
 watch(() => props.idOp, cargar)
 onMounted(cargar)
 
@@ -246,6 +291,28 @@ defineExpose({ recargar: cargar, mediciones })
 .pc-rango-ok   { background: #2db14a33; color: #2db14a; }
 .pc-rango-fail { background: #e74c3c33; color: #e74c3c; }
 .pc-rango-info { background: var(--bg-card); color: var(--text-tertiary); border: 1px solid var(--border-default); }
+
+.pc-section-header { display: flex; align-items: center; gap: 6px; }
+.pc-btn-limpiar {
+  background: transparent; border: none; cursor: pointer;
+  padding: 2px 4px; color: var(--text-tertiary); border-radius: 4px;
+  display: inline-flex; align-items: center;
+  transition: color 80ms, background 80ms;
+}
+.pc-btn-limpiar:hover { color: var(--negative); background: var(--bg-row-hover); }
+
+.pc-input-wrap { position: relative; display: inline-flex; align-items: center; }
+.pc-clear-x {
+  background: var(--text-tertiary); color: var(--bg-card);
+  border: none; cursor: pointer;
+  width: 16px; height: 16px; border-radius: 50%;
+  font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: 4px;
+  font-family: inherit; padding: 0;
+  opacity: 0.6; transition: opacity 80ms, background 80ms;
+}
+.pc-clear-x:hover { opacity: 1; background: var(--negative); color: #fff; }
 
 .pc-chips { display: flex; gap: 4px; flex-wrap: wrap; }
 .pc-chip {

@@ -13,6 +13,14 @@
       <span v-if="estaFirmada" class="cal-firma-info">
         Firmada por {{ short(insp?.firmada_por) }} · {{ fmtFechaCorta(insp?.firmada_en) }}
       </span>
+      <button
+        v-if="!readOnly && hayBorrador"
+        type="button" class="cal-btn-limpiar"
+        title="Limpiar todos los campos"
+        @click="confirmarLimpiar"
+      >
+        <span class="material-icons" style="font-size:14px">delete_sweep</span>
+      </button>
     </div>
 
     <!-- Form siempre abierto -->
@@ -26,11 +34,16 @@
         </div>
         <div class="cal-row">
           <label class="cal-lbl">Tamaño muestra</label>
-          <input type="number" inputmode="numeric" min="0"
-            :value="form.tamano_muestra ?? ''"
-            :disabled="readOnly"
-            @blur="onBlur('tamano_muestra', $event.target.value, 'int')"
-            class="cal-input cal-input-sm" />
+          <span class="cal-input-wrap">
+            <input type="number" inputmode="numeric" min="0"
+              :value="form.tamano_muestra ?? ''"
+              :disabled="readOnly"
+              @blur="onBlur('tamano_muestra', $event.target.value, 'int')"
+              class="cal-input cal-input-sm" />
+            <button v-if="!readOnly && form.tamano_muestra != null" type="button"
+              class="cal-clear-x" title="Limpiar"
+              @click="onClearField('tamano_muestra')">×</button>
+          </span>
           <span class="cal-mini">AQL sug.: {{ aqlSugerido }}</span>
         </div>
       </div>
@@ -258,9 +271,40 @@ function onChip(key, val) {
   patch({ [key]: nuevo })
 }
 function onChipResultado(val) {
-  if (form.resultado === val) return
-  form.resultado = val
-  patch({ resultado: val })
+  // Re-tap al chip activo lo deselecciona (vuelve a null)
+  const nuevo = form.resultado === val ? null : val
+  if (form.resultado === nuevo) return
+  form.resultado = nuevo
+  patch({ resultado: nuevo })
+}
+
+function onClearField(key) {
+  if (readOnly.value) return
+  // Defectos vuelven a 0, otros campos a null
+  const val = ['defectos_criticos','defectos_mayores','defectos_menores'].includes(key) ? 0 : null
+  if ((form[key] ?? null) === (val ?? null)) return
+  form[key] = val
+  patch({ [key]: val })
+}
+
+function confirmarLimpiar() {
+  if (readOnly.value) return
+  $q.dialog({
+    title: 'Limpiar inspección',
+    message: 'Se borrarán todos los campos del bloque Calidad. ¿Confirmar?',
+    cancel: { label: 'Cancelar', flat: true, color: 'grey-5' },
+    ok: { label: 'Limpiar', unelevated: true, color: 'negative' },
+    persistent: false, dark: true
+  }).onOk(() => {
+    const reset = {
+      tamano_muestra: null, visual_normal: null, tapado_sellado: null,
+      etiqueta_normal: null, sabor_olor_normal: null,
+      defectos_criticos: 0, defectos_mayores: 0, defectos_menores: 0,
+      resultado: null, observacion: null,
+    }
+    Object.assign(form, reset)
+    patch(reset)
+  })
 }
 function onBlur(key, raw, kind) {
   let v = raw
@@ -428,6 +472,29 @@ defineExpose({ insp, recargar: cargar, ultimaInsp: insp })
   display: flex; align-items: center; gap: 8px; padding-top: 4px;
 }
 .cal-firma-falta { text-align: right; color: #ffa726; padding-top: 4px; font-style: italic; }
+
+/* Botón sutil "Limpiar todo" en header */
+.cal-btn-limpiar {
+  background: transparent; border: none; cursor: pointer;
+  padding: 2px 4px; color: var(--text-tertiary); border-radius: 4px;
+  display: inline-flex; align-items: center;
+  transition: color 80ms, background 80ms;
+}
+.cal-btn-limpiar:hover { color: var(--negative); background: var(--bg-row-hover); }
+
+/* X chiquita al lado de inputs con valor */
+.cal-input-wrap { position: relative; display: inline-flex; align-items: center; }
+.cal-clear-x {
+  background: var(--text-tertiary); color: var(--bg-card);
+  border: none; cursor: pointer;
+  width: 16px; height: 16px; border-radius: 50%;
+  font-size: 13px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: 4px;
+  font-family: inherit; padding: 0;
+  opacity: 0.6; transition: opacity 80ms, background 80ms;
+}
+.cal-clear-x:hover { opacity: 1; background: var(--negative); color: #fff; }
 
 @media (max-width: 600px) {
   .cal-lbl { width: 110px; }
