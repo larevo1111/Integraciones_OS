@@ -485,25 +485,29 @@ defineExpose({ insp, recargar: cargar, ultimaInsp: insp })
 /* Botón sutil "Limpiar todo" en header */
 .cal-btn-limpiar {
   background: transparent; border: none; cursor: pointer;
-  padding: 2px 4px; color: var(--text-tertiary); border-radius: 4px;
+  padding: 4px 6px; color: var(--text-tertiary); border-radius: 4px;
   display: inline-flex; align-items: center;
   transition: color 80ms, background 80ms;
 }
-.cal-btn-limpiar:hover { color: var(--negative); background: var(--bg-row-hover); }
+.cal-btn-limpiar:hover {
+  color: var(--negative); background: var(--bg-row-hover);
+}
 
 /* X chiquita al lado de inputs con valor */
 .cal-input-wrap { position: relative; display: inline-flex; align-items: center; }
 .cal-clear-x {
-  background: var(--text-tertiary); color: var(--bg-card);
-  border: none; cursor: pointer;
-  width: 16px; height: 16px; border-radius: 50%;
-  font-size: 13px; line-height: 1;
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border-default); cursor: pointer;
+  width: 18px; height: 18px; border-radius: 50%;
+  font-size: 14px; line-height: 1; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center;
-  margin-left: 4px;
+  margin-left: 6px; flex-shrink: 0;
   font-family: inherit; padding: 0;
-  opacity: 0.6; transition: opacity 80ms, background 80ms;
+  transition: color 80ms, background 80ms, border-color 80ms;
 }
-.cal-clear-x:hover { opacity: 1; background: var(--negative); color: #fff; }
+.cal-clear-x:hover {
+  background: var(--negative); color: #fff; border-color: var(--negative);
+}
 
 @media (max-width: 600px) {
   .cal-lbl { width: 110px; }

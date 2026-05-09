@@ -5,6 +5,12 @@
 html { overscroll-behavior-y: contain; }
 
 :root {
+  /* Estados (ambos temas) */
+  --negative:        #e74c3c;
+  --warning:         #ffa726;
+  --success:         #2db14a;
+  --info:            #2196f3;
+
   /* Fondos — DARK */
   --bg-app:          #0d0d0d;
   --bg-surface:      #111111;
