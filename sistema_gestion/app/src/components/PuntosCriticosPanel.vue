@@ -62,6 +62,9 @@
               :class="['pc-chip', medicionVal(pc, 'valor_booleano') === 0 ? 'pc-chip-active pc-chip-no' : '']"
               :disabled="readOnly"
               @click="onChipBooleano(pc, 0)">No</button>
+            <button v-if="!readOnly && medicionVal(pc, 'valor_booleano') !== null && medicionVal(pc, 'valor_booleano') !== undefined" type="button"
+              class="pc-clear-x" title="Limpiar"
+              @click="onClearPC(pc)">×</button>
           </div>
         </template>
 
@@ -72,17 +75,25 @@
               :class="['pc-chip', medicionVal(pc, 'valor_texto') === op ? 'pc-chip-active pc-chip-si' : '']"
               :disabled="readOnly"
               @click="onSeleccion(pc, op)">{{ op }}</button>
+            <button v-if="!readOnly && medicionVal(pc, 'valor_texto')" type="button"
+              class="pc-clear-x" title="Limpiar"
+              @click="onClearPC(pc)">×</button>
           </div>
         </template>
 
         <!-- Texto -->
         <template v-else>
-          <input type="text"
-            :value="medicion(pc.id)?.valor_texto ?? ''"
-            :disabled="readOnly"
-            @blur="onBlurTexto(pc, $event.target.value)"
-            class="pc-input pc-input-full"
-          />
+          <span class="pc-input-wrap pc-text-wrap">
+            <input type="text"
+              :value="medicion(pc.id)?.valor_texto ?? ''"
+              :disabled="readOnly"
+              @blur="onBlurTexto(pc, $event.target.value)"
+              class="pc-input pc-input-full"
+            />
+            <button v-if="!readOnly && medicion(pc.id)?.valor_texto" type="button"
+              class="pc-clear-x" title="Limpiar"
+              @click="onClearPC(pc)">×</button>
+          </span>
         </template>
       </div>
     </div>

@@ -58,6 +58,9 @@
               :class="['cal-chip', form[check.key] === op.v ? 'cal-chip-active cal-chip-' + op.v : '']"
               :disabled="readOnly"
               @click="onChip(check.key, op.v)">{{ op.l }}</button>
+            <button v-if="!readOnly && form[check.key] != null" type="button"
+              class="cal-clear-x" title="Limpiar"
+              @click="onClearField(check.key)">×</button>
           </div>
         </div>
       </div>
@@ -80,6 +83,9 @@
               :disabled="readOnly"
               @click="onStep(d.key, 1)">+</button>
           </div>
+          <button v-if="!readOnly && (form[d.key] || 0) > 0" type="button"
+            class="cal-clear-x" title="Limpiar"
+            @click="onClearField(d.key)">×</button>
           <span v-if="d.key === 'defectos_criticos' && (form.defectos_criticos || 0) > 0" class="cal-mini cal-warn">tolerancia 0</span>
         </div>
       </div>
@@ -96,6 +102,9 @@
             :class="['cal-chip', form.resultado === 'rechazado' ? 'cal-chip-active cal-chip-rechazado' : '']"
             :disabled="readOnly"
             @click="onChipResultado('rechazado')">Rechazado</button>
+          <button v-if="!readOnly && form.resultado != null" type="button"
+            class="cal-clear-x" title="Limpiar"
+            @click="onClearField('resultado')">×</button>
         </div>
         <textarea
           :value="form.observacion ?? ''"
