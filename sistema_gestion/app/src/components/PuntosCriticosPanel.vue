@@ -101,21 +101,31 @@ function opcionesDe(pc) {
   if (!pc.opciones_json) return []
   try { const o = JSON.parse(pc.opciones_json); return Array.isArray(o) ? o : [] } catch { return [] }
 }
+function fmtNum(v) {
+  if (v == null || v === '') return ''
+  const n = Number(v)
+  return isNaN(n) ? String(v) : String(n)
+}
 function rangoPlaceholder(pc) {
   if (pc.rango_min == null && pc.rango_max == null) return ''
-  return `${pc.rango_min ?? ''}–${pc.rango_max ?? ''}`
+  return `${fmtNum(pc.rango_min)}–${fmtNum(pc.rango_max)}`
 }
 function rangoVisual(pc) {
   const m = medicion(pc.id)
-  if (!m || m.valor_numerico == null || m.valor_numerico === '') return ''
-  return m.dentro_rango === 1 ? '✓ rango' : '✗ fuera'
+  // Si tiene valor → ✓ rango / ✗ fuera
+  if (m && m.valor_numerico != null && m.valor_numerico !== '') {
+    return m.dentro_rango === 1 ? '✓ rango' : '✗ fuera'
+  }
+  // Sin valor → mostrar el rango como guía
+  if (pc.rango_min == null && pc.rango_max == null) return ''
+  return `${fmtNum(pc.rango_min)}–${fmtNum(pc.rango_max)}`
 }
 function rangoClass(pc) {
   const m = medicion(pc.id)
-  if (!m) return ''
+  if (!m || m.valor_numerico == null || m.valor_numerico === '') return 'pc-rango-info'
   if (m.dentro_rango === 1) return 'pc-rango-ok'
   if (m.dentro_rango === 0) return 'pc-rango-fail'
-  return ''
+  return 'pc-rango-info'
 }
 function short(email) {
   if (!email) return ''
@@ -235,6 +245,7 @@ defineExpose({ recargar: cargar, mediciones })
 }
 .pc-rango-ok   { background: #2db14a33; color: #2db14a; }
 .pc-rango-fail { background: #e74c3c33; color: #e74c3c; }
+.pc-rango-info { background: var(--bg-card); color: var(--text-tertiary); border: 1px solid var(--border-default); }
 
 .pc-chips { display: flex; gap: 4px; flex-wrap: wrap; }
 .pc-chip {

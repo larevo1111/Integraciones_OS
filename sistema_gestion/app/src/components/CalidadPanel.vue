@@ -279,15 +279,29 @@ function onStep(key, delta) {
 
 async function firmar() {
   if (!puedeFirmar.value) return
-  firmando.value = true
-  try {
-    await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/calidad/firmar`, { method: 'POST' })
-    $q.notify({ type: 'positive', message: 'Inspección firmada', position: 'top', timeout: 2500 })
-    await cargar()
-    emit('actualizada')
-  } catch (e) {
-    $q.notify({ type: 'negative', message: e.message || 'Error al firmar', position: 'top' })
-  } finally { firmando.value = false }
+  const nombre = auth.usuario?.nombre || auth.usuario?.email || 'Usuario'
+  const email  = auth.usuario?.email || ''
+  $q.dialog({
+    title: 'Firmar inspección',
+    message: `Estás firmando como:<br><b style="font-size:14px;color:var(--accent)">${nombre}</b>` +
+             (email ? `<br><span style="font-size:11px;color:var(--text-tertiary)">${email}</span>` : '') +
+             `<br><br>Resultado: <b>${form.resultado === 'aprobado' ? '🟢 Aprobado' : '🔴 Rechazado'}</b>` +
+             `<br><br>Una vez firmada, la inspección queda inmutable (solo nivel ≥5 puede reabrir).`,
+    html: true,
+    cancel: { label: 'Cancelar', flat: true, color: 'grey-5' },
+    ok:     { label: 'Confirmar firma', unelevated: true, color: 'primary' },
+    persistent: true, dark: true
+  }).onOk(async () => {
+    firmando.value = true
+    try {
+      await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/calidad/firmar`, { method: 'POST' })
+      $q.notify({ type: 'positive', message: `Inspección firmada por ${nombre}`, position: 'top', timeout: 2500 })
+      await cargar()
+      emit('actualizada')
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e.message || 'Error al firmar', position: 'top' })
+    } finally { firmando.value = false }
+  })
 }
 
 async function reabrir() {
