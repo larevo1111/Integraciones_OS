@@ -1,7 +1,63 @@
 # Contexto Activo — Integraciones OS
 **Actualizado**: 2026-05-08
 
-## Completado 2026-05-08 — Sistema Gestión: Sección Calidad por OP (v2.10.30)
+## Completado 2026-05-08 (sesión tarde) — Refactor Calidad → Puntos Críticos + Calidad separados (v2.11.0)
+
+Refactor conceptual del bloque Calidad. **Antes** mezclaba todo en un único registro; **ahora** separa lo que conceptualmente NO es lo mismo:
+
+### Bloque "Puntos Críticos" (NUEVO bloque hermano, entre Tiempos y Calidad)
+- Mediciones que se hacen DURANTE producción (T° cocción, tiempo, pH).
+- Vienen de la receta del producto principal (`prod_recetas_puntos_criticos`).
+- **Auto-save por campo** al perder foco. Cada PC es row independiente en `g_op_pc_proceso`.
+- Sello implícito: `registrado_por` + `actualizada_por` + timestamps.
+- **No** tiene firma — son registros continuos del proceso.
+
+### Bloque "Calidad" (refactorizado)
+- 4 sub-bloques: muestreo · inspección visual · defectos · resultado (sin más bloque PCs).
+- **Form siempre abierto** desde que se abre la OP (sin botón "+ Inspección").
+- **Auto-save por campo** (PATCH al backend en cada blur/click).
+- Botón **"Firmar inspección"** = acto explícito que registra `firmada_por` + `firmada_en` (puede ser persona distinta al digitador).
+- **Una sola inspección por OP** (UPSERT por `empresa+id_op`).
+- **Tras firma → inmutable**. Botón **"Reabrir"** solo nivel ≥5.
+
+### Resultado simplificado
+- Solo Aprobado / Rechazado (eliminado "Liberado con observación" — confundía).
+
+### BD (os_gestion VPS)
+- `g_op_inspeccion_calidad` — campos NULLABLE, agregado `firmada/firmada_por/firmada_en/actualizada_por/actualizada_en`, `UNIQUE(empresa, id_op)`.
+- `g_op_pc_proceso` (NUEVA) — FK directo a OP. `UNIQUE(empresa, id_op, pc_receta_id)`.
+- `g_op_pc_registro` DROPPED (reemplazada por `g_op_pc_proceso`).
+
+### Backend (sistema_gestion/api/server.js)
+- `PATCH /op/:id/calidad` — UPSERT borrador. Rechaza si ya firmada (HTTP 409).
+- `POST /op/:id/calidad/firmar` — registra `firmada_por` (usuario actual).
+- `POST /op/:id/calidad/reabrir` — solo nivel ≥5.
+- `GET /op/:id/pc-proceso` — mediciones actuales.
+- `PATCH /op/:id/pc-proceso/:pc_receta_id` — UPSERT auto-save de un PC.
+- `GET /op/:id/calidad` — devuelve la única (o null).
+
+### Frontend
+- **`PuntosCriticosPanel.vue`** (NUEVO) — bloque dedicado con auto-save por campo.
+- **`CalidadPanel.vue` refactorizado** — form siempre abierto, badge Borrador/Firmada, acciones Firmar/Reabrir, read-only si firmada o OP cerrada.
+- **`OpPanel.vue`** — bloque PuntosCriticos insertado entre Tiempos y Calidad.
+- Soft-block al validar OP actualizado: avisa si calidad sin firmar o rechazada.
+
+### Tests E2E (7 escenarios pasados simulando usuario real)
+1. OP Validada: bloques correctos + 14 chips/6 inputs disabled (read-only) ✓
+2. OP Generada: form abierto, badge Borrador, controles habilitados ✓
+3. Auto-save al chip "Sí" → visual_normal persistido en BD ✓
+4. PCs cargados desde receta cod 583 (4 PCs Cobertura Chocolate) ✓
+5. Firmar → BD `firmada=1`, badge 🟢 APROBADO, todo bloqueado ✓
+6. Reabrir nivel 9 → `firmada=0`, badge Borrador, controles habilitados ✓
+7. PCs auto-save por blur con indicadores ✓ rango / ✗ fuera ✓
+
+Bump SEMVER MINOR (v2.10.32 → v2.11.0) por cambio de modelo conceptual + BD.
+
+Plan completado: `.agent/planes/completados/calidad_inspeccion_op_2026-05-08.md` (sesión mañana) + commit `9ec92e3` (sesión tarde refactor).
+
+---
+
+## Completado 2026-05-08 (sesión mañana) — Sistema Gestión: Sección Calidad por OP (v2.10.30)
 
 Digitalizada la bitácora de calidad en papel como bloque dentro de cada OP en `OpPanel.vue`. Combina:
 - **Inspección visual genérica** (4 booleanos: visual / tapado / etiqueta / sabor-olor) → para todos los productos

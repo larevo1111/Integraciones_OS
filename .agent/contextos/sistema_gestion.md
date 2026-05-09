@@ -1,6 +1,6 @@
 # Contexto: Sistema Gestión OS
 **Actualizado**: 2026-05-08
-**Versión actual**: v2.10.30
+**Versión actual**: v2.11.0
 
 ## Propósito
 
@@ -47,8 +47,8 @@ Pool `comunidad` usa SSH tunnel a Hostinger (puerto 65002, key `sos_erp`). Pools
 | `g_op_detalle` | **Una fila por OP** (UPSERT por `id_op`+`empresa`). `observaciones_lote`, `procesado_por`, `procesado_en`, `validado_por`, `validado_en`, `op_anterior`, `responsable_validado` |
 | `g_op_lineas` | Materiales/productos REALES de una OP (después de validar). `tipo` enum('material','producto'), `cod_articulo`, `descripcion`, `unidad`, `cantidad_teorica`, `cantidad_real`, `costo_unit`, `precio_unit`, `es_no_previsto` |
 | `g_op_tiempos` | **Snapshot de tiempos consolidados por OP × categoria_produccion** (`segundos_totales`). Se llena al validar OP O al editar manualmente desde OpPanel (nivel ≥5). Si está vacío para una OP, los tiempos se calculan al vuelo desde `g_tareas.duracion_usuario_seg` (modo "vivo") |
-| `g_op_inspeccion_calidad` | **Calidad por OP (2026-05-08)**. Una row por inspección. Snapshot completo de muestreo (`tamano_lote_unidades`, `tamano_muestra`), 4 booleanos genéricos (`visual_normal`, `tapado_sellado`, `etiqueta_normal`, `sabor_olor_normal` enum si/no/na), 3 contadores (`defectos_criticos/mayores/menores`), `resultado` enum(aprobado/rechazado/liberado_observacion), `observacion`, `inspector_email`, `inspeccionado_en` |
-| `g_op_pc_registro` | **Mediciones de Puntos Críticos (2026-05-08)**. FK a `g_op_inspeccion_calidad`. Snapshot de `parametro/tipo/unidad/rango_min-max` (por si la receta cambia). `valor_numerico/booleano/texto` según tipo. `dentro_rango` calculado server-side al insertar |
+| `g_op_inspeccion_calidad` | **Calidad por OP (refactor v2.11.0)**. UNA inspección por OP (`UNIQUE(empresa, id_op)`). Campos NULLABLE para borrador. Muestreo, 4 booleanos genéricos, 3 contadores defectos, resultado (aprobado/rechazado), observación. `firmada` (0=borrador / 1=firmada inmutable), `firmada_por`, `firmada_en` = inspector que firma. `actualizada_por`, `actualizada_en` = quien hizo el último auto-save (puede ser distinto al inspector). Tras firma solo se reabre con nivel ≥5 |
+| `g_op_pc_proceso` | **Mediciones de Puntos Críticos (NUEVA v2.11.0, reemplaza g_op_pc_registro)**. FK directo a OP (no a inspección — los PCs son del proceso, NO parte de la inspección). `UNIQUE(empresa, id_op, pc_receta_id)`. Snapshot de `parametro/tipo/unidad/rango_min-max`. `valor_numerico/booleano/texto`. `dentro_rango` calculado al PATCH. Auto-save por campo en frontend |
 | `g_op_jobs` | **Jobs de procesar/validar (2026-04-29)**. Tracking persistente. `tipo` enum(procesar/validar), `estado` enum(pendiente/en_progreso/exitoso/fallido), `started_at`, `finished_at`, `resultado_json`, `error_msg`, `usuario_email` |
 | `g_tarea_produccion_lineas` | (Legacy 2026-04-21) Líneas materiales/productos por tarea. Reemplazado en gran parte por `g_op_lineas` que es por OP, no por tarea |
 | `g_tarea_tiempo` | Legacy — ya no se consulta. Las duraciones viven en `g_tareas` directamente |
@@ -458,7 +458,40 @@ Caso real OP 2233 → 2240: la OP original se quedó `Generada/Anulado` por un c
 - Frontend: nueva columna **"Lote/OP ant"** en tabla OPs (entre OP y Responsable, visible default, sortable). Para OP sin validar = id_orden propio. Para OP creada al validar otra = op_anterior (id de la original).
 - En el panel detalle: fila "Lote/OP ant" siempre visible.
 
-### v2.10.30 — Sección Calidad por OP (2026-05-08)
+### v2.11.0 — Refactor Calidad → Puntos Críticos + Calidad separados (2026-05-08, sesión tarde)
+Refactor conceptual del bloque Calidad. **Antes** tenía sub-bloque "Mediciones del proceso" mezclado con la inspección; **ahora** los Puntos Críticos viven en su **propio bloque hermano** (entre Tiempos y Calidad). Razón: las mediciones de proceso (T° cocción, pH) se hacen DURANTE producción y NO son parte de la inspección final del producto.
+
+**Bloque Puntos Críticos (NUEVO `PuntosCriticosPanel.vue`)**:
+- Auto-save por campo al blur. Cada PC = row independiente.
+- Tabla `g_op_pc_proceso` (FK directo a OP, NO a inspección).
+- Sello `registrado_por` + `actualizada_por` con timestamps.
+- NO tiene firma — son registros continuos del proceso.
+
+**Bloque Calidad (refactor `CalidadPanel.vue`)**:
+- 4 sub-bloques: muestreo · inspección visual · defectos · resultado (sin PCs).
+- Form siempre abierto al abrir la OP (sin botón "+ Inspección").
+- Auto-save por campo via `PATCH /op/:id/calidad`.
+- Una sola inspección por OP (`UNIQUE(empresa, id_op)` en BD).
+- Botón "Firmar inspección" → `firmada=1`, registra `firmada_por` (inspector). Tras firma → inmutable.
+- Botón "Reabrir" solo nivel ≥5.
+- Resultado simplificado: solo Aprobado / Rechazado.
+
+**Endpoints nuevos**:
+- `PATCH /op/:id/calidad` — UPSERT borrador. 409 si firmada.
+- `POST /op/:id/calidad/firmar` — registra firma.
+- `POST /op/:id/calidad/reabrir` — nivel ≥5.
+- `GET /op/:id/pc-proceso`, `PATCH /op/:id/pc-proceso/:pc_receta_id`.
+
+**BD**:
+- `g_op_inspeccion_calidad` campos NULLABLE + `firmada/firmada_por/firmada_en/actualizada_por/actualizada_en`. UNIQUE.
+- `g_op_pc_proceso` (NUEVA). UNIQUE por (empresa, id_op, pc_receta_id).
+- `g_op_pc_registro` DROPPED.
+
+**SEMVER**: bump MINOR (v2.10.32 → v2.11.0) por cambio de modelo + BD.
+
+Tests E2E pasados simulando usuario real: OP Validada read-only, OP Generada form abierto, auto-save por chip, PCs auto-save numérico+booleano, indicadores ✓ rango / ✗ fuera, firma inmutable, reabrir nivel 9.
+
+### v2.10.30 — Sección Calidad por OP (sesión mañana 2026-05-08)
 Digitalización de la bitácora de calidad en papel. Nuevo bloque `<CalidadPanel>` embebido en `OpPanel.vue` entre Tiempos y Tareas.
 
 **BD nuevas en `os_gestion`**: `g_op_inspeccion_calidad` + `g_op_pc_registro` (FK).
