@@ -140,12 +140,9 @@
             <button type="button"
               :class="['cal-chip', form.resultado === 'rechazado' ? 'cal-chip-active cal-chip-rechazado' : '']"
               @click="form.resultado = 'rechazado'">Rechazado</button>
-            <button type="button"
-              :class="['cal-chip', form.resultado === 'liberado_observacion' ? 'cal-chip-active cal-chip-liberado' : '']"
-              @click="form.resultado = 'liberado_observacion'">Liberado c/obs</button>
           </div>
           <textarea v-model="form.observacion" class="cal-textarea"
-            :placeholder="obsRequerida ? 'Observación obligatoria…' : 'Observación (opcional)'"
+            placeholder="Observación (opcional)"
             rows="2"></textarea>
           <div class="cal-mini cal-firma">Firma: {{ inspectorEmail }} · {{ fmtFecha(new Date()) }}</div>
         </div>
@@ -228,36 +225,12 @@ const defectosFields = computed(() => [
   { key: 'defectos_menores',  label: 'Menores',  warning: '' },
 ])
 
-const tieneDefectoCritico = computed(() => (form.defectos_criticos || 0) > 0)
-const obsRequerida = computed(() =>
-  form.resultado === 'rechazado' ||
-  form.resultado === 'liberado_observacion' ||
-  tieneDefectoCritico.value
-)
-
-const puedeGuardar = computed(() => {
-  if (!form.resultado) return false
-  if (obsRequerida.value && !(form.observacion || '').trim()) return false
-  return true
-})
-
-const mensajeFalta = computed(() => {
-  if (!form.resultado) return 'Falta: elegir resultado'
-  if (obsRequerida.value && !(form.observacion || '').trim()) {
-    if (tieneDefectoCritico.value) return 'Falta: observación (hay defecto crítico)'
-    if (form.resultado === 'rechazado') return 'Falta: observación (rechazo)'
-    if (form.resultado === 'liberado_observacion') return 'Falta: observación'
-  }
-  return ''
-})
+const puedeGuardar = computed(() => !!form.resultado)
+const mensajeFalta = computed(() => form.resultado ? '' : 'Falta: elegir Aprobado o Rechazado')
 
 const badgeClass = computed(() => {
   if (!ultimaInsp.value) return ''
   return resultadoClase(ultimaInsp.value.resultado)
-})
-
-watch(() => form.defectos_criticos, v => {
-  if (v > 0 && form.resultado !== 'rechazado') form.resultado = 'rechazado'
 })
 
 async function cargarInspecciones() {
