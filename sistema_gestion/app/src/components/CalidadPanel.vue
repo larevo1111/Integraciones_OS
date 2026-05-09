@@ -145,7 +145,7 @@
               @click="form.resultado = 'liberado_observacion'">Liberado c/obs</button>
           </div>
           <textarea v-model="form.observacion" class="cal-textarea"
-            :placeholder="obsRequerida ? 'Observación obligatoria por rechazo o defecto crítico' : 'Observación (opcional)'"
+            :placeholder="obsRequerida ? 'Observación obligatoria…' : 'Observación (opcional)'"
             rows="2"></textarea>
           <div class="cal-mini cal-firma">Firma: {{ inspectorEmail }} · {{ fmtFecha(new Date()) }}</div>
         </div>
@@ -154,10 +154,13 @@
         <div class="cal-acciones">
           <q-btn flat dense no-caps size="sm" label="Cancelar" @click="cancelar" />
           <q-space />
-          <q-btn unelevated dense no-caps size="sm" color="primary"
-            :loading="guardando"
-            :disable="!puedeGuardar" label="Guardar inspección"
-            type="submit" />
+          <div class="cal-submit-wrap">
+            <q-btn unelevated dense no-caps size="sm" color="primary"
+              :loading="guardando"
+              :disable="!puedeGuardar" label="Guardar inspección"
+              type="submit" />
+            <div v-if="!puedeGuardar && !guardando" class="cal-hint-falta">{{ mensajeFalta }}</div>
+          </div>
         </div>
       </template>
     </form>
@@ -226,12 +229,26 @@ const defectosFields = computed(() => [
 ])
 
 const tieneDefectoCritico = computed(() => (form.defectos_criticos || 0) > 0)
-const obsRequerida = computed(() => form.resultado === 'rechazado' || tieneDefectoCritico.value)
+const obsRequerida = computed(() =>
+  form.resultado === 'rechazado' ||
+  form.resultado === 'liberado_observacion' ||
+  tieneDefectoCritico.value
+)
 
 const puedeGuardar = computed(() => {
   if (!form.resultado) return false
   if (obsRequerida.value && !(form.observacion || '').trim()) return false
   return true
+})
+
+const mensajeFalta = computed(() => {
+  if (!form.resultado) return 'Falta: elegir resultado'
+  if (obsRequerida.value && !(form.observacion || '').trim()) {
+    if (tieneDefectoCritico.value) return 'Falta: observación (hay defecto crítico)'
+    if (form.resultado === 'rechazado') return 'Falta: observación (rechazo)'
+    if (form.resultado === 'liberado_observacion') return 'Falta: observación'
+  }
+  return ''
 })
 
 const badgeClass = computed(() => {
@@ -495,6 +512,10 @@ defineExpose({ ultimaInsp })
 
 .cal-acciones {
   display: flex; align-items: center; gap: 8px; padding-top: 4px;
+}
+.cal-submit-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cal-hint-falta {
+  font-size: 10px; color: #ffa726; font-style: italic;
 }
 
 @media (max-width: 600px) {
