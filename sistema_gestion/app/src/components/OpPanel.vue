@@ -252,7 +252,13 @@
               </template>
             </div>
 
-            <!-- ── BLOQUE 5: CALIDAD ──────────────────────────── -->
+            <!-- ── BLOQUE 5: PUNTOS CRÍTICOS DEL PROCESO ──────── -->
+            <PuntosCriticosPanel
+              :id-op="String(idOp)"
+              :read-only="estado === 'Validado' || estaAnulada"
+            />
+
+            <!-- ── BLOQUE 6: CALIDAD ──────────────────────────── -->
             <CalidadPanel
               ref="calidadPanelRef"
               :id-op="String(idOp)"
@@ -260,7 +266,7 @@
               :es-anulada="estaAnulada"
             />
 
-            <!-- ── BLOQUE 6: TAREAS VINCULADAS ────────────────── -->
+            <!-- ── BLOQUE 7: TAREAS VINCULADAS ────────────────── -->
             <div class="op-section">
               <div class="op-section-title">Tareas vinculadas ({{ ficha.tareas_vinculadas.length }})</div>
 
@@ -410,6 +416,7 @@ import EtiquetasSelector from './EtiquetasSelector.vue'
 import CatProduccionSelector from './CatProduccionSelector.vue'
 import ArticuloSelector from './ArticuloSelector.vue'
 import CalidadPanel from './CalidadPanel.vue'
+import PuntosCriticosPanel from './PuntosCriticosPanel.vue'
 
 const $q  = useQuasar()
 const auth = useAuthStore()
@@ -775,15 +782,15 @@ function confirmarProcesar() {
 }
 
 function confirmarValidar() {
-  // Soft-block: si calidad rechazada o sin inspección, advertir antes de validar
-  const ultima = calidadPanelRef.value?.ultimaInsp
+  // Soft-block: avisa si calidad no firmada / rechazada / inexistente
+  const insp = calidadPanelRef.value?.insp?.value || calidadPanelRef.value?.insp || null
   let extraMsg = ''
-  if (!ultima) {
+  if (!insp) {
     extraMsg = '<br><br><span style="color:#ffa726">⚠️ Esta OP no tiene inspección de calidad registrada.</span>'
-  } else if (ultima.resultado === 'rechazado') {
-    extraMsg = '<br><br><span style="color:#e74c3c">⚠️ Esta OP tiene Calidad = <b>Rechazado</b>.</span>'
-  } else if (ultima.resultado === 'liberado_observacion') {
-    extraMsg = '<br><br><span style="color:#ffa726">ℹ️ Calidad: Liberado con observación.</span>'
+  } else if (insp.firmada !== 1) {
+    extraMsg = '<br><br><span style="color:#ffa726">⚠️ La inspección de calidad está como <b>borrador</b> (sin firmar).</span>'
+  } else if (insp.resultado === 'rechazado') {
+    extraMsg = '<br><br><span style="color:#e74c3c">⚠️ Calidad = <b>Rechazado</b>.</span>'
   }
   $q.dialog({
     title: 'Validar OP',

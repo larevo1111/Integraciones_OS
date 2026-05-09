@@ -2355,111 +2355,229 @@ app.get('/api/gestion/op/:id_op/calidad/sugerencia', requireAuth, async (req, re
   }
 })
 
-// GET /api/gestion/op/:id_op/calidad — lista inspecciones de la OP (con sus PCs)
+// GET /api/gestion/op/:id_op/calidad — devuelve la inspección única de la OP (o null)
 app.get('/api/gestion/op/:id_op/calidad', requireAuth, async (req, res) => {
   const idOp = String(req.params.id_op)
   try {
-    const [inspecciones] = await db.gestion.query(
-      `SELECT * FROM g_op_inspeccion_calidad
-       WHERE empresa = ? AND id_op = ?
-       ORDER BY inspeccionado_en DESC, id DESC`,
+    const [[insp]] = await db.gestion.query(
+      `SELECT * FROM g_op_inspeccion_calidad WHERE empresa = ? AND id_op = ? LIMIT 1`,
       [req.empresa, idOp]
     )
-    if (!inspecciones.length) return res.json({ inspecciones: [] })
-    const ids = inspecciones.map(i => i.id)
-    const [pcs] = await db.gestion.query(
-      `SELECT * FROM g_op_pc_registro WHERE inspeccion_id IN (?) ORDER BY id ASC`,
-      [ids]
-    )
-    const pcMap = {}
-    for (const r of pcs) {
-      (pcMap[r.inspeccion_id] = pcMap[r.inspeccion_id] || []).push(r)
-    }
-    inspecciones.forEach(i => { i.puntos_criticos = pcMap[i.id] || [] })
-    res.json({ inspecciones })
+    res.json({ inspeccion: insp || null })
   } catch (e) {
     console.error('[GET /op/:id/calidad]', e)
     res.status(500).json({ error: e.message })
   }
 })
 
-// POST /api/gestion/op/:id_op/calidad — crear inspección + registros PCs
-app.post('/api/gestion/op/:id_op/calidad', requireAuth, async (req, res) => {
+// PATCH /api/gestion/op/:id_op/calidad — UPSERT borrador (auto-save)
+// Body con cualquier subconjunto de campos. NO permite editar si firmada=1.
+app.patch('/api/gestion/op/:id_op/calidad', requireAuth, async (req, res) => {
   const idOp = String(req.params.id_op)
   const b = req.body || {}
-  const validBool = v => ['si','no','na'].includes(v) ? v : null
-  const resultadoVal = ['aprobado','rechazado','liberado_observacion'].includes(b.resultado) ? b.resultado : null
-  if (!resultadoVal) return res.status(400).json({ error: 'resultado requerido (aprobado|rechazado|liberado_observacion)' })
+  const validBool = v => ['si','no','na'].includes(v) ? v : (v === null ? null : undefined)
+  const validRes  = v => ['aprobado','rechazado','liberado_observacion'].includes(v) ? v : (v === null ? null : undefined)
 
-  const conn = await db.gestion.getConnection()
   try {
-    await conn.beginTransaction()
-    const [r] = await conn.query(
-      `INSERT INTO g_op_inspeccion_calidad
-        (empresa, id_op, tamano_lote_unidades, tamano_muestra,
-         visual_normal, tapado_sellado, etiqueta_normal, sabor_olor_normal,
-         defectos_criticos, defectos_mayores, defectos_menores,
-         resultado, observacion, inspector_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.empresa, idOp,
-        b.tamano_lote_unidades ?? null,
-        b.tamano_muestra ?? null,
-        validBool(b.visual_normal),
-        validBool(b.tapado_sellado),
-        validBool(b.etiqueta_normal),
-        validBool(b.sabor_olor_normal),
-        Number(b.defectos_criticos) || 0,
-        Number(b.defectos_mayores) || 0,
-        Number(b.defectos_menores) || 0,
-        resultadoVal,
-        b.observacion?.toString().trim() || null,
-        req.usuario.email,
-      ]
+    // Verificar si ya existe y si está firmada
+    const [[existente]] = await db.gestion.query(
+      `SELECT id, firmada FROM g_op_inspeccion_calidad WHERE empresa = ? AND id_op = ?`,
+      [req.empresa, idOp]
     )
-    const inspeccionId = r.insertId
-
-    // Insertar PCs (si vienen)
-    const pcs = Array.isArray(b.puntos_criticos) ? b.puntos_criticos : []
-    for (const pc of pcs) {
-      const tipoPC = ['numerico','booleano','texto','seleccion'].includes(pc.tipo) ? pc.tipo : 'texto'
-      const valorNum = pc.valor_numerico != null && pc.valor_numerico !== '' ? Number(pc.valor_numerico) : null
-      const valorBool = pc.valor_booleano == null ? null : (pc.valor_booleano ? 1 : 0)
-      const rangoMin = pc.rango_min != null && pc.rango_min !== '' ? Number(pc.rango_min) : null
-      const rangoMax = pc.rango_max != null && pc.rango_max !== '' ? Number(pc.rango_max) : null
-      // Calcular dentro_rango server-side
-      let dentroRango = null
-      if (tipoPC === 'numerico' && valorNum != null) {
-        const okMin = rangoMin == null || valorNum >= rangoMin
-        const okMax = rangoMax == null || valorNum <= rangoMax
-        dentroRango = (okMin && okMax) ? 1 : 0
-      } else if (tipoPC === 'booleano' && valorBool != null) {
-        dentroRango = valorBool === 1 ? 1 : 0
-      }
-      await conn.query(
-        `INSERT INTO g_op_pc_registro
-          (inspeccion_id, pc_receta_id, parametro, tipo, unidad,
-           rango_min, rango_max, valor_numerico, valor_booleano, valor_texto,
-           dentro_rango, observacion)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          inspeccionId, pc.pc_receta_id ?? null,
-          (pc.parametro || '').toString().slice(0, 100),
-          tipoPC, pc.unidad?.toString().slice(0, 20) || null,
-          rangoMin, rangoMax, valorNum, valorBool,
-          pc.valor_texto?.toString() || null,
-          dentroRango, pc.observacion?.toString() || null
-        ]
-      )
+    if (existente && existente.firmada === 1) {
+      return res.status(409).json({ error: 'Inspección firmada — no se puede editar. Reabrir primero (nivel ≥5).' })
     }
-    await conn.commit()
-    res.json({ ok: true, inspeccionId })
+
+    // Construir SET dinámico solo con campos enviados
+    const updates = []
+    const params = []
+    const ALLOWED = {
+      tamano_lote_unidades: 'int',
+      tamano_muestra: 'int',
+      visual_normal: 'bool3',
+      tapado_sellado: 'bool3',
+      etiqueta_normal: 'bool3',
+      sabor_olor_normal: 'bool3',
+      defectos_criticos: 'int',
+      defectos_mayores: 'int',
+      defectos_menores: 'int',
+      resultado: 'res',
+      observacion: 'str',
+    }
+    for (const [k, kind] of Object.entries(ALLOWED)) {
+      if (!(k in b)) continue
+      let v = b[k]
+      if (kind === 'bool3') {
+        const ok = validBool(v); if (ok === undefined) continue
+        v = ok
+      } else if (kind === 'res') {
+        const ok = validRes(v); if (ok === undefined) continue
+        v = ok
+      } else if (kind === 'int') {
+        v = v == null || v === '' ? null : Number(v)
+        if (v != null && isNaN(v)) continue
+      } else if (kind === 'str') {
+        v = v == null ? null : String(v).trim() || null
+      }
+      updates.push(`${k} = ?`); params.push(v)
+    }
+    updates.push(`actualizada_por = ?`); params.push(req.usuario.email)
+    updates.push(`actualizada_en = NOW()`)
+
+    if (existente) {
+      params.push(existente.id)
+      await db.gestion.query(
+        `UPDATE g_op_inspeccion_calidad SET ${updates.join(', ')} WHERE id = ?`,
+        params
+      )
+      res.json({ ok: true, inspeccionId: existente.id, creada: false })
+    } else {
+      // Insert nuevo
+      const cols = ['empresa', 'id_op', 'actualizada_por', 'actualizada_en']
+      const vals = [req.empresa, idOp, req.usuario.email, new Date()]
+      const placeholders = ['?','?','?','?']
+      for (const [k, kind] of Object.entries(ALLOWED)) {
+        if (!(k in b)) continue
+        let v = b[k]
+        if (kind === 'bool3') v = validBool(v)
+        else if (kind === 'res') v = validRes(v)
+        else if (kind === 'int') v = v == null || v === '' ? null : Number(v)
+        else if (kind === 'str') v = v == null ? null : String(v).trim() || null
+        if (v === undefined) continue
+        cols.push(k); vals.push(v); placeholders.push('?')
+      }
+      const [r] = await db.gestion.query(
+        `INSERT INTO g_op_inspeccion_calidad (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`,
+        vals
+      )
+      res.json({ ok: true, inspeccionId: r.insertId, creada: true })
+    }
   } catch (e) {
-    try { await conn.rollback() } catch (_) {}
-    console.error('[POST /op/:id/calidad]', e)
+    console.error('[PATCH /op/:id/calidad]', e)
     res.status(500).json({ error: e.message })
-  } finally {
-    try { conn.release() } catch (_) {}
+  }
+})
+
+// POST /api/gestion/op/:id_op/calidad/firmar
+// Marca como firmada. Registra firmada_por (usuario actual) + firmada_en.
+// Requiere que tenga al menos resultado seleccionado.
+app.post('/api/gestion/op/:id_op/calidad/firmar', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  try {
+    const [[insp]] = await db.gestion.query(
+      `SELECT id, firmada, resultado FROM g_op_inspeccion_calidad WHERE empresa = ? AND id_op = ?`,
+      [req.empresa, idOp]
+    )
+    if (!insp) return res.status(404).json({ error: 'No hay inspección para firmar' })
+    if (insp.firmada === 1) return res.status(409).json({ error: 'Ya estaba firmada' })
+    if (!insp.resultado) return res.status(400).json({ error: 'Debe elegir un resultado (Aprobado/Rechazado) antes de firmar' })
+
+    await db.gestion.query(
+      `UPDATE g_op_inspeccion_calidad
+       SET firmada = 1, firmada_por = ?, firmada_en = NOW(),
+           inspector_email = ?
+       WHERE id = ?`,
+      [req.usuario.email, req.usuario.email, insp.id]
+    )
+    res.json({ ok: true, firmada_por: req.usuario.email })
+  } catch (e) {
+    console.error('[POST /op/:id/calidad/firmar]', e)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/gestion/op/:id_op/calidad/reabrir
+// Solo nivel ≥5. Vuelve a borrador (firmada=0). Mantiene firmada_por/en como historial.
+app.post('/api/gestion/op/:id_op/calidad/reabrir', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+  if (miNivel < 5) return res.status(403).json({ error: 'Reabrir requiere nivel ≥5' })
+  try {
+    const [r] = await db.gestion.query(
+      `UPDATE g_op_inspeccion_calidad
+       SET firmada = 0, actualizada_por = ?, actualizada_en = NOW()
+       WHERE empresa = ? AND id_op = ? AND firmada = 1`,
+      [req.usuario.email, req.empresa, idOp]
+    )
+    if (!r.affectedRows) return res.status(404).json({ error: 'No hay inspección firmada para reabrir' })
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// ─── Puntos Críticos del Proceso (separados de Calidad) ──────────
+// GET /api/gestion/op/:id_op/pc-proceso — mediciones actuales de la OP
+app.get('/api/gestion/op/:id_op/pc-proceso', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  try {
+    const [rows] = await db.gestion.query(
+      `SELECT * FROM g_op_pc_proceso WHERE empresa = ? AND id_op = ? ORDER BY pc_receta_id ASC`,
+      [req.empresa, idOp]
+    )
+    res.json({ mediciones: rows })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+// PATCH /api/gestion/op/:id_op/pc-proceso/:pc_receta_id — UPSERT de un PC.
+// Auto-save por blur. Body: { parametro, tipo, unidad, rango_min, rango_max, valor_numerico/booleano/texto, observacion }
+app.patch('/api/gestion/op/:id_op/pc-proceso/:pc_receta_id', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const pcRecetaId = parseInt(req.params.pc_receta_id, 10)
+  if (!pcRecetaId) return res.status(400).json({ error: 'pc_receta_id inválido' })
+  const b = req.body || {}
+
+  const tipo = ['numerico','booleano','texto','seleccion'].includes(b.tipo) ? b.tipo : 'texto'
+  const valorNum = b.valor_numerico != null && b.valor_numerico !== '' ? Number(b.valor_numerico) : null
+  const valorBool = b.valor_booleano == null ? null : (b.valor_booleano ? 1 : 0)
+  const rangoMin = b.rango_min != null && b.rango_min !== '' ? Number(b.rango_min) : null
+  const rangoMax = b.rango_max != null && b.rango_max !== '' ? Number(b.rango_max) : null
+
+  // Calcular dentro_rango
+  let dentroRango = null
+  if (tipo === 'numerico' && valorNum != null) {
+    const okMin = rangoMin == null || valorNum >= rangoMin
+    const okMax = rangoMax == null || valorNum <= rangoMax
+    dentroRango = (okMin && okMax) ? 1 : 0
+  } else if (tipo === 'booleano' && valorBool != null) {
+    dentroRango = valorBool === 1 ? 1 : 0
+  }
+
+  try {
+    // ¿Existe ya?
+    const [[existente]] = await db.gestion.query(
+      `SELECT id FROM g_op_pc_proceso WHERE empresa = ? AND id_op = ? AND pc_receta_id = ?`,
+      [req.empresa, idOp, pcRecetaId]
+    )
+    if (existente) {
+      await db.gestion.query(
+        `UPDATE g_op_pc_proceso
+         SET valor_numerico = ?, valor_booleano = ?, valor_texto = ?,
+             dentro_rango = ?, observacion = ?,
+             actualizada_por = ?, actualizada_en = NOW()
+         WHERE id = ?`,
+        [valorNum, valorBool, b.valor_texto?.toString() || null, dentroRango,
+         b.observacion?.toString() || null, req.usuario.email, existente.id]
+      )
+      res.json({ ok: true, id: existente.id, creado: false, dentro_rango: dentroRango })
+    } else {
+      const [r] = await db.gestion.query(
+        `INSERT INTO g_op_pc_proceso
+          (empresa, id_op, pc_receta_id, parametro, tipo, unidad,
+           rango_min, rango_max, valor_numerico, valor_booleano, valor_texto,
+           dentro_rango, observacion, registrado_por)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [req.empresa, idOp, pcRecetaId,
+         (b.parametro || '').toString().slice(0, 100),
+         tipo, b.unidad?.toString().slice(0, 20) || null,
+         rangoMin, rangoMax, valorNum, valorBool,
+         b.valor_texto?.toString() || null,
+         dentroRango, b.observacion?.toString() || null,
+         req.usuario.email]
+      )
+      res.json({ ok: true, id: r.insertId, creado: true, dentro_rango: dentroRango })
+    }
+  } catch (e) {
+    console.error('[PATCH /op/:id/pc-proceso/:pcId]', e)
+    res.status(500).json({ error: e.message })
   }
 })
 
