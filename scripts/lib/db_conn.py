@@ -215,8 +215,11 @@ def _conn_pg(prefijo, dict_cursor=False):
     """
     import psycopg2
     if dict_cursor:
-        from psycopg2.extras import DictCursor
-        cursor_factory = DictCursor
+        # RealDictCursor devuelve dict puro (JSON-serializable como objeto),
+        # no DictRow (que serializa como array). Más compatible con el código
+        # que esperaba el comportamiento de pymysql.cursors.DictCursor.
+        from psycopg2.extras import RealDictCursor
+        cursor_factory = RealDictCursor
     else:
         cursor_factory = None
 
