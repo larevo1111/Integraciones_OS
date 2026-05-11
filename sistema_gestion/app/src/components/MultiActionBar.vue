@@ -293,26 +293,22 @@ function isoRel(dias) {
   cursor: pointer;
   box-sizing: border-box;
   font-family: inherit;
-  /* color-scheme le dice al browser qué paleta usar para el chrome nativo del
-     input type=date (fondo del datetime-edit, color del placeholder dd/mm/aaaa,
-     ícono del calendario). Sin esto el browser pinta fondo blanco en dark mode. */
-  color-scheme: dark;
 }
-[data-theme="light"] .multi-date-input { color-scheme: light; }
 .multi-date-input:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-/* Fix nativo del input type=date — el datetime-edit hereda color para que
-   "dd/mm/aaaa" sea visible tanto en tema claro como oscuro */
+/* Forzar el mismo color de letra que los otros items del menú en TODOS los
+   subfields del input type=date (placeholder dd/mm/aaaa, día, mes, año). */
+.multi-date-input,
 .multi-date-input::-webkit-datetime-edit,
 .multi-date-input::-webkit-datetime-edit-fields-wrapper,
 .multi-date-input::-webkit-datetime-edit-text,
 .multi-date-input::-webkit-datetime-edit-day-field,
 .multi-date-input::-webkit-datetime-edit-month-field,
 .multi-date-input::-webkit-datetime-edit-year-field {
-  color: var(--text-primary);
+  color: var(--text-secondary) !important;
 }
 .multi-date-input::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
-  opacity: 0.8;
+  filter: invert(0.6);
+  opacity: 0.7;
   cursor: pointer;
 }
 [data-theme="light"] .multi-date-input::-webkit-calendar-picker-indicator {
