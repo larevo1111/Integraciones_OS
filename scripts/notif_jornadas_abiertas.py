@@ -54,11 +54,11 @@ def obtener_contactos(emails):
         with conn.cursor() as cur:
             placeholders = ','.join(['%s'] * len(emails))
             cur.execute(
-                f"SELECT email AS Email, nombre AS Nombre_Usuario, telefono FROM sis_usuarios "
+                f"SELECT email, nombre, telefono FROM sis_usuarios "
                 f"WHERE email IN ({placeholders}) AND estado='activo'",
                 emails
             )
-            return {r['Email']: r for r in cur.fetchall()}
+            return {r['email']: r for r in cur.fetchall()}
 
 
 def main():
@@ -98,7 +98,7 @@ def main():
 
     for j in abiertas:
         info = contactos.get(j['usuario'])
-        nombre = (info['Nombre_Usuario'] if info else None) or j['usuario'].split('@')[0]
+        nombre = (info['nombre'] if info else None) or j['usuario'].split('@')[0]
         mins = j['minutos_activa'] or 0
         horas = mins // 60
         minutos = mins % 60
@@ -125,7 +125,7 @@ def main():
     lineas = []
     for j in abiertas:
         info = contactos.get(j['usuario'])
-        nombre = (info['Nombre_Usuario'] if info else None) or j['usuario'].split('@')[0]
+        nombre = (info['nombre'] if info else None) or j['usuario'].split('@')[0]
         mins = j['minutos_activa'] or 0
         horas = mins // 60
         minutos = mins % 60

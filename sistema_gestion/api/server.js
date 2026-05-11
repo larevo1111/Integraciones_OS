@@ -348,7 +348,7 @@ app.post('/api/gestion/auth/seleccionar_empresa', async (req, res) => {
       SELECT e.uid, e.nombre, e.siglas
       FROM sis_usuarios_empresas ue
       JOIN sis_empresas e ON e.uid = ue.empresa_uid
-      WHERE ue.usuario_email = ? AND ue.empresa_uid = ? AND ue.estado = 'activo' AND (e.estado = 'activa' OR e.estado IS NULL)
+      WHERE ue.usuario_email = ? AND LOWER(ue.empresa_uid) = LOWER(?) AND ue.estado = 'activo' AND (e.estado = 'activa' OR e.estado IS NULL)
     `, [decoded.email, empresa_uid])
 
     if (!emp) return res.status(403).json({ error: 'No tienes acceso a esa empresa' })
@@ -443,7 +443,7 @@ app.get('/api/gestion/usuarios', async (req, res) => {
              u.nivel_global AS nivel, u.foto_url AS foto, ue.rol_uid AS rol
       FROM sis_usuarios_empresas ue
       JOIN sis_usuarios u ON u.email = ue.usuario_email
-      WHERE ue.empresa_uid = ? AND ue.estado = 'activo' AND u.estado = 'activo'
+      WHERE LOWER(ue.empresa_uid) = LOWER(?) AND ue.estado = 'activo' AND u.estado = 'activo'
       ORDER BY u.nombre
     `, [req.empresa])
     res.json({ ok: true, usuarios: rows })

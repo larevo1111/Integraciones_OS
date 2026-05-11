@@ -185,8 +185,58 @@ def remota(prefijo, dict_cursor=False):
 def integracion(dict_cursor=False): return remota('INTEGRACION', dict_cursor)
 def gestion(dict_cursor=False):     return remota('GESTION',     dict_cursor)
 def inventario(dict_cursor=False):  return remota('INVENTARIO',  dict_cursor)
-def master(dict_cursor=False):      return remota('MASTER',      dict_cursor)
 def comunidad(dict_cursor=False):   return remota('COMUNIDAD',   dict_cursor)
+# master migrado a Postgres el 9-may-2026 — usa psycopg2, NO pymysql
+def master(dict_cursor=False):      return _conn_pg('MASTER',    dict_cursor)
+
+
+# ─── Soporte Postgres (NUEVO 2026-05-11) ──────────────────────────────
+# El master se migró de MariaDB a Postgres. psycopg2 usa los MISMOS
+# placeholders %s que pymysql → cero cambios en queries de las apps.
+# La única diferencia es el dict_cursor: psycopg2 usa cursor_factory=DictCursor.
+def _cfg_pg(prefijo):
+    """Lee DB_<prefijo>_PG_* del env."""
+    return dict(
+        host=os.getenv(f'DB_{prefijo}_PG_HOST', '127.0.0.1'),
+        port=int(os.getenv(f'DB_{prefijo}_PG_PORT', '5432')),
+        user=os.getenv(f'DB_{prefijo}_PG_USER'),
+        password=os.getenv(f'DB_{prefijo}_PG_PASS'),
+        dbname=os.getenv(f'DB_{prefijo}_PG_NAME'),
+    )
+
+
+@contextmanager
+def _conn_pg(prefijo, dict_cursor=False):
+    """Context manager para BD Postgres. API compatible con pymysql:
+        with master(dict_cursor=True) as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT ... WHERE email = %s', (email,))
+            row = cur.fetchone()
+    """
+    import psycopg2
+    if dict_cursor:
+        from psycopg2.extras import DictCursor
+        cursor_factory = DictCursor
+    else:
+        cursor_factory = None
+
+    cfg = _cfg_pg(prefijo)
+    if not cfg['user'] or not cfg['password'] or not cfg['dbname']:
+        raise RuntimeError(f"Config DB_{prefijo}_PG_* incompleta en integracion_conexionesbd.env")
+
+    kwargs = dict(
+        host=cfg['host'], port=cfg['port'],
+        user=cfg['user'], password=cfg['password'], dbname=cfg['dbname'],
+        connect_timeout=15,
+    )
+    if cursor_factory:
+        kwargs['cursor_factory'] = cursor_factory
+
+    conn = psycopg2.connect(**kwargs)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 # ─── cfg_inventario(): dict listo para pymysql.connect con tunnel SSH abierto ───
@@ -212,14 +262,18 @@ def cfg_integracion(dict_cursor=True):
 
 
 def cfg_master(dict_cursor=True):
-    """Retorna dict compatible con pymysql.connect(**) para sos_master_erp en VPS.
-    Abre tunnel SSH al VPS si no está abierto.
+    """DEPRECATED: master se migró a Postgres el 9-may-2026 — ya no aplica
+    el patrón pymysql.connect(**dict). Usar el context manager directamente:
 
-    USAR PARA: validación de usuarios, empresas, roles, permisos. Única fuente
-    de verdad post-aislamiento de Hostinger (2026-04-24). Reemplaza
-    sys_usuarios/sys_usuarios_empresas/sys_empresa de u768061575_os_comunidad.
+        from lib import master
+        with master(dict_cursor=True) as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT ... WHERE email = %s', (email,))
     """
-    return _cfg_remota_dict('MASTER', dict_cursor)
+    raise NotImplementedError(
+        "cfg_master() ya no aplica — master está en Postgres. "
+        "Usar `with master() as conn:` directamente."
+    )
 
 
 def _cfg_remota_dict(prefijo, dict_cursor):

@@ -1,23 +1,24 @@
 /**
  * sistema_gestion/api/db.js
- * Wrapper sobre lib/db_conn.js — pools: master, gestion, integracion, comunidad.
+ * Wrapper sobre lib/db_conn.js — pools: master, gestion, integracion, inventario, comunidad.
  *
- * MASTER = fuente de verdad de usuarios/empresas/roles (reemplaza comunidad
- * desde 2026-04-24, tras aislar Hostinger).
+ * MASTER = fuente de verdad de usuarios/empresas/roles. Reside en POSTGRES
+ * desde el 9-may-2026 (migrado de MariaDB). El helper central expone un
+ * adapter mysql2-compat → las queries siguen usando `?` y `const [rows] = ...`.
+ *
+ * GESTION / INTEGRACION / INVENTARIO / COMUNIDAD = MariaDB (sin cambios).
  *
  * Getters dinámicos: leen el pool actual del helper central EN CADA ACCESO.
- * Si el SSH tunnel se reconecta, el pool se recrea automáticamente y todos
- * los `db.gestion.query(...)` posteriores usan el nuevo pool sin cachear uno viejo.
+ * Si el SSH tunnel se reconecta, el pool se recrea y los consumers ven el nuevo.
  */
 const central = require('../../lib/db_conn')
 
 async function conectar() {
-  // master/gestion/integracion/inventario viven en VPS Contabo (misma red local para
-  // el server que corre allí; SSH para el local). comunidad (Hostinger) queda como
-  // legacy opcional — algún query aún lo puede usar hasta refactor completo.
+  // master en Postgres (local, sin SSH). gestion/integracion/inventario en
+  // MariaDB local (mismo VPS). comunidad en Hostinger (legacy, opcional).
   await Promise.all([central.master(), central.gestion(), central.integracion(), central.inventario()])
   intentarComunidad()
-  console.log(`[db] Pools listos (master+gestion+integracion+inventario) — timezone: ${central.TIMEZONE}`)
+  console.log(`[db] Pools listos (master Postgres + gestion/integracion/inventario MariaDB) — timezone: ${central.TIMEZONE}`)
 }
 
 async function intentarComunidad() {

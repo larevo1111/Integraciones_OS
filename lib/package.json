@@ -1,0 +1,12 @@
+{
+  "name": "@os/db-conn",
+  "version": "1.0.0",
+  "description": "Helper único de conexiones a BD (mysql2 + pg)",
+  "main": "db_conn.js",
+  "private": true,
+  "dependencies": {
+    "mysql2": "^3.0.0",
+    "ssh2": "^1.0.0",
+    "pg": "^8.0.0"
+  }
+}
