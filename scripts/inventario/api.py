@@ -19,7 +19,16 @@ BASE_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
 STATIC_DIR = os.path.join(BASE_DIR, 'inventario', 'static')
 FOTOS_DIR = os.path.join(BASE_DIR, 'inventario', 'fotos')
 POLITICAS_PATH = os.path.join(BASE_DIR, 'inventario', 'politicas.json')
-JWT_SECRET = '30e4cfa02643f4f05b846aab50974c7a5df85b1f05c990b3fe64e297538adbc2'
+# JWT_SECRET — leído de Infisical (fallback a env var legacy)
+# Antes de 2026-05-11 estaba hardcoded en este archivo (leak). Rotar después.
+import sys as _sys_jwt, os as _os_jwt
+_sys_jwt.path.insert(0, _os_jwt.path.dirname(_os_jwt.path.dirname(_os_jwt.path.abspath(__file__))))
+try:
+    from lib.infisical import get as _infisical_get
+    JWT_SECRET = _infisical_get('INVENTARIO_JWT_SECRET', '/backends-erp')
+except Exception as _e:
+    print(f'[inventario/api] WARN: Infisical JWT_SECRET falló: {_e}, usando fallback', flush=True)
+    JWT_SECRET = _os_jwt.getenv('INVENTARIO_JWT_SECRET') or '30e4cfa02643f4f05b846aab50974c7a5df85b1f05c990b3fe64e297538adbc2'
 
 
 def verificar_jwt(request: Request):

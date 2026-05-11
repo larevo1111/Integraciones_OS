@@ -19,6 +19,7 @@ Mismos drivers que ya se usan: pymysql, sshtunnel.
 """
 import os
 import sys
+from io import StringIO
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -26,15 +27,33 @@ import pymysql
 from sshtunnel import SSHTunnelForwarder
 from dotenv import load_dotenv
 
-# ─── Cargar .env central (raíz del repo) ─────────────────────────────
+# ─── Cargar .env central (raíz del repo) — FALLBACK si Infisical falla ────────
+# Desde 2026-05-11, los secrets viven en Infisical. El .env queda como
+# fallback durante la transición. Cuando todo esté validado, el .env se elimina.
 _RAIZ_REPO = Path(__file__).resolve().parents[2]
 _ENV_PATH  = _RAIZ_REPO / 'integracion_conexionesbd.env'
 if _ENV_PATH.exists():
     load_dotenv(_ENV_PATH)
-else:
-    print(f'[db_conn] WARN: {_ENV_PATH} no existe', file=sys.stderr)
 
-TIMEZONE = os.getenv('DB_TIMEZONE', '-05:00')
+# ─── Bootstrap desde Infisical (NUEVO 2026-05-11) ─────────────────────
+# Carga todos los secrets de /shared al startup y los expone como variables
+# de entorno (sin sobreescribir las ya existentes del proceso).
+# Si Infisical no responde, las apps siguen funcionando con valores del .env.
+_INFISICAL_LOADED = False
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from infisical import get_many as _infisical_get_many  # type: ignore
+    _shared = _infisical_get_many('/shared')
+    for _k, _v in _shared.items():
+        # Solo sobreescribe valores explícitos del proceso si no fueron seteados ya.
+        # Los valores del .env se cargaron arriba en os.environ — los reemplazamos
+        # con los de Infisical (más recientes / fuente de verdad).
+        os.environ[_k] = _v
+    _INFISICAL_LOADED = True
+except Exception as _e:
+    print(f'[db_conn] WARN: Infisical bootstrap falló, usando .env: {_e}', file=sys.stderr)
+
+TIMEZONE = os.getenv('APP_TIMEZONE', os.getenv('DB_TIMEZONE', '-05:00'))
 
 
 # ─── Config readers ──────────────────────────────────────────────────
@@ -113,16 +132,35 @@ def abrir_tunel(prefijo):
             try: viejo.stop()
             except Exception: pass
     s = cfg_remota_ssh(P)
+    # SSH key: preferir Infisical (memoria pura, sin tocar disco). Fallback a path.
+    ssh_pkey_arg = _ssh_pkey_for(P, s['key'])
     t = SSHTunnelForwarder(
         (s['host'], s['port']),
         ssh_username=s['user'],
-        ssh_pkey=s['key'],
+        ssh_pkey=ssh_pkey_arg,
         remote_bind_address=(s['remote_host'], s['remote_port']),
         set_keepalive=30.0,  # ping SSH cada 30s para evitar timeout del server
     )
     t.start()
     _tuneles[P] = t
     return t
+
+
+def _ssh_pkey_for(prefijo, fallback_path):
+    """Devuelve la SSH key como objeto paramiko (cargado desde Infisical) o path.
+
+    Mapea: INTEGRACION/INVENTARIO/GESTION/MASTER → key del VPS Contabo
+           COMUNIDAD → key de Hostinger jumphost
+    """
+    if not _INFISICAL_LOADED:
+        return fallback_path
+    try:
+        from infisical import get_ssh_key_object  # type: ignore
+        which = 'HOSTINGER' if prefijo == 'COMUNIDAD' else 'VPS'
+        return get_ssh_key_object(which)
+    except Exception as e:
+        print(f'[db_conn] WARN: SSH key Infisical falló para {prefijo}, fallback a path: {e}', file=sys.stderr)
+        return fallback_path
 
 
 def cerrar_tuneles():

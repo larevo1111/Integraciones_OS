@@ -38,8 +38,15 @@ DB_INV  = 'INV'   # tablas inv_*
 # effi_data local es SOLO intermediaria del pipeline — ver MANIFESTO §8.
 DB_EFFI = 'EFFI'
 
-JWT_SECRET = os.environ.get('JWT_SECRET', 'os_secret_dev_change_me')
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+# Secrets desde Infisical (con fallback a env legacy)
+try:
+    from lib.infisical import get as _ig
+    JWT_SECRET = _ig('PRODUCCION_JWT_SECRET', '/backends-erp')
+    GOOGLE_CLIENT_ID = _ig('GOOGLE_OAUTH_CLIENT_ID', '/google-oauth')
+except Exception as _e:
+    print(f'[produccion/api] WARN: Infisical falló: {_e}', flush=True)
+    JWT_SECRET = os.environ.get('JWT_SECRET', 'os_secret_dev_change_me')
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
