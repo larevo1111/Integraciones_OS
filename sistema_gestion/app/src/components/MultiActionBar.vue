@@ -285,16 +285,21 @@ function isoRel(dias) {
 .multi-date-input {
   display: block;
   width: 100%;
-  padding: 7px 10px;
+  padding: 8px 12px;
   font-size: 12px;
-  background: var(--bg-card);
+  background: transparent;
   border: none;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   cursor: pointer;
   box-sizing: border-box;
   font-family: inherit;
+  /* color-scheme le dice al browser qué paleta usar para el chrome nativo del
+     input type=date (fondo del datetime-edit, color del placeholder dd/mm/aaaa,
+     ícono del calendario). Sin esto el browser pinta fondo blanco en dark mode. */
+  color-scheme: dark;
 }
+[data-theme="light"] .multi-date-input { color-scheme: light; }
+.multi-date-input:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 /* Fix nativo del input type=date — el datetime-edit hereda color para que
    "dd/mm/aaaa" sea visible tanto en tema claro como oscuro */
 .multi-date-input::-webkit-datetime-edit,
