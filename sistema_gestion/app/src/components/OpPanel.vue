@@ -105,10 +105,10 @@
                       <input
                         type="text" inputmode="decimal"
                         class="op-input-cell"
-                        :value="formValor(l)"
+                        :key="`real-${l.id}-${l.cantidad_real ?? 'null'}`"
+                        :value="valorInicial(l)"
                         :placeholder="fmtNum(l.cantidad_teorica)"
-                        @input="e => borrador[l.id] = e.target.value"
-                        @blur="guardarLinea(l)"
+                        @blur="e => guardarLinea(l, e.target.value)"
                       />
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.costo_unit) }}</td>
@@ -149,10 +149,10 @@
                       <input
                         type="text" inputmode="decimal"
                         class="op-input-cell"
-                        :value="formValor(l)"
+                        :key="`real-${l.id}-${l.cantidad_real ?? 'null'}`"
+                        :value="valorInicial(l)"
                         :placeholder="fmtNum(l.cantidad_teorica)"
-                        @input="e => borrador[l.id] = e.target.value"
-                        @blur="guardarLinea(l)"
+                        @blur="e => guardarLinea(l, e.target.value)"
                       />
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.precio_unit) }}</td>
@@ -432,7 +432,6 @@ const ficha       = ref(null)
 const cargando    = ref(false)
 const calidadPanelRef = ref(null)
 const obsLote     = ref('')
-const borrador    = reactive({})
 const tareaAbierta = ref(null)
 const procesando  = ref(false)
 const validando   = ref(false)
@@ -533,7 +532,6 @@ async function cargar() {
     const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/ficha`)
     ficha.value = r
     obsLote.value = r.detalle?.observaciones_lote || ''
-    Object.keys(borrador).forEach(k => delete borrador[k])
     if (!jobActivo.value) checarJobActivo()
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Error cargando OP: ' + (e.message || e), position: 'top' })
@@ -600,22 +598,18 @@ function segHHMMSS(seg) {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':')
 }
 function slug(s) { return String(s || '').toLowerCase().replace(/\s+/g, '-') }
-function formValor(l) {
-  if (borrador[l.id] !== undefined) return borrador[l.id]
+function valorInicial(l) {
   return l.cantidad_real == null ? '' : fmtNum(l.cantidad_real)
 }
 
-async function guardarLinea(l) {
-  const raw = borrador[l.id]
-  if (raw === undefined) return
+async function guardarLinea(l, raw) {
   const val = parseDecimal(raw)
-  if (val === l.cantidad_real) { delete borrador[l.id]; return }
+  if (val === l.cantidad_real) return
   try {
     const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/lineas/${l.id}`, {
       method: 'PUT', body: JSON.stringify({ cantidad_real: val })
     })
     l.cantidad_real = r.cantidad_real
-    delete borrador[l.id]
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Error guardando: ' + (e.message || e), position: 'top' })
   }
