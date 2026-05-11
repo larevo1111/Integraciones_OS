@@ -269,6 +269,24 @@ function isoRel(dias) {
   min-width: 140px;
   z-index: 10;
 }
+
+/* Mobile: el menú se centra en el viewport (no en el botón) para que
+   NUNCA se corte. Posición fija arriba de la barra de acciones, ancho casi
+   completo de la pantalla con un margen pequeño. */
+@media (max-width: 600px) {
+  .multi-bar-menu {
+    position: fixed;
+    /* La barra está en bottom: 65px + safe-area y mide ~70px (2 filas en mobile).
+       Dejar gap de 8px. */
+    bottom: calc(65px + env(safe-area-inset-bottom, 0) + 80px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 240px;
+    max-width: calc(100vw - 24px);
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
 .multi-date-input {
   display: block;
   width: 100%;

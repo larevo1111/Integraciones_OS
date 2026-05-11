@@ -411,9 +411,12 @@ const toastRef = ref(null)
 
 const LABELS_CAMPO = {
   estado: 'Estado', prioridad: 'Prioridad', categoria_id: 'Categoría',
-  proyecto_id: 'Proyecto', responsable: 'Responsable', fecha_limite: 'Fecha',
-  id_op: 'OP Effi', id_remision: 'Remisión', id_pedido: 'Pedido', descripcion: 'Descripción', notas: 'Notas',
-  tiempo_estimado_min: 'T. estimado'
+  categoria_produccion_id: 'Sub-categoría',
+  proyecto_id: 'Proyecto', responsable: 'Responsable',
+  fecha_limite: 'Fecha', fecha_inicio_estimada: 'Inicio estimado',
+  id_op: 'OP Effi', id_remision: 'Remisión', id_pedido: 'Pedido',
+  descripcion: 'Descripción', notas: 'Notas', titulo: 'Título',
+  tiempo_estimado_min: 'T. estimado', etiquetas: 'Etiquetas'
 }
 
 // Título auto-resize
@@ -484,8 +487,18 @@ const duracionCronometroFmt = computed(() => {
 const duracionSistemaFmt    = computed(() => { _tickRef.value; return formatHHMMSS(calcDuracionSistema(props.tarea)) })
 
 
+// Helper: toast de "campo actualizado" con undo. Centraliza el "chulito verde".
+async function _toastActualizado(campo, valorAnterior, valorNuevo, undoFn) {
+  if (valorAnterior === valorNuevo) return
+  const label = LABELS_CAMPO[campo] || campo
+  await nextTick()
+  toastRef.value?.mostrar(`${label} actualizado`, undoFn)
+}
+
 // Al setear fecha_estimada: sincroniza fecha_inicio_estimada si no tiene valor
 async function actualizarFechaEstimada(valor) {
+  if (!props.tarea) return
+  const valorAnterior = props.tarea.fecha_limite
   const body = { fecha_limite: valor || null }
   if (!props.tarea.fecha_inicio_estimada) body.fecha_inicio_estimada = valor || null
   try {
@@ -494,6 +507,8 @@ async function actualizarFechaEstimada(valor) {
       body: JSON.stringify(body)
     })
     emit('actualizada', data.tarea)
+    await _toastActualizado('fecha_limite', valorAnterior, valor || null,
+      () => actualizarFechaEstimada(valorAnterior))
   } catch (e) { console.error(e) }
 }
 
@@ -507,16 +522,21 @@ const hayCambiosPendientes = computed(() => {
   return false
 })
 
-function guardarCampoPendiente(campo, valor) {
+async function guardarCampoPendiente(campo, valor) {
   const id = props.tarea?.id
   if (!id) { delete camposPendientes[campo]; return }
-  if (valor !== (props.tarea[campo] || '')) {
-    // Usar ID capturado — protege contra cambio de tarea durante blur
-    api(`/api/gestion/tareas/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ [campo]: valor })
-    }).then(data => emit('actualizada', data.tarea))
-     .catch(e => console.error(e))
+  const valorAnterior = props.tarea[campo] || ''
+  if (valor !== valorAnterior) {
+    try {
+      // Usar ID capturado — protege contra cambio de tarea durante blur
+      const data = await api(`/api/gestion/tareas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ [campo]: valor })
+      })
+      emit('actualizada', data.tarea)
+      await _toastActualizado(campo, valorAnterior, valor,
+        () => actualizar(campo, valorAnterior))
+    } catch (e) { console.error(e) }
   }
   delete camposPendientes[campo]
 }
@@ -551,22 +571,15 @@ function descartarYCerrar() {
 
 async function actualizar(campo, valor) {
   if (!props.tarea) return
-  const valorAnterior = props.tarea[campo]  // guardar antes de actualizar
+  const valorAnterior = props.tarea[campo]
   try {
     const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
       method: 'PUT',
       body: JSON.stringify({ [campo]: valor })
     })
     emit('actualizada', data.tarea)
-    // Mostrar toast solo si el valor realmente cambió
-    if (valorAnterior !== valor) {
-      const label = LABELS_CAMPO[campo] || campo
-      await nextTick()
-      toastRef.value?.mostrar(
-        `${label} actualizado`,
-        () => actualizar(campo, valorAnterior)
-      )
-    }
+    await _toastActualizado(campo, valorAnterior, valor,
+      () => actualizar(campo, valorAnterior))
   } catch (e) { console.error(e) }
 }
 
@@ -595,12 +608,16 @@ function ciclarEstado() {
 
 async function actualizarEtiquetas(ids) {
   if (!props.tarea) return
+  const idsAnteriores = (props.tarea.etiquetas || []).map(e => e?.id ?? e).sort().join(',')
+  const idsNuevos = (ids || []).slice().sort().join(',')
   try {
     const data = await api(`/api/gestion/tareas/${props.tarea.id}`, {
       method: 'PUT',
       body: JSON.stringify({ etiquetas: ids })
     })
     emit('actualizada', data.tarea)
+    await _toastActualizado('etiquetas', idsAnteriores, idsNuevos,
+      () => actualizarEtiquetas((props.tarea.etiquetas || []).map(e => e?.id ?? e)))
   } catch (e) { console.error(e) }
 }
 
