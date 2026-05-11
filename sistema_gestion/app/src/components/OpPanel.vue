@@ -107,6 +107,7 @@
                         class="op-input-cell"
                         v-model="valores[l.id]"
                         :placeholder="fmtNum(l.cantidad_teorica)"
+                        @beforeinput="filtrarDecimal"
                         @blur="guardarLinea(l)"
                       />
                     </td>
@@ -150,6 +151,7 @@
                         class="op-input-cell"
                         v-model="valores[l.id]"
                         :placeholder="fmtNum(l.cantidad_teorica)"
+                        @beforeinput="filtrarDecimal"
                         @blur="guardarLinea(l)"
                       />
                     </td>
@@ -602,6 +604,14 @@ function segHHMMSS(seg) {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':')
 }
 function slug(s) { return String(s || '').toLowerCase().replace(/\s+/g, '-') }
+// Filtro mientras se escribe: solo dígitos y un único separador decimal (, o .)
+function filtrarDecimal(e) {
+  if (e.data == null) return  // borrado / navegación: siempre permitir
+  if (!/^[0-9.,]$/.test(e.data)) { e.preventDefault(); return }
+  // No permitir un segundo separador si ya hay uno
+  if (/[.,]/.test(e.data) && /[.,]/.test(e.target.value)) e.preventDefault()
+}
+
 async function guardarLinea(l) {
   const raw = valores[l.id]
   const val = parseDecimal(raw)
