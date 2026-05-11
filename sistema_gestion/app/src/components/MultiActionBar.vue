@@ -287,12 +287,32 @@ function isoRel(dias) {
   width: 100%;
   padding: 7px 10px;
   font-size: 12px;
-  background: transparent;
+  background: var(--bg-card);
   border: none;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   cursor: pointer;
   box-sizing: border-box;
+  font-family: inherit;
+}
+/* Fix nativo del input type=date — el datetime-edit hereda color para que
+   "dd/mm/aaaa" sea visible tanto en tema claro como oscuro */
+.multi-date-input::-webkit-datetime-edit,
+.multi-date-input::-webkit-datetime-edit-fields-wrapper,
+.multi-date-input::-webkit-datetime-edit-text,
+.multi-date-input::-webkit-datetime-edit-day-field,
+.multi-date-input::-webkit-datetime-edit-month-field,
+.multi-date-input::-webkit-datetime-edit-year-field {
+  color: var(--text-primary);
+}
+.multi-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  opacity: 0.8;
+  cursor: pointer;
+}
+[data-theme="light"] .multi-date-input::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.6;
 }
 .multi-menu-item {
   padding: 8px 12px;
