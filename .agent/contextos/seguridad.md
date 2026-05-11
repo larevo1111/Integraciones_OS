@@ -1,7 +1,7 @@
 # Contexto: Seguridad y credenciales
 
-**Última actualización**: 2026-05-11
-**Estado actual**: 🟡 En migración a Infisical — Fase 1 (Tailscale) y Fase 2 (Infisical) completadas. Pendiente: import de secrets, rotación, refactor de helpers.
+**Última actualización**: 2026-05-11 (Fase A completada)
+**Estado actual**: ✅ **Fase A completa** — Infisical activo, 185 secrets importados, 8 servicios refactorizados leyendo de Infisical. **Pendiente Fase B**: rotación de credenciales expuestas.
 
 ⚠ **Regla absoluta**: este archivo NO contiene valores de credenciales. Solo arquitectura, decisiones, plan. Los valores viven (transitoriamente) en `/home/osserver/tempoclv/secrets-inventory.env` (gitignored, permisos 600) y (definitivamente) en Infisical.
 
@@ -562,3 +562,257 @@ Email de recuperación de Contabo → my.contabo.com/account-recovery
 - **Infisical URL**: https://vps-contabo.tail44c420.ts.net (solo tailnet)
 - **Infisical docker-compose**: `/opt/infisical/docker-compose.yml` (en VPS)
 - **Backup Infisical**: `/var/backups/infisical/` (VPS, retención 7d) + `/home/osserver/backups/infisical/` (casa, retención 30d)
+
+---
+
+## 11. ESTADO FINAL FASE A — completado 2026-05-11 ✅
+
+Fecha exacta: tarde-noche del 11 de mayo 2026 (~5 horas de trabajo, una sola sesión).
+
+### 11.1 Resultados verificados
+
+| # | Componente | Estado | Validación |
+|---|---|---|---|
+| 1 | **Project `os-infra`** en Infisical | ✅ creado | UI muestra 185 secrets en 19 folders |
+| 2 | **Machine Identity `admin-bootstrap`** | ✅ activa | Universal Auth funcionando, token 30 días |
+| 3 | **19 folders** en `/` del project | ✅ todos | Verificado con `GET /api/v1/folders` |
+| 4 | **185 secrets** importados | ✅ todos | Conteo coincide local (185) ↔ Infisical (185) |
+| 5 | **SSH keys privadas** en `/ssh-keys-privadas/` | ✅ 4 entradas | VPS + Hostinger, públicas y privadas |
+| 6 | **Backup horario Infisical** | ✅ funcionando | VPS local + rsync via tailnet a casa |
+| 7 | **`lib/infisical.js` + `scripts/lib/infisical.py`** | ✅ creados | Test 100% OK (get, getMany, getSSHKey) |
+| 8 | **`lib/db_conn.{js,py}`** modificado | ✅ refactor con bootstrap Infisical + SSH key memoria pura | Sin cambios para callers |
+| 9 | **8 servicios refactorizados** | ✅ todos activos | Ver tabla 11.2 |
+| 10 | **Documento de plan** | ✅ este archivo | Plan + decisiones + arquitectura completa |
+
+### 11.2 Servicios migrados (todos active + respondiendo HTTP 200)
+
+| Servicio | Servidor | Puerto | Modificaciones |
+|---|---|---|---|
+| **ia-service** | local | 5100 | `scripts/ia_service/config.py` bootstrap `/ia-service/*` → os.environ |
+| **os-telegram-bot** | local | — | Hereda de ia-service (mismo proceso config) |
+| **os-gestion** | local | 9300 | `sistema_gestion/api/server.js` → `cargarSecretsInfisical()` antes de `app.listen` |
+| **os-inventario-api** | local | 9401 | `scripts/inventario/api.py` JWT_SECRET (antes hardcoded) → Infisical |
+| **os-produccion-api** | local | 9600 | `scripts/produccion/api.py` JWT + GOOGLE_CLIENT_ID → Infisical |
+| **wa-bridge** | local | 3100 | Sin cambio directo — usa `lib/db_conn` (ya migrado) |
+| **effi-webhook** | local | 5050 | Sin cambio directo — usa `lib/db_conn` |
+| **os-erp-frontend** | **VPS** | 9100 | `lib/db_conn.js` (ya migrado, git pull + restart) |
+
+### 11.3 Cómo funciona el flujo de credenciales ahora
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  INFISICAL (https://vps-contabo.tail44c420.ts.net)               │
+│  Project: os-infra                                                │
+│  185 secrets en 19 folders                                        │
+│  Solo accesible vía tailnet privada                              │
+└──────────────────────────────────────────────────────────────────┘
+                            │
+                            │  HTTPS via tailnet
+                            │  (Universal Auth — token JWT)
+                            ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  lib/infisical.{js,py}  — cliente SDK con cache memoria          │
+│                                                                   │
+│   get(key, folder)      → valor del secret (string)              │
+│   getMany(folder)       → todos los secrets de un folder         │
+│   getSSHKey(which)      → SSH key como string (Node) / objeto    │
+│                            paramiko (Python). Memoria pura.       │
+└──────────────────────────────────────────────────────────────────┘
+                            │
+       ┌────────────────────┼────────────────────┐
+       ▼                    ▼                    ▼
+┌────────────────┐  ┌────────────────┐  ┌────────────────┐
+│ lib/db_conn.js │  │ scripts/lib/   │  │ código de cada │
+│ /db_conn.py    │  │ db_conn.py     │  │ servicio       │
+│                │  │                │  │                │
+│ Bootstrap al   │  │ Lee /shared/   │  │ Carga propio   │
+│ import:        │  │ al import →    │  │ folder al      │
+│ /shared/ →     │  │ os.environ     │  │ startup:       │
+│ process.env    │  │                │  │ /backends-erp, │
+│                │  │ SSH key como   │  │ /ia-service,   │
+│ SSH key como   │  │ paramiko       │  │ etc.           │
+│ Buffer en      │  │ object en      │  │                │
+│ memoria        │  │ memoria        │  │                │
+└────────────────┘  └────────────────┘  └────────────────┘
+                            │
+                            ▼ FALLBACK si Infisical no responde
+┌──────────────────────────────────────────────────────────────────┐
+│  integracion_conexionesbd.env + scripts/.env + sistema_gestion/  │
+│  api/.env + etc. (vivos durante transición — eliminamos al final)│
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 11.4 Cómo se autentica cada servicio contra Infisical
+
+**Mecanismo**: Universal Auth (Client ID + Client Secret de la Machine Identity).
+
+**Hoy (Fase A)**: TODOS los servicios usan la misma identity `admin-bootstrap`:
+- Client ID: `5605ebaf-950c-421b-8dc8-b37b67bc27bf`
+- Client Secret: en `/home/osserver/tempoclv/.infisical_admin_bootstrap.env` (permisos 600)
+
+**Cómo lo encuentran los servicios**:
+1. **Servicios LOCAL**: `infisical.{js,py}` carga del archivo `tempoclv/...env` si las env vars del proceso no están definidas.
+2. **ERP Frontend en VPS**: idem — el archivo `tempoclv/` se replicó al VPS via scp.
+3. **Sistema Gestión local**: además, las env vars Infisical están en su `.env` propio (sistema_gestion/api/.env) — más explícito.
+
+**Después (Fase B planeada)**: cada servicio tendrá su Machine Identity con scope mínimo. Hay que crearlas en UI (5 min c/u, ~40 min total) y reemplazar el Client ID/Secret en cada uno.
+
+### 11.5 Cómo está cubierta cada categoría de secret
+
+| Categoría | Antes | Ahora |
+|---|---|---|
+| Pass MariaDB (osadmin local + VPS + por-BD) | `integracion_conexionesbd.env` | Infisical `/shared/DB_*_PASS` → bootstrap a process.env |
+| SSH keys | `~/.ssh/id_ed25519` + `~/.ssh/sos_erp` filesystem | Infisical `/ssh-keys-privadas/` → cargada como objeto paramiko/Buffer en memoria pura (sin tocar disco) |
+| API keys IA cloud (11 agentes) | BD `ia_service_os.ia_agentes.api_key` | BD (sin cambio — sigue siendo fuente para el servicio) + duplicado en Infisical `/ia-service/IA_AGENT_KEY_*` para auditoría/recovery |
+| Token Telegram bot | `scripts/.env` | Infisical `/ia-service/TELEGRAM_*` → bootstrap |
+| JWT secrets de backends | hardcoded (inventario) o `.env` (gestion, produccion) | Infisical `/backends-erp/*_JWT_SECRET` → carga al startup del servicio |
+| Google OAuth Client ID | `.env` (público pero ahí) | Infisical `/google-oauth/` |
+| Google OAuth Client Secret | `.env` | Infisical `/google-oauth/` |
+| Passwords paneles SaaS (Contabo, Hostinger, Cloudflare) | gestor personal (SafeInCloud) | Infisical `/cuentas-externas/` (con valores "COMPLETAR" — Santi llena si quiere) |
+| Pass humana sudo + osadmin (la "A") | `.env` y propagada | Infisical `/shared/DB_LOCAL_PASS` + `/admin-local/LOCAL_LOGIN_PASS` |
+
+### 11.6 Bug crítico arreglado durante Fase A
+
+**`JWT_SECRET` hardcoded en `scripts/inventario/api.py:22`**: valor literal en código fuente, **expuesto en repo público** desde su creación. Fix:
+- Valor copiado a Infisical `/backends-erp/INVENTARIO_JWT_SECRET`
+- Archivo modificado para leer de Infisical con fallback al valor viejo (solo hasta validar y rotar en Fase B)
+
+Es la única exposición de tipo "JWT secret hardcoded en código" que detecté. El resto de servicios ya leía de `.env` (que está gitignored).
+
+### 11.7 Archivos creados/modificados
+
+**Nuevos**:
+- `lib/infisical.js` — cliente Infisical Node
+- `scripts/lib/infisical.py` — cliente Infisical Python
+- `.agent/contextos/seguridad.md` (este documento)
+- `/home/osserver/tempoclv/secrets-inventory.env` (TRANSITORIO, se borra)
+- `/home/osserver/tempoclv/.infisical_admin_bootstrap.env` (mientras admin-bootstrap exista)
+- `/home/osserver/tempoclv/.infisical_access_token` (cache token, regenerable)
+- `/opt/infisical/docker-compose.yml` (en VPS — stack levantado)
+- `/opt/infisical/.env` (en VPS — secrets internos de Infisical)
+- `/opt/infisical/backup.sh` (en VPS — script de backup horario)
+
+**Modificados**:
+- `lib/db_conn.js` — bootstrap Infisical + SSH key memoria pura
+- `scripts/lib/db_conn.py` — idem
+- `sistema_gestion/api/server.js` — carga JWT + Google OAuth de Infisical
+- `sistema_gestion/api/.env` — agrega vars INFISICAL_*
+- `scripts/inventario/api.py` — JWT de Infisical (fix de hardcoded)
+- `scripts/produccion/api.py` — JWT + Google OAuth de Infisical
+- `scripts/ia_service/config.py` — bootstrap `/ia-service/*` a os.environ
+
+**Commits hechos**:
+- `45d3390` — feat(seguridad): centralizar credenciales en Infisical
+- `c48d369` — feat(ia-service): bootstrap secrets desde Infisical
+
+---
+
+## 12. FASE B — Rotación (PENDIENTE — siguiente paso)
+
+### Requisitos previos cumplidos para empezar Fase B
+- [x] Infisical funcionando como single source of truth
+- [x] Servicios leyendo de Infisical (con fallback)
+- [x] 24h de estabilidad esperadas (validar mañana 12-may que nada explotó)
+- [ ] Crear 8 Machine Identities scope-mínimo (UI, 5 min c/u) — esto es Fase B también
+
+### Orden de rotación recomendado (lo expuesto primero)
+
+#### 🔴 Día 1 — credenciales expuestas en GitHub PÚBLICO
+1. **Token bot Telegram** (Santi en BotFather):
+   - `/revoke` el bot → `/newtoken`
+   - Actualizar en Infisical UI: `/ia-service/TELEGRAM_BOT_TOKEN`
+   - Restart `os-telegram-bot.service`
+   - Validar: enviar mensaje al bot, debe responder
+2. **Pass humana "A"** (osadmin MariaDB local + VPS + sudo OS):
+   - Generar pass random nueva (yo te ayudo)
+   - SQL: `ALTER USER 'osadmin'@'localhost' IDENTIFIED BY 'NUEVA';` en local + VPS
+   - `passwd osserver` en local + VPS
+   - Update Infisical: `/shared/DB_LOCAL_PASS` + `/admin-local/LOCAL_LOGIN_PASS` + `/admin-vps/VPS_LOGIN_PASS`
+   - Restart de TODOS los servicios (toman pass nueva)
+   - Validar: cada servicio reconecta a MariaDB sin error
+
+#### 🟡 Días siguientes — uno por día
+3. **API keys IA** (vos en cada console.X.com):
+   - console.anthropic.com → revoke + create → update Infisical `/ia-service/IA_AGENT_KEY_CLAUDE_SONNET` + BD `ia_agentes` slug=`claude-sonnet`
+   - aistudio.google.com → idem para `IA_AGENT_KEY_GEMINI_*` (los 4)
+   - console.groq.com → idem para `IA_AGENT_KEY_GROQ_LLAMA` + `IA_AGENT_KEY_GPT_OSS_120B`
+   - platform.deepseek.com → idem para `IA_AGENT_KEY_DEEPSEEK_*` (los 2)
+   - cloud.cerebras.ai → idem `IA_AGENT_KEY_CEREBRAS_LLAMA`
+4. **OAuth Client Secret Google** (console.cloud.google.com):
+   - Regenerar el client secret
+   - Update Infisical `/google-oauth/GOOGLE_OAUTH_CLIENT_SECRET`
+   - Restart gestion + produccion + erp-frontend
+5. **JWT secrets** (los 4: ia-admin, gestion, produccion, inventario):
+   - Generar random nuevos
+   - Update Infisical en `/backends-erp/`
+   - Restart servicios → **invalida sesiones activas** (todos los logueados tienen que loguear de nuevo — hacelo en horario tranquilo)
+6. **Hostinger users + Cloudflare API tokens**:
+   - Hostinger panel → cambiar pass de DB users
+   - Cloudflare dashboard → regenerar API token si lo tenés activo
+7. **Pass paneles SaaS** (cuando quieras, manualmente)
+
+### Una vez rotado todo
+
+- [ ] Borrar `/home/osserver/tempoclv/secrets-inventory.env` (valores viejos)
+- [ ] Borrar `/home/osserver/tempoclv/.infisical_admin_bootstrap.env` SI creamos machine identities por servicio antes
+- [ ] Eliminar valores antiguos de los `.env` que ya quedan obsoletos (`integracion_conexionesbd.env` → mantener solo INFISICAL_* + APP_TIMEZONE; el resto eliminar)
+- [ ] Considerar Fase 4 — gitleaks pre-commit + history scrubbing
+
+---
+
+## 13. Cómo usar el sistema desde aquí adelante
+
+### Para Claude (yo) en futuras sesiones
+
+**Para conectar a una BD**: igual que antes, sin cambios.
+```python
+from lib import local, integracion
+with local('ia_service_os') as conn:
+    ...
+```
+
+**Para leer un secret específico**:
+```python
+from lib.infisical import get
+api_key = get('GMAIL_APP_PASSWORD', '/ia-service')
+```
+
+**NUNCA en futuras sesiones**:
+- Yo NO veo valores de secrets (solo nombres y paths)
+- Si Santi me pide "agregá una API key nueva", le digo "creála en Infisical UI" — no la manipulo yo
+- Si necesito un secret nuevo en código, escribo `get('NEW_KEY', '/folder')` con un nombre claro, y le digo a Santi qué nombre creó en Infisical
+
+### Para Santi cuando rote un secret
+
+1. Cambiar el valor en el sistema target (BotFather, ALTER USER, console.X.com, etc.)
+2. En Infisical UI: ir al folder → editar el secret → pegar valor nuevo → Save
+3. Restart del/los servicio(s) que lo usan: `sudo systemctl restart NOMBRE.service`
+4. Validar: hacer una operación funcional del servicio
+
+### Para Santi cuando agregue un servicio nuevo
+
+1. En Infisical UI: crear los secrets del nuevo servicio en el folder correspondiente
+2. En código del servicio: `require('../lib/infisical').get('KEY_NAME', '/folder')`
+3. Agregar `INFISICAL_CLIENT_ID` y `INFISICAL_CLIENT_SECRET` al `.env` o systemd Environment del servicio (mientras siga usando `admin-bootstrap`)
+4. Restart del servicio
+
+### Para Santi cuando quiera revocar un acceso
+
+1. En Infisical UI: Identity → revoke client secret → confirm
+2. Generar uno nuevo si el servicio lo sigue necesitando
+3. Update Infisical credentials del servicio + restart
+
+---
+
+## 14. Tabla de contactos / endpoints clave
+
+| Recurso | URL / Path |
+|---|---|
+| Infisical UI | https://vps-contabo.tail44c420.ts.net (solo tailnet) |
+| Infisical API | mismo dominio + `/api/v1/...` |
+| Tailscale admin | https://login.tailscale.com/admin |
+| Panel Contabo VPS | https://my.contabo.com |
+| Cloudflare dashboard | https://dash.cloudflare.com |
+| Hostinger panel | https://hpanel.hostinger.com |
+| BotFather Telegram | https://t.me/BotFather |
+| GitHub repos | https://github.com/larevo1111 |
