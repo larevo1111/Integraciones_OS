@@ -14,7 +14,7 @@
         <!-- Fila 2 (mobile) / misma línea (desktop): acciones -->
         <div class="multi-bar-actions">
           <!-- Fecha -->
-          <div v-if="acciones.includes('fecha')" style="position:relative">
+          <div v-if="acciones.includes('fecha')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'fecha' }" @click="toggleMenu('fecha')">
               <span class="material-icons" style="font-size:14px">event</span>
             </button>
@@ -29,7 +29,7 @@
           </div>
 
           <!-- Estado -->
-          <div v-if="acciones.includes('estado')" style="position:relative">
+          <div v-if="acciones.includes('estado')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'estado' }" @click="toggleMenu('estado')">
               <span class="material-icons" style="font-size:14px">swap_horiz</span> Estado
             </button>
@@ -39,7 +39,7 @@
           </div>
 
           <!-- Prioridad -->
-          <div v-if="acciones.includes('prioridad')" style="position:relative">
+          <div v-if="acciones.includes('prioridad')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'prioridad' }" @click="toggleMenu('prioridad')">
               <span class="material-icons" style="font-size:14px">flag</span> Prio.
             </button>
@@ -49,7 +49,7 @@
           </div>
 
           <!-- Categoría -->
-          <div v-if="acciones.includes('categoria')" style="position:relative">
+          <div v-if="acciones.includes('categoria')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'categoria' }" @click="toggleMenu('categoria')">
               <span class="material-icons" style="font-size:14px">label</span> Cat.
             </button>
@@ -62,7 +62,7 @@
           </div>
 
           <!-- Proyecto -->
-          <div v-if="acciones.includes('proyecto')" style="position:relative">
+          <div v-if="acciones.includes('proyecto')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'proyecto' }" @click="toggleMenu('proyecto')">
               <span class="material-icons" style="font-size:14px">folder</span> Proy.
             </button>
@@ -77,7 +77,7 @@
           </div>
 
           <!-- Etiquetas -->
-          <div v-if="acciones.includes('etiquetas')" style="position:relative">
+          <div v-if="acciones.includes('etiquetas')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'etiquetas' }" @click="toggleMenu('etiquetas')">
               <span class="material-icons" style="font-size:14px">sell</span>
               <span class="d-desktop-only">Etiq.</span>
@@ -100,7 +100,7 @@
           </div>
 
           <!-- Responsable -->
-          <div v-if="acciones.includes('responsable')" style="position:relative">
+          <div v-if="acciones.includes('responsable')" >
             <button class="multi-bar-btn" :class="{ 'multi-bar-btn-active': abierto === 'responsable' }" @click="toggleMenu('responsable')">
               <span class="material-icons" style="font-size:14px">person</span>
             </button>
@@ -270,17 +270,12 @@ function isoRel(dias) {
   z-index: 10;
 }
 
-/* Mobile: el menú se centra en el viewport (no en el botón) para que
-   NUNCA se corte. Posición fija arriba de la barra de acciones, ancho casi
-   completo de la pantalla con un margen pequeño. */
+/* Mobile: solo ajustar max-width para que nunca se salga del viewport.
+   El menú ya está anclado a .multi-bar (no a un wrap individual de botón) gracias
+   a que la barra es position:fixed (ancestor con position). Así `bottom: 100%`
+   mide la altura real de la barra y `left: 50%` la centra. */
 @media (max-width: 600px) {
   .multi-bar-menu {
-    position: fixed;
-    /* La barra está en bottom: 65px + safe-area y mide ~70px (2 filas en mobile).
-       Dejar gap de 8px. */
-    bottom: calc(65px + env(safe-area-inset-bottom, 0) + 80px);
-    left: 50%;
-    transform: translateX(-50%);
     min-width: 240px;
     max-width: calc(100vw - 24px);
     max-height: 50vh;
