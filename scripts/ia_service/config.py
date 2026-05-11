@@ -7,7 +7,7 @@ import sys
 import pymysql
 from dotenv import load_dotenv
 
-# Cargar scripts/.env (GEMINI_API_KEY, GROQ_API_KEY, etc.)
+# Cargar scripts/.env (GEMINI_API_KEY, GROQ_API_KEY, etc.) — fallback durante transición
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(_BASE, '.env'))
 
@@ -15,6 +15,16 @@ load_dotenv(os.path.join(_BASE, '.env'))
 sys.path.insert(0, _BASE)
 from lib import cfg_local, cfg_remota_ssh, cfg_remota_db
 from lib.db_conn import abrir_tunel
+
+# Bootstrap secrets desde Infisical (2026-05-11)
+# Carga /ia-service/* a os.environ para las apps que esperan os.getenv('X').
+try:
+    from lib.infisical import get_many as _ig_many
+    _ia_secrets = _ig_many('/ia-service')
+    for _k, _v in _ia_secrets.items():
+        os.environ[_k] = _v
+except Exception as _e:
+    print(f'[ia_service/config] WARN: Infisical /ia-service falló, usando .env: {_e}', flush=True)
 
 _local = cfg_local()
 DB_HOST = _local['host']
