@@ -512,14 +512,14 @@
         <div class="topbar">
           <q-btn flat dense round icon="menu" class="lt-md" @click="drawerOpen = !drawerOpen" />
           <span class="topbar-title">{{ tituloRuta }}</span>
-          <div v-if="esPaginaTareas" class="quick-search" :class="{ expanded: qsExpanded }">
+          <div v-if="lupaActiva" class="quick-search" :class="{ expanded: qsExpanded }">
             <q-btn flat dense round size="xs" icon="search" @click="qsExpanded = !qsExpanded; $nextTick(() => qsExpanded && $refs.qsInput?.focus())" />
             <input
               v-show="qsExpanded"
               ref="qsInput"
               v-model="qsQuery"
               class="qs-input"
-              placeholder="Buscar tarea..."
+              :placeholder="qsPlaceholder"
               @keydown.escape="qsExpanded = false; qsQuery = ''"
             />
             <q-btn v-if="qsExpanded && qsQuery" flat dense round size="xs" icon="close" @click="qsQuery = ''; $refs.qsInput?.focus()" />
@@ -618,8 +618,9 @@ import { hoyLocal } from 'src/services/fecha'
 import ProyectoPanel from 'src/components/ProyectoPanel.vue'
 import JornadaHeader from 'src/components/JornadaHeader.vue'
 import SidebarSubSeccion from 'src/components/SidebarSubSeccion.vue'
+import { usePageSearch, emitirBusqueda, desactivarBusqueda } from 'src/composables/usePageSearch'
 
-const APP_VERSION = 'v2.11.15'
+const APP_VERSION = 'v2.11.16'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -941,12 +942,18 @@ async function eliminarEtiqueta() {
 
 const ruta = computed(() => route.path)
 
-// Búsqueda rápida
+// Búsqueda rápida — soporta dos modos:
+//   1. Tareas/Equipo: provide('qsQuery') consumido vía inject (filtrado en memoria).
+//   2. Páginas que activan usePageSearch (ej. OPs): callback con debounce hacia el backend.
 const qsExpanded = ref(false)
 const qsQuery    = ref('')
+const { enabled: pageSearchEnabled, placeholder: pageSearchPlaceholder } = usePageSearch()
 const esPaginaTareas = computed(() => ruta.value.startsWith('/tareas') || ruta.value.startsWith('/equipo'))
+const lupaActiva = computed(() => esPaginaTareas.value || pageSearchEnabled.value)
+const qsPlaceholder = computed(() => pageSearchEnabled.value ? pageSearchPlaceholder.value : 'Buscar tarea...')
 provide('qsQuery', qsQuery)
-watch(ruta, () => { qsQuery.value = ''; qsExpanded.value = false })
+watch(qsQuery, (v) => { if (pageSearchEnabled.value) emitirBusqueda(v) })
+watch(ruta, () => { qsQuery.value = ''; qsExpanded.value = false; desactivarBusqueda() })
 
 const TITULOS = { '/tareas': 'Mis Tareas', '/equipo': 'Equipo', '/jornadas': 'Jornadas' }
 const tituloRuta = computed(() => {

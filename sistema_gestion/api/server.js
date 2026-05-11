@@ -34,10 +34,24 @@ if (fs.existsSync(envPath)) {
   })
 }
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
-const JWT_SECRET       = process.env.JWT_SECRET
-const IA_SERVICE_URL   = process.env.IA_SERVICE_URL || 'http://127.0.0.1:5100'
-const PORT             = 9300
+// Secrets — cargados al startup desde Infisical (fallback a .env si Infisical falla)
+let GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
+let JWT_SECRET       = process.env.JWT_SECRET
+const IA_SERVICE_URL = process.env.IA_SERVICE_URL || 'http://127.0.0.1:5100'
+const PORT           = 9300
+
+const secrets = require('../../lib/infisical')
+async function cargarSecretsInfisical() {
+  try {
+    const oauth = await secrets.get('GOOGLE_OAUTH_CLIENT_ID', '/google-oauth')
+    if (oauth) GOOGLE_CLIENT_ID = oauth
+    const jwtS = await secrets.get('GESTION_JWT_SECRET', '/backends-erp')
+    if (jwtS) JWT_SECRET = jwtS
+    console.log('[server] Secrets cargados desde Infisical ✓')
+  } catch (e) {
+    console.warn('[server] Infisical no disponible, usando .env:', e.message)
+  }
+}
 
 // Timezone: helpers centralizados en lib/timezone.js (fuente única: APP_TIMEZONE en .env)
 const { localDate: localDateCO, parseHora: parseHoraCO, parseBackendDate, TZ_NAME } = require('../../lib/timezone')
@@ -1426,8 +1440,19 @@ app.get('/api/gestion/op', async (req, res) => {
     }
     if (vigencia) { where.push('e.vigencia = ?'); params.push(vigencia) }
     if (q) {
-      where.push('(e.id_orden LIKE ? OR a.descripcion_articulo_producido LIKE ?)')
-      params.push(`%${q}%`, `%${q}%`)
+      // Quicksearch multi-palabra: AND entre palabras, OR entre columnas.
+      // Encuentra "cobertura templada" en "Cobertura Chocolate Templada".
+      const palabras = String(q).trim().split(/\s+/).filter(Boolean)
+      for (const w of palabras) {
+        where.push(`(
+          e.id_orden LIKE ?
+          OR e.nombre_encargado LIKE ?
+          OR a.cod_articulo LIKE ?
+          OR a.descripcion_articulo_producido LIKE ?
+        )`)
+        const pat = `%${w}%`
+        params.push(pat, pat, pat, pat)
+      }
     }
     if (desde) { where.push('e.fecha_de_creacion >= ?'); params.push(desde) }
     if (hasta) { where.push('e.fecha_de_creacion <= ?'); params.push(`${hasta} 23:59:59`) }
@@ -3934,6 +3959,11 @@ app.use((req, res) => {
 // ─── Arrancar ─────────────────────────────────────────────────────
 async function arrancar() {
   try {
+    await cargarSecretsInfisical()
+    if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
+      console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET (revisar Infisical y .env)')
+      process.exit(1)
+    }
     console.log('[server] Conectando SSH tunnel → Hostinger...')
     await db.conectar()
     console.log('[server] Pools MySQL listos (comunidad / gestion / integracion)')

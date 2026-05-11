@@ -8,20 +8,10 @@
       @row-click="abrirOp"
     >
       <template #toolbar>
-        <q-input
-          v-model="qInput" dense outlined dark
-          placeholder="Buscar (id u artículo)"
-          clearable @clear="qInput=''; cargar()" @keyup.enter="cargar()"
-          style="min-width:200px"
-          input-class="text-caption"
-        >
-          <template #prepend><q-icon name="search" size="14px" /></template>
-        </q-input>
         <q-btn
           flat dense no-caps size="sm"
           :disable="sincronizando"
           @click="sincronizarEffi"
-          class="q-ml-sm"
         >
           <span class="material-icons q-mr-xs" :class="{ 'spin-ico': sincronizando }" style="font-size:14px">sync</span>
           {{ sincronizando ? 'Sincronizando…' : 'Sincronizar Effi' }}
@@ -52,11 +42,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from 'src/services/api'
 import { useAuthStore } from 'src/stores/authStore'
+import { activarBusqueda, desactivarBusqueda } from 'src/composables/usePageSearch'
 import OsDataTable from 'src/components/OsDataTable.vue'
 import OpPanel from 'src/components/OpPanel.vue'
 
@@ -70,6 +61,7 @@ const panelIdOp = ref(null)
 const usuarios = ref([])
 const categorias = ref([])
 const sincronizando = ref(false)
+let buscarTimer = null
 
 const ESTADO_COLOR = {
   Generada:  '#7c8ea8',
@@ -193,6 +185,14 @@ watch(() => route.query.op_id, (id) => {
 }, { immediate: true })
 
 onMounted(async () => {
+  activarBusqueda({
+    placeholder: 'Buscar OP, artículo o encargado…',
+    onChange: (q) => {
+      qInput.value = q
+      clearTimeout(buscarTimer)
+      buscarTimer = setTimeout(() => cargar(), 300)
+    }
+  })
   await cargar()
   // Cargar lookups en paralelo (tareas vinculadas las muestra OpPanel)
   try {
@@ -203,6 +203,11 @@ onMounted(async () => {
     usuarios.value = u.usuarios || []
     categorias.value = c.categorias || []
   } catch {}
+})
+
+onUnmounted(() => {
+  clearTimeout(buscarTimer)
+  desactivarBusqueda()
 })
 </script>
 
