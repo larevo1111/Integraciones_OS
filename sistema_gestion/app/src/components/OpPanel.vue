@@ -105,10 +105,9 @@
                       <input
                         type="text" inputmode="decimal"
                         class="op-input-cell"
-                        :key="`real-${l.id}-${l.cantidad_real ?? 'null'}`"
-                        :value="valorInicial(l)"
+                        v-model="valores[l.id]"
                         :placeholder="fmtNum(l.cantidad_teorica)"
-                        @blur="e => guardarLinea(l, e.target.value)"
+                        @blur="guardarLinea(l)"
                       />
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.costo_unit) }}</td>
@@ -149,10 +148,9 @@
                       <input
                         type="text" inputmode="decimal"
                         class="op-input-cell"
-                        :key="`real-${l.id}-${l.cantidad_real ?? 'null'}`"
-                        :value="valorInicial(l)"
+                        v-model="valores[l.id]"
                         :placeholder="fmtNum(l.cantidad_teorica)"
-                        @blur="e => guardarLinea(l, e.target.value)"
+                        @blur="guardarLinea(l)"
                       />
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.precio_unit) }}</td>
@@ -432,6 +430,7 @@ const ficha       = ref(null)
 const cargando    = ref(false)
 const calidadPanelRef = ref(null)
 const obsLote     = ref('')
+const valores     = reactive({})  // id_linea -> string editable del input "Real"
 const tareaAbierta = ref(null)
 const procesando  = ref(false)
 const validando   = ref(false)
@@ -532,6 +531,11 @@ async function cargar() {
     const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/ficha`)
     ficha.value = r
     obsLote.value = r.detalle?.observaciones_lote || ''
+    // Inicializar inputs editables de cantidad_real
+    Object.keys(valores).forEach(k => delete valores[k])
+    for (const l of [...(r.materiales || []), ...(r.productos || [])]) {
+      valores[l.id] = l.cantidad_real == null ? '' : fmtNum(l.cantidad_real)
+    }
     if (!jobActivo.value) checarJobActivo()
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Error cargando OP: ' + (e.message || e), position: 'top' })
@@ -598,11 +602,8 @@ function segHHMMSS(seg) {
   return [h, m, s].map(n => String(n).padStart(2, '0')).join(':')
 }
 function slug(s) { return String(s || '').toLowerCase().replace(/\s+/g, '-') }
-function valorInicial(l) {
-  return l.cantidad_real == null ? '' : fmtNum(l.cantidad_real)
-}
-
-async function guardarLinea(l, raw) {
+async function guardarLinea(l) {
+  const raw = valores[l.id]
   const val = parseDecimal(raw)
   if (val === l.cantidad_real) return
   try {
@@ -610,6 +611,7 @@ async function guardarLinea(l, raw) {
       method: 'PUT', body: JSON.stringify({ cantidad_real: val })
     })
     l.cantidad_real = r.cantidad_real
+    valores[l.id] = r.cantidad_real == null ? '' : fmtNum(r.cantidad_real)
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Error guardando: ' + (e.message || e), position: 'top' })
   }
