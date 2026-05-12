@@ -1930,15 +1930,46 @@ function _ejecutarPlaywright(args, timeoutMs, cwd) {
   })
 }
 
+function _ejecutarPython(args, timeoutMs, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile('python3', args, { timeout: timeoutMs, cwd }, (err, stdout, stderr) => {
+      if (err) return reject(new Error((stderr || err.message).slice(-800)))
+      resolve(stdout || '')
+    })
+  })
+}
+
+// Intenta POST directo (rápido) y cae a Playwright si falla.
+// Cada operación: ~60-120x más rápida con POST. El fallback Playwright
+// preserva la robustez si Effi cambia el formato del HTML / endpoint.
+async function _postOrPlaywright(postArgs, playwrightArgs, timeoutMs, cwd, opName) {
+  try {
+    console.log(`[${opName}] intentando POST directo...`)
+    const t0 = Date.now()
+    const out = await _ejecutarPython(postArgs, timeoutMs, cwd)
+    console.log(`[${opName}] POST OK en ${((Date.now() - t0) / 1000).toFixed(2)}s`)
+    return out
+  } catch (e) {
+    console.warn(`[${opName}] POST falló (${e.message.slice(0, 200)}) — fallback Playwright`)
+    const t0 = Date.now()
+    const out = await _ejecutarPlaywright(playwrightArgs, timeoutMs, cwd)
+    console.log(`[${opName}] Playwright OK en ${((Date.now() - t0) / 1000).toFixed(2)}s`)
+    return out
+  }
+}
+
 async function _jobProcesar(jobId, idOp, empresa, usuario, encargadoReal = null) {
   try {
     await _jobMarcar(jobId, 'en_progreso')
     const nombre = usuario.nombre || usuario.email
     const observacion = `Procesado por ${nombre} (OS Gestión)`
     const scriptsDir = path.join(__dirname, '../../scripts')
-    const scriptPath = path.join(scriptsDir, 'cambiar_estado_orden_produccion.js')
 
-    await _ejecutarPlaywright([scriptPath, idOp, 'Procesada', observacion], 90000, scriptsDir)
+    await _postOrPlaywright(
+      [path.join(scriptsDir, 'cambiar_estado_orden_produccion_post.py'), idOp, 'Procesada', observacion],
+      [path.join(scriptsDir, 'cambiar_estado_orden_produccion.js'), idOp, 'Procesada', observacion],
+      90000, scriptsDir, `op/procesar ${idOp}`
+    )
 
     // Si el operador eligió un encargado real distinto al predefinido, guardarlo
     // en g_op_detalle. Solo informativo en Procesar; al Validar se usa para
@@ -2164,22 +2195,19 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
     const jsonPath = `/tmp/op_validacion_${idOpOriginal}_${Date.now()}.json`
     fs.writeFileSync(jsonPath, JSON.stringify(jsonOp, null, 2))
 
-    // 8. Ejecutar 3 scripts Playwright secuencialmente
+    // 8. Ejecutar 3 acciones con POST directo (rápido) y fallback Playwright.
+    // Tiempos típicos: POST ~1.5s total vs Playwright 2-3 min.
     const scripts = path.join(__dirname, '../../scripts')
-    function ejecutar(args, timeoutMs) {
-      return new Promise((resolve, reject) => {
-        execFile('node', args, { timeout: timeoutMs, cwd: scripts }, (err, stdout, stderr) => {
-          if (err) return reject(new Error((stderr || err.message).slice(-800)))
-          resolve(stdout || '')
-        })
-      })
-    }
 
     // ORDEN SEGURO (2026-04-29): crear nueva PRIMERO, validarla, y SOLO al final
     // anular la original. Si algo falla en los 2 primeros pasos, la original queda
     // intacta y se puede reintentar sin perder la OP.
     console.log(`[op/validar] ${idOpOriginal} — crear nueva con reales`)
-    const stdoutCrear = await ejecutar([path.join(scripts, 'import_orden_produccion.js'), jsonPath], 180000)
+    const stdoutCrear = await _postOrPlaywright(
+      [path.join(scripts, 'import_orden_produccion_post.py'), jsonPath],
+      [path.join(scripts, 'import_orden_produccion.js'), jsonPath],
+      180000, scripts, `op/validar crear (orig ${idOpOriginal})`
+    )
     const matchId = stdoutCrear.match(/OP_CREADA:(\d+)/)
     if (!matchId) throw new Error('No se pudo capturar el ID de la nueva OP. La original no se anuló — se puede reintentar.')
     const idOpNueva = matchId[1]
@@ -2187,7 +2215,11 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
 
     console.log(`[op/validar] ${idOpNueva} — cambiar a Validado`)
     try {
-      await ejecutar([path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion], 90000)
+      await _postOrPlaywright(
+        [path.join(scripts, 'cambiar_estado_orden_produccion_post.py'), idOpNueva, 'Validado', observacion],
+        [path.join(scripts, 'cambiar_estado_orden_produccion.js'), idOpNueva, 'Validado', observacion],
+        90000, scripts, `op/validar cambiar_estado ${idOpNueva}`
+      )
     } catch (e) {
       // Falló validar — la nueva queda creada en Generada. Original intacta.
       throw new Error(`Nueva OP ${idOpNueva} creada pero falló cambio a Validado: ${e.message}. La original ${idOpOriginal} NO se anuló (queda vigente).`)
@@ -2195,7 +2227,11 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
 
     console.log(`[op/validar] ${idOpOriginal} — anular original (último paso)`)
     try {
-      await ejecutar([path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion], 120000)
+      await _postOrPlaywright(
+        [path.join(scripts, 'anular_orden_produccion_post.py'), idOpOriginal, observacion],
+        [path.join(scripts, 'anular_orden_produccion.js'), idOpOriginal, observacion],
+        120000, scripts, `op/validar anular ${idOpOriginal}`
+      )
     } catch (e) {
       // Crítico pero no fatal: la nueva está validada, solo falta anular la original.
       // Reportar pero NO marcar el job como fallido — el usuario puede anular manualmente.
