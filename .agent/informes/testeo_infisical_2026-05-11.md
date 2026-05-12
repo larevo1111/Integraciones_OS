@@ -366,3 +366,53 @@ find /dev/shm -name '*ssh*' -o -name '*key*' → 0 archivos ✅
 
 **Conclusión Fase 7**: ✅ Sin leaks en logs (excepto issue pre-existente del bot), permisos corregidos a 600, sin keys en filesystem temporal, git limpio.
 
+
+---
+
+## ADDENDUM — hallazgo Effi credenciales (post-testing por feedback Santi)
+
+### Issue crítico encontrado fuera del scope inicial
+
+Durante el cierre del testing, Santi señaló que había credenciales de **Effi.com.co** (el ERP scraped por Playwright) en los scripts. Investigación reveló:
+
+**🔴 Leak CRÍTICO en repo PÚBLICO**: `scripts/session.js` líneas 6-7 tenían:
+```javascript
+const EFFI_USER = 'ORIGENSILVESTRE.COL@GMAIL.COM';
+const EFFI_PASS = 'LAREVO1111';
+```
+
+Aparecía también en `.agent/CATALOGO_SCRIPTS.md` y `.agent/PENDIENTES.md`.
+
+**Exposición**:
+- 3 archivos en HEAD del repo público Integraciones_OS
+- 2 commits en git history del mismo repo público
+- Valor literal del password expuesto en GitHub
+
+### Acciones tomadas
+
+| # | Acción | Estado |
+|---|---|---|
+| 1 | Subir `EFFI_URL`, `EFFI_USER`, `EFFI_PASS` a Infisical en `/effi/` | ✅ 3 secrets agregados |
+| 2 | Refactor `scripts/session.js`: leer de Infisical via `lib/infisical` con fallback a env vars | ✅ |
+| 3 | Reemplazar literales en `.agent/CATALOGO_SCRIPTS.md` por placeholder | ✅ |
+| 4 | Marcar item como resuelto en `.agent/PENDIENTES.md` | ✅ |
+| 5 | Sincronizar `/home/osserver/playwright/scripts/session.js` (fuera del repo) con la versión refactorizada usando path absoluto | ✅ |
+| 6 | Commit `de27942` + push a main | ✅ |
+
+### Auditoría final exhaustiva — repos públicos limpios
+
+| Repo | Visibilidad | Emails con creds | Tokens largos | Creds Effi | Estado |
+|---|---|---|---|---|---|
+| Integraciones_OS | PÚBLICO | 0 | 0 | 0 | ✅ HEAD limpio |
+| SOS_ERP_descartado | PÚBLICO | 0 | 0 | 0 | ✅ HEAD limpio |
+| configuracion-servidor-local-linux | PÚBLICO | 0 | 0 | 0 | ✅ HEAD limpio |
+
+### ⚠ PENDIENTE — Fase B urgente
+
+**El password viejo `LAREVO1111` sigue en git history del repo público hasta que:**
+1. Se rote en **effi.com.co** (login → cambiar contraseña)
+2. Se actualice el nuevo valor en Infisical `/effi/EFFI_PASS`
+3. Opcionalmente: `git filter-repo` para borrar history (destructivo, requiere force-push)
+
+**Hasta que se rote en effi.com.co, el password viejo SIGUE SIENDO VÁLIDO** — cualquiera que vea el git history puede loguearse en Effi como Origen Silvestre.
+
