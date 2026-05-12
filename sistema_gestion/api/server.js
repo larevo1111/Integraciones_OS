@@ -70,10 +70,9 @@ const PLAYWRIGHT_OK = (() => {
 })()
 console.log(`[server] Playwright + session Effi disponibles: ${PLAYWRIGHT_OK}`)
 
-if (!GOOGLE_CLIENT_ID || !JWT_SECRET) {
-  console.error('ERROR: Faltan GOOGLE_CLIENT_ID o JWT_SECRET en .env')
-  process.exit(1)
-}
+// El chequeo de GOOGLE_CLIENT_ID y JWT_SECRET se hace dentro de arrancar(),
+// DESPUÉS de cargarSecretsInfisical(). Antes estaba acá en top-level pero
+// crasheaba el proceso si las vars solo venían de Infisical (no del .env).
 
 // ─── CACHÉ DE NIVELES DE USUARIO ──────────────────────────────────
 // Se carga al iniciar y se refresca cada 5 minutos
@@ -2161,17 +2160,52 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
       [idOpNueva, req.usuario.email, idOpOriginal, req.empresa]
     )
 
-    // 10. Copiar g_op_lineas de la original a la nueva (datos congelados)
+    // 10. Copiar g_op_lineas de la original a la nueva (datos congelados).
+    // Si el operador no editó cantidad_real, asume implícitamente cantidad_teorica
+    // (lo que Effi muestra). Por eso COALESCE(real, teorica).
     await db.gestion.query(
       `INSERT INTO g_op_lineas
         (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
          cantidad_teorica, cantidad_real, costo_unit, precio_unit,
          es_no_previsto, usuario_ult_modificacion)
        SELECT ?, empresa, tipo, cod_articulo, descripcion, unidad,
-              cantidad_real AS cantidad_teorica,  -- al validar, real pasa a ser teórico de la nueva OP
-              cantidad_real, costo_unit, precio_unit,
+              COALESCE(cantidad_real, cantidad_teorica) AS cantidad_teorica,
+              COALESCE(cantidad_real, cantidad_teorica) AS cantidad_real,
+              costo_unit, precio_unit,
               es_no_previsto, usuario_ult_modificacion
        FROM g_op_lineas WHERE empresa = ? AND id_op = ?`,
+      [idOpNueva, req.empresa, idOpOriginal]
+    )
+
+    // 10b. Copiar puntos críticos de proceso (g_op_pc_proceso)
+    await db.gestion.query(
+      `INSERT INTO g_op_pc_proceso
+        (id_op, empresa, pc_receta_id, parametro, tipo, unidad,
+         rango_min, rango_max, valor_numerico, valor_booleano, valor_texto,
+         dentro_rango, observacion, registrado_por, registrado_en,
+         actualizada_por, actualizada_en)
+       SELECT ?, empresa, pc_receta_id, parametro, tipo, unidad,
+              rango_min, rango_max, valor_numerico, valor_booleano, valor_texto,
+              dentro_rango, observacion, registrado_por, registrado_en,
+              actualizada_por, actualizada_en
+       FROM g_op_pc_proceso WHERE empresa = ? AND id_op = ?`,
+      [idOpNueva, req.empresa, idOpOriginal]
+    )
+
+    // 10c. Copiar inspección de calidad (g_op_inspeccion_calidad)
+    await db.gestion.query(
+      `INSERT INTO g_op_inspeccion_calidad
+        (id_op, empresa, tamano_lote_unidades, tamano_muestra,
+         visual_normal, tapado_sellado, etiqueta_normal, sabor_olor_normal,
+         defectos_criticos, defectos_mayores, defectos_menores,
+         resultado, observacion, firmada, firmada_por, firmada_en,
+         actualizada_por, actualizada_en, inspector_email, inspeccionado_en)
+       SELECT ?, empresa, tamano_lote_unidades, tamano_muestra,
+              visual_normal, tapado_sellado, etiqueta_normal, sabor_olor_normal,
+              defectos_criticos, defectos_mayores, defectos_menores,
+              resultado, observacion, firmada, firmada_por, firmada_en,
+              actualizada_por, actualizada_en, inspector_email, inspeccionado_en
+       FROM g_op_inspeccion_calidad WHERE empresa = ? AND id_op = ?`,
       [idOpNueva, req.empresa, idOpOriginal]
     )
 

@@ -105,8 +105,10 @@
                       <input
                         type="text" inputmode="decimal"
                         class="op-input-cell"
+                        :class="{ 'op-input-cell--locked': lineasBloqueadas }"
                         v-model="valores[l.id]"
                         :placeholder="fmtNum(l.cantidad_teorica)"
+                        :readonly="lineasBloqueadas"
                         @beforeinput="filtrarDecimal"
                         @blur="guardarLinea(l)"
                       />
@@ -149,8 +151,10 @@
                       <input
                         type="text" inputmode="decimal"
                         class="op-input-cell"
+                        :class="{ 'op-input-cell--locked': lineasBloqueadas }"
                         v-model="valores[l.id]"
                         :placeholder="fmtNum(l.cantidad_teorica)"
+                        :readonly="lineasBloqueadas"
                         @beforeinput="filtrarDecimal"
                         @blur="guardarLinea(l)"
                       />
@@ -458,6 +462,7 @@ const puedeProcesar = computed(() => miNivel.value >= 3 && !estaAnulada.value)
 const puedeValidar  = computed(() => miNivel.value >= 5 && !estaAnulada.value)
 const puedeAgregar = computed(() => estado.value === 'Generada' && miNivel.value >= 3 && !estaAnulada.value)
 const puedeEditarTiempos = computed(() => miNivel.value >= 5)
+const lineasBloqueadas = computed(() => estado.value === 'Validado' || estaAnulada.value)
 
 // Edición tiempos consolidados (nivel >= 5)
 const editandoTiempos = ref(false)
@@ -613,6 +618,7 @@ function filtrarDecimal(e) {
 }
 
 async function guardarLinea(l) {
+  if (lineasBloqueadas.value) return
   const raw = valores[l.id]
   const val = parseDecimal(raw)
   if (val === l.cantidad_real) return
@@ -885,6 +891,12 @@ onUnmounted(() => _limpiarJob())
 }
 .op-input-cell:hover { background: var(--bg-card); }
 .op-input-cell:focus { outline: 1.5px solid var(--accent); outline-offset: -1.5px; background: var(--bg-card); }
+.op-input-cell--locked,
+.op-input-cell--locked:hover,
+.op-input-cell--locked:focus {
+  background: transparent; cursor: not-allowed; outline: none;
+  color: var(--text-secondary);
+}
 
 .tiempo-edit-row {
   display: inline-flex; align-items: center; gap: 4px;
