@@ -229,9 +229,13 @@
                   <tbody>
                     <tr v-for="(t, idx) in tiemposEdit" :key="'edit-'+idx">
                       <td>
-                        <select v-model.number="t.categoria_produccion_id" class="op-input-num" style="width:auto">
-                          <option v-for="c in categoriasProduccion" :key="c.id" :value="c.id">{{ c.nombre }}</option>
-                        </select>
+                        <q-select
+                          v-model="t.categoria_produccion_id"
+                          :options="categoriasProduccion.map(c => ({ value: c.id, label: c.nombre }))"
+                          emit-value map-options
+                          dense borderless
+                          class="op-cat-sel"
+                        />
                       </td>
                       <td class="t-right">
                         <span class="tiempo-edit-row">
