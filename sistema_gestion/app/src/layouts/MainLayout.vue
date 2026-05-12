@@ -620,7 +620,7 @@ import JornadaHeader from 'src/components/JornadaHeader.vue'
 import SidebarSubSeccion from 'src/components/SidebarSubSeccion.vue'
 import { usePageSearch, emitirBusqueda, desactivarBusqueda } from 'src/composables/usePageSearch'
 
-const APP_VERSION = 'v2.11.17'
+const APP_VERSION = 'v2.11.18'
 const $q = useQuasar()
 
 // ─── Layout state ───
@@ -1241,11 +1241,13 @@ const eqEtiquetasCount  = computed(() => etiquetasGlobal.value.filter(e => e.tar
 /* ─── Main page ─── */
 .main-page {
   display: flex; flex-direction: column;
-  min-height: 100%;
+  height: 100dvh;
+  height: 100vh;  /* fallback navegadores viejos */
   padding: 0 !important;
 }
 .page-body {
   flex: 1;
+  min-height: 0;  /* clave para que el flex child scrollee */
   overflow-y: auto;
   overflow-x: hidden;
 }

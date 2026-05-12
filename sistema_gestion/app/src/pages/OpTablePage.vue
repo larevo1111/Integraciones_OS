@@ -212,7 +212,23 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.ops-page { padding: 0; }
+.ops-page {
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.ops-page :deep(.os-table-wrapper) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ops-page :deep(.table-scroll) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
 .ops-page :deep(.os-table th:nth-child(4)) { min-width: 280px; }
 .cel-articulos {
   display: -webkit-box;
