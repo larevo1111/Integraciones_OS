@@ -44,18 +44,35 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 
 ## 🔴 Pendientes activos
 
-### [P1] Credenciales Effi hardcodeadas en código fuente
+### [P1] FASE B Seguridad: rotar credenciales expuestas en GitHub público
 **Categoría**: seguridad
-**Detectado**: 2026-04-29 por Claude (al regenerar sesión Effi caída)
-**Contexto**: `scripts/session.js` líneas 6-7 tienen `EFFI_USER` y `EFFI_PASS` (antes hardcoded — migrado a Infisical /effi/ el 2026-05-11) en el código, versionado en git. Cualquiera con acceso al repo puede loguearse en Effi como Origen Silvestre.
-**Riesgo si no se hace**: credenciales filtradas si el repo se vuelve público o se comparte por error; rotar el password en Effi exige nuevo commit + push.
+**Detectado**: 2026-05-10 (auditoría) — confirmado 2026-05-11 con migración a Infisical
+**Contexto**: Fase A (centralización en Infisical) completa, todos los servicios leen secrets de Infisical. PERO las credenciales históricas siguen en git history de repos PÚBLICOS y siguen siendo válidas en sus sistemas origen. Hay que rotarlas en cada sistema target y actualizar en Infisical UI.
+**Riesgo si no se hace**: cualquiera que vea git history del repo público puede usar las credenciales.
+**Acción propuesta** — de a una por día, en orden:
+1. **Pass Effi.com.co** (más urgente, valor `LAREVO1111` en commits c0... y 55ef7...): login a effi.com.co → cambiar pass → actualizar Infisical `/effi/EFFI_PASS`
+2. **Token Telegram bot**: `@BotFather` → `/revoke` → `/newtoken` → actualizar Infisical `/ia-service/TELEGRAM_BOT_TOKEN`
+3. **Pass humana "A"** (`Pepe2467.` en doc del incidente): script automático: `ALTER USER 'osadmin'@'localhost' IDENTIFIED BY 'NUEVA'` en local + VPS + `passwd osserver` local + VPS + update Infisical
+4. **API keys IA**: en cada console (Anthropic, Google, Groq, DeepSeek, Cerebras) — revoke + generate → actualizar Infisical `/ia-service/IA_AGENT_KEY_*`
+5. **JWT secrets** (los 4: ia-admin, gestion, produccion, inventario): generar random → actualizar Infisical → restart servicios (invalida sesiones activas — horario tranquilo)
+6. **WooCommerce keys** (si sitio activo)
+**Archivos involucrados**: solo Infisical UI + sistemas target (no toca código del repo — los helpers ya leen de Infisical)
+**Estimado**: M (~40 min total, distribuido en sesiones cortas)
+
+### [P2] FASE B Seguridad: crear 8 Machine Identities scope-mínimo en UI
+**Categoría**: seguridad / defensa en profundidad
+**Detectado**: 2026-05-11 (durante migración — deuda asumida conscientemente)
+**Contexto**: Hoy TODOS los servicios usan la misma Machine Identity `admin-bootstrap` con admin sobre el project. Funciona pero viola "scope mínimo". Razón: API de Infisical no permite crear project-managed identities sin permisos org-level, y `admin-bootstrap` solo tiene scope project.
+**Riesgo si no se hace**: si un servicio se compromete, atacante obtiene admin sobre TODO os-infra (lectura + escritura). Con identities scope-mínimo, atacante solo lee los paths del servicio comprometido.
 **Acción propuesta**:
-- Mover `EFFI_USER` y `EFFI_PASS` a `integracion_conexionesbd.env` (ya gitignored)
-- Leer con `process.env.EFFI_USER` / `process.env.EFFI_PASS` en `session.js` (cargar dotenv si no está)
-- Actualizar `integracion_conexionesbd.env.example` con los keys
-- Documentar en MANIFESTO §8B
-**Archivos involucrados**: `scripts/session.js`, `integracion_conexionesbd.env(.example)`
-**Estimado**: S (15 min)
+- Santi crea 8 identities en UI Infisical (5 min c/u, ~40 min total)
+- Por cada: name + role custom (Read sobre paths específicos)
+- Generar Client ID + Client Secret
+- Actualizar el `.env` de cada servicio con sus propias credenciales Infisical
+- Restart servicios
+- Revocar (no eliminar) `admin-bootstrap` para uso runtime; mantenerla solo para admin Claude/Santi
+**Archivos involucrados**: Infisical UI + `.env` de cada servicio (8 archivos)
+**Estimado**: M (~60 min con validación)
 
 ### [P2] `session.js` usa path absoluto `/scripts/session.json`
 **Categoría**: estandarización (viola CLAUDE.md "paths relativos")
@@ -171,3 +188,26 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 
 ## ✅ Resueltos
 *(Items movidos aquí al cerrarse, con fecha y commit)*
+
+### ✅ [P1] Credenciales Effi hardcodeadas en código fuente — RESUELTO 2026-05-11
+- Migrado a Infisical `/effi/` (EFFI_USER, EFFI_PASS, EFFI_URL)
+- `scripts/session.js` refactorizado: lee de Infisical via `lib/infisical.getMany('/effi')` con fallback a env vars
+- `/home/osserver/playwright/scripts/session.js` sincronizado (path absoluto al helper)
+- Test E2E: login real a effi.com.co en 3.4s con creds de Infisical ✓
+- Commit: `de27942`
+- **NOTA**: el valor viejo de la pass sigue en git history del repo público hasta que se rote en effi.com.co (queda como item P1 nuevo: rotación FASE B)
+
+### ✅ MIGRACIÓN COMPLETA A INFISICAL — Fase A — 2026-05-11
+- Tailscale instalado en VPS Contabo (`vps-contabo`)
+- Infisical self-hosted activo (only tailnet, HTTPS via tailscale serve)
+- 185 secrets en 19 folders importados
+- `lib/infisical.{js,py}` + `lib/db_conn.{js,py}` modificado con bootstrap
+- 8 servicios refactorizados y validados (gestion + inventario + produccion + ERP frontend + ia-service + telegram bot + wa-bridge + effi-webhook)
+- Testing riguroso 7 fases, todos los tests pasados
+- Reporte: `.agent/informes/testeo_infisical_2026-05-11.md`
+- Plan: `.agent/contextos/seguridad.md` + `.agent/planes/completados/testeo_infisical_2026-05-11.md`
+- Commits: `45d3390` (refactor base), `c48d369` (ia-service), `b6c82b3` (test report), `de27942` (Effi fix), `b321298` (test addendum)
+- Bugs encontrados y corregidos durante testing:
+  - sistema_gestion: chequeo top-level antes de cargarSecretsInfisical → FIXED
+  - inventario: JWT_SECRET hardcoded → FIXED
+  - 4 archivos .env con permisos 644/664 → FIXED a 600

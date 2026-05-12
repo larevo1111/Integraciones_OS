@@ -816,3 +816,123 @@ api_key = get('GMAIL_APP_PASSWORD', '/ia-service')
 | Hostinger panel | https://hpanel.hostinger.com |
 | BotFather Telegram | https://t.me/BotFather |
 | GitHub repos | https://github.com/larevo1111 |
+
+---
+
+## 15. Sub-fase A.1 — Migración Effi credenciales (2026-05-11 post-testing)
+
+### Hallazgo
+Durante el testing de Fase A, Santi señaló que las credenciales de **Effi.com.co** (login al ERP para Playwright scraping) estaban hardcoded en `scripts/session.js`. Investigación reveló:
+
+- **3 archivos en HEAD repo PÚBLICO** + 2 commits en history del mismo repo público
+- Valor `EFFI_PASS = 'LAREVO1111'` expuesto en GitHub
+- Mismas creds duplicadas en `/home/osserver/playwright/scripts/session.js` (fuera del repo)
+
+### Acciones tomadas (completas)
+
+| # | Acción | Estado |
+|---|---|---|
+| 1 | Subir `EFFI_URL`, `EFFI_USER`, `EFFI_PASS` a Infisical `/effi/` | ✅ |
+| 2 | Refactor `scripts/session.js` → lee de Infisical via `lib/infisical.getMany('/effi')` con fallback a `process.env.EFFI_*` | ✅ |
+| 3 | Reemplazar literales en `.agent/CATALOGO_SCRIPTS.md` por placeholder `<EFFI_USER en Infisical /effi/>` | ✅ |
+| 4 | Marcar item resuelto en `.agent/PENDIENTES.md` | ✅ |
+| 5 | Sincronizar `/home/osserver/playwright/scripts/session.js` con versión refactorizada usando `require('/home/osserver/.../lib/infisical')` (path absoluto porque está fuera del repo) | ✅ |
+| 6 | Commits: `de27942` (fix) + `b321298` (addendum reporte) | ✅ |
+
+### Test funcional ejecutado (post-fix)
+
+**Procedimiento**:
+1. Eliminar `scripts/session.json` (forzar login real, no cookie reutilizada)
+2. Limpiar `process.env.EFFI_USER/EFFI_PASS` (forzar lectura desde Infisical)
+3. Ejecutar `getPage()` del módulo refactorizado
+
+**Resultado**: ✅
+- Creds leídas de Infisical `/effi/`
+- Login real a effi.com.co en 3.4 segundos
+- URL post-login: `https://effi.com.co/app/calendario` (logueado)
+- Cookie de effi.com.co guardada en session.json (1 cookie, 961 bytes)
+
+### Resumen actualizado del flujo Playwright
+
+```
+Script Playwright (export_*.js)
+        ↓ require
+scripts/session.js (refactorizado 2026-05-11)
+        ↓ await _cargarCredsInfisical()
+lib/infisical.getMany('/effi')
+        ↓ HTTPS via tailnet
+Infisical (VPS) → EFFI_URL, EFFI_USER, EFFI_PASS
+        ↓ page.fill('#email', EFFI_USER) / page.fill('#password', EFFI_PASS)
+effi.com.co/ingreso → login OK
+        ↓ context.storageState({ path: 'session.json' })
+session.json (cookies para reuso, válido ~varios días)
+```
+
+### Pendiente Fase B (cuando Santi decida)
+- ROTAR pass en effi.com.co (login → cambiar contraseña)
+- Update Infisical `/effi/EFFI_PASS` con valor nuevo
+- El password viejo sigue en git history del repo público — válido hasta que se rote en Effi mismo
+- Opcionalmente: `git filter-repo` para borrar history (destructivo, requiere force-push)
+
+---
+
+## 16. ESTADO FINAL POST-TESTING (2026-05-11)
+
+### Lo que TODO está hecho
+
+- ✅ Fase 1 — Tailscale en VPS (`vps-contabo` en tailnet)
+- ✅ Fase 2 — Infisical activo (https://vps-contabo.tail44c420.ts.net, solo tailnet)
+- ✅ Fase A — 8 servicios refactorizados + 185 secrets en Infisical
+- ✅ Sub-fase A.1 — Credenciales Effi migradas + Playwright funcional
+- ✅ Testing riguroso 7 fases (reporte: `.agent/informes/testeo_infisical_2026-05-11.md`)
+- ✅ 1 bug critical fixed en sistema_gestion (chequeo top-level)
+- ✅ Permisos 600 aplicados a `.env`/.agent/.servers.env/.licencias.env
+
+### Lo que está pendiente Fase B (cuando Santi quiera)
+
+- ⏳ Crear 8 Machine Identities scope-mínimo en UI (5 min × 8 = 40 min total)
+- ⏳ Rotar credenciales expuestas en GitHub:
+  - Pass Effi (`effi.com.co` → cambiar pass)
+  - Token bot Telegram (`@BotFather` → revoke + newtoken)
+  - Pass humana "A" (osadmin@MariaDB + sudo OS — script auto)
+  - API keys IA (Anthropic, Google, Groq, DeepSeek, Cerebras — manual UI c/u)
+  - JWT secrets (los 4: ia-admin, gestion, produccion, inventario)
+  - WooCommerce keys (si sitio activo)
+- ⏳ Cleanup post-validación: borrar `/home/osserver/tempoclv/`, simplificar `.env`
+- ⏳ 5 issues paralelos pre-existentes detectados (bot httpx logging, verificar_jwt inventario, sync_*.py SSH key, etc.)
+
+### Cómo invocar Infisical desde código
+
+**Python**:
+```python
+sys.path.insert(0, 'scripts')  # si no estás en scripts/
+from lib.infisical import get, get_many, get_ssh_key_object
+val = get('DB_LOCAL_PASS', '/shared')
+key = get_ssh_key_object('VPS')  # objeto paramiko en memoria pura
+```
+
+**Node**:
+```js
+const secrets = require('../../lib/infisical')  // ajustar path relativo
+const val = await secrets.get('DB_LOCAL_PASS', '/shared')
+const all = await secrets.getMany('/shared')
+const keyStr = await secrets.getSSHKey('VPS')
+```
+
+**Bootstrap automático**: cualquier servicio que importe `lib/db_conn` (Node) o `from lib import ...` (Python) carga automáticamente `/shared/*` a `process.env`/`os.environ`. Solo hay que importar uno de los 2 helpers — el resto es transparente.
+
+### Cómo agregar Infisical a un nuevo servicio
+
+1. Crear los secrets en Infisical UI (ej: en folder `/nuevo-servicio/`)
+2. En código del servicio:
+   ```js
+   const secrets = require('.../lib/infisical')
+   const apiKey = await secrets.get('API_KEY', '/nuevo-servicio')
+   ```
+3. Agregar al `.env` (o systemd Environment del servicio):
+   ```
+   INFISICAL_CLIENT_ID=5605ebaf-950c-421b-8dc8-b37b67bc27bf
+   INFISICAL_CLIENT_SECRET=<en /home/osserver/tempoclv/.infisical_admin_bootstrap.env>
+   ```
+   *(O dejarlo sin esas vars — el helper detecta el bootstrap file automáticamente)*
+4. Restart del servicio

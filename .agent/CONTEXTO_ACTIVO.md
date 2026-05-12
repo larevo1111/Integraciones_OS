@@ -1,5 +1,86 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-08
+**Actualizado**: 2026-05-11
+
+## 🔐 Completado 2026-05-11 — MIGRACIÓN COMPLETA A INFISICAL (Fase A + Sub-fase A.1 + Testing)
+
+**Resumen ejecutivo**: todas las credenciales del ecosistema OS (185 secrets) están centralizadas en Infisical self-hosted. 8 servicios + Playwright scraping refactorizados para leer de Infisical. Tailscale + Infisical activos. Testing riguroso 7 fases aprobado.
+
+### Infraestructura activa
+- **Tailscale tailnet** `larevo1111@` — 5 nodes: osserver-ms (casa), lenovo, celular, tablet, **vps-contabo (NUEVO)**
+- **Infisical self-hosted** en VPS Contabo (https://vps-contabo.tail44c420.ts.net, solo tailnet, HTTPS via tailscale serve)
+- **Backup horario** del Postgres de Infisical: local VPS `/var/backups/infisical/` + rsync via tailnet a `/home/osserver/backups/infisical/`
+
+### Estructura Infisical (project `os-infra`)
+185 secrets en 19 folders:
+- `/shared/` (83 — DB local + VPS x4 + Hostinger)
+- `/ia-service/` (19 — API keys IA + Telegram + Gmail + Tavily)
+- `/effi/` (6 — credenciales scraping Effi.com.co)
+- `/backends-erp/` (4+1 — JWT secrets)
+- `/admin-local/`, `/admin-vps/`, `/tunnels/`, `/ssh-keys-privadas/`, otros (total 19 folders)
+
+### Servicios migrados (todos active + verificados)
+| Servicio | Servidor | Estado |
+|---|---|---|
+| ia-service :5100 | local | ✅ |
+| os-telegram-bot | local | ✅ (issue pre-existente httpx logging) |
+| os-gestion :9300 | local | ✅ |
+| os-inventario-api :9401 | local | ✅ |
+| os-produccion-api :9600 | local | ✅ |
+| wa-bridge :3100 | local | ✅ |
+| effi-webhook :5050 | local | ✅ |
+| os-erp-frontend :9100 | **VPS** | ✅ (HTTPS público OK) |
+| Playwright scripts | local | ✅ (login a Effi vía Infisical) |
+
+### Helpers nuevos (lib/)
+- **`lib/infisical.js`** + **`scripts/lib/infisical.py`**: clientes Infisical con cache memoria 5min, login Universal Auth, SSH key loader (memoria pura — Python: objeto paramiko, Node: Buffer)
+- **`lib/db_conn.{js,py}`** modificados: bootstrap automático de `/shared` a process.env al import + SSH key vía Infisical en memoria
+
+### Cómo usar (para futuras sesiones de Claude)
+```python
+# Python — bootstrap automático via db_conn
+from lib import local, integracion  # ya tiene secrets cargados via Infisical
+# Para secrets específicos:
+from lib.infisical import get
+api_key = get('ANTHROPIC_API_KEY', '/ia-service')
+```
+```js
+// Node — idem
+const db = require('./lib/db_conn')
+const pool = await db.local('ia_service_os')
+// Para secrets específicos:
+const secrets = require('./lib/infisical')
+const tok = await secrets.get('TELEGRAM_BOT_TOKEN', '/ia-service')
+```
+
+### Doc completo
+- **Plan + arquitectura + decisiones**: `.agent/contextos/seguridad.md` (938 líneas) — leer al inicio de cualquier sesión que toque seguridad
+- **Reporte de testing**: `.agent/informes/testeo_infisical_2026-05-11.md` (418 líneas) — 7 fases, ✅ APROBADO
+- **Plan de testing**: `.agent/planes/completados/testeo_infisical_2026-05-11.md`
+
+### Pendiente Fase B (cuando Santi decida)
+1. **Rotar credenciales expuestas en GitHub** (pass Effi, token bot Telegram, pass humana "A", API keys IA, JWT secrets)
+2. **Crear 8 Machine Identities scope-mínimo** en Infisical UI (deuda técnica)
+3. **Cleanup**: borrar `/home/osserver/tempoclv/`, simplificar `.env`s
+4. **Fase 4 opcional**: gitleaks pre-commit hook + git history scrubbing
+
+### Bugs detectados y corregidos durante el testing
+1. **`sistema_gestion/api/server.js`**: chequeo `GOOGLE_CLIENT_ID/JWT_SECRET` se ejecutaba antes de `cargarSecretsInfisical()` → process.exit(1). **FIXED**: movido el chequeo dentro de `arrancar()`.
+2. **`scripts/inventario/api.py:22`**: JWT_SECRET hardcoded en código fuente. **FIXED**: leer de Infisical con fallback.
+3. **`scripts/session.js`** (Playwright login Effi): EFFI_USER + EFFI_PASS hardcoded **en repo público**. **FIXED**: leer de Infisical.
+4. **Permisos amplios** (644/664) en 4 archivos `.env`. **FIXED**: chmod 600.
+
+### Issues paralelos pre-existentes documentados (NO de Infisical)
+- Bot Telegram: httpx loguea token en URL de cada poll (fix: silenciar logger httpx)
+- `verificar_jwt()` definida en inventario pero NUNCA aplicada a endpoints
+- Bot tiene `Conflict` polls intermitentes (otro proceso polling con mismo token?)
+- 3 scripts `sync_*.py` leen SSH key del filesystem (no memoria pura)
+
+### Commits clave de esta sesión
+- `b6c82b3` Testeo riguroso Fase A completo (reporte 368 lineas)
+- `de27942` Fix CRITICAL: credenciales Effi a Infisical
+- `b321298` Addendum testeo con caso Effi
+
+---
 
 ## Completado 2026-05-08 (sesión tarde) — Refactor Calidad → Puntos Críticos + Calidad separados (v2.11.0)
 
