@@ -2248,6 +2248,27 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
         [idOpNueva, op.sucursal, op.bodega, op.id_encargado, op.nombre_encargado,
          op.fecha_inicial, op.fecha_final, observacion]
       )
+      // Insertar artículos producidos en staging para que la tabla de OPs
+      // (que arma columna "Artículos" desde zeffi_articulos_producidos) muestre
+      // los productos al instante, sin esperar el próximo sync Effi.
+      const [prodLineas] = await db.gestion.query(
+        `SELECT cod_articulo, descripcion, cantidad_real
+           FROM g_op_lineas
+          WHERE id_op = ? AND empresa = ? AND tipo = 'producto'`,
+        [idOpNueva, req.empresa]
+      )
+      for (const p of prodLineas) {
+        await db.integracion.query(
+          `INSERT IGNORE INTO zeffi_articulos_producidos
+             (sucursal, bodega, id_orden, nombre_encargado, id_encargado,
+              cod_articulo, descripcion_articulo_producido, cantidad,
+              vigencia, fecha_creacion)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Orden vigente', NOW())`,
+          [op.sucursal, op.bodega, idOpNueva, op.nombre_encargado, op.id_encargado,
+           String(p.cod_articulo), p.descripcion,
+           p.cantidad_real == null ? null : String(p.cantidad_real).replace('.', ',')]
+        )
+      }
     } catch (e) { console.warn('[op/validar] staging no actualizable:', e.message) }
 
     try { fs.unlinkSync(jsonPath) } catch (_) {}
