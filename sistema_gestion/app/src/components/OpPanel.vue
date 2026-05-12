@@ -76,7 +76,6 @@
                     :options="encargadosOptions"
                     emit-value map-options
                     dense borderless
-                    :dark="temaDark"
                     class="op-encargado-sel"
                     :loading="!encargadosLista.length"
                   />
@@ -524,8 +523,6 @@ const puedeEditarTiempos = computed(() => miNivel.value >= 5)
 const lineasBloqueadas = computed(() => estado.value === 'Validado' || estaAnulada.value)
 // Encargado real editable en Generada o Procesada (mismos criterios que materiales reales)
 const puedeEditarEncargado = computed(() => !lineasBloqueadas.value)
-// La app usa data-theme custom (no $q.dark), así que pasamos :dark explícito a Quasar
-const temaDark = computed(() => auth.tema === 'dark')
 const encargadosOptions = computed(() =>
   encargadosLista.value.map(e => ({ value: e.cc, label: e.nombre }))
 )

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { Dark } from 'quasar'
 
 const KEY_JWT     = 'gestion_jwt'
 const KEY_USUARIO = 'gestion_usuario'
@@ -89,6 +90,10 @@ export const useAuthStore = defineStore('auth', {
 
     _aplicarTema(tema) {
       document.documentElement.setAttribute('data-theme', tema)
+      // Sincronizar con Quasar Dark plugin para que TODOS los componentes
+      // Quasar (q-select dropdowns, q-input, q-card, q-dialog, etc) tomen
+      // el tema correcto sin necesidad de pasar :dark prop a cada uno.
+      Dark.set(tema === 'dark')
     },
 
     inicializarTema() {
