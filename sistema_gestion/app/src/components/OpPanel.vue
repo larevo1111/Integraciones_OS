@@ -75,7 +75,7 @@
                     v-model="encargadoRealCC"
                     :options="encargadosOptions"
                     emit-value map-options
-                    dense borderless dark
+                    dense borderless
                     class="op-encargado-sel"
                     :loading="!encargadosLista.length"
                   />
