@@ -19,20 +19,31 @@ DB_INV  = cfg_inventario(dict_cursor=False)
 
 
 def detectar_unidad(nombre):
-    """Detecta la unidad de medida del nombre del artículo."""
-    n = nombre.upper()
+    """Detecta la unidad de medida del nombre del artículo.
 
-    if re.search(r'\bX\s*KG\b|\bKG\b|\bX\s*KILO\b|\bKILO\b|\bKL\b', n):
+    Regla:
+    - "X KG/KILO/LT" sin número antes → unidad de medida (KG/LT) — granel
+    - "<número> GR/GRS/G/KG/KGS/ML/CC" → UND (presentación de N peso por unidad)
+    - Default → UND
+    """
+    n = (nombre or '').upper()
+    # 1. "X KG/KILO" explícito → granel
+    if re.search(r'\bX\s*KG\b|\bX\s*KILO\b|\bX\s*KL\b', n):
         return 'KG', 1000
-    if re.search(r'\bGRS?\b|\bGRAMOS?\b|\b\d+\s*GRS?\b|\b\d+\s*G\b', n):
-        return 'GRS', None
-    if re.search(r'\bLT\b|\bLITRO\b|\bLTS\b|\bX\s*LT\b', n):
+    if re.search(r'\bX\s*LT\b|\bX\s*LITRO\b', n):
+        return 'LT', 1000
+    # 2. Número + peso/volumen → presentación = UND
+    if re.search(r'\b\d+\s*(GRS?|GRAMOS?|G|KGS?|KILOS?|ML|CC|LTS?|LITROS?)\b', n):
+        return 'UND', None
+    # 3. Unidad de medida sin número
+    if re.search(r'\bKG\b|\bKILO\b|\bKL\b|\bKGS\b', n):
+        return 'KG', 1000
+    if re.search(r'\bLT\b(?!\s*X)|\bLITROS?\b|\bLTS\b', n):
         return 'LT', 1000
     if re.search(r'\bML\b|\bMILILITROS?\b', n):
         return 'ML', None
-    if re.search(r'\bUNIDAD\b|\bUND\b|\bX\s*UND\b', n):
-        return 'UND', None
-
+    if re.search(r'\bGRS?\b|\bGRAMOS?\b', n):
+        return 'GRS', None
     return 'UND', None
 
 

@@ -60,15 +60,23 @@ CREATE TABLE IF NOT EXISTS `{TABLA}` (
 # ─── Detección de unidad (misma lógica que calcular_rangos.py) ─────────────────
 
 def detectar_unidad(nombre):
+    """Regla: "<número> GR/GRS/G/KG..." → UND (presentación N peso por unidad).
+       "X KG/KILO/LT" → granel (KG/LT). Default UND."""
     n = (nombre or '').upper()
-    if re.search(r'\bX\s*KG\b|\bKG\b|\bX\s*KILO\b|\bKILO\b|\bKL\b', n):
+    if re.search(r'\bX\s*KG\b|\bX\s*KILO\b|\bX\s*KL\b', n):
         return 'KG'
-    if re.search(r'\bGRS?\b|\bGRAMOS?\b|\b\d+\s*GRS?\b|\b\d+\s*G\b', n):
-        return 'GRS'
-    if re.search(r'\bLT\b|\bLITRO\b|\bLTS\b|\bX\s*LT\b', n):
+    if re.search(r'\bX\s*LT\b|\bX\s*LITRO\b', n):
+        return 'LT'
+    if re.search(r'\b\d+\s*(GRS?|GRAMOS?|G|KGS?|KILOS?|ML|CC|LTS?|LITROS?)\b', n):
+        return 'UND'
+    if re.search(r'\bKG\b|\bKILO\b|\bKL\b|\bKGS\b', n):
+        return 'KG'
+    if re.search(r'\bLT\b(?!\s*X)|\bLITROS?\b|\bLTS\b', n):
         return 'LT'
     if re.search(r'\bML\b|\bMILILITROS?\b', n):
         return 'ML'
+    if re.search(r'\bGRS?\b|\bGRAMOS?\b', n):
+        return 'GRS'
     return 'UND'
 
 
