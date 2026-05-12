@@ -1024,11 +1024,11 @@ curl https://inv.oscomunidad.com               # → 200
 
 ⚠ Estos puntos siguen siendo riesgo. Decisión de Santi de no rotar todavía.
 
-1. **Pass `Pepe2467.`** sigue activa en:
+1. **Pass `[REDACTED-PASS-LINUX]`** sigue activa en:
    - VPS: `root`, `osserver`, MariaDB `osadmin`, code-server VPS
    - osserver-ms (local): user `osserver`, MariaDB `osadmin`, code-server local, MinIO, Grafana, etc.
 
-2. **`Pepe2467.` está VERSIONADA en repo público GitHub** en:
+2. **`[REDACTED-PASS-LINUX]` está VERSIONADA en repo público GitHub** en:
    - `.agent/docs/INCIDENTE_SEGURIDAD_2026-04-20.md`
    - `.agent/PENDIENTES.md`
    - `.agent/planes/completados/testeo_infisical_2026-05-11.md`
@@ -1043,9 +1043,121 @@ curl https://inv.oscomunidad.com               # → 200
 1. Generar 3 passwords fuertes únicas: `root@VPS`, `osserver@VPS`, `osserver@osserver-ms`
 2. Aplicar `passwd <user>` en cada server (puede hacerlo Claude o Santi)
 3. Update en Infisical: `/admin-vps/VPS_LOGIN_PASS`, `/admin-vps/VPS_PANEL_PASS` (no, esa es de Contabo), `/admin-local/LOCAL_LOGIN_PASS`, `/shared/MARIADB_PASS` (si aplica a osadmin@VPS y @local)
-4. Editar repo: remover `Pepe2467.` literal de los 3 archivos → reemplazar por `[REDACTED — ver Infisical]`
+4. Editar repo: remover `[REDACTED-PASS-LINUX]` literal de los 3 archivos → reemplazar por `[REDACTED — ver Infisical]`
 5. Commit + push
 6. (Opcional) `git filter-repo` para borrar también de history
 7. Deshabilitar `PermitRootLogin yes` en `/etc/ssh/sshd_config` del VPS → `PermitRootLogin no`, restart sshd
 8. Quitar autorización de key en `/root/.ssh/authorized_keys` del VPS
+
+
+---
+
+# Sección 18 — Sub-fase A.3 (2026-05-12): Rotación de credenciales expuestas
+
+Aplicada después de Sub-fase A.2. Cierra el riesgo de pass `[REDACTED-PASS-LINUX]` filtrada en repo público.
+
+## 18.1 Decisión
+
+Santi eligió **Opción A**: passwords aleatorios fuertes (24 chars base64 sin `/+=`) por cuenta, todas en Infisical, sin valores compartidos.
+
+Para acceso desde dispositivos sin SSH key (celular, otras PCs), el plan es agregar SSH keys por dispositivo a `~/.ssh/authorized_keys` del VPS. La pass random queda como salida de emergencia (Infisical web).
+
+## 18.2 Passwords rotadas (8)
+
+Generadas con `openssl rand -base64 32 | tr -d '/+=' | cut -c1-24`. Aplicadas con `chpasswd` (Linux) y `ALTER USER` (MariaDB).
+
+| Cuenta | Where | Aplicado | Infisical secret |
+|---|---|---|---|
+| osserver Linux | VPS Contabo | `chpasswd` | `/admin-vps/VPS_LOGIN_PASS` |
+| root Linux | VPS Contabo | `chpasswd` | `/admin-vps/VPS_ROOT_PASS` |
+| osadmin MariaDB | VPS Contabo | `ALTER USER 'osadmin'@'localhost'` | `/admin-vps/VPS_MARIADB_OSADMIN_PASS` |
+| os_gestion MariaDB | VPS Contabo | `ALTER USER 'os_gestion'@'localhost' + '@127.0.0.1'` | `/shared/DB_GESTION_PASS` |
+| os_integracion MariaDB | VPS Contabo | `ALTER USER 'os_integracion'@'localhost' + '@127.0.0.1'` | `/shared/DB_INTEGRACION_PASS` |
+| inventario_produccion_effi MariaDB | VPS Contabo | `ALTER USER ...@'localhost' + '@127.0.0.1'` | `/shared/DB_INVENTARIO_PASS` |
+| osserver Linux | osserver-ms (local) | `sudo chpasswd` | `/admin-local/LOCAL_LOGIN_PASS` |
+| osadmin MariaDB | osserver-ms (local) | `ALTER USER 'osadmin'@'%' + '@172.18.0.%'` | `/shared/DB_LOCAL_PASS` + `MARIADB_PASS` |
+
+## 18.3 Archivos del repo limpiados
+
+Búsqueda + sed `Pepe2467 → [REDACTED-PASS-LINUX]` y `Pepe2467.OS → [REDACTED-PASS-OS]`. 9 menciones eliminadas:
+
+| Archivo | Menciones eliminadas |
+|---|---|
+| `.agent/docs/INCIDENTE_SEGURIDAD_2026-04-20.md` | 4 |
+| `.agent/PENDIENTES.md` | 1 |
+| `.agent/planes/completados/testeo_infisical_2026-05-11.md` | 1 |
+| `.agent/CONTEXTO_ACTIVO.md` | 1 |
+| `.agent/contextos/seguridad.md` | 3 |
+
+Comando final de verificación: `git grep "Pepe2467"` → cero matches.
+
+⚠ **El valor `[REDACTED-PASS-LINUX]` sigue en git **history**.** Para borrarlo completamente habría que correr `git filter-repo --replace-text` y force-push. Decisión pendiente con Santi (cambio destructivo del history).
+
+## 18.4 Bug arquitectural descubierto: apps del VPS NO usan Infisical client
+
+Síntoma post-rotación de los 3 MariaDB users del VPS: las apps en VPS empezaron a fallar con `Access denied`. La rotación funcionó (verificado con queries directas) pero las apps no tomaban el valor nuevo de Infisical.
+
+**Causa**: las unidades systemd del VPS (`os-gestion.service`, `os-inventario-api.service`, etc.) NO declaran `EnvironmentFile=/home/osserver/tempoclv/.infisical_admin_bootstrap.env`. Sin esa variable, el helper `lib/infisical.{py,js}` no puede hacer login a Infisical (no tiene `INFISICAL_CLIENT_ID`/`CLIENT_SECRET`) y silencia el error. Las apps siguen funcionando con el `.env` local del VPS, que tenía valores viejos.
+
+**Workaround inmediato**: editar `/home/osserver/Proyectos_Antigravity/Integraciones_OS/integracion_conexionesbd.env` del VPS con `sed -i` para reemplazar las 4 passes (DB_LOCAL_PASS, DB_GESTION_PASS, DB_INTEGRACION_PASS, DB_INVENTARIO_PASS) por las nuevas. Luego `systemctl restart os-gestion os-inventario-api os-produccion-api os-sync-api`.
+
+**Solución correcta (pendiente)**: agregar a las units systemd del VPS:
+```
+[Service]
+EnvironmentFile=/home/osserver/tempoclv/.infisical_admin_bootstrap.env
+```
+Y luego daemon-reload + restart. Una vez bootstrap funciona, las apps leerán de Infisical igual que en local.
+
+## 18.5 Pendiente (no bloqueante, requiere autorización Santi)
+
+1. Configurar `EnvironmentFile=` Infisical en systemd del VPS (apps + futuros nuevos)
+2. SSH keys en Lenovo + celular (Opción A elegida — paso a paso para Santi cuando esté con cada dispositivo)
+3. Rotar passwords secundarios: Grafana, MinIO, code-server (local + VPS), NocoDB/Nextcloud/EspoCRM (sufijo `.OS`)
+4. `PermitRootLogin no` en sshd VPS + remove root key
+5. (Opcional) `git filter-repo --replace-text` para borrar history pública
+
+## 18.6 Cómo se hizo (script reproducible mentalmente)
+
+```bash
+# 1. Generar passes a archivo temp 600
+for NAME in OSSERVER_VPS ROOT_VPS MARIADB_VPS OSSERVER_LOCAL MARIADB_LOCAL \
+            DB_GESTION DB_INTEGRACION DB_INVENTARIO; do
+  PASS=$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-24)
+  echo "$NAME=$PASS"
+done > /tmp/.passes_rot_2026-05-12
+chmod 600 /tmp/.passes_rot_2026-05-12
+set -a; . /tmp/.passes_rot_2026-05-12; set +a
+
+# 2. Aplicar VPS (vía SSH como root con key)
+ssh root@vps-contabo "
+echo 'osserver:${OSSERVER_VPS}' | chpasswd
+echo 'root:${ROOT_VPS}' | chpasswd
+mysql -uroot -e \"
+  ALTER USER 'osadmin'@'localhost' IDENTIFIED BY '${MARIADB_VPS}';
+  ALTER USER 'os_gestion'@'localhost' IDENTIFIED BY '${DB_GESTION}';
+  ALTER USER 'os_gestion'@'127.0.0.1' IDENTIFIED BY '${DB_GESTION}';
+  ALTER USER 'os_integracion'@'localhost' IDENTIFIED BY '${DB_INTEGRACION}';
+  ALTER USER 'os_integracion'@'127.0.0.1' IDENTIFIED BY '${DB_INTEGRACION}';
+  ALTER USER 'inventario_produccion_effi'@'localhost' IDENTIFIED BY '${DB_INVENTARIO}';
+  ALTER USER 'inventario_produccion_effi'@'127.0.0.1' IDENTIFIED BY '${DB_INVENTARIO}';
+  FLUSH PRIVILEGES;
+\"
+"
+
+# 3. Aplicar local
+echo "osserver:${OSSERVER_LOCAL}" | sudo chpasswd
+sudo mysql -uroot -e "
+  ALTER USER 'osadmin'@'%' IDENTIFIED BY '${MARIADB_LOCAL}';
+  ALTER USER 'osadmin'@'172.18.0.%' IDENTIFIED BY '${MARIADB_LOCAL}';
+  FLUSH PRIVILEGES;
+"
+
+# 4. Update Infisical (API REST PATCH /api/v3/secrets/raw/<KEY>)
+# 5. Update .env local + VPS para fallback
+# 6. Restart services local + VPS
+# 7. Limpiar repo: sed -i 's|Pepe2467\.|[REDACTED-PASS-LINUX]|g; s|Pepe2467\.OS|[REDACTED-PASS-OS]|g' archivos
+# 8. Validar: pass vieja DENIED en todos los users
+# 9. Commit + push
+# 10. shred -u /tmp/.passes_rot_2026-05-12
+```
 

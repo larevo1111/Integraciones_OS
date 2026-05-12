@@ -469,7 +469,7 @@ sudo tailscale up
 
 ```bash
 # Buscar leaks en logs recientes (debe devolver 0)
-journalctl --since '1 hour ago' | grep -iE "AAG1Ctrf|st\.[a-z0-9]{50,}|sk-ant-|sk-proj-|AIzaSy|gsk_|Pepe2467\.|82d13e9a"
+journalctl --since '1 hour ago' | grep -iE "AAG1Ctrf|st\.[a-z0-9]{50,}|sk-ant-|sk-proj-|AIzaSy|gsk_|[REDACTED-PASS]\.|82d13e9a"
 ```
 
 ### 7.2 Permisos de archivos

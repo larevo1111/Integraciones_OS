@@ -1,5 +1,45 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-11 (segunda actualización del día)
+**Actualizado**: 2026-05-12
+
+## 🔁 Completado 2026-05-12 — Sub-fase A.3: Rotación de credenciales expuestas
+
+**Resumen**: la pass `[REDACTED-PASS-LINUX]` (anteriormente en GitHub público) está MUERTA en todos los sistemas. 8 credenciales rotadas a valores únicos random.
+
+### Credenciales rotadas (todas en Infisical)
+| Cuenta | Server | Secret en Infisical |
+|---|---|---|
+| osserver (Linux) | VPS | `/admin-vps/VPS_LOGIN_PASS` |
+| root (Linux) | VPS | `/admin-vps/VPS_ROOT_PASS` *(nuevo)* |
+| osadmin (MariaDB) | VPS | `/admin-vps/VPS_MARIADB_OSADMIN_PASS` *(nuevo)* |
+| os_gestion (MariaDB) | VPS | `/shared/DB_GESTION_PASS` |
+| os_integracion (MariaDB) | VPS | `/shared/DB_INTEGRACION_PASS` |
+| inventario_produccion_effi (MariaDB) | VPS | `/shared/DB_INVENTARIO_PASS` |
+| osserver (Linux) | osserver-ms | `/admin-local/LOCAL_LOGIN_PASS` |
+| osadmin (MariaDB) | osserver-ms | `/shared/DB_LOCAL_PASS` + `/shared/MARIADB_PASS` |
+
+### Archivos limpiados del repo (5 files, 9 menciones eliminadas)
+- `.agent/docs/INCIDENTE_SEGURIDAD_2026-04-20.md` (4)
+- `.agent/PENDIENTES.md` (1)
+- `.agent/planes/completados/testeo_infisical_2026-05-11.md` (1)
+- `.agent/CONTEXTO_ACTIVO.md` (1) y `.agent/contextos/seguridad.md` (3)
+→ `git grep "Pepe2467"` ya devuelve cero.
+
+### Validación post-rotación
+- Pass vieja → ❌ DENIED en SSH local, SSH VPS, MariaDB local, MariaDB VPS osadmin, MariaDB VPS os_gestion
+- Servicios web (gestion/inv/menu): ✅ 200/401 (sin errores de BD)
+- Logs `os-gestion`, `os-inventario-api`, `os-produccion-api`, `ia-service`, `os-telegram-bot`: 0 errores `1045`/`Access denied`
+- Apps en VPS también actualizadas (`.env` del repo VPS modificado con las pass nuevas)
+
+### Deuda técnica detectada (no bloqueante)
+**Apps del VPS NO usan Infisical client** (systemd units sin `EnvironmentFile=/home/osserver/tempoclv/.infisical_admin_bootstrap.env`). Leen del `.env` local del VPS. Solución temporal aplicada: update manual del `.env` del VPS. Solución correcta: configurar Infisical client allá (próxima sesión).
+
+### Lo que sigue
+1. **Configurar Infisical client en apps del VPS** (deuda técnica)
+2. **SSH keys en Lenovo + celular** (para no tipear pass) — Opción A elegida por Santi
+3. **Rotar passwords secundarios**: Grafana, MinIO, code-server local + VPS, NocoDB/Nextcloud (sufijo `.OS`)
+4. **Deshabilitar `PermitRootLogin`** en sshd VPS, quitar autorización key root
+
+---
 
 ## 🛡️ Completado 2026-05-11 (tarde) — Sub-fase A.2: SSH VPS detrás de Tailscale + UFW
 
@@ -28,7 +68,7 @@
 - Logs de servicios: 0 errores nuevos
 
 ### Pendiente próxima fase (autorización Santi)
-1. **Rotar passwords `root`, `osserver` (VPS) y `osserver` (osserver-ms local)** — actualmente `Pepe2467.` expuesta en 3 archivos del repo público
+1. **Rotar passwords `root`, `osserver` (VPS) y `osserver` (osserver-ms local)** — actualmente `[REDACTED-PASS-LINUX]` expuesta en 3 archivos del repo público
 2. Limpiar los 3 archivos: `.agent/docs/INCIDENTE_SEGURIDAD_2026-04-20.md`, `.agent/PENDIENTES.md`, `.agent/planes/completados/testeo_infisical_2026-05-11.md`
 3. Quitar autorización de key SSH en root del VPS (forzar `osserver` + `sudo`)
 

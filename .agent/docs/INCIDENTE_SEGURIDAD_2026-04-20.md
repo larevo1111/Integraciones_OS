@@ -64,7 +64,7 @@ Resultado: todos los `.php` del directorio devuelven 403. El malware no puede ej
 ### 3. Rotación de TODAS las credenciales que coincidían con la leakeada
 
 Old password: `Epist2487.` (shared en todos los servicios)
-New password: `Pepe2467.` (shared en todos los servicios — decisión del dueño)
+New password: `[REDACTED-PASS-LINUX]` (shared en todos los servicios — decisión del dueño)
 
 Componente | Usuario | Dónde | Estado
 ---|---|---|---
@@ -82,7 +82,7 @@ SSH keys | `~/.ssh/id_ed25519`, `~/.ssh/sos_erp` | — | ✅ sin cambio (keys no
 
 ### 4. Limpieza de `Epist2487.` en el repo
 
-Actualizados para usar `Pepe2467.`:
+Actualizados para usar `[REDACTED-PASS-LINUX]`:
 - `integracion_conexionesbd.env` (local + VPS) — todas las `*_PASS` rotadas
 - `scripts/inventario/analisis_ia_inventario.py` — refactor al helper `cfg_local()`, ya sin hardcode
 - `.agent/.servers.env` — VPS_PASS
@@ -110,7 +110,7 @@ Test de conexión desde helper `scripts/lib/db_conn.py` con nuevas passwords:
 ✅ LOCAL ia_service_os:   17 agentes
 ✅ VPS os_integracion:    943 facturas
 ✅ VPS os_gestion:        473 tareas
-✅ HOSTINGER os_comunidad: 8 usuarios (con password Pepe2467.)
+✅ HOSTINGER os_comunidad: 8 usuarios (con password [REDACTED-PASS-LINUX])
 ```
 
 Todos los servicios systemd `active` (local + VPS). Dominios públicos HTTP 200. Sin errores en logs post-restart.
@@ -119,7 +119,7 @@ Todos los servicios systemd `active` (local + VPS). Dominios públicos HTTP 200.
 
 1. **Rotar Cloudflare R2** — las keys `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY` del `.env` leakeado siguen activas. Entrar a Cloudflare dashboard → R2 → API Tokens → revocar las viejas + crear nuevas. Actualizar donde se usen.
 2. **Rotar password de Moodle** (`campus/`) — entrar al admin de Moodle, cambiar `admin` password y credenciales de su BD.
-3. **Considerar cambiar la password `Pepe2467.` por una única por servicio** — el hecho de que todos compartan la misma significa que si se leakea una, se leakean todas. Un gestor de secretos (ej: 1Password, Vaultwarden) es la mejor práctica.
+3. **Considerar cambiar la password `[REDACTED-PASS-LINUX]` por una única por servicio** — el hecho de que todos compartan la misma significa que si se leakea una, se leakean todas. Un gestor de secretos (ej: 1Password, Vaultwarden) es la mejor práctica.
 4. **Nuclear el WordPress de Hostinger** cuando tengas 30 minutos — hoy quedó en "modo congelado" (PHP bloqueado). Si no lo vas a usar, se puede eliminar del hPanel. El VPS ya tiene el WP nuevo (`wp.oscomunidad.com`) con Elementor Pro y el template de producto importado.
 5. **Actualizar plugins WordPress en el VPS** — Elementor FREE y PRO están en versiones (3.35.5 / 3.35.1) un poco detrás de las últimas (4.0.3). Hacer `wp plugin update --all` en el VPS.
 6. **Habilitar 2FA** en hPanel de Hostinger y Cloudflare si no lo tienen ya.

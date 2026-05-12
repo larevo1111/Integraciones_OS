@@ -52,7 +52,7 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 **Acción propuesta** — de a una por día, en orden:
 1. **Pass Effi.com.co** (más urgente, valor `LAREVO1111` en commits c0... y 55ef7...): login a effi.com.co → cambiar pass → actualizar Infisical `/effi/EFFI_PASS`
 2. **Token Telegram bot**: `@BotFather` → `/revoke` → `/newtoken` → actualizar Infisical `/ia-service/TELEGRAM_BOT_TOKEN`
-3. **Pass humana "A"** (`Pepe2467.` en doc del incidente): script automático: `ALTER USER 'osadmin'@'localhost' IDENTIFIED BY 'NUEVA'` en local + VPS + `passwd osserver` local + VPS + update Infisical
+3. **Pass humana "A"** (`[REDACTED-PASS-LINUX]` en doc del incidente): script automático: `ALTER USER 'osadmin'@'localhost' IDENTIFIED BY 'NUEVA'` en local + VPS + `passwd osserver` local + VPS + update Infisical
 4. **API keys IA**: en cada console (Anthropic, Google, Groq, DeepSeek, Cerebras) — revoke + generate → actualizar Infisical `/ia-service/IA_AGENT_KEY_*`
 5. **JWT secrets** (los 4: ia-admin, gestion, produccion, inventario): generar random → actualizar Infisical → restart servicios (invalida sesiones activas — horario tranquilo)
 6. **WooCommerce keys** (si sitio activo)
@@ -183,6 +183,18 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 - Verificar que `tunnel-hostinger.service` esté activo antes de la check, o agregar mensaje de diagnóstico si el túnel está caído.
 **Archivos involucrados**: `scripts/diagnostico_diario.py` (líneas 62-69, 151-177)
 **Estimado**: S (15 min)
+
+### [P1] `psycopg2` no instalado — `notif_jornadas_abiertas.py` crashea
+**Categoría**: dependencias / limpieza
+**Detectado**: 2026-05-12 por Claude (RD)
+**Contexto**: Commits `5cc2b47` y `dfc65ce` migraron la función `master()` en `scripts/lib/db_conn.py` de MariaDB/pymysql a PostgreSQL/psycopg2. Pero `psycopg2` no está instalado en el servidor local. Resultado: `notif_jornadas_abiertas.py` crashea con `ModuleNotFoundError: No module named 'psycopg2'` cada vez que hay jornadas abiertas — Santi no recibe esa notificación. El pipeline en sí no se afecta (no usa `master()`).
+**Riesgo si no se hace**: Santi no recibe alertas de jornadas abiertas. Si `master()` se usa en otros scripts futuros, también fallarán silenciosamente.
+**Acción propuesta**:
+- Instalar: `pip3 install psycopg2-binary` en el servidor local
+- Verificar que el VPS donde corre Postgres (`sos_master_erp`) esté accesible con las credenciales de MASTER en `integracion_conexionesbd.env`
+- Probar: `python3 -c "from lib.db_conn import master; print('OK')"` desde `scripts/`
+**Archivos involucrados**: `scripts/lib/db_conn.py` (función `master` / `_conn_pg`), `scripts/notif_jornadas_abiertas.py`
+**Estimado**: S (5 min — solo instalar la librería)
 
 ---
 
