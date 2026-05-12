@@ -1709,7 +1709,8 @@ app.get('/api/gestion/op/:id_op/ficha', requireAuth, async (req, res) => {
     // 5. Detalle local (g_op_detalle)
     const [[detalle]] = await db.gestion.query(
       `SELECT observaciones_lote, procesado_por, procesado_en, validado_por, validado_en,
-              op_anterior, responsable_validado
+              op_anterior, responsable_validado,
+              encargado_real_cc, encargado_real_nombre
        FROM g_op_detalle WHERE empresa = ? AND id_op = ?`,
       [req.empresa, idOp]
     )

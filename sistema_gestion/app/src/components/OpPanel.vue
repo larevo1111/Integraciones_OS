@@ -63,7 +63,25 @@
             <!-- ── BLOQUE 1: CABECERA ─────────────────────────── -->
             <div class="op-section">
               <div class="op-cab-row"><span class="op-lbl">Producto</span><span class="op-val">{{ articuloPrincipal || '—' }}</span></div>
-              <div class="op-cab-row"><span class="op-lbl">Encargado</span><span class="op-val">{{ ficha.cabecera.nombre_encargado || '—' }}</span></div>
+              <div class="op-cab-row">
+                <span class="op-lbl">Encargado previsto</span>
+                <span class="op-val">{{ ficha.cabecera.nombre_encargado || '—' }}</span>
+              </div>
+              <div class="op-cab-row">
+                <span class="op-lbl">Encargado real</span>
+                <span class="op-val">
+                  <q-select
+                    v-if="puedeEditarEncargado"
+                    v-model="encargadoRealCC"
+                    :options="encargadosOptions"
+                    emit-value map-options
+                    dense borderless dark
+                    class="op-encargado-sel"
+                    :loading="!encargadosLista.length"
+                  />
+                  <template v-else>{{ encargadoRealNombre || '—' }}</template>
+                </span>
+              </div>
               <div class="op-cab-row"><span class="op-lbl">Vigencia</span><span class="op-val">{{ ficha.cabecera.vigencia || '—' }}</span></div>
               <div class="op-cab-row"><span class="op-lbl">Creada</span><span class="op-val">{{ fmtFecha(ficha.cabecera.fecha_de_creacion) }}</span></div>
               <div class="op-cab-row"><span class="op-lbl">Sucursal/Bodega</span><span class="op-val">{{ ficha.cabecera.sucursal || '—' }} / {{ ficha.cabecera.bodega || '—' }}</span></div>
@@ -373,30 +391,21 @@
       </aside>
     </div>
 
-    <!-- Diálogo: confirmar procesar / validar (con selector de encargado real) -->
+    <!-- Diálogo: confirmar procesar / validar (encargado se elige en el panel) -->
     <q-dialog v-model="dialogConfirm" persistent>
       <q-card style="min-width:380px;max-width:90vw">
         <q-card-section>
           <div class="text-h6">{{ confirmTipo === 'validar' ? 'Validar' : 'Procesar' }} OP {{ idOp }}</div>
         </q-card-section>
         <q-card-section class="q-pt-none">
-          <div class="text-caption text-grey q-mb-xs">
+          <div class="text-caption text-grey">
             {{ confirmTipo === 'validar'
               ? 'Anula la OP, crea una nueva con los reales reportados y la marca como Validado. Corre en segundo plano (~2-3 min).'
               : 'Cambia el estado de la OP a Procesada en Effi. Corre en segundo plano (~30-60s).' }}
           </div>
 
-          <div class="q-mt-md">
-            <div class="text-caption text-grey q-mb-xs">
-              Encargado <span style="opacity:0.6">(predefinido: {{ ficha?.cabecera?.nombre_encargado || '—' }})</span>
-            </div>
-            <q-select
-              v-model="encargadoRealCC"
-              :options="encargadosLista.map(e => ({ value: e.cc, label: e.nombre }))"
-              emit-value map-options
-              dense filled
-              :loading="!encargadosLista.length"
-            />
+          <div class="q-mt-md" style="font-size:13px">
+            Encargado: <b>{{ encargadoRealNombre || ficha?.cabecera?.nombre_encargado || '—' }}</b>
           </div>
 
           <div v-if="confirmAviso" class="q-mt-md" style="color:#ffa726;font-size:13px">
@@ -512,6 +521,15 @@ const puedeValidar  = computed(() => miNivel.value >= 5 && !estaAnulada.value)
 const puedeAgregar = computed(() => estado.value === 'Generada' && miNivel.value >= 3 && !estaAnulada.value)
 const puedeEditarTiempos = computed(() => miNivel.value >= 5)
 const lineasBloqueadas = computed(() => estado.value === 'Validado' || estaAnulada.value)
+// Encargado real editable en Generada o Procesada (mismos criterios que materiales reales)
+const puedeEditarEncargado = computed(() => !lineasBloqueadas.value)
+const encargadosOptions = computed(() =>
+  encargadosLista.value.map(e => ({ value: e.cc, label: e.nombre }))
+)
+const encargadoRealNombre = computed(() => {
+  const e = encargadosLista.value.find(x => x.cc === encargadoRealCC.value)
+  return e?.nombre || ficha.value?.cabecera?.nombre_encargado || ''
+})
 
 // Edición tiempos consolidados (nivel >= 5)
 const editandoTiempos = ref(false)
@@ -592,6 +610,10 @@ async function cargar() {
     for (const l of [...(r.materiales || []), ...(r.productos || [])]) {
       valores[l.id] = l.cantidad_real == null ? '' : fmtNum(l.cantidad_real)
     }
+    // Prellenar encargado real: si la OP ya tiene encargado_real_cc guardado, usar ese;
+    // sino, default = CC del predefinido (Effi). Cargar lista en paralelo.
+    encargadoRealCC.value = r.detalle?.encargado_real_cc || _ccPredefinida()
+    _cargarEncargados()
     if (!jobActivo.value) checarJobActivo()
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Error cargando OP: ' + (e.message || e), position: 'top' })
@@ -928,6 +950,10 @@ onUnmounted(() => _limpiarJob())
 }
 .op-lbl { width: 130px; color: var(--text-tertiary); font-size: 11px; }
 .op-val { flex: 1; }
+/* Select inline del encargado real: estilo discreto, sin marco grueso */
+.op-encargado-sel { min-width: 220px; max-width: 320px; }
+.op-encargado-sel :deep(.q-field__control) { min-height: 28px; padding: 0; }
+.op-encargado-sel :deep(.q-field__native) { padding: 0; min-height: 22px; font-size: 12px; }
 
 .op-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .op-table thead th {
