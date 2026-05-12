@@ -1,5 +1,38 @@
 # Contexto Activo — Integraciones OS
-**Actualizado**: 2026-05-11
+**Actualizado**: 2026-05-11 (segunda actualización del día)
+
+## 🛡️ Completado 2026-05-11 (tarde) — Sub-fase A.2: SSH VPS detrás de Tailscale + UFW
+
+**Resumen**: SSH del VPS ya NO acepta conexiones desde internet abierto. Solo Tailscale. Tráfico de las apps al VPS pasa por la red privada.
+
+### Cambios aplicados
+1. **3 secrets Infisical actualizados** (`/shared/`): `DB_INTEGRACION_SSH_HOST`, `DB_GESTION_SSH_HOST`, `DB_INVENTARIO_SSH_HOST` → de `94.72.115.156` a **`vps-contabo`** (hostname Tailscale, resuelve a `100.86.226.112`)
+2. **2 scripts editados**: `scripts/deploy_gestion.sh` (VPS_HOST) y `scripts/tunnel_hostinger.sh` (jump `osserver@vps-contabo` en lugar de `root@94.72.115.156`)
+3. **Bug FIXED en `lib/db_conn.js:241`**: `_conectarRemota()` leía `process.env` antes de que terminara el bootstrap async de Infisical → agregado `await _bootstrapPromise` al inicio
+4. **UFW activado en VPS Contabo**:
+   - `default deny incoming`, `default allow outgoing`
+   - `allow in on tailscale0` (todo desde Tailscale)
+   - `allow 80/tcp` + `allow 443/tcp` (Cloudflare Tunnel)
+   - SSH puerto 22 NO está abierto a internet abierto
+
+### Cómo entrar al VPS ahora
+| Forma | Estado |
+|---|---|
+| `ssh osserver@vps-contabo` (Tailscale) | ✅ funciona |
+| `ssh osserver@94.72.115.156` (internet) | ❌ Connection timeout |
+| Panel web Contabo `my.contabo.com` | ✅ salida de emergencia si Tailscale falla |
+
+### Verificación post-cambio
+- 6 conexiones SSH desde osserver-ms al VPS — **100% Tailscale**, 0 por IP pública
+- Servicios web públicos: menu, gestion, inv, ia, wp, crm, ialocal, code-vps → todos 200/302 OK
+- Logs de servicios: 0 errores nuevos
+
+### Pendiente próxima fase (autorización Santi)
+1. **Rotar passwords `root`, `osserver` (VPS) y `osserver` (osserver-ms local)** — actualmente `Pepe2467.` expuesta en 3 archivos del repo público
+2. Limpiar los 3 archivos: `.agent/docs/INCIDENTE_SEGURIDAD_2026-04-20.md`, `.agent/PENDIENTES.md`, `.agent/planes/completados/testeo_infisical_2026-05-11.md`
+3. Quitar autorización de key SSH en root del VPS (forzar `osserver` + `sudo`)
+
+---
 
 ## 🔐 Completado 2026-05-11 — MIGRACIÓN COMPLETA A INFISICAL (Fase A + Sub-fase A.1 + Testing)
 

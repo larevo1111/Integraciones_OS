@@ -936,3 +936,116 @@ const keyStr = await secrets.getSSHKey('VPS')
    ```
    *(O dejarlo sin esas vars — el helper detecta el bootstrap file automáticamente)*
 4. Restart del servicio
+
+---
+
+# Sección 17 — Sub-fase A.2 (2026-05-11, tarde): SSH del VPS detrás de Tailscale + UFW
+
+Aplicada después de la migración Infisical, en sesión continua con Santi. Cierra el último vector de ataque a internet abierto del VPS.
+
+## 17.1 Cambios concretos
+
+### A. Infisical (3 secrets de `/shared/`)
+
+| Secret | Antes | Después |
+|---|---|---|
+| `DB_INTEGRACION_SSH_HOST` | `94.72.115.156` | `vps-contabo` |
+| `DB_GESTION_SSH_HOST` | `94.72.115.156` | `vps-contabo` |
+| `DB_INVENTARIO_SSH_HOST` | `94.72.115.156` | `vps-contabo` |
+| `VPS_IP` | (sin cambio) | `94.72.115.156` (queda para info/logs/docs) |
+
+`vps-contabo` es el hostname Tailscale del VPS, resuelve a `100.86.226.112` desde cualquier dispositivo del tailnet.
+
+### B. Archivos del repo editados
+
+- `scripts/deploy_gestion.sh:24` — `VPS_HOST="vps-contabo"`
+- `scripts/tunnel_hostinger.sh:13` — `-J osserver@vps-contabo` (antes `-J root@94.72.115.156`)
+
+### C. Bug crítico encontrado y fixed en `lib/db_conn.js`
+
+**Síntoma**: tras cambiar `DB_GESTION_SSH_HOST` en Infisical y reiniciar el servicio, las conexiones de `os-gestion` seguían yendo a `94.72.115.156`.
+
+**Causa raíz**: `_conectarRemota(prefijo)` en línea 241 leía `process.env.DB_*_SSH_HOST` **antes** de que terminara el bootstrap async de Infisical (que se ejecuta como Promise `_bootstrapPromise` al import del módulo). Como el `.env` viejo aún tenía la IP pública, esa era la que se usaba.
+
+**Fix aplicado**:
+```js
+async function _conectarRemota(prefijo) {
+  await _bootstrapPromise   // ← agregado
+  const st = _remotas[prefijo]
+  if (st.ready && st.pool) return st.pool
+  const cfg = _cfgRemota(prefijo)   // ← ahora sí lee el valor ya bootstrap'd
+  ...
+}
+```
+
+Esto solo afectaba a Node (db_conn.js). En Python el bootstrap es sincrónico (en el import), no había el race.
+
+### D. UFW activado en VPS Contabo
+
+```
+Default: deny (incoming), allow (outgoing), deny (routed)
+Rules:
+  Anywhere on tailscale0   ALLOW IN   Anywhere     ← SSH/cualquier puerto desde Tailscale
+  80/tcp                   ALLOW IN   Anywhere     ← HTTP (Cloudflare Tunnel también, pero open por compat)
+  443/tcp                  ALLOW IN   Anywhere     ← HTTPS
+```
+
+**No hay regla SSH desde internet abierto**. Resultado:
+- `ssh osserver@vps-contabo` (Tailscale) → ✅ funciona
+- `ssh osserver@94.72.115.156` (internet) → ❌ Connection timeout
+
+## 17.2 Cómo entrar al VPS ahora (referencia para humanos y Claude)
+
+| Quién | Cómo | Notas |
+|---|---|---|
+| Santi desde Lenovo | `ssh osserver@vps-contabo` o `ssh osserver@100.86.226.112` | Necesita Tailscale activo en el cliente |
+| Santi desde celular | Tailscale app + cliente SSH (Termius) | Misma red privada, mismo método |
+| Claude desde osserver-ms | `ssh osserver@vps-contabo` (con `~/.ssh/id_ed25519`) | osserver-ms ya está en tailnet |
+| Emergencia (Tailscale caído) | Panel web Contabo (`my.contabo.com`) | "VNC web" del proveedor — pass de Contabo, NO la del Linux |
+
+## 17.3 Test de validación post-cambio (snapshot 2026-05-11 22:33)
+
+```bash
+# Conexiones SSH desde osserver-ms al VPS
+ss -tnp | grep "100.86.226.112:22" | wc -l   # → 6  (todas por Tailscale)
+ss -tnp | grep "94.72.115.156:22" | wc -l    # → 0  (ninguna por IP pública)
+
+# Test SSH externo (debe fallar)
+ssh -o ConnectTimeout=6 osserver@94.72.115.156   # → Connection timed out
+
+# Servicios web públicos (Cloudflare Tunnel)
+curl https://gestion.oscomunidad.com           # → 200
+curl https://menu.oscomunidad.com              # → 200
+curl https://inv.oscomunidad.com               # → 200
+# Todos OK
+```
+
+## 17.4 Lo que NO se hizo (pendiente fase de rotación)
+
+⚠ Estos puntos siguen siendo riesgo. Decisión de Santi de no rotar todavía.
+
+1. **Pass `Pepe2467.`** sigue activa en:
+   - VPS: `root`, `osserver`, MariaDB `osadmin`, code-server VPS
+   - osserver-ms (local): user `osserver`, MariaDB `osadmin`, code-server local, MinIO, Grafana, etc.
+
+2. **`Pepe2467.` está VERSIONADA en repo público GitHub** en:
+   - `.agent/docs/INCIDENTE_SEGURIDAD_2026-04-20.md`
+   - `.agent/PENDIENTES.md`
+   - `.agent/planes/completados/testeo_infisical_2026-05-11.md`
+   → Cualquiera con acceso al repo puede ver la pass, pero ya **no puede entrar al VPS por SSH desde internet abierto** (UFW lo bloquea). Sigue habiendo riesgo si alguien entra a osserver-ms (vía WiFi de casa o tailnet comprometido).
+
+3. **La única SSH key personal** sigue siendo `/home/osserver/.ssh/id_ed25519` en osserver-ms, **sin passphrase**. Autoriza root + osserver del VPS. Mientras osserver-ms tenga pass fuerte, la key está protegida por permisos `0600` + firewall local + Tailscale.
+
+4. **Root del VPS sigue aceptando login interactivo** (`PermitRootLogin yes`). Plan: deshabilitar en sshd_config y forzar `osserver` + `sudo`.
+
+## 17.5 Plan rotación (Fase B — pendiente autorización Santi)
+
+1. Generar 3 passwords fuertes únicas: `root@VPS`, `osserver@VPS`, `osserver@osserver-ms`
+2. Aplicar `passwd <user>` en cada server (puede hacerlo Claude o Santi)
+3. Update en Infisical: `/admin-vps/VPS_LOGIN_PASS`, `/admin-vps/VPS_PANEL_PASS` (no, esa es de Contabo), `/admin-local/LOCAL_LOGIN_PASS`, `/shared/MARIADB_PASS` (si aplica a osadmin@VPS y @local)
+4. Editar repo: remover `Pepe2467.` literal de los 3 archivos → reemplazar por `[REDACTED — ver Infisical]`
+5. Commit + push
+6. (Opcional) `git filter-repo` para borrar también de history
+7. Deshabilitar `PermitRootLogin yes` en `/etc/ssh/sshd_config` del VPS → `PermitRootLogin no`, restart sshd
+8. Quitar autorización de key en `/root/.ssh/authorized_keys` del VPS
+
