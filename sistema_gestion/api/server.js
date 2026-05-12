@@ -2210,23 +2210,23 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
     )
 
     // 10. Copiar g_op_lineas de la original a la nueva (datos congelados).
-    // Reglas:
+    // Reglas (asimétricas a propósito):
     //  - Si cantidad_real es NULL, asume cantidad_teorica (lo que Effi muestra).
-    //  - Si cantidad efectiva = 0, omite la línea (no se manda a Effi, así que
-    //    tampoco debe quedar en g_op_lineas de la nueva).
+    //  - Si cantidad_real = 0 (operador lo escribió explícito), se PRESERVA en
+    //    g_op_lineas para auditoría ("estimado 8 / real 0"). Effi rechaza
+    //    cantidad 0 pero eso se filtra solo en el JSON del paso 7.
     await db.gestion.query(
       `INSERT INTO g_op_lineas
         (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
          cantidad_teorica, cantidad_real, costo_unit, precio_unit,
          es_no_previsto, usuario_ult_modificacion)
        SELECT ?, empresa, tipo, cod_articulo, descripcion, unidad,
-              COALESCE(cantidad_real, cantidad_teorica) AS cantidad_teorica,
+              cantidad_teorica,
               COALESCE(cantidad_real, cantidad_teorica) AS cantidad_real,
               costo_unit, precio_unit,
               es_no_previsto, usuario_ult_modificacion
        FROM g_op_lineas
-       WHERE empresa = ? AND id_op = ?
-         AND COALESCE(cantidad_real, cantidad_teorica) > 0`,
+       WHERE empresa = ? AND id_op = ?`,
       [idOpNueva, req.empresa, idOpOriginal]
     )
 
@@ -2312,10 +2312,13 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
       // Insertar artículos producidos en staging para que la tabla de OPs
       // (que arma columna "Artículos" desde zeffi_articulos_producidos) muestre
       // los productos al instante, sin esperar el próximo sync Effi.
+      // Filtro cantidad > 0: Effi no crea productos con cantidad 0, así que
+      // staging tampoco los muestra (el operador igual los ve en g_op_lineas).
       const [prodLineas] = await db.gestion.query(
         `SELECT cod_articulo, descripcion, cantidad_real
            FROM g_op_lineas
-          WHERE id_op = ? AND empresa = ? AND tipo = 'producto'`,
+          WHERE id_op = ? AND empresa = ? AND tipo = 'producto'
+            AND cantidad_real IS NOT NULL AND cantidad_real > 0`,
         [idOpNueva, req.empresa]
       )
       for (const p of prodLineas) {
@@ -2327,7 +2330,7 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Orden vigente', NOW())`,
           [op.sucursal, op.bodega, idOpNueva, stagingEncargadoNombre, stagingEncargadoId,
            String(p.cod_articulo), p.descripcion,
-           p.cantidad_real == null ? null : String(p.cantidad_real).replace('.', ',')]
+           String(p.cantidad_real).replace('.', ',')]
         )
       }
     } catch (e) { console.warn('[op/validar] staging no actualizable:', e.message) }
