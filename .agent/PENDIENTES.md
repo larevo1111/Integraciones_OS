@@ -47,7 +47,7 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 ### [P1] Credenciales Effi hardcodeadas en código fuente
 **Categoría**: seguridad
 **Detectado**: 2026-04-29 por Claude (al regenerar sesión Effi caída)
-**Contexto**: `scripts/session.js` líneas 6-7 tienen `EFFI_USER` y `EFFI_PASS` como string literales en el código, versionado en git. Cualquiera con acceso al repo puede loguearse en Effi como Origen Silvestre.
+**Contexto**: `scripts/session.js` líneas 6-7 tienen `EFFI_USER` y `EFFI_PASS` (antes hardcoded — migrado a Infisical /effi/ el 2026-05-11) en el código, versionado en git. Cualquiera con acceso al repo puede loguearse en Effi como Origen Silvestre.
 **Riesgo si no se hace**: credenciales filtradas si el repo se vuelve público o se comparte por error; rotar el password en Effi exige nuevo commit + push.
 **Acción propuesta**:
 - Mover `EFFI_USER` y `EFFI_PASS` a `integracion_conexionesbd.env` (ya gitignored)
@@ -143,6 +143,29 @@ Al resolverlo: mover el bloque entero a `## ✅ Resueltos` con la fecha de cierr
 - Reiniciar `os-ia-admin.service`.
 **Archivos involucrados**: `ia-admin/api/server.js` (líneas 1257-1283 y 1286-1292)
 **Estimado**: M (30-45 min)
+
+### [P2] Bug: `diagnostico_diario.py` usa IP del VPS para check Hostinger (falso positivo diario)
+**Categoría**: limpieza
+**Detectado**: 2026-05-10 por Claude (RD)
+**Contexto**: `HOSTINGER_CFG` (líneas 62-69) usa `cfg_remota_ssh('INTEGRACION')['host']` = `94.72.115.156` (VPS Contabo) como host MySQL. Hostinger en realidad está disponible vía `127.0.0.1:3313` expuesto por `tunnel-hostinger.service` (túnel permanente SSH al jumphost). El fallo "Can't connect to MySQL server on '94.72.115.156'" aparece cada mañana aunque Hostinger esté perfectamente operativo.
+**Riesgo si no se hace**: el RD diario reporta fallo Hostinger como P1 todos los días → ruido que oculta errores reales.
+**Acción propuesta**:
+- En `diagnostico_diario.py` líneas 62-69, reemplazar:
+  ```python
+  _ssh_i = cfg_remota_ssh('INTEGRACION')
+  _db_i  = cfg_remota_db('INTEGRACION')
+  HOSTINGER_CFG = dict(host=_ssh_i['host'], port=3306, ...)
+  ```
+  por:
+  ```python
+  _ssh_c = cfg_remota_ssh('COMUNIDAD')
+  _db_c  = cfg_remota_db('COMUNIDAD')
+  HOSTINGER_CFG = dict(host=_ssh_c['remote_host'], port=_ssh_c['remote_port'], **_db_c, connect_timeout=10, read_timeout=10)
+  ```
+- La tabla a consultar debe ser de `u768061575_os_comunidad`, no `zeffi_facturas_venta_encabezados` (que no existe en `os_comunidad`). Usar `SELECT COUNT(*) FROM sis_usuarios` o `sys_usuarios`.
+- Verificar que `tunnel-hostinger.service` esté activo antes de la check, o agregar mensaje de diagnóstico si el túnel está caído.
+**Archivos involucrados**: `scripts/diagnostico_diario.py` (líneas 62-69, 151-177)
+**Estimado**: S (15 min)
 
 ---
 

@@ -512,7 +512,7 @@ Al crear cualquier script nuevo, agregar una entrada en la sección correspondie
 - **Ejecución manual**: no se ejecuta directamente, es `require('./session')`
 - **Salida**: `{ browser, context, page }` ya autenticado
 - **Dependencias**: Playwright, `/scripts/session.json` (estado de sesión guardado)
-- **Notas**: reutiliza sesión si `session.json` existe y está válida. Si la sesión expiró, hace login automático con `ORIGENSILVESTRE.COL@GMAIL.COM`. Guarda nueva sesión en `/scripts/session.json`.
+- **Notas**: reutiliza sesión si `session.json` existe y está válida. Si la sesión expiró, hace login automático con `<EFFI_USER en Infisical /effi/>`. Guarda nueva sesión en `/scripts/session.json`.
 - **Gotcha**: el path `SESSION_FILE = '/scripts/session.json'` es absoluto — requiere symlink `/scripts → <repo>/scripts` en el sistema de archivos. Ya existe en local y VPS.
 
 ---
