@@ -892,7 +892,9 @@ onUnmounted(() => document.removeEventListener('click', handleOutsideClick))
 
 /* ── TABLA ── */
 .table-scroll { overflow-x: auto; }
-.os-table     { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* border-collapse: separate es necesario para que position: sticky funcione
+   en <th> en Chrome. border-spacing: 0 lo hace visualmente idéntico a collapse. */
+.os-table     { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 
 .th {
   text-align: left; padding: 0 12px;
