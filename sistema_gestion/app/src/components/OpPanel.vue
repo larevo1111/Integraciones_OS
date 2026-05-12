@@ -373,6 +373,48 @@
       </aside>
     </div>
 
+    <!-- Diálogo: confirmar procesar / validar (con selector de encargado real) -->
+    <q-dialog v-model="dialogConfirm" persistent>
+      <q-card style="min-width:380px;max-width:90vw">
+        <q-card-section>
+          <div class="text-h6">{{ confirmTipo === 'validar' ? 'Validar' : 'Procesar' }} OP {{ idOp }}</div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <div class="text-caption text-grey q-mb-xs">
+            {{ confirmTipo === 'validar'
+              ? 'Anula la OP, crea una nueva con los reales reportados y la marca como Validado. Corre en segundo plano (~2-3 min).'
+              : 'Cambia el estado de la OP a Procesada en Effi. Corre en segundo plano (~30-60s).' }}
+          </div>
+
+          <div class="q-mt-md">
+            <div class="text-caption text-grey q-mb-xs">
+              Encargado <span style="opacity:0.6">(predefinido: {{ ficha?.cabecera?.nombre_encargado || '—' }})</span>
+            </div>
+            <q-select
+              v-model="encargadoRealCC"
+              :options="encargadosLista.map(e => ({ value: e.cc, label: e.nombre }))"
+              emit-value map-options
+              dense filled
+              :loading="!encargadosLista.length"
+            />
+          </div>
+
+          <div v-if="confirmAviso" class="q-mt-md" style="color:#ffa726;font-size:13px">
+            {{ confirmAviso }}
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" @click="dialogConfirm = false" />
+          <q-btn
+            unelevated
+            :label="confirmTipo === 'validar' ? 'Validar' : 'Procesar'"
+            :color="confirmTipo === 'validar' ? 'positive' : 'warning'"
+            @click="ejecutarConfirmar"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Diálogo: agregar línea no prevista -->
     <q-dialog v-model="dialogNuevaLinea" persistent>
       <q-card style="min-width:380px;max-width:90vw">
@@ -442,6 +484,13 @@ const procesando  = ref(false)
 const validando   = ref(false)
 const dialogNuevaLinea = ref(false)
 const nuevaLinea = reactive({ tipo: 'material', cantidad_real: '' })
+
+// Diálogo confirmar procesar/validar con selector de encargado real
+const dialogConfirm = ref(false)
+const confirmTipo = ref('')              // 'procesar' | 'validar'
+const confirmAviso = ref('')             // HTML extra (warnings de calidad en validar)
+const encargadosLista = ref([])          // { email, nombre, cc, nivel } desde /api/gestion/encargados
+const encargadoRealCC = ref('')          // CC seleccionado en el dialog
 const articuloSeleccionado = ref(null)  // {cod, nombre, unidad, costo_unit, precio_unit, grupo}
 
 // Quickadd tarea vinculada a esta OP
@@ -777,48 +826,66 @@ async function checarJobActivo() {
   } catch (_) {}
 }
 
-function confirmarProcesar() {
-  $q.dialog({
-    title: 'Procesar OP',
-    message: `Cambia el estado de la OP ${props.idOp} a "Procesada" en Effi. Corre en segundo plano (~30-60s).`,
-    cancel: true, ok: { label: 'Procesar', color: 'warning' }, persistent: false, dark: true
-  }).onOk(async () => {
-    try {
-      const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/procesar`, { method: 'POST' })
-      _iniciarPolling(r.jobId, r.tipo || 'procesar')
-    } catch (e) {
-      if (e?.retry) setTimeout(confirmarProcesar, 3000)
-      else $q.notify({ type: 'negative', message: e.message || 'Error al iniciar', position: 'top', timeout: 6000 })
-    }
-  })
+async function _cargarEncargados() {
+  if (encargadosLista.value.length) return
+  try {
+    const r = await api('/api/gestion/encargados')
+    encargadosLista.value = r.encargados || []
+  } catch (e) {
+    console.warn('[OpPanel] No se pudo cargar lista de encargados:', e.message)
+  }
 }
 
-function confirmarValidar() {
-  // Soft-block: avisa si calidad no firmada / rechazada / inexistente
-  const insp = calidadPanelRef.value?.insp?.value || calidadPanelRef.value?.insp || null
-  let extraMsg = ''
-  if (!insp) {
-    extraMsg = '<br><br><span style="color:#ffa726">⚠️ Esta OP no tiene inspección de calidad registrada.</span>'
-  } else if (insp.firmada !== 1) {
-    extraMsg = '<br><br><span style="color:#ffa726">⚠️ La inspección de calidad está como <b>borrador</b> (sin firmar).</span>'
-  } else if (insp.resultado === 'rechazado') {
-    extraMsg = '<br><br><span style="color:#e74c3c">⚠️ Calidad = <b>Rechazado</b>.</span>'
-  }
-  $q.dialog({
-    title: 'Validar OP',
-    message: `Anula la OP ${props.idOp}, crea una nueva con los reales reportados y la marca como "Validado". Corre en segundo plano (~2-3 min).${extraMsg}`,
-    html: true,
-    cancel: 'Cancelar', ok: { label: 'Validar', color: 'positive' }, persistent: true, dark: true
-  }).onOk(async () => {
-    try {
-      const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/validar`, { method: 'POST' })
-      _iniciarPolling(r.jobId, r.tipo || 'validar')
-    } catch (e) {
-      if (e?.retry) setTimeout(confirmarValidar, 5000)
-      else $q.notify({ type: 'negative', message: e.message || 'Error al iniciar', position: 'top', timeout: 8000 })
-    }
-  })
+// Resuelve la CC predefinida desde id_encargado (formato Effi 'CC: 74084937')
+function _ccPredefinida() {
+  const raw = ficha.value?.cabecera?.id_encargado || ''
+  return String(raw).replace(/^CC:\s*/, '').trim()
 }
+
+async function abrirConfirmar(tipo) {
+  await _cargarEncargados()
+  confirmTipo.value = tipo
+  encargadoRealCC.value = _ccPredefinida()
+  confirmAviso.value = ''
+  if (tipo === 'validar') {
+    // Soft-block: avisa si calidad no firmada / rechazada / inexistente
+    const insp = calidadPanelRef.value?.insp?.value || calidadPanelRef.value?.insp || null
+    if (!insp) {
+      confirmAviso.value = '⚠️ Esta OP no tiene inspección de calidad registrada.'
+    } else if (insp.firmada !== 1) {
+      confirmAviso.value = '⚠️ La inspección de calidad está como borrador (sin firmar).'
+    } else if (insp.resultado === 'rechazado') {
+      confirmAviso.value = '⚠️ Calidad = Rechazado.'
+    }
+  }
+  dialogConfirm.value = true
+}
+
+async function ejecutarConfirmar() {
+  const tipo = confirmTipo.value
+  const ccElegida = String(encargadoRealCC.value || '').trim()
+  const ccDefault = _ccPredefinida()
+  // Solo enviar encargado_real si difiere del predefinido
+  let body = null
+  if (ccElegida && ccElegida !== ccDefault) {
+    const enc = encargadosLista.value.find(e => e.cc === ccElegida)
+    body = { encargado_real_cc: ccElegida, encargado_real_nombre: enc?.nombre || '' }
+  }
+  dialogConfirm.value = false
+  try {
+    const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/${tipo}`, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined
+    })
+    _iniciarPolling(r.jobId, r.tipo || tipo)
+  } catch (e) {
+    if (e?.retry) setTimeout(() => abrirConfirmar(tipo), tipo === 'validar' ? 5000 : 3000)
+    else $q.notify({ type: 'negative', message: e.message || 'Error al iniciar', position: 'top', timeout: 6000 })
+  }
+}
+
+const confirmarProcesar = () => abrirConfirmar('procesar')
+const confirmarValidar  = () => abrirConfirmar('validar')
 
 onUnmounted(() => _limpiarJob())
 </script>

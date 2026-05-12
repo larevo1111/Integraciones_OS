@@ -465,6 +465,29 @@ app.get('/api/gestion/usuarios', async (req, res) => {
   }
 })
 
+// GET /api/gestion/encargados — candidatos a ser responsable de OP en Effi.
+// Misma fuente y orden que /api/produccion/encargados (módulo Producción):
+// usuarios activos con cédula; Deivy y Laura primero, Jenifer y Santi al final.
+app.get('/api/gestion/encargados', async (req, res) => {
+  try {
+    const [rows] = await db.master.query(`
+      SELECT email, nombre, numero_identificacion AS cc, nivel_global AS nivel
+      FROM sis_usuarios
+      WHERE estado = 'activo' AND numero_identificacion IS NOT NULL
+      ORDER BY CASE numero_identificacion
+        WHEN '74084937'   THEN 1
+        WHEN '1017206760' THEN 2
+        WHEN '1128457413' THEN 98
+        WHEN '3506889'    THEN 99
+        ELSE 50 END,
+      nivel_global DESC, nombre
+    `)
+    res.json({ ok: true, encargados: rows })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // ─── CATEGORÍAS ───────────────────────────────────────────────────
 
 // GET /api/gestion/categorias  (opcionalmente filtradas por perfil del usuario)
@@ -1906,7 +1929,7 @@ function _ejecutarPlaywright(args, timeoutMs, cwd) {
   })
 }
 
-async function _jobProcesar(jobId, idOp, empresa, usuario) {
+async function _jobProcesar(jobId, idOp, empresa, usuario, encargadoReal = null) {
   try {
     await _jobMarcar(jobId, 'en_progreso')
     const nombre = usuario.nombre || usuario.email
@@ -1916,12 +1939,18 @@ async function _jobProcesar(jobId, idOp, empresa, usuario) {
 
     await _ejecutarPlaywright([scriptPath, idOp, 'Procesada', observacion], 90000, scriptsDir)
 
+    // Si el operador eligió un encargado real distinto al predefinido, guardarlo
+    // en g_op_detalle. Solo informativo en Procesar; al Validar se usa para
+    // crear la nueva OP en Effi con ese encargado.
     await db.gestion.query(
-      `INSERT INTO g_op_detalle (id_op, empresa, procesado_por, procesado_en)
-       VALUES (?, ?, ?, NOW())
+      `INSERT INTO g_op_detalle
+         (id_op, empresa, procesado_por, procesado_en, encargado_real_cc, encargado_real_nombre)
+       VALUES (?, ?, ?, NOW(), ?, ?)
        ON DUPLICATE KEY UPDATE procesado_por = VALUES(procesado_por),
-                               procesado_en  = VALUES(procesado_en)`,
-      [idOp, empresa, usuario.email]
+                               procesado_en  = VALUES(procesado_en),
+                               encargado_real_cc     = COALESCE(VALUES(encargado_real_cc), encargado_real_cc),
+                               encargado_real_nombre = COALESCE(VALUES(encargado_real_nombre), encargado_real_nombre)`,
+      [idOp, empresa, usuario.email, encargadoReal?.cc || null, encargadoReal?.nombre || null]
     )
     try {
       await db.integracion.query(
@@ -1969,7 +1998,10 @@ app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
       [req.empresa, idOp, req.usuario.email]
     )
     const jobId = r.insertId
-    setImmediate(() => _jobProcesar(jobId, idOp, req.empresa, req.usuario))
+    const enc = req.body?.encargado_real_cc
+      ? { cc: String(req.body.encargado_real_cc), nombre: String(req.body.encargado_real_nombre || '') }
+      : null
+    setImmediate(() => _jobProcesar(jobId, idOp, req.empresa, req.usuario, enc))
     res.json({ ok: true, jobId, tipo: 'procesar', estado: 'pendiente' })
   } catch (e) {
     console.error('[POST /op/:id/procesar]', e)
@@ -1989,7 +2021,7 @@ app.post('/api/gestion/op/:id_op/procesar', requireAuth, async (req, res) => {
 //   9. Snapshot de tiempos: INSERT g_op_tiempos (id_nueva, categoria, segundos) por cada categoría > 0.
 //  10. Reflejar en staging (original Anulada, nueva Validado).
 // Permisos: nivel >= 5.
-async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
+async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal = null) {
   try {
     await _jobMarcar(jobId, 'en_progreso')
     const req = { empresa, usuario }  // shim para minimizar cambios al cuerpo migrado
@@ -2085,11 +2117,21 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
     const bodegaIdMap   = { 'Principal': 1 }
     const sucursal_id = sucursalIdMap[op.sucursal] || 1
     const bodega_id   = bodegaIdMap[op.bodega] || 1
-    const encargadoCC = String(op.id_encargado || '').replace(/^CC:\s*/, '').trim()
+    const encargadoOriginalCC = String(op.id_encargado || '').replace(/^CC:\s*/, '').trim()
+    // Si el operador eligió encargado real, usar ese para crear la nueva OP en Effi.
+    const encargadoCC = encargadoReal?.cc || encargadoOriginalCC
+    const encargadoNombre = encargadoReal?.nombre || op.nombre_encargado
     const terceroCC   = op.id_tercero ? String(op.id_tercero).replace(/^CC:\s*/, '').trim() : ''
     const fechaInicio = String(op.fecha_inicial || '').slice(0, 10)
     const fechaFin    = String(op.fecha_final   || '').slice(0, 10)
 
+    // Resolver cantidad efectiva: si real es null → asume teórico (sentido común,
+    // igual que muestra Effi). Si real === 0 → el operador lo puso explícitamente:
+    // se omite la línea (Effi rechaza materiales/productos con cantidad 0).
+    const _cantidadEfectiva = (l) => {
+      if (l.cantidad_real == null) return Number(l.cantidad_teorica ?? 0)
+      return Number(l.cantidad_real)
+    }
     const jsonOp = {
       sucursal_id, bodega_id,
       fecha_inicio: fechaInicio, fecha_fin: fechaFin,
@@ -2097,18 +2139,24 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
       tercero: terceroCC,
       activo_productivo_id: null,
       observacion,
-      materiales: lineas.filter(l => l.tipo === 'material').map(l => ({
-        cod_articulo: l.cod_articulo,
-        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
-        costo: Number(l.costo_unit || 0),
-        lote: '', serie: '',
-      })),
-      articulos_producidos: lineas.filter(l => l.tipo === 'producto').map(l => ({
-        cod_articulo: l.cod_articulo,
-        cantidad: Number(l.cantidad_real ?? l.cantidad_teorica ?? 0),
-        precio: Number(l.precio_unit || 0),
-        lote: '', serie: '',
-      })),
+      materiales: lineas
+        .filter(l => l.tipo === 'material')
+        .map(l => ({
+          cod_articulo: l.cod_articulo,
+          cantidad: _cantidadEfectiva(l),
+          costo: Number(l.costo_unit || 0),
+          lote: '', serie: '',
+        }))
+        .filter(m => m.cantidad > 0),
+      articulos_producidos: lineas
+        .filter(l => l.tipo === 'producto')
+        .map(l => ({
+          cod_articulo: l.cod_articulo,
+          cantidad: _cantidadEfectiva(l),
+          precio: Number(l.precio_unit || 0),
+          lote: '', serie: '',
+        }))
+        .filter(p => p.cantidad > 0),
       otros_costos: [],
     }
 
@@ -2161,8 +2209,10 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
     )
 
     // 10. Copiar g_op_lineas de la original a la nueva (datos congelados).
-    // Si el operador no editó cantidad_real, asume implícitamente cantidad_teorica
-    // (lo que Effi muestra). Por eso COALESCE(real, teorica).
+    // Reglas:
+    //  - Si cantidad_real es NULL, asume cantidad_teorica (lo que Effi muestra).
+    //  - Si cantidad efectiva = 0, omite la línea (no se manda a Effi, así que
+    //    tampoco debe quedar en g_op_lineas de la nueva).
     await db.gestion.query(
       `INSERT INTO g_op_lineas
         (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
@@ -2173,7 +2223,9 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
               COALESCE(cantidad_real, cantidad_teorica) AS cantidad_real,
               costo_unit, precio_unit,
               es_no_previsto, usuario_ult_modificacion
-       FROM g_op_lineas WHERE empresa = ? AND id_op = ?`,
+       FROM g_op_lineas
+       WHERE empresa = ? AND id_op = ?
+         AND COALESCE(cantidad_real, cantidad_teorica) > 0`,
       [idOpNueva, req.empresa, idOpOriginal]
     )
 
@@ -2209,19 +2261,24 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
       [idOpNueva, req.empresa, idOpOriginal]
     )
 
-    // 11. INSERT g_op_detalle para la nueva OP (validado_por, validado_en, op_anterior)
+    // 11. INSERT g_op_detalle para la nueva OP (validado_por, validado_en, op_anterior).
+    // También guarda encargado_real_cc/nombre si el operador eligió uno distinto.
     await db.gestion.query(
       `INSERT INTO g_op_detalle
-         (id_op, empresa, observaciones_lote, validado_por, validado_en, op_anterior, responsable_validado)
-       VALUES (?, ?, ?, ?, NOW(), ?, ?)
+         (id_op, empresa, observaciones_lote, validado_por, validado_en, op_anterior,
+          responsable_validado, encargado_real_cc, encargado_real_nombre)
+       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
-         observaciones_lote   = VALUES(observaciones_lote),
-         validado_por         = VALUES(validado_por),
-         validado_en          = VALUES(validado_en),
-         op_anterior          = VALUES(op_anterior),
-         responsable_validado = VALUES(responsable_validado)`,
+         observaciones_lote     = VALUES(observaciones_lote),
+         validado_por           = VALUES(validado_por),
+         validado_en            = VALUES(validado_en),
+         op_anterior            = VALUES(op_anterior),
+         responsable_validado   = VALUES(responsable_validado),
+         encargado_real_cc      = COALESCE(VALUES(encargado_real_cc), encargado_real_cc),
+         encargado_real_nombre  = COALESCE(VALUES(encargado_real_nombre), encargado_real_nombre)`,
       [idOpNueva, req.empresa, det?.observaciones_lote ?? null, req.usuario.email,
-       idOpOriginal, det?.responsable_validado ?? null]
+       idOpOriginal, det?.responsable_validado ?? null,
+       encargadoReal?.cc || null, encargadoReal?.nombre || null]
     )
 
     // 12. Snapshot tiempos en g_op_tiempos (id_nueva)
@@ -2240,12 +2297,15 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
         `UPDATE zeffi_produccion_encabezados SET estado = 'Anulada', vigencia = 'Anulado' WHERE id_orden = ?`,
         [idOpOriginal]
       )
+      // Para staging, si hay encargado real lo usamos (mismo formato 'CC: <cc>' que Effi).
+      const stagingEncargadoId     = encargadoReal?.cc ? `CC: ${encargadoReal.cc}` : op.id_encargado
+      const stagingEncargadoNombre = encargadoReal?.nombre || op.nombre_encargado
       await db.integracion.query(
         `INSERT IGNORE INTO zeffi_produccion_encabezados
            (id_orden, sucursal, bodega, id_encargado, nombre_encargado,
             fecha_inicial, fecha_final, fecha_de_creacion, observacion, estado, vigencia)
          VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 'Validado', 'Vigente')`,
-        [idOpNueva, op.sucursal, op.bodega, op.id_encargado, op.nombre_encargado,
+        [idOpNueva, op.sucursal, op.bodega, stagingEncargadoId, stagingEncargadoNombre,
          op.fecha_inicial, op.fecha_final, observacion]
       )
       // Insertar artículos producidos en staging para que la tabla de OPs
@@ -2264,7 +2324,7 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario) {
               cod_articulo, descripcion_articulo_producido, cantidad,
               vigencia, fecha_creacion)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Orden vigente', NOW())`,
-          [op.sucursal, op.bodega, idOpNueva, op.nombre_encargado, op.id_encargado,
+          [op.sucursal, op.bodega, idOpNueva, stagingEncargadoNombre, stagingEncargadoId,
            String(p.cod_articulo), p.descripcion,
            p.cantidad_real == null ? null : String(p.cantidad_real).replace('.', ',')]
         )
@@ -2317,7 +2377,10 @@ app.post('/api/gestion/op/:id_op/validar', requireAuth, async (req, res) => {
       [req.empresa, idOpOriginal, req.usuario.email]
     )
     const jobId = r.insertId
-    setImmediate(() => _jobValidar(jobId, idOpOriginal, req.empresa, req.usuario))
+    const enc = req.body?.encargado_real_cc
+      ? { cc: String(req.body.encargado_real_cc), nombre: String(req.body.encargado_real_nombre || '') }
+      : null
+    setImmediate(() => _jobValidar(jobId, idOpOriginal, req.empresa, req.usuario, enc))
     res.json({ ok: true, jobId, tipo: 'validar', estado: 'pendiente' })
   } catch (e) {
     console.error('[POST /op/:id/validar]', e)
