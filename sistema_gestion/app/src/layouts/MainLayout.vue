@@ -620,7 +620,7 @@ import JornadaHeader from 'src/components/JornadaHeader.vue'
 import SidebarSubSeccion from 'src/components/SidebarSubSeccion.vue'
 import { usePageSearch, emitirBusqueda, desactivarBusqueda } from 'src/composables/usePageSearch'
 
-const APP_VERSION = 'v2.12.1'
+const APP_VERSION = 'v2.12.2'
 const $q = useQuasar()
 
 // ─── Layout state ───

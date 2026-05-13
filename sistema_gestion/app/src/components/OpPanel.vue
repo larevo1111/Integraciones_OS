@@ -974,6 +974,7 @@ onUnmounted(() => _limpiarJob())
   color: var(--text-tertiary); padding: 4px 4px;
   border-bottom: 1px solid var(--border-default);
 }
+.op-table thead th.t-right { text-align: right; }
 .op-table tbody td { padding: 6px 4px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
 .op-table tbody tr:last-child td { border-bottom: none; }
 .t-right { text-align: right; }
