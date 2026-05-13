@@ -1552,13 +1552,18 @@ function onTareaActualizada(t) {
     if (tareaSeleccionada.value?.id === t.id) tareaSeleccionada.value = t
     return
   }
-  // Tarea principal
+  // Tarea principal: actualizar lista local Y refrescar desde backend para
+  // que el filtro activo (hoy/mañana/calendario/personalizado/etc) se
+  // re-aplique correctamente cuando cambia fecha o estado.
   const esCompletada = ['Completada','Cancelada'].includes(t.estado)
   tareas.value      = tareas.value.filter(x => x.id !== t.id)
   completadas.value = completadas.value.filter(x => x.id !== t.id)
   if (esCompletada) completadas.value.unshift(t)
   else              tareas.value.push(t)
   if (tareaSeleccionada.value?.id === t.id) tareaSeleccionada.value = t
+  // Refrescar lista para que el filtro actual remueva/re-incluya según
+  // los nuevos valores (fecha, estado, etc). No bloquea — corre async.
+  cargarTareas()
 }
 
 async function abrirPadre(parentId) {
@@ -1618,6 +1623,18 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* La lista de tareas vive dentro de un flex column con overflow:hidden.
+   Para que scrollee internamente: flex:1 (toma altura disponible),
+   min-height:0 (permite shrink debajo del contenido natural — clave para flex items
+   con overflow), overflow-y:auto (scroll vertical). Sin esto, el contenido se
+   recorta sin scroll. */
+.lista-tareas {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 /* Espacio para el badge de subtareas que flota debajo del círculo de estado */
 .sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
 
