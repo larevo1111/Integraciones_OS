@@ -1344,7 +1344,9 @@ app.post('/api/gestion/tareas/:id/revertir', async (req, res) => {
 
 // ─── OP LOOKUP (Effi) ─────────────────────────────────────────────
 
-// GET /api/gestion/ops  — OPs pendientes (Vigente + no Procesada) con artículos
+// GET /api/gestion/ops  — OPs disponibles para vincular a tareas (Generada + Procesada)
+// Excluye Validado y Anulada. Orden: Generadas primero, luego Procesadas, dentro
+// de cada grupo más recientes primero.
 // ?q=texto  → filtra por id_orden o descripción de artículo
 app.get('/api/gestion/ops', async (req, res) => {
   const q = (req.query.q || '').trim()
@@ -1356,10 +1358,12 @@ app.get('/api/gestion/ops', async (req, res) => {
                SEPARATOR ' / ') AS articulos
       FROM zeffi_produccion_encabezados e
       LEFT JOIN zeffi_articulos_producidos a ON a.id_orden = e.id_orden
-      WHERE e.vigencia = 'Vigente' AND e.estado != 'Procesada'
+      WHERE e.vigencia = 'Vigente' AND e.estado IN ('Generada', 'Procesada')
         ${q ? "AND (e.id_orden LIKE ? OR a.descripcion_articulo_producido LIKE ?)" : ''}
       GROUP BY e.id_orden, e.estado, e.fecha_de_creacion, e.fecha_final
-      ORDER BY e.id_orden DESC
+      ORDER BY
+        CASE e.estado WHEN 'Generada' THEN 1 WHEN 'Procesada' THEN 2 ELSE 9 END,
+        e.id_orden DESC
       LIMIT 30
     `, q ? [`%${q}%`, `%${q}%`] : [])
     res.json({ ok: true, ops: rows })
