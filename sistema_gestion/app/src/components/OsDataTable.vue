@@ -302,6 +302,9 @@ const props = defineProps({
   tooltips: { type: Object,  default: () => ({}) },
   selectedIds: { type: Array, default: () => [] },
   rowClass:     { type: Function, default: null },
+  // Filtros iniciales por columna. Formato: { <key>: { selected: [...], val, val2, op } }
+  // Ej: { estado_efectivo: { selected: ['Generada','Procesada'] } }
+  defaultFilters: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['row-click', 'select-toggle'])
@@ -390,6 +393,18 @@ function openColPopup(key) {
 // ── Filtros por columna ─────────────────────────────
 // Cada filtro: { op: string, val: string, val2: string, selected: Array }
 const columnFilters = ref({})
+
+// Inicializar columnFilters desde la prop defaultFilters al montar.
+// El usuario puede luego destildar o agregar selecciones libremente.
+watch(() => props.defaultFilters, (def) => {
+  if (!def || typeof def !== 'object') return
+  const init = {}
+  for (const [k, v] of Object.entries(def)) {
+    init[k] = { op: v.op || 'contains', val: v.val || '', val2: v.val2 || '', selected: [...(v.selected || [])] }
+  }
+  // Solo aplicar si columnFilters aún está vacío (no machacar cambios manuales del usuario)
+  if (!Object.keys(columnFilters.value).length) columnFilters.value = init
+}, { immediate: true })
 
 function getFilterOp(key) { return columnFilters.value[key]?.op || 'contains' }
 function getFilterVal(key) { return columnFilters.value[key]?.val || '' }

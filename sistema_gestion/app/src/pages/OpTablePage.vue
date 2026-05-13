@@ -5,6 +5,7 @@
       :columns="columnas"
       :rows="filas"
       :loading="cargando"
+      :default-filters="filtrosIniciales"
       @row-click="abrirOp"
     >
       <template #toolbar>
@@ -69,6 +70,10 @@ const ESTADO_COLOR = {
   Validado:  '#2db14a',
   Anulada:   '#888888',
 }
+
+// Filtros default al cargar la tabla: solo Generada + Procesada (las "vivas").
+// El usuario puede destildar/agregar otros estados desde el filtro de columna.
+const filtrosIniciales = { estado_efectivo: { selected: ['Generada', 'Procesada'] } }
 
 const columnas = computed(() => [
   { key: 'estado_efectivo',   label: 'Estado',     sortable: true, visible: true, width: '110px',
