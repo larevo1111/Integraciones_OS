@@ -789,7 +789,20 @@ async function eliminarLinea(l) {
   })
 }
 
-function abrirTarea(t) { tareaAbierta.value = { ...t } }
+async function abrirTarea(t) {
+  // /op/:id/ficha trae las tareas vinculadas con campos mínimos (id, titulo,
+  // estado, responsable, fechas, categoria_produccion). TareaPanel necesita
+  // la tarea completa (descripcion, categoria_color, etiquetas, responsables,
+  // proyecto_*, etc) — cargamos vía /tareas/:id antes de abrir el panel.
+  // Render optimista: mostramos lo que ya tenemos y refrescamos al llegar.
+  tareaAbierta.value = { ...t }
+  try {
+    const r = await api(`/api/gestion/tareas/${t.id}`)
+    if (r?.tarea) tareaAbierta.value = r.tarea
+  } catch (e) {
+    $q.notify({ type: 'negative', message: 'Error cargando tarea: ' + (e.message || e), position: 'top' })
+  }
+}
 function onTareaActualizada(t) {
   if (t && ficha.value) {
     const i = ficha.value.tareas_vinculadas.findIndex(x => x.id === t.id)
