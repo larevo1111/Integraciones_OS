@@ -1634,6 +1634,14 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
 }
+/* En mobile el bottom-tab-bar (52px + safe-area) flota encima del contenido.
+   Padding-bottom suficiente para que la última tarea NO quede tapada cuando
+   scrolleas hasta el fondo. */
+@media (max-width: 768px) {
+  .lista-tareas {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}
 
 /* Espacio para el badge de subtareas que flota debajo del círculo de estado */
 .sortable-tarea-wrap.has-subs { margin-bottom: 14px; }
