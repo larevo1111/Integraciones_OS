@@ -2166,22 +2166,34 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
       const h = Math.floor(m / 60), mm = m % 60
       return mm ? `${h}h${mm}m` : `${h}h`
     }
-    const tiemposStr = tiemposVivos.map(t => `${t.categoria} ${fmtMin(t.segundos)}`).join(' · ')
     const obsOrig = [
       (det?.observaciones_lote || '').replace(/\s+/g, ' ').trim(),
       (op.observacion || '').replace(/\s+/g, ' ').trim()
-    ].filter(Boolean).join(' | ').slice(0, 400)
+    ].filter(Boolean).join(' | ')
 
-    const observacion = [
+    // Effi limita a 255 chars el campo Observación. Armamos parte fija primero
+    // (LOTE + Validó + Reportó + fechas) y le agregamos lo más Obs orig que
+    // quepa hasta 250 chars (margen). Sin "Tiempos" (queda en g_op_tiempos).
+    const partes = [
       `LOTE ${idOpOriginal}`,
       `Validó: ${nombreValidador}`,
       `Reportó: ${nombreReportador}`,
       `Creada: ${fmtFecha(op.fecha_de_creacion)}`,
       det?.procesado_en ? `Procesada: ${fmtFecha(det.procesado_en)}` : null,
       `Validada: ${fmtFecha(new Date())}`,
-      tiemposStr ? `Tiempos: ${tiemposStr}` : null,
-      obsOrig ? `Obs orig: ${obsOrig}` : null
-    ].filter(Boolean).join(' · ')
+    ].filter(Boolean)
+    const cabezaObs = partes.join(' · ')
+    const LIMITE_EFFI_OBS = 250
+    let observacion = cabezaObs
+    if (obsOrig) {
+      const sufijoPrefix = ' · Obs orig: '
+      const disponible = LIMITE_EFFI_OBS - cabezaObs.length - sufijoPrefix.length
+      if (disponible > 20) {
+        const obsTrunc = obsOrig.length > disponible ? obsOrig.slice(0, disponible - 1) + '…' : obsOrig
+        observacion = cabezaObs + sufijoPrefix + obsTrunc
+      }
+    }
+    if (observacion.length > LIMITE_EFFI_OBS) observacion = observacion.slice(0, LIMITE_EFFI_OBS - 1) + '…'
 
     // 7. Preparar JSON para import_orden_produccion.js
     const sucursalIdMap = { 'Principal': 1 }
