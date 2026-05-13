@@ -1112,10 +1112,22 @@ onUnmounted(() => _limpiarJob())
 .op-subtarea-wrap {
   flex: 1; overflow-y: auto;
 }
+/* TareaPanel embebido dentro del OpPanel: ancho completo del wrap, sin
+   border-left propio. Sigue mismo patrón que ProyectoPanel. */
+.op-subtarea-wrap :deep(.tarea-panel) {
+  width: 100%; min-width: 100%;
+  border-left: none; height: 100%;
+}
 
 @media (max-width: 768px) {
   .op-panel { width: 100vw; }
   /* Espacio inferior para que el bottombar móvil no tape Procesar/Validar */
   .op-body { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0)); }
+  /* En mobile app.scss oculta globalmente .tarea-panel (display:none) porque
+     la vista mobile principal usa otro layout. Pero cuando lo embebemos como
+     sub-panel dentro del OpPanel, sí debe verse. Override aquí. */
+  .op-subtarea-wrap :deep(.tarea-panel) {
+    display: flex !important; width: 100%; min-width: 0; height: auto; border-left: none;
+  }
 }
 </style>
