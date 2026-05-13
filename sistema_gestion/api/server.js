@@ -1939,9 +1939,34 @@ function _ejecutarPython(args, timeoutMs, cwd) {
   })
 }
 
+// Renueva la sesión Effi (login automático Playwright, ~20-30s).
+// Se invoca cuando un POST falla por sesión expirada.
+let _refreshingSession = null  // promise compartida si múltiples jobs detectan el problema a la vez
+async function _refrescarSesionEffi(cwd) {
+  if (_refreshingSession) return _refreshingSession
+  _refreshingSession = (async () => {
+    console.log('[session] Renovando sesión Effi...')
+    const t0 = Date.now()
+    try {
+      await _ejecutarPlaywright([path.join(cwd, 'refresh_session.js')], 60000, cwd)
+      console.log(`[session] Renovada en ${((Date.now() - t0) / 1000).toFixed(2)}s`)
+    } finally {
+      _refreshingSession = null
+    }
+  })()
+  return _refreshingSession
+}
+
+function _esSesionExpirada(errMsg) {
+  const s = String(errMsg || '').toLowerCase()
+  return s.includes('sesión effi expirada') || s.includes('sesion expirada') ||
+         s.includes('/ingreso') || s.includes('regenerar con')
+}
+
 // Intenta POST directo (rápido) y cae a Playwright si falla.
 // Cada operación: ~60-120x más rápida con POST. El fallback Playwright
 // preserva la robustez si Effi cambia el formato del HTML / endpoint.
+// Si detecta sesión expirada, renueva y reintenta POST antes de caer a Playwright.
 async function _postOrPlaywright(postArgs, playwrightArgs, timeoutMs, cwd, opName) {
   try {
     console.log(`[${opName}] intentando POST directo...`)
@@ -1950,10 +1975,24 @@ async function _postOrPlaywright(postArgs, playwrightArgs, timeoutMs, cwd, opNam
     console.log(`[${opName}] POST OK en ${((Date.now() - t0) / 1000).toFixed(2)}s`)
     return out
   } catch (e) {
-    console.warn(`[${opName}] POST falló (${e.message.slice(0, 200)}) — fallback Playwright`)
-    const t0 = Date.now()
+    // Sesión expirada → renovar y reintentar POST (mantiene rapidez)
+    if (_esSesionExpirada(e.message)) {
+      console.warn(`[${opName}] POST falló por sesión expirada — renovando y reintentando`)
+      try {
+        await _refrescarSesionEffi(cwd)
+        const t1 = Date.now()
+        const out = await _ejecutarPython(postArgs, timeoutMs, cwd)
+        console.log(`[${opName}] POST OK tras refresh en ${((Date.now() - t1) / 1000).toFixed(2)}s`)
+        return out
+      } catch (e2) {
+        console.warn(`[${opName}] POST falló tras refresh (${e2.message.slice(0, 200)}) — fallback Playwright`)
+      }
+    } else {
+      console.warn(`[${opName}] POST falló (${e.message.slice(0, 200)}) — fallback Playwright`)
+    }
+    const t2 = Date.now()
     const out = await _ejecutarPlaywright(playwrightArgs, timeoutMs, cwd)
-    console.log(`[${opName}] Playwright OK en ${((Date.now() - t0) / 1000).toFixed(2)}s`)
+    console.log(`[${opName}] Playwright OK en ${((Date.now() - t2) / 1000).toFixed(2)}s`)
     return out
   }
 }

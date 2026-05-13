@@ -331,7 +331,16 @@
                     v-model="nuevaTareaEtiquetas"
                     :etiquetas="etiquetasGlobal"
                   />
-                  <input type="date" v-model="nuevaTareaFecha" class="quickadd-date" />
+                  <q-input
+                    v-model="nuevaTareaFecha"
+                    type="date"
+                    dense outlined
+                    class="quickadd-date"
+                  >
+                    <template #prepend>
+                      <q-icon name="event" size="16px" />
+                    </template>
+                  </q-input>
                 </div>
               </template>
 
