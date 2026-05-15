@@ -242,8 +242,15 @@ watch(() => props.tipo, () => { resultados.value = []; if (abierto.value) cargar
   font-size: 11px; font-weight: 700; color: var(--accent); flex-shrink: 0;
 }
 .art-nombre {
-  font-size: 13px; color: var(--text-primary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+  font-size: 13px; color: var(--text-primary); flex: 1;
+  /* Permitir hasta 2 líneas para nombres largos (ej. "Tableta Chocolate 73%
+     con Mani LT 50grs (sin empacar)"). Si se pasa, ellipsis al final. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .art-grupo {
