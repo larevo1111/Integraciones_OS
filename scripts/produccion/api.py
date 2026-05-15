@@ -986,7 +986,7 @@ def listar_recetas(familia: Optional[str] = None, estado: Optional[str] = None,
     sql = """
         SELECT r.id, r.cod_articulo, r.nombre, r.familia, r.patron,
                r.cantidad_lote_std, r.unidad_producto, r.confianza, r.estado,
-               r.n_ops_analizadas, r.updated_at,
+               r.n_ops_analizadas, r.updated_at, r.created_at,
                (SELECT COUNT(*) FROM prod_recetas_materiales WHERE receta_id=r.id) AS n_materiales,
                (SELECT COUNT(*) FROM prod_recetas_costos WHERE receta_id=r.id) AS n_costos
         FROM prod_recetas r
@@ -1033,9 +1033,12 @@ def listar_recetas(familia: Optional[str] = None, estado: Optional[str] = None,
         filtradas = []
         for r in recetas:
             fecha = ultima_op.get(r['cod_articulo'])
-            es_activa = fecha and str(fecha) >= '2026-01-01'
+            tiene_op_2026 = fecha and str(fecha) >= '2026-01-01'
+            # Receta nueva validada en 2026 cuenta como activa aunque no tenga OPs todavía
+            creada_2026 = r.get('created_at') and str(r['created_at']) >= '2026-01-01' and r.get('estado') == 'validada'
+            es_activa = tiene_op_2026 or creada_2026
             if tab == 'activas' and es_activa:
-                r['ultima_op'] = str(fecha)
+                r['ultima_op'] = str(fecha) if fecha else None
                 filtradas.append(r)
             elif tab == 'antiguas' and not es_activa:
                 r['ultima_op'] = str(fecha) if fecha else None
