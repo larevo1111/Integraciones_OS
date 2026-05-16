@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
-import { X, AlertTriangle, Loader2, CheckCircle2, Plus, Trash2 } from "lucide-react"
+import { X, AlertTriangle, Loader2, CheckCircle2, Plus, Trash2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Combobox } from "@/components/ui/combobox"
 import { api } from "@/lib/api"
+import { RecetaEditorModal } from "./receta-editor-modal"
 
 /**
  * Diálogo Programar OP — preview editable.
@@ -21,6 +22,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
   const [encargados, setEncargados] = useState([])
   const [encargadoCC, setEncargadoCC] = useState('')
   const [observacion, setObservacion] = useState('')
+  const [recetaEditarCod, setRecetaEditarCod] = useState(null)
 
   useEffect(() => {
     if (!open || solicitudes.length === 0) return
@@ -179,7 +181,7 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                 <div className="border border-border rounded-md overflow-x-auto">
                   <table className="w-full text-[12px]">
                     <thead className="bg-muted/30 text-[12px]">
-                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Producto</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-2 py-1.5 text-right">Subtotal</th><th className="w-8"></th></tr>
+                      <tr><th className="px-2 py-1.5 text-left">Cód</th><th className="px-2 py-1.5 text-left">Producto</th><th className="px-2 py-1.5 text-right">Cant</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-2 py-1.5 text-right">Subtotal</th><th className="w-16 text-center">Receta</th><th className="w-8"></th></tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {preview.productos.map((p, i) => (
@@ -193,6 +195,16 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-14 sm:w-20 ml-auto" value={p.cantidad} onChange={e => setProd(i, 'cantidad', e.target.value)} /></td>
                           <td className="px-2 py-1"><Input className="h-7 text-right text-[12px] w-16 sm:w-24 ml-auto" value={p.precio} onChange={e => setProd(i, 'precio', e.target.value)} /></td>
                           <td className="px-2 py-1 text-right font-mono">{fmt((parseFloat(p.cantidad)||0) * (parseFloat(p.precio)||0))}</td>
+                          <td className="px-1 py-1 text-center">
+                            <button
+                              onClick={() => setRecetaEditarCod(p.cod)}
+                              title="Modificar receta"
+                              className="text-muted-foreground hover:text-primary p-1 inline-flex items-center gap-1"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              <span className="hidden sm:inline text-[10px]">Receta</span>
+                            </button>
+                          </td>
                           <td className="px-1 py-1"><button onClick={() => removeProd(i)} className="text-muted-foreground hover:text-destructive p-1"><Trash2 className="h-3 w-3" /></button></td>
                         </tr>
                       ))}
@@ -314,6 +326,13 @@ export function ProgramarGrupoDialog({ open, onOpenChange, solicitudes, articulo
           </Button>
         </div>
       </div>
+
+      {/* Modal de edición de receta — abierto al click en el botón Receta de un producto */}
+      <RecetaEditorModal
+        cod={recetaEditarCod}
+        open={!!recetaEditarCod}
+        onOpenChange={(o) => { if (!o) setRecetaEditarCod(null) }}
+      />
     </div>
   )
 }
