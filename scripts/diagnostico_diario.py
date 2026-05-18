@@ -57,16 +57,6 @@ BDS_LOCALES = ['ia_service_os', 'effi_data', 'os_whatsapp', 'espocrm']
 # os_inventario migró a VPS (inventario_produccion_effi)
 
 sys.path.insert(0, BASE_DIR)
-from lib import cfg_remota_ssh, cfg_remota_db
-
-_ssh_i = cfg_remota_ssh('INTEGRACION')
-_db_i  = cfg_remota_db('INTEGRACION')
-HOSTINGER_CFG = dict(
-    host=_ssh_i['host'], port=3306,
-    user=_db_i['user'], password=_db_i['password'],
-    database=_db_i['database'],
-    connect_timeout=10, read_timeout=10,
-)
 
 
 # ── Helpers locales ───────────────────────────────────────────────────────────
@@ -149,32 +139,16 @@ def check_bds_locales():
 
 
 def check_hostinger():
-    """Verifica conexión a Hostinger. (lineas, fallos, acciones)"""
-    import pymysql
+    """Verifica conexión a os_integracion (VPS) via SSH tunnel. (lineas, fallos, acciones)"""
     try:
-        conn = pymysql.connect(**HOSTINGER_CFG)
-        cur = conn.cursor()
-        cur.execute('SELECT COUNT(*) FROM zeffi_facturas_venta_encabezados')
-        n = cur.fetchone()[0]
-        conn.close()
-        return [_ok(f'Hostinger ({n} facturas)')], 0, []
+        from lib import integracion
+        with integracion() as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT COUNT(*) FROM zeffi_facturas_venta_encabezados')
+            n = cur.fetchone()[0]
+        return [_ok(f'VPS os_integracion ({n} facturas)')], 0, []
     except Exception as e:
-        err = str(e)[:80]
-        rc, warp_st, _ = _run(['warp-cli', '--accept-tos', 'status'])
-        if 'Disconnected' in warp_st:
-            _log('Hostinger inalcanzable — activando WARP...')
-            _run(['warp-cli', '--accept-tos', 'connect'], timeout=10)
-            time.sleep(5)
-            try:
-                conn = pymysql.connect(**HOSTINGER_CFG)
-                cur = conn.cursor()
-                cur.execute('SELECT COUNT(*) FROM zeffi_facturas_venta_encabezados')
-                n = cur.fetchone()[0]
-                conn.close()
-                return [_warn(f'Hostinger ({n} fact) — WARP activado')], 0, []
-            except Exception:
-                pass
-        return [_fail(f'Hostinger — {err}')], 1, []
+        return [_fail(f'VPS os_integracion — {str(e)[:80]}')], 1, []
 
 
 def check_warp():
@@ -365,7 +339,7 @@ def main():
     checks = [
         ('SERVICIOS',    lambda: check_servicios(SERVICIOS_REQUERIDOS, _log)),
         ('BD LOCALES',   check_bds_locales),
-        ('HOSTINGER',    check_hostinger),
+        ('VPS os_integracion', check_hostinger),
         ('WARP',         check_warp),
         ('GPU / OLLAMA', check_gpu_ollama),
         ('APPS WEB',     check_apps_web),
