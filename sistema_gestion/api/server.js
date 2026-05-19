@@ -750,6 +750,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
     const [tareasBase] = await db.gestion.query(`
       SELECT t.id, t.parent_id, t.titulo, t.descripcion, t.estado, t.prioridad, t.responsable,
              t.categoria_id, c.nombre AS categoria_nombre, c.color AS categoria_color,
+             t.categoria_produccion_id, cp.nombre AS categoria_produccion_nombre,
              t.proyecto_id, p.nombre AS proyecto_nombre, p.color AS proyecto_color,
              t.fecha_limite, t.fecha_inicio_estimada, t.fecha_fin_estimada,
              t.fecha_inicio_real, t.fecha_fin_real,
@@ -767,6 +768,7 @@ app.get('/api/gestion/tareas/completadas', async (req, res) => {
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
+      LEFT JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
       WHERE ${where.join(' AND ')}
       ORDER BY t.fecha_fin_real DESC
       LIMIT 50
@@ -798,10 +800,12 @@ app.get('/api/gestion/tareas/:id', async (req, res) => {
     const [[tarea]] = await db.gestion.query(`
       SELECT t.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
              c.icono AS categoria_icono, c.es_produccion, c.es_empaque,
+             cp.nombre AS categoria_produccion_nombre,
              p.nombre AS proyecto_nombre, p.color AS proyecto_color
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
       LEFT JOIN g_proyectos p ON p.id = t.proyecto_id
+      LEFT JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
       WHERE t.id = ? AND t.empresa = ?
     `, [req.params.id, req.empresa])
 
@@ -838,6 +842,7 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
       SELECT t.id, t.parent_id, t.titulo, t.estado, t.prioridad,
              t.responsable, t.categoria_id,
              c.nombre AS categoria_nombre, c.color AS categoria_color,
+             t.categoria_produccion_id, cp.nombre AS categoria_produccion_nombre,
              t.proyecto_id, t.fecha_limite, t.tiempo_estimado_min,
              t.fecha_inicio_real, t.fecha_fin_real,
              t.duracion_usuario_seg, t.duracion_cronometro_seg, t.duracion_sistema_seg,
@@ -845,6 +850,7 @@ app.get('/api/gestion/tareas/:id/subtareas', async (req, res) => {
              (SELECT GROUP_CONCAT(tr.email SEPARATOR ',') FROM g_tareas_responsables tr WHERE tr.tarea_id = t.id) AS responsables_csv
       FROM g_tareas t
       JOIN g_categorias c ON c.id = t.categoria_id
+      LEFT JOIN g_categorias_produccion cp ON cp.id = t.categoria_produccion_id
       WHERE t.parent_id = ? AND t.empresa = ?
       ORDER BY FIELD(t.estado,'Pendiente','En Progreso','Completada','Cancelada'),
                FIELD(t.prioridad,'Urgente','Alta','Media','Baja'),
