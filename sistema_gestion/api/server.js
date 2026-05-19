@@ -1731,20 +1731,33 @@ app.get('/api/gestion/op/:id_op/ficha', requireAuth, async (req, res) => {
   }
 })
 
-// PUT /api/gestion/op/:id_op/detalle — guardar observaciones_lote + responsable_validado
+// PUT /api/gestion/op/:id_op/detalle — guardar cambios mientras la OP está en
+// Generada/Procesada (auto-save desde el panel detalle). Solo actualiza los
+// campos enviados (parcial). NO machaca el resto.
 app.put('/api/gestion/op/:id_op/detalle', requireAuth, async (req, res) => {
   const idOp = String(req.params.id_op)
-  const { observaciones_lote, responsable_validado } = req.body
+  const { observaciones_lote, responsable_validado, encargado_real_cc, encargado_real_nombre } = req.body
   try {
-    // UPSERT
-    await db.gestion.query(
-      `INSERT INTO g_op_detalle (id_op, empresa, observaciones_lote, responsable_validado)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         observaciones_lote   = VALUES(observaciones_lote),
-         responsable_validado = VALUES(responsable_validado)`,
-      [idOp, req.empresa, observaciones_lote ?? null, responsable_validado ?? null]
-    )
+    // Construir SET dinámico — solo campos pasados en el body
+    const campos = []
+    const vals  = []
+    if (observaciones_lote   !== undefined) { campos.push('observaciones_lote = ?');   vals.push(observaciones_lote) }
+    if (responsable_validado !== undefined) { campos.push('responsable_validado = ?'); vals.push(responsable_validado) }
+    if (encargado_real_cc    !== undefined) { campos.push('encargado_real_cc = ?');    vals.push(encargado_real_cc) }
+    if (encargado_real_nombre!== undefined) { campos.push('encargado_real_nombre = ?');vals.push(encargado_real_nombre) }
+    if (!campos.length) return res.json({ ok: true })  // nada que actualizar
+
+    // INSERT con todos los pasados o UPDATE de solo esos
+    const insertCols  = ['id_op', 'empresa']
+    const insertVals  = [idOp, req.empresa]
+    const insertPHs   = ['?', '?']
+    if (observaciones_lote   !== undefined) { insertCols.push('observaciones_lote');   insertVals.push(observaciones_lote);    insertPHs.push('?') }
+    if (responsable_validado !== undefined) { insertCols.push('responsable_validado'); insertVals.push(responsable_validado);  insertPHs.push('?') }
+    if (encargado_real_cc    !== undefined) { insertCols.push('encargado_real_cc');    insertVals.push(encargado_real_cc);     insertPHs.push('?') }
+    if (encargado_real_nombre!== undefined) { insertCols.push('encargado_real_nombre');insertVals.push(encargado_real_nombre); insertPHs.push('?') }
+    const sql = `INSERT INTO g_op_detalle (${insertCols.join(', ')}) VALUES (${insertPHs.join(', ')})
+                 ON DUPLICATE KEY UPDATE ${campos.join(', ')}`
+    await db.gestion.query(sql, [...insertVals, ...vals])
     res.json({ ok: true })
   } catch (e) {
     console.error('[PUT /op/:id/detalle]', e)

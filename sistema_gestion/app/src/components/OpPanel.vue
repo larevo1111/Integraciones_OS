@@ -512,7 +512,8 @@ const dialogConfirm = ref(false)
 const confirmTipo = ref('')              // 'procesar' | 'validar'
 const confirmAviso = ref('')             // HTML extra (warnings de calidad en validar)
 const encargadosLista = ref([])          // { email, nombre, cc, nivel } desde /api/gestion/encargados
-const encargadoRealCC = ref('')          // CC seleccionado en el dialog
+const encargadoRealCC = ref('')          // CC seleccionado (auto-save on change)
+let _ignorarProximoChangeEncargado = false  // skip save al hidratar desde ficha
 const articuloSeleccionado = ref(null)  // {cod, nombre, unidad, costo_unit, precio_unit, grupo}
 
 // Quickadd tarea vinculada a esta OP
@@ -542,6 +543,31 @@ const encargadosOptions = computed(() =>
 const encargadoRealNombre = computed(() => {
   const e = encargadosLista.value.find(x => x.cc === encargadoRealCC.value)
   return e?.nombre || ficha.value?.cabecera?.nombre_encargado || ''
+})
+
+// Auto-save del encargado real: al cambiar en el dropdown, PUT al detalle.
+// Skip el primer cambio (cuando hidratamos desde la ficha).
+watch(encargadoRealCC, async (nuevo, viejo) => {
+  if (_ignorarProximoChangeEncargado) {
+    _ignorarProximoChangeEncargado = false
+    return
+  }
+  if (!nuevo || nuevo === viejo) return
+  if (lineasBloqueadas.value) return  // no editable en Validada/Anulada
+  try {
+    const nombre = encargadosLista.value.find(e => e.cc === nuevo)?.nombre || ''
+    await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/detalle`, {
+      method: 'PUT',
+      body: JSON.stringify({ encargado_real_cc: nuevo, encargado_real_nombre: nombre })
+    })
+    if (ficha.value) {
+      if (!ficha.value.detalle) ficha.value.detalle = {}
+      ficha.value.detalle.encargado_real_cc = nuevo
+      ficha.value.detalle.encargado_real_nombre = nombre
+    }
+  } catch (e) {
+    $q.notify({ type: 'negative', message: 'Error guardando encargado: ' + (e.message || e), position: 'top' })
+  }
 })
 
 // Edición tiempos consolidados (nivel >= 5)
@@ -625,6 +651,9 @@ async function cargar() {
     }
     // Prellenar encargado real: si la OP ya tiene encargado_real_cc guardado, usar ese;
     // sino, default = CC del predefinido (Effi). Cargar lista en paralelo.
+    // _ignorarProximoChangeEncargado evita que el watcher dispare un save al
+    // hidratar inicialmente el ref desde la ficha.
+    _ignorarProximoChangeEncargado = true
     encargadoRealCC.value = r.detalle?.encargado_real_cc || _ccPredefinida()
     _cargarEncargados()
     if (!jobActivo.value) checarJobActivo()
