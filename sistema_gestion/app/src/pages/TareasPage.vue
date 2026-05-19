@@ -691,14 +691,17 @@ async function toggleSubtareas(tarea) {
     subtareasExpandidas.value = { ...subtareasExpandidas.value, [id]: false }
     return
   }
-  // Cargar subtareas si no están en caché
-  if (!subtareasData.value[id]) {
-    try {
-      const data = await api(`/api/gestion/tareas/${id}/subtareas`)
-      subtareasData.value = { ...subtareasData.value, [id]: data.subtareas || [] }
-    } catch (e) { console.error(e); return }
-  }
+  // Refrescar SIEMPRE al expandir (sin cache local stale). Si la tarea
+  // padre dice "subtareas_total=5" pero el cache local tiene solo 1
+  // (porque se agregaron subtareas en otra sesión / dispositivo / refresh),
+  // sin fetch los 5 nunca aparecerían. Mostrar primero el cache (instantáneo)
+  // y luego sobrescribir con el resultado fresco para no tener flicker.
+  if (!subtareasData.value[id]) subtareasData.value = { ...subtareasData.value, [id]: [] }
   subtareasExpandidas.value = { ...subtareasExpandidas.value, [id]: true }
+  try {
+    const data = await api(`/api/gestion/tareas/${id}/subtareas`)
+    subtareasData.value = { ...subtareasData.value, [id]: data.subtareas || [] }
+  } catch (e) { console.error(e) }
 }
 
 async function iniciarSubtarea(tarea) {
