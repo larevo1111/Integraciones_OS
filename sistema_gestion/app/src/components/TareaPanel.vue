@@ -27,10 +27,10 @@
         <textarea
           ref="tituloTextareaRef"
           class="tarea-panel-titulo"
-          :value="tarea.titulo"
+          :value="camposPendientes.titulo !== undefined ? camposPendientes.titulo : tarea.titulo"
           rows="1"
-          @input="autoResizeTitulo"
-          @blur="e => e.target.value.trim() && e.target.value !== tarea.titulo && actualizar('titulo', e.target.value.trim())"
+          @input="e => { camposPendientes.titulo = e.target.value; autoResizeTitulo() }"
+          @blur="onBlurTitulo"
           @keydown.enter.prevent="e => { e.target.blur() }"
         />
       </div>
@@ -543,11 +543,35 @@ async function guardarCampoPendiente(campo, valor) {
 
 async function guardarPendientes() {
   for (const [campo, val] of Object.entries(camposPendientes)) {
-    if (val !== undefined && val !== (props.tarea[campo] || '')) {
-      await actualizar(campo, val)
+    if (val === undefined) continue
+    // Título: si quedó vacío al guardar, se descarta el cambio (no permitir
+    // títulos vacíos). El usuario verá el título original al recargar la ficha.
+    if (campo === 'titulo' && !String(val).trim()) continue
+    const valFinal = campo === 'titulo' ? String(val).trim() : val
+    if (valFinal !== (props.tarea[campo] || '')) {
+      await actualizar(campo, valFinal)
     }
   }
   Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
+}
+
+// Blur del título: si el valor es vacío revertir al original; si difiere
+// del actual, guardar de inmediato. Si el usuario sale del panel sin
+// blur, el chulito 'Guardar cambios' en el header dispara guardarPendientes().
+function onBlurTitulo(e) {
+  const valor = String(e.target.value || '').trim()
+  if (!valor) {
+    // Revertir: no permitir vacíos
+    delete camposPendientes.titulo
+    e.target.value = props.tarea.titulo
+    return
+  }
+  if (valor === props.tarea.titulo) {
+    // Sin cambios reales
+    delete camposPendientes.titulo
+    return
+  }
+  guardarCampoPendiente('titulo', valor)
 }
 
 const mostrarConfirmGuardar = ref(false)
