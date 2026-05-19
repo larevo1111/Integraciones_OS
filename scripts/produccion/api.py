@@ -177,37 +177,40 @@ def _is_conn_lost(err):
             or 'broken pipe' in s or '2013' in s or '2006' in s)
 
 
-def q(db, sql, params=None, _retry=True):
-    cfg = _resolve_db(db)
-    try:
-        conn = pymysql.connect(**cfg)
+def _run_with_retry(db, sql, params, write):
+    """Ejecuta query/exec con 3 reintentos + backoff (50/250/1000 ms) ante conn-lost.
+    El bug del 2026-05-19 dejó jobs zombie porque exe() solo tenía 1 reintento y los
+    UPDATE finales del background fallaron por 'Lost connection to MySQL during query'."""
+    import time as _time
+    backoffs = (0, 0.05, 0.25, 1.0)
+    last_err = None
+    for delay in backoffs:
+        if delay: _time.sleep(delay)
+        cfg = _resolve_db(db)
         try:
-            with conn.cursor() as cur:
-                cur.execute(sql, params or ())
-                return cur.fetchall()
-        finally:
-            conn.close()
-    except pymysql.err.OperationalError as e:
-        if _retry and _is_conn_lost(e):
-            return q(db, sql, params, _retry=False)
-        raise
+            conn = pymysql.connect(**cfg)
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, params or ())
+                    if write:
+                        conn.commit()
+                        return cur.lastrowid or cur.rowcount
+                    return cur.fetchall()
+            finally:
+                conn.close()
+        except pymysql.err.OperationalError as e:
+            last_err = e
+            if not _is_conn_lost(e):
+                raise
+    raise last_err
 
 
-def exe(db, sql, params=None, _retry=True):
-    cfg = _resolve_db(db)
-    try:
-        conn = pymysql.connect(**cfg)
-        try:
-            with conn.cursor() as cur:
-                cur.execute(sql, params or ())
-                conn.commit()
-                return cur.lastrowid or cur.rowcount
-        finally:
-            conn.close()
-    except pymysql.err.OperationalError as e:
-        if _retry and _is_conn_lost(e):
-            return exe(db, sql, params, _retry=False)
-        raise
+def q(db, sql, params=None):
+    return _run_with_retry(db, sql, params, write=False)
+
+
+def exe(db, sql, params=None):
+    return _run_with_retry(db, sql, params, write=True)
 
 
 # ── Sugerencia de receta ───────────────────────────────────
@@ -392,8 +395,11 @@ def _construir_observacion(productos: list, usuario: str, solicitudes_ids: list,
 def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: list, json_path: str):
     """Tarea en background: intenta POST directo (rápido ~1s), si falla cae a Playwright (~60-90s).
     Actualiza prod_ops_creadas + prod_solicitudes según resultado.
+
+    BLINDADO: el try/finally garantiza que el job nunca quede en estado 'ejecutando'
+    aunque una excepción mate la rutina (ver bug del 2026-05-19 — job #45 zombie).
     """
-    import json as _j, time as _time, io as _io
+    import json as _j, time as _time, io as _io, traceback as _tb
     from contextlib import redirect_stdout, redirect_stderr
     from datetime import date as _date
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/..'
@@ -403,8 +409,10 @@ def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: l
     op_id = None
     log_buffer = []
     metodo = 'post_directo'
+    estado_final = None  # 'ok' | 'error' — si queda None al final, _safety_net lo marca como error
 
     def _marcar_error(err_msg, log_extra=''):
+        nonlocal estado_final
         duracion = int(_time.time() - t0)
         log_full = '\n'.join(log_buffer) + ('\n--- STDERR ---\n' + log_extra if log_extra else '')
         exe(DB_PROD, "UPDATE prod_ops_creadas SET log_creacion=%s, duracion_seg=%s, estado='error', error=%s WHERE id=%s",
@@ -412,6 +420,7 @@ def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: l
         ph = ','.join(['%s'] * len(solicitudes_ids))
         exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
             tuple(solicitudes_ids))
+        estado_final = 'error'
 
     # ── INTENTO 1: POST directo (rápido) ──────────────────────────────────
     try:
@@ -491,6 +500,30 @@ def _ejecutar_op_background(historico_id: int, payload: dict, solicitudes_ids: l
         SET estado='programado', op_effi=%s, fecha_programada=COALESCE(fecha_programada, %s)
         WHERE id IN ({ph})
     """, tuple([str(op_id), hoy, *solicitudes_ids]))
+    estado_final = 'ok'
+
+
+def _ejecutar_op_background_safe(historico_id: int, payload: dict, solicitudes_ids: list, json_path: str):
+    """Wrapper que garantiza que prod_ops_creadas + prod_solicitudes queden en un estado
+    terminal SIEMPRE, aunque _ejecutar_op_background lance una excepción no manejada o
+    la BD se caiga durante el UPDATE final. Bug del 2026-05-19: job #45 zombie."""
+    import time as _t, traceback as _tb
+    try:
+        _ejecutar_op_background(historico_id, payload, solicitudes_ids, json_path)
+    except Exception as e:
+        tb = _tb.format_exc()[:1500]
+        # Safety net: el job NO debe quedar 'ejecutando'. Reintentar hasta 5 veces con backoff fuerte.
+        for delay in (0, 1, 3, 10, 30):
+            if delay: _t.sleep(delay)
+            try:
+                exe(DB_PROD, "UPDATE prod_ops_creadas SET estado='error', error=%s WHERE id=%s AND estado='ejecutando'",
+                    (f'Excepción no manejada: {e}\n{tb}'[:500], historico_id))
+                ph = ','.join(['%s'] * len(solicitudes_ids))
+                exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='solicitado' WHERE id IN ({ph}) AND estado='programando'",
+                    tuple(solicitudes_ids))
+                break
+            except Exception:
+                continue
 
 
 @app.post("/api/produccion/crear-op-effi")
@@ -549,7 +582,7 @@ def api_crear_op_effi(req: CrearOpRequest, background_tasks: BackgroundTasks, us
     exe(DB_PROD, f"UPDATE prod_solicitudes SET estado='programando' WHERE id IN ({ph})", tuple(req.solicitudes_ids))
 
     # 3) Lanzar Playwright en background
-    background_tasks.add_task(_ejecutar_op_background, historico_id, payload, req.solicitudes_ids, path)
+    background_tasks.add_task(_ejecutar_op_background_safe, historico_id, payload, req.solicitudes_ids, path)
 
     return {"ok": True, "historico_id": historico_id, "mensaje": "OP en proceso (~60s). Podés seguir trabajando.", "estado": "ejecutando"}
 

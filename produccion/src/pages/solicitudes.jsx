@@ -40,13 +40,16 @@ export function SolicitudesPage() {
     [solicitudes, selectedIds]
   )
 
-  const cargar = useCallback(async () => {
-    setLoading(true)
+  const cargar = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
     try {
       const data = await api.get('/api/solicitudes?_end=500')
-      setSolicitudes(data)
+      setSolicitudes(prev => {
+        if (prev.length === data.length && JSON.stringify(prev) === JSON.stringify(data)) return prev
+        return data
+      })
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -64,11 +67,13 @@ export function SolicitudesPage() {
     return () => window.removeEventListener('effi-synced', h)
   }, [cargar, cargarArticulos])
 
-  // Auto-refresh cada 5s mientras haya solicitudes en estado 'programando' (OP en background)
+  // Auto-refresh silencioso mientras haya solicitudes en estado 'programando'.
+  // silent=true: NO toca loading state (evita spinner/blink) y solo dispara setSolicitudes
+  // si los datos realmente cambiaron (evita rerender de toda la tabla cada 8s).
   useEffect(() => {
     const hayProgramando = solicitudes.some(s => s.estado === 'programando')
     if (!hayProgramando) return
-    const t = setInterval(() => cargar(), 5000)
+    const t = setInterval(() => cargar({ silent: true }), 8000)
     return () => clearInterval(t)
   }, [solicitudes, cargar])
 
