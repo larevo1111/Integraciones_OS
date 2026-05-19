@@ -139,13 +139,16 @@ function rangoPlaceholder(pc) {
 }
 function rangoVisual(pc) {
   const m = medicion(pc.id)
-  // Si tiene valor → ✓ rango / ✗ fuera
+  const tieneRango = pc.rango_min != null || pc.rango_max != null
+  const rangoTxt = tieneRango ? `${fmtNum(pc.rango_min)}–${fmtNum(pc.rango_max)}` : ''
+  // Con valor: ✓ rango / ✗ fuera — pero SIEMPRE mostrar el rango numérico
+  // para que el operario sepa cuál era el target.
   if (m && m.valor_numerico != null && m.valor_numerico !== '') {
-    return m.dentro_rango === 1 ? '✓ rango' : '✗ fuera'
+    const prefix = m.dentro_rango === 1 ? '✓' : '✗ fuera de'
+    return tieneRango ? `${prefix} ${rangoTxt}` : prefix.replace('fuera de', 'fuera')
   }
-  // Sin valor → mostrar el rango como guía
-  if (pc.rango_min == null && pc.rango_max == null) return ''
-  return `${fmtNum(pc.rango_min)}–${fmtNum(pc.rango_max)}`
+  // Sin valor → solo el rango como guía
+  return rangoTxt
 }
 function rangoClass(pc) {
   const m = medicion(pc.id)
