@@ -1654,7 +1654,7 @@ app.get('/api/gestion/op/:id_op/ficha', requireAuth, async (req, res) => {
 
     const [lineas] = await db.gestion.query(
       `SELECT id, tipo, cod_articulo, descripcion, unidad,
-              cantidad_teorica, cantidad_real, costo_unit, precio_unit, es_no_previsto
+              cantidad_teorica, cantidad_real, costo_unit, precio_unit, es_no_previsto, fuente
        FROM g_op_lineas
        WHERE empresa = ? AND id_op = ?
        ORDER BY tipo DESC, descripcion`,
@@ -1876,6 +1876,127 @@ app.get('/api/gestion/articulos', requireAuth, async (req, res) => {
     articulos.sort((a,b) => a.score - b.score || a.nombre.localeCompare(b.nombre))
     res.json({ articulos: articulos.slice(0, 30) })
   } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /api/gestion/articulos/no-conformes?q=texto
+// Lista artículos con stock > 0 en bodega "Productos No Conformes Bod PPAL" (id=17),
+// para alimentar el selector de "Material de reproceso" en OpPanel.
+// Bodega "No conformes" identificada en zeffi_bodegas: id=17, nombre exacto en columna
+// stock_bodega_productos_no_conformes_bod_ppal_sucursal_principal.
+app.get('/api/gestion/articulos/no-conformes', requireAuth, async (req, res) => {
+  const q = String(req.query.q || '').trim()
+  try {
+    let sql = `SELECT id, nombre, tipo_de_articulo,
+                 CAST(REPLACE(stock_bodega_productos_no_conformes_bod_ppal_sucursal_principal, ',', '.') AS DECIMAL(15,4)) AS stock_no_conf,
+                 CAST(REPLACE(COALESCE(NULLIF(costo_manual,''), NULLIF(costo_promedio,''), NULLIF(ultimo_costo,'0')), ',', '.') AS DECIMAL(15,2)) AS costo_unit
+               FROM zeffi_inventario
+               WHERE vigencia = 'Vigente'
+                 AND CAST(REPLACE(stock_bodega_productos_no_conformes_bod_ppal_sucursal_principal, ',', '.') AS DECIMAL(15,4)) > 0`
+    const params = []
+    if (q) {
+      for (const w of q.split(/\s+/).filter(Boolean)) {
+        sql += ' AND (id LIKE ? OR nombre LIKE ?)'
+        params.push(`%${w}%`, `%${w}%`)
+      }
+    }
+    sql += ' ORDER BY nombre ASC LIMIT 60'
+    const [rows] = await db.integracion.query(sql, params)
+    res.json({
+      articulos: rows.map(r => ({
+        cod: String(r.id),
+        nombre: r.nombre || '',
+        tipo_effi: r.tipo_de_articulo || '',
+        stock_no_conformes: Number(r.stock_no_conf) || 0,
+        costo_unit: r.costo_unit ? Number(r.costo_unit) : null,
+      })),
+    })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// POST /api/gestion/op/:id_op/reproceso
+// Orquesta: (1) traslado en Effi de bodega No conformes (17) → Principal (1)
+//           (2) agrega línea de material a g_op_lineas con fuente='reproceso'.
+// Body: { cod_articulo, descripcion, cantidad, unidad, costo_unit, observacion_traslado? }
+// Solo permitido si la OP está en estado 'Generada'. Si el traslado falla, NO inserta línea.
+const REPO_INTEGRACIONES = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
+const BODEGA_NO_CONFORMES = 17
+const BODEGA_PRINCIPAL = 1
+
+function _trasladoCrear(payload) {
+  // Promesa que ejecuta el script Python POST. Devuelve id_traslado.
+  return new Promise((resolve, reject) => {
+    const tmpPath = `/tmp/traslado_reproceso_${Date.now()}_${Math.random().toString(36).slice(2,8)}.json`
+    require('fs').writeFileSync(tmpPath, JSON.stringify(payload))
+    execFile('python3', [`${REPO_INTEGRACIONES}/scripts/import_traslado_inventario_post.py`, tmpPath],
+      { timeout: 30000, cwd: REPO_INTEGRACIONES }, (err, stdout, stderr) => {
+        try { require('fs').unlinkSync(tmpPath) } catch {}
+        if (err) return reject(new Error(`Script traslado falló: ${stderr || err.message}`))
+        const m = (stdout || '').match(/TRASLADO_CREADO:(\d+)/)
+        if (!m) return reject(new Error(`Script no devolvió TRASLADO_CREADO. stdout=${(stdout||'').slice(-300)}`))
+        resolve(Number(m[1]))
+      })
+  })
+}
+
+app.post('/api/gestion/op/:id_op/reproceso', requireAuth, async (req, res) => {
+  const idOp = String(req.params.id_op)
+  const { cod_articulo, descripcion, cantidad, unidad, costo_unit } = req.body
+  if (!cod_articulo) return res.status(400).json({ error: 'cod_articulo requerido' })
+  const cant = Number(String(cantidad || '').replace(',', '.'))
+  if (!cant || cant <= 0) return res.status(400).json({ error: 'cantidad > 0 requerida' })
+
+  try {
+    // 1) Verificar OP en estado Generada
+    const [[op]] = await db.integracion.query(
+      'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ?', [idOp]
+    )
+    if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
+    if (op.estado !== 'Generada') {
+      return res.status(400).json({ error: `Solo se puede agregar reproceso a OPs Generadas (estado actual: ${op.estado})` })
+    }
+
+    // 2) Verificar stock disponible en bodega No conformes
+    const [[art]] = await db.integracion.query(
+      `SELECT nombre,
+              CAST(REPLACE(stock_bodega_productos_no_conformes_bod_ppal_sucursal_principal, ',', '.') AS DECIMAL(15,4)) AS stock_nc
+       FROM zeffi_inventario WHERE id = ?`, [String(cod_articulo)]
+    )
+    if (!art) return res.status(404).json({ error: `Artículo ${cod_articulo} no existe en Effi` })
+    if (Number(art.stock_nc) < cant) {
+      return res.status(400).json({ error: `Stock insuficiente en No conformes: ${art.stock_nc} disponible, ${cant} solicitado` })
+    }
+
+    // 3) Traslado en Effi (No conformes → Principal)
+    const idTraslado = await _trasladoCrear({
+      sucursal_origen: 1, bodega_origen: BODEGA_NO_CONFORMES,
+      sucursal_destino: 1, bodega_destino: BODEGA_PRINCIPAL,
+      observacion: `Reproceso OP ${idOp} · solicitado por ${req.usuario.email}`,
+      articulos: [{
+        cod_articulo: String(cod_articulo),
+        descripcion: descripcion || art.nombre,
+        cantidad: cant,
+        lote: '', serie: '',
+      }],
+    })
+
+    // 4) Insertar línea en g_op_lineas como material no previsto con fuente='reproceso'
+    const [r] = await db.gestion.query(
+      `INSERT INTO g_op_lineas
+        (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
+         cantidad_teorica, cantidad_real, costo_unit, precio_unit,
+         es_no_previsto, fuente, usuario_ult_modificacion)
+       VALUES (?, ?, 'material', ?, ?, ?, NULL, ?, ?, NULL, 1, 'reproceso', ?)`,
+      [idOp, req.empresa, String(cod_articulo), descripcion || art.nombre, unidad || '',
+       cant, costo_unit ?? null, req.usuario.email]
+    )
+
+    res.json({ ok: true, id_linea: r.insertId, id_traslado: idTraslado })
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe una línea para ese cod en esta OP. Editá la cantidad existente o eliminala primero.' })
     res.status(500).json({ error: e.message })
   }
 })

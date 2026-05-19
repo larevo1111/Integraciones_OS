@@ -115,7 +115,8 @@
                   <tr v-for="l in ficha.materiales" :key="l.id">
                     <td>
                       <span class="text-grey">{{ l.cod_articulo }}</span>
-                      <span v-if="l.es_no_previsto" class="badge-no-prev">+</span>
+                      <span v-if="l.fuente === 'reproceso'" class="badge-reproceso" title="Material de reproceso (traslado automático desde No conformes)">reproceso</span>
+                      <span v-else-if="l.es_no_previsto" class="badge-no-prev">+</span>
                       <div>{{ l.descripcion }}</div>
                     </td>
                     <td class="t-right text-grey">{{ fmtNum(l.cantidad_teorica) }} {{ l.unidad }}</td>
@@ -142,6 +143,7 @@
               </table>
               <div v-if="puedeAgregar" class="op-add-line">
                 <button class="op-btn-add" @click="abrirNuevaLinea('material')">+ agregar material no previsto</button>
+                <button class="op-btn-add" @click="abrirReproceso" title="Traslada el material desde bodega No conformes a Principal en Effi, y lo agrega como material no previsto a la OP">+ material de reproceso</button>
               </div>
             </div>
 
@@ -437,6 +439,63 @@
       </q-card>
     </q-dialog>
 
+    <!-- Diálogo: agregar material de reproceso (traslado No conformes → Principal) -->
+    <q-dialog v-model="dialogReproceso" persistent>
+      <q-card style="min-width:420px;max-width:90vw">
+        <q-card-section>
+          <div class="text-h6">Material de reproceso</div>
+          <div class="text-caption text-grey" style="margin-top:4px">
+            Solo lista artículos con stock en bodega <b>"Productos No Conformes Bod PPAL"</b>.
+            Al confirmar: traslado en Effi a Principal + agrega como material a esta OP.
+          </div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <div class="text-caption text-grey q-mb-xs">Artículo a reprocesar</div>
+          <q-select
+            v-model="reprocesoArt"
+            :options="reprocesoOpts"
+            use-input input-debounce="350"
+            @filter="buscarNoConformes"
+            option-label="label" option-value="cod"
+            placeholder="Buscar por código o nombre…"
+            dense filled emit-value="false" map-options
+            clearable hide-selected fill-input
+            no-error-icon
+          >
+            <template v-slot:no-option>
+              <q-item><q-item-section class="text-grey">Escribí para buscar…</q-item-section></q-item>
+            </template>
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps">
+                <q-item-section>
+                  <q-item-label>{{ scope.opt.cod }} · {{ scope.opt.nombre }}</q-item-label>
+                  <q-item-label caption>Stock no conformes: {{ scope.opt.stock_no_conformes }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <div v-if="reprocesoArt" class="row items-end q-gutter-sm q-mt-md">
+            <q-input
+              v-model="reprocesoCant"
+              label="Cantidad a reprocesar"
+              dense filled inputmode="decimal" autofocus
+              class="col"
+              :hint="`Disponible: ${reprocesoArt.stock_no_conformes}`"
+            />
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" :disable="reprocesoEnviando" @click="cerrarReproceso" />
+          <q-btn
+            unelevated label="Trasladar + agregar" color="primary"
+            :loading="reprocesoEnviando"
+            :disable="!reprocesoArt || !reprocesoCant"
+            @click="confirmarReproceso"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Diálogo: agregar línea no prevista -->
     <q-dialog v-model="dialogNuevaLinea" persistent>
       <q-card style="min-width:380px;max-width:90vw">
@@ -507,6 +566,13 @@ const procesando  = ref(false)
 const validando   = ref(false)
 const dialogNuevaLinea = ref(false)
 const nuevaLinea = reactive({ tipo: 'material', cantidad_real: '' })
+
+// Material de reproceso: traslado en Effi (No conformes → Principal) + agrega como material no previsto.
+const dialogReproceso = ref(false)
+const reprocesoArt = ref(null)         // { cod, nombre, stock_no_conformes, costo_unit }
+const reprocesoCant = ref('')
+const reprocesoOpts = ref([])
+const reprocesoEnviando = ref(false)
 
 // Diálogo confirmar procesar/validar con selector de encargado real
 const dialogConfirm = ref(false)
@@ -774,6 +840,61 @@ function cerrarDialogNuevaLinea() {
   dialogNuevaLinea.value = false
   articuloSeleccionado.value = null
   nuevaLinea.cantidad_real = ''
+}
+
+function abrirReproceso() {
+  reprocesoArt.value = null
+  reprocesoCant.value = ''
+  reprocesoOpts.value = []
+  dialogReproceso.value = true
+}
+function cerrarReproceso() {
+  if (reprocesoEnviando.value) return
+  dialogReproceso.value = false
+  reprocesoArt.value = null
+  reprocesoCant.value = ''
+}
+async function buscarNoConformes(val, update) {
+  try {
+    const q = (val || '').trim()
+    const r = await api(`/api/gestion/articulos/no-conformes${q ? '?q=' + encodeURIComponent(q) : ''}`)
+    const opts = (r.articulos || []).map(a => ({ ...a, label: `${a.cod} · ${a.nombre}` }))
+    update(() => { reprocesoOpts.value = opts })
+  } catch {
+    update(() => { reprocesoOpts.value = [] })
+  }
+}
+async function confirmarReproceso() {
+  if (!reprocesoArt.value) return
+  const a = reprocesoArt.value
+  const cant = parseDecimal(reprocesoCant.value)
+  if (!cant || cant <= 0) {
+    $q.notify({ type: 'negative', message: 'Cantidad inválida', position: 'top' })
+    return
+  }
+  if (cant > a.stock_no_conformes) {
+    $q.notify({ type: 'negative', message: `Solo hay ${a.stock_no_conformes} disponibles en No conformes`, position: 'top' })
+    return
+  }
+  reprocesoEnviando.value = true
+  try {
+    const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/reproceso`, {
+      method: 'POST',
+      body: JSON.stringify({
+        cod_articulo: a.cod, descripcion: a.nombre,
+        cantidad: cant, costo_unit: a.costo_unit ?? null,
+      })
+    })
+    dialogReproceso.value = false
+    reprocesoArt.value = null
+    reprocesoCant.value = ''
+    await cargar()
+    $q.notify({ type: 'positive', message: `Traslado #${r.id_traslado} + material agregado`, position: 'top' })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.message || 'Error en reproceso', position: 'top', timeout: 6000 })
+  } finally {
+    reprocesoEnviando.value = false
+  }
 }
 
 async function agregarLineaNoPrevista() {
@@ -1061,8 +1182,14 @@ onUnmounted(() => _limpiarJob())
   font-size: 10px; padding: 0 4px; border-radius: 6px;
   background: var(--accent); color: #fff; font-weight: 600;
 }
+.badge-reproceso {
+  display: inline-block; margin-left: 4px;
+  font-size: 10px; padding: 0 6px; border-radius: 6px;
+  background: #b45309; color: #fff; font-weight: 600;
+  letter-spacing: 0.3px; text-transform: uppercase;
+}
 
-.op-add-line { margin-top: 6px; }
+.op-add-line { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
 .op-btn-add {
   background: transparent; color: var(--accent);
   border: 1px dashed var(--border-default);
