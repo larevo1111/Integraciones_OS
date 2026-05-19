@@ -45,10 +45,12 @@ try:
     from infisical import get_many as _infisical_get_many  # type: ignore
     _shared = _infisical_get_many('/shared')
     for _k, _v in _shared.items():
-        # Solo sobreescribe valores explícitos del proceso si no fueron seteados ya.
-        # Los valores del .env se cargaron arriba en os.environ — los reemplazamos
-        # con los de Infisical (más recientes / fuente de verdad).
-        os.environ[_k] = _v
+        # NO sobreescribir si ya está en os.environ (cargado del .env). Esto evita
+        # desincronizaciones catastróficas si Infisical guarda un password viejo
+        # que rompe la conexión: el .env (controlado por nosotros y validado contra
+        # MariaDB) gana. Doc: .agent/docs/INCIDENT_2026-05-14_INFISICAL_DB_PASS_VIEJO.md
+        if _k not in os.environ:
+            os.environ[_k] = _v
     _INFISICAL_LOADED = True
 except Exception as _e:
     print(f'[db_conn] WARN: Infisical bootstrap falló, usando .env: {_e}', file=sys.stderr)

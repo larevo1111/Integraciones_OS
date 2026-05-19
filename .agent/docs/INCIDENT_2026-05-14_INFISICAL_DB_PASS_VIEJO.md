@@ -58,3 +58,37 @@ Restart `os-gestion.service` para que el helper Infisical lea el valor actualiza
 - `lib/db_conn.js` actualmente prioriza Infisical sobre `.env`. Eso es **correcto** según la política — pero implica que cualquier desfase entre el password real de MariaDB y el de Infisical rompe TODO. La fuente de verdad debe ser Infisical, no el `.env`.
 - El `.env` debería eliminarse después de migrar todas las credenciales (la política § "Prohibiciones absolutas" lo exige).
 - Falta una verificación de salud que detecte estos desfases sin esperar a que un operador haga clic en "Sincronizar Effi".
+
+---
+
+## Reincidencia 2026-05-19
+
+El bug se repitió en la misma forma exacta: Infisical tenía un password viejo
+(`znHo...`) y el `.env` el bueno (`WeYB...`). Santi confirmó que **NO ha tocado
+Infisical manualmente**. No hay crons ni scripts del repo que escriban a Infisical.
+La rotación viene de algún sistema externo desconocido (posiblemente la UI web
+de Infisical accedida por otro dispositivo / cuenta, o un job interno del
+servidor Infisical).
+
+## Fix definitivo (2026-05-19)
+
+Cambio de prioridad en los helpers de carga de credenciales:
+
+- `lib/db_conn.js` (Node) — el bootstrap de Infisical ahora hace
+  `if (!(k in process.env)) process.env[k] = v`. Si la variable ya viene del
+  `.env`, **no se sobreescribe**.
+- `scripts/lib/db_conn.py` (Python) — mismo principio con `if _k not in os.environ`.
+
+Esto invierte la jerarquía: ahora el `.env` (cuyo valor podemos validar
+contra MariaDB en cualquier momento) tiene prioridad. Infisical pasa a ser
+"fallback" para variables ausentes en el `.env`.
+
+**Trade-off conocido**: contradice levemente la política § "Infisical es fuente
+única" durante la transición. Pero la realidad operativa muestra que algo está
+rotando Infisical fuera de nuestro control, y la consecuencia (apps caídas
+por desincronización) es peor que el incumplimiento parcial de la política.
+La meta de Opción C (rotar MariaDB + eliminar `.env`) sigue vigente — cuando
+se ejecute, ya no habrá `.env` y este flag no aplicará.
+
+Si Infisical cae completamente, todo sigue funcionando con `.env`.
+Si Infisical se desincroniza (como pasó 2 veces), el `.env` rescata.
