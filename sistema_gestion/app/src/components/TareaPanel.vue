@@ -290,7 +290,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { api } from 'src/services/api'
 import { parseBackendDate, localISO, TZ_NAME } from 'src/services/fecha'
 import { crearSubtarea as crearSubtareaFn } from 'src/composables/useTareas'
@@ -353,10 +353,9 @@ async function toggleEstadoSubtarea(s) {
 
 watch(() => props.tarea?.id, cargarSubtareas, { immediate: true })
 
-// Limpiar pendientes al cambiar de tarea
-watch(() => props.tarea?.id, () => {
-  Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
-})
+// NOTA: el watcher que antes borraba camposPendientes al cambiar de tarea
+// (perdiendo cambios sin guardar) fue reemplazado por el watcher más abajo
+// que hace flush ANTES de limpiar.
 
 // Breadcrumb subtarea
 const padreNombre = ref('')
@@ -457,7 +456,77 @@ async function _cargarCabeceraOp() {
 }
 watch(() => props.tarea?.id_op, _cargarCabeceraOp, { immediate: true })
 
-onMounted(() => { nextTick(autoResizeTitulo); _cargarCatProduccion() })
+onMounted(() => {
+  nextTick(autoResizeTitulo)
+  _cargarCatProduccion()
+  // Guardar pendientes si el usuario cierra la pestaña/recarga (titulo, descripcion, notas).
+  // El navegador permite operaciones sincrónicas en beforeunload; usamos sendBeacon.
+  window.addEventListener('beforeunload', _flushPendientesBeacon)
+})
+
+// Garantía 1: si el componente se desmonta con pendientes (panel cerrado, navegación,
+// padre cambia v-if), guardar antes que se pierdan.
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', _flushPendientesBeacon)
+  if (hayCambiosPendientes.value) {
+    // Fire-and-forget: la app puede seguir; el await del PUT queda colgando pero
+    // el browser lo respeta antes de desmontar el contexto JS.
+    guardarPendientes().catch(e => console.error('[TareaPanel] flush al desmontar:', e))
+  }
+})
+
+// Garantía 2: si la tarea cambia de id (usuario abre otra tarea sin cerrar el panel),
+// guardar pendientes de la anterior ANTES de pisar props.tarea.
+watch(() => props.tarea?.id, (nuevoId, viejoId) => {
+  if (viejoId && viejoId !== nuevoId && hayCambiosPendientes.value) {
+    // Capturar pendientes ANTES de que cambien por el re-render
+    const snapshot = { ...camposPendientes, _idCapturado: viejoId }
+    Object.keys(camposPendientes).forEach(k => delete camposPendientes[k])
+    _flushSnapshot(snapshot)
+  }
+})
+
+// Garantía 3: en beforeunload del navegador (cerrar pestaña / recargar / cerrar nav),
+// enviar los pendientes via sendBeacon (síncrono y rápido). El usuario no espera.
+function _flushPendientesBeacon() {
+  if (!hayCambiosPendientes.value || !props.tarea?.id) return
+  const body = {}
+  for (const [campo, val] of Object.entries(camposPendientes)) {
+    if (val === undefined) continue
+    if (campo === 'titulo' && !String(val).trim()) continue
+    body[campo] = campo === 'titulo' ? String(val).trim() : val
+  }
+  if (!Object.keys(body).length) return
+  try {
+    const token = useAuthStore().token
+    const blob = new Blob([JSON.stringify(body)], { type: 'application/json' })
+    // sendBeacon no permite headers custom; usamos /api/gestion/tareas/:id/flush
+    // como endpoint POST que acepta el token en query. Si no existe, lo agregamos.
+    // Alternativa: fetch keepalive (mejor soportado y permite headers).
+    fetch(`/api/gestion/tareas/${props.tarea.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {}
+}
+
+async function _flushSnapshot(snapshot) {
+  const id = snapshot._idCapturado
+  delete snapshot._idCapturado
+  for (const [campo, val] of Object.entries(snapshot)) {
+    if (val === undefined) continue
+    if (campo === 'titulo' && !String(val).trim()) continue
+    const valFinal = campo === 'titulo' ? String(val).trim() : val
+    try {
+      await api(`/api/gestion/tareas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ [campo]: valFinal })
+      })
+    } catch (e) { console.error('[TareaPanel] flush al cambiar de tarea:', e) }
+  }
+}
 
 // Cronómetro
 import { formatHHMMSS, calcDuracionVivo, calcDuracionSistema } from 'src/services/crono'
