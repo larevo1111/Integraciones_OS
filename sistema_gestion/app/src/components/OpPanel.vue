@@ -476,6 +476,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'src/services/api'
 import { fmtNum, parseDecimal } from 'src/services/numero'
+import { hoyLocal } from 'src/services/fecha'
 import { useAuthStore } from 'src/stores/authStore'
 import { crearTarea } from 'src/composables/useTareas'
 import TareaPanel from './TareaPanel.vue'
@@ -524,7 +525,7 @@ const nuevaTareaTitulo     = ref('')
 const nuevaTareaCatProdId  = ref(null)
 const nuevaTareaResponsables = ref(auth.usuario?.email ? [auth.usuario.email] : [])
 const nuevaTareaEtiquetas  = ref([])
-const nuevaTareaFecha      = ref('')
+const nuevaTareaFecha      = ref(hoyLocal())  // Default: hoy
 
 const miNivel = computed(() => auth.usuario?.nivel || 1)
 const estado = computed(() => ficha.value?.cabecera?.estado || '')
@@ -696,7 +697,7 @@ async function crearTareaEnOp() {
     nuevaTareaCatProdId.value = null
     nuevaTareaResponsables.value = auth.usuario?.email ? [auth.usuario.email] : []
     nuevaTareaEtiquetas.value = []
-    nuevaTareaFecha.value = ''
+    nuevaTareaFecha.value = hoyLocal()  // Resetear default a hoy
     mostrarFormTarea.value = false
     await cargar()
   } catch (e) {
