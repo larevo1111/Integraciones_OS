@@ -40,6 +40,14 @@ export function SolicitudesPage() {
     [solicitudes, selectedIds]
   )
 
+  // Lookup cod_articulo → {stock, unidad} para mostrar el stock en la tabla.
+  // Se reconstruye cuando articulos cambia (al cargar inicialmente o tras un sync).
+  const stockByCod = useMemo(() => {
+    const m = new Map()
+    for (const a of articulos) m.set(a.value, { stock: a.stock, unidad: a.unidad })
+    return m
+  }, [articulos])
+
   const cargar = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
     try {
@@ -98,7 +106,7 @@ export function SolicitudesPage() {
 
   const columns = [
     { key: 'id', label: 'ID', visible: true, nowrap: true, numeric: true },
-    { key: 'cod_articulo', label: 'Cód', visible: true, nowrap: true },
+    { key: 'stock', label: 'Stock', visible: true, nowrap: true, numeric: true },
     { key: 'nombre_articulo', label: 'Producto', visible: true },
     { key: 'tipo_articulo', label: 'Tipo', visible: true, options: TIPOS },
     { key: 'cantidad', label: 'Cantidad', visible: true, numeric: true, nowrap: true },
@@ -114,8 +122,11 @@ export function SolicitudesPage() {
 
   const renderCell = (row, col, value) => {
     if (col.key === 'nombre_articulo') {
-      // Quitar prefix "NN — " si quedó del guardado antiguo (cod ya está en columna Cód)
-      return value ? value.replace(/^\d+\s*—\s*/, '') : '—'
+      // Mostrar siempre "cod · nombre" (la columna Cód ya no existe).
+      // Solicitudes viejas guardaron solo el nombre; otras tienen "cod — nombre" o "cod · nombre".
+      const limpio = value ? value.replace(/^\d+\s*[—·]\s*/, '') : ''
+      if (!limpio) return '—'
+      return row.cod_articulo ? `${row.cod_articulo} · ${limpio}` : limpio
     }
     if (col.key === 'estado') {
       const label = ESTADOS.find(e => e.value === value)?.label || value
@@ -126,6 +137,15 @@ export function SolicitudesPage() {
     }
     if (col.key === 'cantidad') {
       return <span className="font-mono">{value}</span>
+    }
+    if (col.key === 'stock') {
+      const info = stockByCod.get(row.cod_articulo)
+      if (!info || info.stock == null || info.stock === '') {
+        return <span className="text-muted-foreground/40">—</span>
+      }
+      const n = Number(info.stock)
+      const color = n <= 0 ? 'text-destructive' : n < 5 ? 'text-amber-500' : 'text-muted-foreground'
+      return <span className={`font-mono ${color}`}>{info.stock}{info.unidad ? ` ${info.unidad}` : ''}</span>
     }
     if (col.key === 'fecha_necesidad' || col.key === 'fecha_programada') {
       return value ? (
