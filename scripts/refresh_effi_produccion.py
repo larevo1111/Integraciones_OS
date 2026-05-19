@@ -34,10 +34,43 @@ def log(paso, msg, ok=True):
     print(json.dumps({'paso': paso, 'msg': msg, 'ok': ok}), flush=True)
 
 
+def es_sesion_expirada(stderr):
+    """Detecta si el stderr de un script Playwright indica sesión Effi expirada.
+    Patrones típicos: timeout esperando elementos de la UI logueada, redirect a
+    /ingreso, mensajes de login fallido."""
+    if not stderr: return False
+    s = stderr.lower()
+    return ('locator.waitfor: timeout' in s or 'expirad' in s
+            or '/ingreso' in s or 'sesión' in s)
+
+
+def refrescar_sesion_effi():
+    """Invoca refresh_session.js para renovar las cookies Effi. ~20-30s."""
+    log('refresh_session', 'Sesión Effi expirada — renovando...')
+    try:
+        r = subprocess.run(['node', 'scripts/refresh_session.js'], cwd=REPO,
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            log('refresh_session', f'ERROR renovando sesión: {r.stderr[-200:]}', ok=False)
+            return False
+        log('refresh_session', '✅ Sesión renovada')
+        return True
+    except subprocess.TimeoutExpired:
+        log('refresh_session', 'TIMEOUT renovando sesión', ok=False)
+        return False
+
+
 def run_node(script, descripcion, timeout=600):
+    """Ejecuta script Playwright. Si falla por sesión expirada, renueva sesión
+    y reintenta 1 vez antes de abortar."""
     log(descripcion, f'Ejecutando {script}...')
     r = subprocess.run(['node', f'scripts/{script}'], cwd=REPO,
                        capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0 and es_sesion_expirada(r.stderr):
+        if refrescar_sesion_effi():
+            log(descripcion, f'Reintentando {script} con sesión fresca...')
+            r = subprocess.run(['node', f'scripts/{script}'], cwd=REPO,
+                               capture_output=True, text=True, timeout=timeout)
     if r.returncode != 0:
         log(descripcion, f'ERROR: {r.stderr[-300:]}', ok=False)
         sys.exit(1)
