@@ -1,5 +1,50 @@
 # Integraciones_OS — Instrucciones para Claude
 
+---
+
+# 🔐🔐🔐 LECTURA OBLIGATORIA — POLÍTICA DE SEGURIDAD DE CREDENCIALES 🔐🔐🔐
+
+## ⛔ STOP. ANTES DE CUALQUIER OTRA COSA ⛔
+
+**Si la tarea actual involucra de cualquier forma:**
+
+- Credenciales (passwords, tokens, API keys, JWT secrets, SSH keys, OAuth secrets)
+- Archivos `.env`, `.env.example`, `secrets.yaml`, `config.json` con datos sensibles
+- Infisical (lectura, escritura, configuración, Machine Identities, tokens)
+- Migración, rotación, generación o almacenamiento de cualquier secreto
+- Configuración de `EnvironmentFile=` en systemd
+- Permisos de archivos que pueden contener credenciales (chmod en `.env`, `~/.ssh/`, etc.)
+- Limpieza de history, journalctl, /tmp, git history relacionada con secrets
+- Cualquier comando que mencione `password`, `secret`, `token`, `key`, `auth`, `credential`
+
+**ENTONCES OBLIGATORIAMENTE:**
+
+1. **LEER COMPLETO** el archivo [`.agent/POLITICA_SEGURIDAD.md`](.agent/POLITICA_SEGURIDAD.md) **ANTES** de ejecutar nada.
+2. **MENCIONAR EXPLÍCITAMENTE** en tu primera respuesta de esa tarea: *"Leí `.agent/POLITICA_SEGURIDAD.md` y voy a aplicarla."*
+3. **APLICARLA AL PIE DE LA LETRA**: incluye 3 excepciones permitidas (HOST + TOKEN + SSH personal), prohibiciones absolutas (NO fallbacks, NO `.env` con secrets, NO "deuda aceptable"), checklist de 7 verificaciones antes de cerrar.
+4. **VALIDAR EL CHECKLIST DE 7 PUNTOS** antes de declarar terminada cualquier tarea de credenciales. Sin esos 7 pasos verificados, la tarea NO está terminada.
+
+## Reglas vigentes (resumen — el detalle está en POLITICA_SEGURIDAD.md)
+
+- Las credenciales viven **exclusivamente en Infisical**. Si Infisical cae, las apps fallan. Es el costo aceptado.
+- Las **únicas 3 cosas fuera de Infisical**: `INFISICAL_HOST` + `INFISICAL_TOKEN` (en `.env` con permisos `600`) y la SSH key personal humana (`~/.ssh/`, con passphrase).
+- **PROHIBIDO** crear fallbacks en `.env` "por seguridad".
+- **PROHIBIDO** llamar "deuda técnica aceptable" a credenciales sin migrar.
+- **PROHIBIDO** rotar credenciales antes de que TODAS las apps lean exclusivamente de Infisical.
+- **PROHIBIDO** declarar "migración completa" sin haber validado las 7 verificaciones obligatorias en TODOS los servidores.
+- Si encontrás un workaround que requiera dejar credenciales en disco → **DETENERTE y avisar a Santi**. NO taparlo con un `.env`.
+- Si Santi pide algo que contradice la política → señalarlo explícitamente antes de ejecutar. La política prima.
+
+## Consecuencia si no se cumple
+
+Cualquier acción sobre credenciales tomada **sin haber leído y aplicado** `POLITICA_SEGURIDAD.md` se considera **no autorizada y reversible**. Santi puede pedir que se deshaga, y la responsabilidad es del agente que la ejecutó sin leer la política.
+
+## Por qué esta política existe
+
+El 2026-05-12, una "migración a Infisical" declarada como completa resultó tener fallbacks en `.env`, apps del VPS que nunca usaron Infisical, y rotaciones que dejaron las credenciales nuevas en archivos con permisos 644. **Nunca más.** Esta política existe para que ningún agente repita ese patrón.
+
+---
+
 ## 🛑 MÁXIMA ABSOLUTA — INFRAESTRUCTURA
 
 **NUNCA hacer cambios de infraestructura sin autorización explícita y clara de Santi.**
@@ -252,6 +297,32 @@ Igual que con BD y timezone: prohibido reimplementar un helper existente o usar 
 - MariaDB: `mysql -u osadmin -pEpist2487. effi_data -e "..." 2>/dev/null`
 - Git: commit + push sin preguntar, con mensaje descriptivo en español
 - Al terminar una tarea significativa: actualizar el contexto del módulo en `.agent/contextos/<modulo>.md` y actualizar `.agent/CONTEXTO_ACTIVO.md` si cambió el estado global
+
+## ⚠️ REGLA ABSOLUTA — Restart de servicios systemd
+
+**Para reiniciar cualquiera de los servicios del proyecto en VPS, SIEMPRE usar `sudo systemctl restart`. NUNCA `kill PID`.**
+
+Servicios cubiertos (sudoers NOPASSWD configurado el 2026-05-20):
+- `os-gestion.service` (puerto 9300)
+- `os-produccion-api.service` (puerto 9600)
+- `os-inventario-api.service`
+- `os-erp-frontend.service` (puerto 9100)
+
+```bash
+ssh osserver@vps-contabo "sudo systemctl restart os-gestion.service"
+```
+
+Funciona sin password gracias a `/etc/sudoers.d/osserver-restart`. Si por algún motivo pide password → la sudoers se rompió, **NO** caer en `kill PID`. Arreglar la sudoers.
+
+### Por qué `kill PID` está prohibido
+
+Incidente 2026-05-20: tras un deploy de v2.14.2, se mató el PID equivocado. systemd respawn'eó otro proceso pero quedó otro fantasma sirviendo código viejo. Resultado: el endpoint nuevo respondía con código viejo, el operador vio bug fantasma imposible de reproducir desde código. Diagnóstico tomó horas.
+
+### Para deploys
+
+Los `deploy.sh` (sistema_gestion + frontend) ya incluyen el restart al final. Si agregás un módulo nuevo con su propio deploy.sh, agregalo a la regla sudoers y al deploy.sh:
+1. Editar `/etc/sudoers.d/osserver-restart` agregando el `.service` nuevo (como root, con `visudo -c -f` previo)
+2. En el deploy.sh: `sudo -n systemctl restart <servicio>` (con `-n` para que falle ruidoso si la sudoers no está)
 
 ## ⚠️ REGLAS MODO AUTÓNOMO — claude -p sin supervisión
 

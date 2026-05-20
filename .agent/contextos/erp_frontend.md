@@ -19,6 +19,8 @@ El **ERP real** está en `u768061575_os_comunidad` (Hostinger) — **⚠️ NO T
 | Directorio | `frontend/` |
 | Build prod | `cd frontend/app && npx quasar build` |
 | Dev | `cd frontend/app && npx quasar dev` |
+| Deploy completo | `cd frontend && bash deploy.sh` (build + restart vía sudoers NOPASSWD) |
+| Restart manual | `sudo systemctl restart os-erp-frontend.service` — NUNCA `kill PID` (ver REGLA ABSOLUTA en CLAUDE.md raíz §Restart de servicios systemd) |
 
 ## Regla ABSOLUTA antes de cualquier trabajo frontend
 

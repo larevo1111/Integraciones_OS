@@ -52,17 +52,20 @@ echo "   OK - index.html referencia $INDEX_JS"
 
 echo ""
 echo ">> [5/5] Reiniciando os-gestion.service"
-if sudo -n systemctl restart os-gestion.service 2>/dev/null; then
-  sleep 1
-  if systemctl is-active --quiet os-gestion.service; then
-    echo "   OK - servicio activo"
-  else
-    echo "   WARNING - servicio no arrancó limpio, revisar con: sudo journalctl -u os-gestion -n 30"
-    exit 1
-  fi
-else
-  echo "   SKIP - sin permisos sudo sin password (los archivos ya están en su lugar, Express los toma al vuelo)"
+# Requiere sudoers: /etc/sudoers.d/osserver-restart (creado 2026-05-20).
+# Ver .agent/contextos/sistema_gestion.md §Deploy.
+if ! sudo -n systemctl restart os-gestion.service; then
+  echo "ERROR: no se pudo reiniciar os-gestion.service sin password."
+  echo "       Configurar /etc/sudoers.d/osserver-restart (ver .agent/contextos/sistema_gestion.md)."
+  exit 1
 fi
+sleep 1
+if ! systemctl is-active --quiet os-gestion.service; then
+  echo "ERROR: servicio no arrancó limpio tras restart"
+  echo "       Revisar: sudo journalctl -u os-gestion -n 30"
+  exit 1
+fi
+echo "   OK - servicio activo (pid $(systemctl show -p MainPID --value os-gestion.service))"
 
 echo ""
 echo "==========================================="

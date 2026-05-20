@@ -77,6 +77,8 @@ Placeholder — parámetros del módulo (próximamente).
 
 Service files versionados en `scripts/produccion/` y `scripts/inventario/`. Para reinstalar: copiar a `/etc/systemd/system/` + `daemon-reload + enable --now`.
 
+**Restart tras editar código Python**: `sudo systemctl restart os-produccion-api.service` (o `os-inventario-api.service`). Sin password, gracias a `/etc/sudoers.d/osserver-restart`. NUNCA `kill PID` (ver REGLA ABSOLUTA en CLAUDE.md raíz §Restart de servicios systemd).
+
 ### En LOCAL (servidor del taller)
 - `effi-pipeline.timer` + `effi-pipeline.service` — orquestador grande Effi → effi_data LOCAL → sync a `os_integracion` VPS. **Frecuencia: cada 1 hora.** Ejecuta `scripts/orquestador.py`.
 - APIs locales `os-produccion-api` y `os-inventario-api`: **detenidas** (`systemctl stop`), no `disable` — quedan como respaldo durante 1 semana post-migración.

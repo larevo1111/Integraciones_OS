@@ -21,9 +21,10 @@ Web activa en gestion.oscomunidad.com + Android futuro (Capacitor).
 | Hosting | **VPS Contabo 94.72.115.156** — DNS apunta al VPS desde 2026-04-20 |
 
 ### Deploy a VPS
-1. `npm run build` local + rsync a `api/public/` + commit + push
-2. SSH al VPS: `git pull` + `systemctl restart os-gestion.service`
-3. Sudo del VPS sin password sobre `osserver` no está configurado — usar sudoers o root via `sshpass -p '<pwd>' ssh root@94.72.115.156`
+Flujo único: commit + push local → SSH a VPS → `cd sistema_gestion && bash deploy.sh`.
+El script hace: `quasar build -m pwa` → copia a `api/public/` → `sudo systemctl restart os-gestion.service` (sin password, gracias a `/etc/sudoers.d/osserver-restart` creado 2026-05-20).
+
+**Restart fuera de deploy.sh**: `sudo systemctl restart os-gestion.service`. NUNCA `kill PID` (ver REGLA ABSOLUTA en CLAUDE.md raíz §Restart de servicios systemd).
 
 ## Credenciales BD (3 pools centralizados)
 
