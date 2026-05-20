@@ -18,37 +18,15 @@ JSON esperado:
 Tiempo: ~2-4s. Si la sesión expira, falla con RuntimeError (mismo patrón que OP POST).
 Endpoint identificado por espionaje del form #form_CR el 2026-05-19.
 """
-import sys, json, re, time as _t
+import sys, os, json, re, time as _t
 from pathlib import Path
-import requests
 
 REPO = Path(__file__).resolve().parent.parent
-SESSION_FILE = REPO / 'scripts' / 'session.json'
+sys.path.insert(0, str(REPO / 'scripts'))
+from lib import sesion_effi_http
+
 EFFI_BASE = 'https://effi.com.co'
 ENDPOINT = f'{EFFI_BASE}/app/traslado_inventario/crear_traslado_inventario'
-
-
-def _cargar_cookies():
-    if not SESSION_FILE.exists():
-        raise RuntimeError(f'No existe {SESSION_FILE}')
-    state = json.loads(SESSION_FILE.read_text())
-    return {c['name']: c['value'] for c in state.get('cookies', [])
-            if c.get('domain', '').endswith('effi.com.co')}
-
-
-def _session_http():
-    s = requests.Session()
-    cookies = _cargar_cookies()
-    if not cookies:
-        raise RuntimeError('Sin cookies Effi en session.json')
-    s.cookies.update(cookies)
-    s.headers.update({
-        'X-Requested-With': 'XMLHttpRequest',
-        'Referer': f'{EFFI_BASE}/app/traslado_inventario',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0.0.0',
-        'Accept': '*/*',
-    })
-    return s
 
 
 def _get_session_info(s):
@@ -74,7 +52,7 @@ def _max_traslado_id(s):
 
 def crear_traslado(json_path):
     data = json.loads(Path(json_path).read_text())
-    s = _session_http()
+    s = sesion_effi_http(referer=f'{EFFI_BASE}/app/traslado_inventario')
 
     print('🔄 Cargando session info...')
     session_empresa, session_usuario = _get_session_info(s)

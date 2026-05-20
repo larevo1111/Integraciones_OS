@@ -35,30 +35,14 @@ from pathlib import Path
 import requests
 
 REPO = Path(__file__).resolve().parent.parent
-SESSION_FILE = REPO / 'scripts' / 'session.json'
+sys.path.insert(0, str(REPO / 'scripts'))
+from lib import sesion_effi_http
 EFFI_BASE = 'https://effi.com.co'
 
 
-def cargar_cookies():
-    if not SESSION_FILE.exists():
-        raise RuntimeError(f'No existe {SESSION_FILE}. Generar con scripts/session.js')
-    state = json.loads(SESSION_FILE.read_text())
-    return {c['name']: c['value'] for c in state.get('cookies', [])
-            if 'effi.com.co' in c.get('domain', '')}
-
-
 def crear_session_http():
-    s = requests.Session()
-    cookies = cargar_cookies()
-    if not cookies:
-        raise RuntimeError('Sin cookies de sesión Effi')
-    s.cookies.update(cookies)
-    s.headers.update({
-        'X-Requested-With': 'XMLHttpRequest',
-        'Referer': f'{EFFI_BASE}/app/articulo',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0',
-    })
-    return s
+    """Verifica sesión Effi (renueva si expirada) — fuente única lib/effi_session.py"""
+    return sesion_effi_http(referer=f'{EFFI_BASE}/app/articulo')
 
 
 def get_session_info(s):

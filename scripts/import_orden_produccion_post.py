@@ -9,21 +9,11 @@ Doc: .agent/docs/EFFI_POST_DIRECTO.md
 """
 import sys, os, json, re
 from pathlib import Path
-import requests
 from urllib.parse import parse_qs
 
 REPO = Path(__file__).resolve().parent.parent
-SESSION_FILE = REPO / 'scripts' / 'session.json'
-
-# Sesión Playwright → cookies para requests
-def _cargar_cookies():
-    if not SESSION_FILE.exists():
-        # RuntimeError (no SystemExit) para que el wrapper _ejecutar_op_background
-        # lo capture con `except Exception` y caiga al fallback Playwright.
-        raise RuntimeError(f'No existe {SESSION_FILE}. Generar con scripts/session.js')
-    state = json.loads(SESSION_FILE.read_text())
-    return {c['name']: c['value'] for c in state.get('cookies', [])
-            if 'effi.com.co' in c.get('domain', '') or c.get('domain', '').endswith('effi.com.co')}
+sys.path.insert(0, str(REPO / 'scripts'))
+from lib import sesion_effi_http
 
 
 def _formato_coma(n):
@@ -41,19 +31,8 @@ def _fmt_fecha(iso):
 
 
 def crear_session_http():
-    s = requests.Session()
-    cookies = _cargar_cookies()
-    if not cookies:
-        raise RuntimeError('Sin cookies de sesión Effi en session.json')
-    s.cookies.update(cookies)
-    s.headers.update({
-        'X-Requested-With': 'XMLHttpRequest',
-        'Referer': 'https://effi.com.co/app/orden_produccion',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-    })
-    return s
+    """Compat: scripts antiguos esperan esta función. Delega al helper único."""
+    return sesion_effi_http(referer='https://effi.com.co/app/orden_produccion')
 
 
 # Mapeo CC/NIT → ID interno Effi.
