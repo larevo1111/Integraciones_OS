@@ -599,7 +599,14 @@ const vigencia = computed(() => ficha.value?.cabecera?.vigencia || '')
 const estaAnulada = computed(() => vigencia.value === 'Anulado')
 const puedeProcesar = computed(() => miNivel.value >= 3 && !estaAnulada.value)
 const puedeValidar  = computed(() => miNivel.value >= 5 && !estaAnulada.value)
-const puedeAgregar = computed(() => estado.value === 'Generada' && miNivel.value >= 3 && !estaAnulada.value)
+// Generada: nivel ≥ 3 (procesar). Procesada: nivel ≥ 5 (autoridad de validar).
+// Validado/Anulada: nadie agrega ni elimina.
+const puedeAgregar = computed(() => {
+  if (estaAnulada.value) return false
+  if (estado.value === 'Generada') return miNivel.value >= 3
+  if (estado.value === 'Procesada') return miNivel.value >= 5
+  return false
+})
 const puedeEditarTiempos = computed(() => miNivel.value >= 5)
 const lineasBloqueadas = computed(() => estado.value === 'Validado' || estaAnulada.value)
 // Encargado real editable en Generada o Procesada (mismos criterios que materiales reales)

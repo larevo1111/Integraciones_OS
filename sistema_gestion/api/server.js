@@ -1950,13 +1950,18 @@ app.post('/api/gestion/op/:id_op/reproceso', requireAuth, async (req, res) => {
   if (!cant || cant <= 0) return res.status(400).json({ error: 'cantidad > 0 requerida' })
 
   try {
-    // 1) Verificar OP en estado Generada
+    // 1) Verificar OP en estado Generada (nivel ≥ 3) o Procesada (nivel ≥ 5)
     const [[op]] = await db.integracion.query(
       'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ?', [idOp]
     )
     if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
-    if (op.estado !== 'Generada') {
-      return res.status(400).json({ error: `Solo se puede agregar reproceso a OPs Generadas (estado actual: ${op.estado})` })
+    const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+    if (op.estado === 'Generada') {
+      if (miNivel < 3) return res.status(403).json({ error: 'Nivel ≥ 3 requerido' })
+    } else if (op.estado === 'Procesada') {
+      if (miNivel < 5) return res.status(403).json({ error: 'Solo nivel ≥ 5 puede agregar reproceso a OPs Procesadas' })
+    } else {
+      return res.status(400).json({ error: `No se puede agregar reproceso a OPs en estado ${op.estado}` })
     }
 
     // 2) Verificar stock disponible en bodega No conformes
@@ -2008,13 +2013,18 @@ app.post('/api/gestion/op/:id_op/lineas', requireAuth, async (req, res) => {
   if (!['material','producto'].includes(tipo)) return res.status(400).json({ error: "tipo debe ser 'material' o 'producto'" })
   if (!cod_articulo) return res.status(400).json({ error: 'cod_articulo requerido' })
   try {
-    // Verificar estado Generada
+    // Verificar estado Generada (nivel ≥ 3) o Procesada (nivel ≥ 5)
     const [[op]] = await db.integracion.query(
       'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ?', [idOp]
     )
     if (!op) return res.status(404).json({ error: 'OP no encontrada en Effi' })
-    if (op.estado !== 'Generada') {
-      return res.status(400).json({ error: `Solo se pueden agregar líneas no previstas en OPs Generadas (estado actual: ${op.estado})` })
+    const miNivel = req.usuario.nivel || nivelCache[req.usuario.email] || 1
+    if (op.estado === 'Generada') {
+      if (miNivel < 3) return res.status(403).json({ error: 'Nivel ≥ 3 requerido' })
+    } else if (op.estado === 'Procesada') {
+      if (miNivel < 5) return res.status(403).json({ error: 'Solo nivel ≥ 5 puede agregar líneas no previstas a OPs Procesadas' })
+    } else {
+      return res.status(400).json({ error: `No se pueden agregar líneas no previstas a OPs en estado ${op.estado}` })
     }
     const cant = cantidad_real == null || cantidad_real === '' ? null : Number(String(cantidad_real).replace(',', '.'))
     const [r] = await db.gestion.query(
