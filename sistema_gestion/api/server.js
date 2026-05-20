@@ -1920,27 +1920,15 @@ app.get('/api/gestion/articulos/no-conformes', requireAuth, async (req, res) => 
 // POST /api/gestion/op/:id_op/reproceso
 // Orquesta: (1) traslado en Effi de bodega No conformes (17) → Principal (1)
 //           (2) agrega línea de material a g_op_lineas con fuente='reproceso'.
-// Body: { cod_articulo, descripcion, cantidad, unidad, costo_unit, observacion_traslado? }
-// Solo permitido si la OP está en estado 'Generada'. Si el traslado falla, NO inserta línea.
+// Body: { cod_articulo, descripcion, cantidad, unidad, costo_unit }
+// El traslado en Effi NO se hace acá — se hace al Validar la OP (mismo punto donde
+// se crea la OP nueva con los reales). Acá solo se registra la intención de reproceso.
+// Razón (2026-05-20): si trasladáramos ahora, editar cantidad o eliminar la línea
+// dejaría stock fantasma o traslados huérfanos. Diferir al validar mantiene la fuente
+// única de verdad en un solo paso atómico y permite ajustar libremente durante la edición.
 const REPO_INTEGRACIONES = '/home/osserver/Proyectos_Antigravity/Integraciones_OS'
 const BODEGA_NO_CONFORMES = 17
 const BODEGA_PRINCIPAL = 1
-
-function _trasladoCrear(payload) {
-  // Promesa que ejecuta el script Python POST. Devuelve id_traslado.
-  return new Promise((resolve, reject) => {
-    const tmpPath = `/tmp/traslado_reproceso_${Date.now()}_${Math.random().toString(36).slice(2,8)}.json`
-    require('fs').writeFileSync(tmpPath, JSON.stringify(payload))
-    execFile('python3', [`${REPO_INTEGRACIONES}/scripts/import_traslado_inventario_post.py`, tmpPath],
-      { timeout: 30000, cwd: REPO_INTEGRACIONES }, (err, stdout, stderr) => {
-        try { require('fs').unlinkSync(tmpPath) } catch {}
-        if (err) return reject(new Error(`Script traslado falló: ${stderr || err.message}`))
-        const m = (stdout || '').match(/TRASLADO_CREADO:(\d+)/)
-        if (!m) return reject(new Error(`Script no devolvió TRASLADO_CREADO. stdout=${(stdout||'').slice(-300)}`))
-        resolve(Number(m[1]))
-      })
-  })
-}
 
 app.post('/api/gestion/op/:id_op/reproceso', requireAuth, async (req, res) => {
   const idOp = String(req.params.id_op)
@@ -1950,7 +1938,7 @@ app.post('/api/gestion/op/:id_op/reproceso', requireAuth, async (req, res) => {
   if (!cant || cant <= 0) return res.status(400).json({ error: 'cantidad > 0 requerida' })
 
   try {
-    // 1) Verificar OP en estado Generada (nivel ≥ 3) o Procesada (nivel ≥ 5)
+    // 1) OP debe estar Generada (nivel ≥3) o Procesada (nivel ≥5)
     const [[op]] = await db.integracion.query(
       'SELECT estado FROM zeffi_produccion_encabezados WHERE id_orden = ?', [idOp]
     )
@@ -1964,7 +1952,8 @@ app.post('/api/gestion/op/:id_op/reproceso', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `No se puede agregar reproceso a OPs en estado ${op.estado}` })
     }
 
-    // 2) Verificar stock disponible en bodega No conformes
+    // 2) Verificar stock disponible HOY en bodega No conformes (informativo + previene
+    //    intentos imposibles). El stock real se re-verifica al validar.
     const [[art]] = await db.integracion.query(
       `SELECT nombre,
               CAST(REPLACE(stock_bodega_productos_no_conformes_bod_ppal_sucursal_principal, ',', '.') AS DECIMAL(15,4)) AS stock_nc
@@ -1975,33 +1964,21 @@ app.post('/api/gestion/op/:id_op/reproceso', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `Stock insuficiente en No conformes: ${art.stock_nc} disponible, ${cant} solicitado` })
     }
 
-    // 3) Traslado en Effi (No conformes → Principal)
-    const idTraslado = await _trasladoCrear({
-      sucursal_origen: 1, bodega_origen: BODEGA_NO_CONFORMES,
-      sucursal_destino: 1, bodega_destino: BODEGA_PRINCIPAL,
-      observacion: `Reproceso OP ${idOp} · solicitado por ${req.usuario.email}`,
-      articulos: [{
-        cod_articulo: String(cod_articulo),
-        descripcion: descripcion || art.nombre,
-        cantidad: cant,
-        lote: '', serie: '',
-      }],
-    })
-
-    // 4) Insertar línea en g_op_lineas como material no previsto con fuente='reproceso'
+    // 3) Insertar línea: fuente='reproceso', id_traslado_effi=NULL.
+    //    El traslado se hará al validar (procesarTrasladosReproceso) y se persistirá ahí.
     const [r] = await db.gestion.query(
       `INSERT INTO g_op_lineas
         (id_op, empresa, tipo, cod_articulo, descripcion, unidad,
          cantidad_teorica, cantidad_real, costo_unit, precio_unit,
-         es_no_previsto, fuente, usuario_ult_modificacion)
-       VALUES (?, ?, 'material', ?, ?, ?, NULL, ?, ?, NULL, 1, 'reproceso', ?)`,
+         es_no_previsto, fuente, id_traslado_effi, usuario_ult_modificacion)
+       VALUES (?, ?, 'material', ?, ?, ?, NULL, ?, ?, NULL, 1, 'reproceso', NULL, ?)`,
       [idOp, req.empresa, String(cod_articulo), descripcion || art.nombre, unidad || '',
        cant, costo_unit ?? null, req.usuario.email]
     )
 
-    res.json({ ok: true, id_linea: r.insertId, id_traslado: idTraslado })
+    res.json({ ok: true, id_linea: r.insertId })
   } catch (e) {
-    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe una línea para ese cod en esta OP. Editá la cantidad existente o eliminala primero.' })
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ya existe una línea para ese cod en esta OP.' })
     res.status(500).json({ error: e.message })
   }
 })
@@ -2149,6 +2126,62 @@ async function _postOrPlaywright(postArgs, playwrightArgs, timeoutMs, cwd, opNam
     console.log(`[${opName}] Playwright OK en ${((Date.now() - t2) / 1000).toFixed(2)}s`)
     return out
   }
+}
+
+// Hace los traslados pendientes para las líneas de reproceso de una OP.
+// Mover stock de bodega No conformes (17) → Principal (1) ANTES de crear la
+// OP nueva en Effi al validar (la OP nueva consume material de Principal).
+//
+// Idempotente: solo procesa líneas con id_traslado_effi IS NULL. Si valida se
+// reintenta tras fallo parcial, no duplica traslados ya hechos.
+//
+// Lanza Error en el primer traslado que falle: el _jobValidar lo captura y
+// marca el job como error sin seguir adelante con la creación de la OP nueva.
+async function _procesarTrasladosReprocesoPendientes(idOp, empresa, cwd) {
+  const [pendientes] = await db.gestion.query(
+    `SELECT id, cod_articulo, descripcion,
+            COALESCE(cantidad_real, cantidad_teorica) AS cant
+     FROM g_op_lineas
+     WHERE empresa = ? AND id_op = ?
+       AND fuente = 'reproceso' AND id_traslado_effi IS NULL`,
+    [empresa, idOp]
+  )
+  if (!pendientes.length) return { hechos: 0 }
+  console.log(`[op/validar] ${idOp} — procesando ${pendientes.length} traslado(s) de reproceso`)
+  for (const l of pendientes) {
+    const cant = Number(l.cant)
+    if (!cant || cant <= 0) {
+      throw new Error(`Línea reproceso ${l.id} (cod ${l.cod_articulo}) tiene cantidad inválida (${l.cant}). Eliminala o corregila antes de validar.`)
+    }
+    const tmpPath = `/tmp/traslado_reproceso_${idOp}_${l.id}_${Date.now()}.json`
+    fs.writeFileSync(tmpPath, JSON.stringify({
+      sucursal_origen: 1, bodega_origen: 17,
+      sucursal_destino: 1, bodega_destino: 1,
+      observacion: `Reproceso OP ${idOp} (línea ${l.id})`,
+      articulos: [{
+        cod_articulo: String(l.cod_articulo),
+        descripcion: l.descripcion || '',
+        cantidad: cant,
+        lote: '', serie: '',
+      }],
+    }))
+    try {
+      const out = await _ejecutarPython([path.join(cwd, 'import_traslado_inventario_post.py'), tmpPath], 30000, cwd)
+      const m = out.match(/TRASLADO_CREADO:(\d+)/)
+      if (!m) throw new Error(`Sin TRASLADO_CREADO en stdout: ${out.slice(-300)}`)
+      const idTraslado = m[1]
+      await db.gestion.query(
+        'UPDATE g_op_lineas SET id_traslado_effi = ? WHERE id = ?',
+        [idTraslado, l.id]
+      )
+      console.log(`[op/validar] ${idOp} — traslado #${idTraslado} OK (línea ${l.id}, cod ${l.cod_articulo}, cant ${cant})`)
+    } catch (e) {
+      throw new Error(`Traslado reproceso falló (línea ${l.id} cod ${l.cod_articulo} cant ${cant}): ${e.message.slice(0, 300)}`)
+    } finally {
+      try { fs.unlinkSync(tmpPath) } catch {}
+    }
+  }
+  return { hechos: pendientes.length }
 }
 
 async function _jobProcesar(jobId, idOp, empresa, usuario, encargadoReal = null) {
@@ -2403,6 +2436,12 @@ async function _jobValidar(jobId, idOpOriginal, empresa, usuario, encargadoReal 
     // 8. Ejecutar 3 acciones con POST directo (rápido) y fallback Playwright.
     // Tiempos típicos: POST ~1.5s total vs Playwright 2-3 min.
     const scripts = path.join(__dirname, '../../scripts')
+
+    // 7.5 — TRASLADOS DE REPROCESO (si los hay).
+    // Mueve stock No conformes → Principal antes de que Effi cree la nueva OP,
+    // porque la OP nueva consume material de Principal. Idempotente: solo procesa
+    // las líneas con id_traslado_effi NULL. Si falla, throw y la original queda intacta.
+    await _procesarTrasladosReprocesoPendientes(idOpOriginal, req.empresa, scripts)
 
     // ORDEN SEGURO (2026-04-29): crear nueva PRIMERO, validarla, y SOLO al final
     // anular la original. Si algo falla en los 2 primeros pasos, la original queda

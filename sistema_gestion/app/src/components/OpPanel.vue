@@ -143,7 +143,7 @@
               </table>
               <div v-if="puedeAgregar" class="op-add-line">
                 <button class="op-btn-add" @click="abrirNuevaLinea('material')">+ agregar material no previsto</button>
-                <button class="op-btn-add" @click="abrirReproceso" title="Traslada el material desde bodega No conformes a Principal en Effi, y lo agrega como material no previsto a la OP">+ material de reproceso</button>
+                <button class="op-btn-add" @click="abrirReproceso" title="Agrega un material que vive en bodega No conformes. El traslado a Principal se hace en Effi automáticamente al validar la OP">+ material de reproceso</button>
               </div>
             </div>
 
@@ -446,7 +446,8 @@
           <div class="text-h6">Material de reproceso</div>
           <div class="text-caption text-grey" style="margin-top:4px">
             Solo lista artículos con stock en bodega <b>"Productos No Conformes Bod PPAL"</b>.
-            Al confirmar: traslado en Effi a Principal + agrega como material a esta OP.
+            Acá solo se registra. El traslado en Effi (No conformes → Principal) se hace
+            automáticamente al <b>Validar la OP</b>.
           </div>
         </q-card-section>
         <q-card-section class="q-pt-none">
@@ -885,7 +886,7 @@ async function confirmarReproceso() {
   }
   reprocesoEnviando.value = true
   try {
-    const r = await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/reproceso`, {
+    await api(`/api/gestion/op/${encodeURIComponent(props.idOp)}/reproceso`, {
       method: 'POST',
       body: JSON.stringify({
         cod_articulo: a.cod, descripcion: a.nombre,
@@ -896,7 +897,7 @@ async function confirmarReproceso() {
     reprocesoArt.value = null
     reprocesoCant.value = ''
     await cargar()
-    $q.notify({ type: 'positive', message: `Traslado #${r.id_traslado} + material agregado`, position: 'top' })
+    $q.notify({ type: 'positive', message: 'Material de reproceso agregado · el traslado en Effi se hará al validar', position: 'top', timeout: 4000 })
   } catch (e) {
     $q.notify({ type: 'negative', message: e.message || 'Error en reproceso', position: 'top', timeout: 6000 })
   } finally {
