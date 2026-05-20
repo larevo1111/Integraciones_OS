@@ -488,7 +488,7 @@
         <q-card-actions align="right">
           <q-btn flat label="Cancelar" :disable="reprocesoEnviando" @click="cerrarReproceso" />
           <q-btn
-            unelevated label="Trasladar + agregar" color="primary"
+            unelevated label="Agregar" color="primary"
             :loading="reprocesoEnviando"
             :disable="!reprocesoArt || !reprocesoCant"
             @click="confirmarReproceso"
