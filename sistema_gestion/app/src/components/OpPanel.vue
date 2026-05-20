@@ -1052,7 +1052,9 @@ function _ccPredefinida() {
 async function abrirConfirmar(tipo) {
   await _cargarEncargados()
   confirmTipo.value = tipo
-  encargadoRealCC.value = _ccPredefinida()
+  // NO tocar encargadoRealCC: ya tiene el valor actual (auto-save lo hidrata
+  // desde BD al cargar la OP). Si lo reseteamos al predefinido, el watcher
+  // dispara un PUT que machaca el encargado real con el previsto.
   confirmAviso.value = ''
   if (tipo === 'validar') {
     // Soft-block: avisa si calidad no firmada / rechazada / inexistente
